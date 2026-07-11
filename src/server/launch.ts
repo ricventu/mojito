@@ -22,6 +22,7 @@ export interface LaunchDeps {
   registry: Registry;
   stateDir: string;
   port: number;
+  token: string;
   projectsPath: string;
   hasSession: (name: string) => Promise<boolean>;
   newSession: (name: string, cwd: string, command: string) => Promise<void>;
@@ -63,7 +64,7 @@ export async function launchSession(
   const settingsDir = join(deps.stateDir, "settings");
   mkdirSync(settingsDir, { recursive: true });
   const settingsPath = join(settingsDir, `${id}.json`);
-  writeFileSync(settingsPath, JSON.stringify(buildHookSettings(id, deps.port), null, 2));
+  writeFileSync(settingsPath, JSON.stringify(buildHookSettings(id, deps.port, deps.token), null, 2));
 
   const command = buildClaudeCommand(req, settingsPath);
   await deps.newSession(id, cwd, command);

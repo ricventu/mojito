@@ -15,7 +15,7 @@ const baseReq = {
 
 function deps(over: Record<string, unknown> = {}) {
   return {
-    registry: new Registry(dir), stateDir: dir, port: 4711, projectsPath: "/nope.json",
+    registry: new Registry(dir), stateDir: dir, port: 4711, token: "test-token", projectsPath: "/nope.json",
     hasSession: vi.fn(async () => false),
     newSession: vi.fn(async () => {}),
     pipePane: vi.fn(async () => {}),

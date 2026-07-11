@@ -15,7 +15,7 @@ export async function runAutoAdvance(prev: SessionMeta, newStatus: string): Prom
       autoAdvance: prev.autoAdvance,
       projectName: null, // repo already resolvable from the map/worktree
     },
-    { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, projectsPath: cfg.projectsPath,
+    { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token, projectsPath: cfg.projectsPath,
       hasSession, newSession, pipePane },
   );
 }

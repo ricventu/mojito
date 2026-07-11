@@ -13,11 +13,12 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const cfg = getConfig();
   if (!tokenFromHeaders(req.headers, cfg.token)) return new NextResponse("unauthorized", { status: 401 });
-  const body = await req.json();
+  let body;
+  try { body = await req.json(); } catch { return new NextResponse("bad json", { status: 400 }); }
   const res = await launchSession(
     { ticket: body.ticket, status: body.status, model: body.model ?? "opus", effort: body.effort ?? "high",
       autoAdvance: !!body.autoAdvance, projectName: body.projectName ?? null },
-    { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, projectsPath: cfg.projectsPath,
+    { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token, projectsPath: cfg.projectsPath,
       hasSession, newSession, pipePane },
   );
   if (!res.ok) {

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildHookSettings } from "@/server/hookSettings";
 
 describe("buildHookSettings", () => {
-  const s = buildHookSettings("mojito-RIC-46-planned", 4711);
+  const s = buildHookSettings("mojito-RIC-46-planned", 4711, "secret-tok");
 
   it("defines all four hook events", () => {
     expect(Object.keys(s.hooks).sort()).toEqual(
@@ -17,5 +17,6 @@ describe("buildHookSettings", () => {
     expect(stop).toContain("event=Stop");
     expect(stop).toContain("--data-binary @-"); // forwards hook stdin
     expect(stop).toContain("|| true");          // never blocks claude
+    expect(stop).toContain("x-mojito-token: secret-tok");
   });
 });
