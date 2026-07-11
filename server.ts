@@ -29,22 +29,35 @@ async function main() {
   getRegistry().recover(await listSessions("mojito-"));
 
   const server = createServer((req, res) => handle(req, res));
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
 
   server.on("upgrade", (req, socket, head) => {
-    const url = req.url ?? "";
-    if (!tokenFromUrl(url, cfg.token)) {
-      socket.destroy();
-      return;
-    }
-    const path = url.split("?")[0];
-    if (path === "/ws/pty") {
-      const id = new URLSearchParams(url.split("?")[1] ?? "").get("session") ?? "";
-      wss.handleUpgrade(req, socket, head, (ws) => attachPty(ws, id));
-    } else if (path === "/ws/events") {
-      wss.handleUpgrade(req, socket, head, (ws) => attachEvents(ws, getBus()));
-    } else {
-      socket.destroy();
+    try {
+      const url = req.url ?? "";
+      if (!tokenFromUrl(url, cfg.token)) {
+        socket.destroy();
+        return;
+      }
+      const path = url.split("?")[0];
+      if (path === "/ws/pty") {
+        const id = new URLSearchParams(url.split("?")[1] ?? "").get("session") ?? "";
+        if (!id) {
+          socket.destroy();
+          return;
+        }
+        wss.handleUpgrade(req, socket, head, (ws) => attachPty(ws, id));
+      } else if (path === "/ws/events") {
+        wss.handleUpgrade(req, socket, head, (ws) => attachEvents(ws, getBus()));
+      } else {
+        socket.destroy();
+      }
+    } catch (err) {
+      console.error("upgrade handler error:", err);
+      try {
+        socket.destroy();
+      } catch {
+        /* already destroyed */
+      }
     }
   });
 

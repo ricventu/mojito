@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Effort, SessionMeta } from "./types.js";
 import { tmuxName, parseIdentifier, validateTicket } from "./sessionKey.js";
@@ -62,9 +62,12 @@ export async function launchSession(
   if (!cwd) return { ok: false, reason: "no-repo" };
 
   const settingsDir = join(deps.stateDir, "settings");
-  mkdirSync(settingsDir, { recursive: true });
+  mkdirSync(settingsDir, { recursive: true, mode: 0o700 });
   const settingsPath = join(settingsDir, `${id}.json`);
-  writeFileSync(settingsPath, JSON.stringify(buildHookSettings(id, deps.port, deps.token), null, 2));
+  writeFileSync(settingsPath, JSON.stringify(buildHookSettings(id, deps.port, deps.token), null, 2), {
+    mode: 0o600,
+  });
+  chmodSync(settingsPath, 0o600); // mode on writeFileSync is ignored if the file pre-existed
 
   const command = buildClaudeCommand(req, settingsPath);
   await deps.newSession(id, cwd, command);

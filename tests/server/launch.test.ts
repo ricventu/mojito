@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { launchSession, buildClaudeCommand } from "@/server/launch";
@@ -64,5 +64,13 @@ describe("launchSession", () => {
     expect(d.newSession).toHaveBeenCalledOnce();
     expect(d.pipePane).toHaveBeenCalledOnce();
     expect(d.registry.get("mojito-RIC-46-planned")?.state).toBe("starting");
+  });
+
+  it("writes the hook settings file with owner-only permissions", async () => {
+    const d = deps();
+    const res = await launchSession(baseReq, d);
+    expect(res.ok).toBe(true);
+    const mode = statSync(join(dir, "settings", "mojito-RIC-46-planned.json")).mode & 0o777;
+    expect(mode).toBe(0o600);
   });
 });
