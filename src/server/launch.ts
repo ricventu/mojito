@@ -41,8 +41,8 @@ function defaultResolveCwd(projectsPath: string) {
 export function buildClaudeCommand(req: LaunchRequest, settingsPath: string): string {
   const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
   return (
-    `claude --model ${req.model} --effort ${req.effort} ` +
-    `--settings ${q(settingsPath)} "/lime-next ${req.ticket}"`
+    `claude --model ${q(req.model)} --effort ${q(req.effort)} ` +
+    `--settings ${q(settingsPath)} ${q(`/lime-next ${req.ticket}`)}`
   );
 }
 

@@ -28,9 +28,16 @@ function deps(over: Record<string, unknown> = {}) {
 describe("launchSession", () => {
   it("builds a claude command with model, effort, settings, and the slash command", () => {
     const cmd = buildClaudeCommand(baseReq, "/state/settings/x.json");
-    expect(cmd).toContain("claude --model opus --effort high");
+    expect(cmd).toContain("claude --model 'opus' --effort 'high'");
     expect(cmd).toContain("--settings '/state/settings/x.json'");
-    expect(cmd).toContain('"/lime-next RIC-46"');
+    expect(cmd).toContain("'/lime-next RIC-46'");
+  });
+
+  it("neutralizes shell metacharacters in model/effort", () => {
+    const cmd = buildClaudeCommand({ ...baseReq, model: "opus; touch pwned" }, "/s/x.json");
+    // the injection payload is contained inside a single-quoted token, not a live command
+    expect(cmd).toContain("--model 'opus; touch pwned'");
+    expect(cmd).not.toContain("; touch pwned "); // never appears unquoted/executable
   });
 
   it("refuses a duplicate", async () => {
