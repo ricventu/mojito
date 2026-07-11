@@ -33,6 +33,11 @@ describe("launchSession", () => {
     expect(cmd).toContain("'/lime-next RIC-46'");
   });
 
+  it("appends a trailing gate arg inside the quoted slash command", () => {
+    const cmd = buildClaudeCommand({ ...baseReq, trailingArg: "approve" }, "/s/x.json");
+    expect(cmd).toContain("'/lime-next RIC-46 approve'");
+  });
+
   it("neutralizes shell metacharacters in model/effort", () => {
     const cmd = buildClaudeCommand({ ...baseReq, model: "opus; touch pwned" }, "/s/x.json");
     // the injection payload is contained inside a single-quoted token, not a live command

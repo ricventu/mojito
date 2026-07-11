@@ -15,6 +15,7 @@ export interface LaunchRequest {
   effort: Effort;
   autoAdvance: boolean;
   projectName: string | null;
+  trailingArg?: string;
 }
 
 export interface LaunchDeps {
@@ -42,7 +43,7 @@ export function buildClaudeCommand(req: LaunchRequest, settingsPath: string): st
   const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
   return (
     `claude --model ${q(req.model)} --effort ${q(req.effort)} ` +
-    `--settings ${q(settingsPath)} ${q(`/lime-next ${req.ticket}`)}`
+    `--settings ${q(settingsPath)} ${q(`/lime-next ${req.ticket}${req.trailingArg ? ` ${req.trailingArg}` : ""}`)}`
   );
 }
 
