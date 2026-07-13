@@ -11,9 +11,11 @@ export default function SessionList(
   { token: string; sessions: SessionMeta[]; onOpen: (s: SessionMeta) => void; onChanged: () => void },
 ) {
   const dismiss = async (s: SessionMeta) => {
-    if (s.state === "running" || s.state === "needs-input" || s.state === "starting") {
-      if (!confirm(`Kill the running session for ${s.ticket}?`)) return;
-    }
+    const active = s.state === "running" || s.state === "needs-input" || s.state === "starting";
+    const prompt = active
+      ? `Kill the running session for ${s.ticket}?`
+      : `Dismiss the session for ${s.ticket}?`;
+    if (!confirm(prompt)) return;
     await apiFetch(token, `/api/sessions/${s.id}`, { method: "DELETE" });
     onChanged();
   };
