@@ -16,6 +16,7 @@ export default function TerminalView(
   const wsRef = useRef<WebSocket | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const [advErr, setAdvErr] = useState<string | null>(null);
+  const [auto, setAuto] = useState(session.autoAdvance);
 
   useEffect(() => {
     const term = new Terminal({
@@ -81,6 +82,11 @@ export default function TerminalView(
       setAdvErr(message);
     }
   };
+  const toggleAuto = async () => {
+    const nextValue = !auto;
+    const res = await apiFetch(token, `/api/sessions/${session.id}`, { method: "PATCH", body: JSON.stringify({ autoAdvance: nextValue }) });
+    if (res.ok) setAuto(nextValue);
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
@@ -89,6 +95,9 @@ export default function TerminalView(
         <span className="id">{session.ticket}</span>
         <span className="status">· {session.launchStatus}</span>
         <span className="grow" />
+        <button className={`chip toggle${auto ? " on" : ""}`} onClick={toggleAuto}>
+          auto: {auto ? "on" : "off"}
+        </button>
         <StateBadge state={session.state} />
       </header>
       <div ref={holder} style={{ flex: 1, overflow: "hidden" }} />
