@@ -1,21 +1,186 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-html, body { height: 100%; margin: 0; background: #0b0b0c; color: #e7e7ea; }
 
-/* Native form controls default to a light system background; without explicit
-   colors they render light text on a light control = unreadable in this dark UI.
-   Give every control a dark surface with light text. */
-select, input, textarea, button {
-  background: #1b1b1e;
-  color: #e7e7ea;
-  border: 1px solid #333;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font: inherit;
+/* ============================================================
+   Mojito design tokens — dark-only terminal driver.
+   Deep charcoal ground + Mojito lime accent. Semantic state
+   colors are separate from the accent.
+   ============================================================ */
+:root {
+  --bg: #0d0f11;          /* app ground */
+  --surface: #16191d;     /* cards, sheets */
+  --surface-hi: #1e2329;  /* inputs, raised, hover */
+  --border: #2b3139;      /* visible divider */
+  --border-hi: #3c444e;
+
+  --text: #e7eaed;
+  --text-dim: #98a0aa;
+  --text-faint: #69717c;
+
+  --accent: #5ce08a;      /* Mojito lime */
+  --accent-ink: #06140b;  /* text on accent */
+  --accent-soft: #14311f;
+
+  --run: #6cb6ff;   --run-bg: #12243b;
+  --attn: #f0b429;  --attn-bg: #2f2510;
+  --ok: #57d977;    --ok-bg: #143020;
+  --err: #ff6b6b;   --err-bg: #37191b;
+  --wait: #9aa1ab;  --wait-bg: #1f242a;
+
+  --r: 12px;
+  --r-sm: 9px;
+  --shadow: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 6px 20px -8px rgba(0, 0, 0, .7);
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
 }
-select { padding-right: 8px; }
-/* The dropdown popup list (rendered by the OS) needs its own colors. */
-option { background: #1b1b1e; color: #e7e7ea; }
-button { cursor: pointer; }
-label { color: #e7e7ea; }
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans);
+  -webkit-font-smoothing: antialiased; line-height: 1.4; }
+
+/* Native form controls default to a light system surface; give them the dark
+   token surface so they stay readable. Specific classes below refine them. */
+select, input, textarea {
+  background: var(--surface-hi); color: var(--text);
+  border: 1px solid var(--border-hi); border-radius: var(--r-sm);
+  padding: 10px 12px; font: 500 14px/1.2 var(--sans);
+}
+option { background: var(--surface-hi); color: var(--text); }
+select:focus, input:focus, textarea:focus {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+}
+label { color: var(--text); }
+
+/* ---- Buttons ---- */
+.btn {
+  font: 600 13px/1 var(--sans); padding: 10px 14px; border-radius: var(--r-sm);
+  border: 1px solid var(--border-hi); background: var(--surface-hi); color: var(--text);
+  cursor: pointer; transition: background .15s, border-color .15s, transform .1s;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:active { transform: scale(.98); }
+.btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.btn.block { width: 100%; padding: 13px; }
+.btn.sm { padding: 7px 11px; font-size: 12px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { background: transparent; }
+.btn.danger { color: var(--err); background: var(--err-bg); border-color: color-mix(in srgb, var(--err) 40%, var(--border)); }
+.btn.danger:hover { border-color: var(--err); }
+
+/* ---- Cards ---- */
+.card {
+  display: block; width: 100%; text-align: left;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow);
+  transition: border-color .15s, transform .1s; color: var(--text);
+}
+.card.tap { cursor: pointer; }
+.card.tap:active { transform: scale(.99); }
+.card.attn {
+  background: linear-gradient(90deg, var(--attn-bg), var(--surface) 60%);
+  border-color: color-mix(in srgb, var(--attn) 45%, var(--border));
+}
+.card .id { font: 700 14px/1.2 var(--mono); color: var(--text); letter-spacing: -.01em; }
+.card .status { color: var(--text-dim); font: 500 13px/1.3 var(--mono); }
+.card .title { margin-top: 6px; font-size: 14px; color: var(--text); }
+.card .title.muted { color: var(--text-dim); }
+.card .meta { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---- Layout helpers ---- */
+.pad { padding: 12px; }
+.row { display: flex; align-items: center; gap: 8px; }
+.grow { flex: 1; }
+.empty { color: var(--text-dim); padding: 24px 4px; text-align: center; }
+
+/* ---- Section title ---- */
+.sect {
+  font: 600 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--text-faint); margin: 14px 2px 10px; display: flex; align-items: center; gap: 8px;
+}
+.sect::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.sect:first-child { margin-top: 2px; }
+
+/* ---- Chips (labels / meta) ---- */
+.chip {
+  display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px;
+  background: var(--surface-hi); border: 1px solid var(--border); color: var(--text-dim);
+  font: 600 11px/1 var(--mono);
+}
+
+/* ---- State badges ---- */
+.badge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px 4px 8px; border-radius: 999px;
+  font: 700 11px/1 var(--mono); letter-spacing: .02em; text-transform: uppercase; border: 1px solid;
+  white-space: nowrap;
+}
+.badge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+.badge.run  { color: var(--run);  background: var(--run-bg);  border-color: color-mix(in srgb, var(--run) 40%, transparent); }
+.badge.attn { color: var(--attn); background: var(--attn-bg); border-color: color-mix(in srgb, var(--attn) 45%, transparent); }
+.badge.ok   { color: var(--ok);   background: var(--ok-bg);   border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.badge.err  { color: var(--err);  background: var(--err-bg);  border-color: color-mix(in srgb, var(--err) 40%, transparent); }
+.badge.wait { color: var(--wait); background: var(--wait-bg); border-color: var(--border-hi); }
+.badge.run .dot, .badge.wait .dot { animation: mojito-pulse 1.6s ease-in-out infinite; }
+@keyframes mojito-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .badge .dot { animation: none; } }
+
+/* ---- Alert banner ---- */
+.alert {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--r);
+  background: var(--attn-bg); border: 1px solid color-mix(in srgb, var(--attn) 50%, transparent);
+  color: var(--text); box-shadow: var(--shadow); cursor: pointer;
+}
+.alert .id { font: 700 13px var(--mono); color: var(--attn); }
+.alert .x { margin-left: auto; color: var(--text-dim); background: none; border: none; font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px; }
+
+/* ---- Bottom nav ---- */
+.nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; border-top: 1px solid var(--border);
+  background: var(--surface); padding-bottom: env(safe-area-inset-bottom); z-index: 40; }
+.nav .tab { flex: 1; padding: 15px; text-align: center; font: 600 13px var(--sans); color: var(--text-dim);
+  background: none; border: none; cursor: pointer; position: relative; }
+.nav .tab.active { color: var(--text); }
+.nav .tab.active::before { content: ""; position: absolute; top: 0; left: 30%; right: 30%; height: 2px;
+  background: var(--accent); border-radius: 2px; }
+.nav .tab .count { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px;
+  padding: 0 5px; margin-left: 6px; border-radius: 999px; background: var(--attn); color: #1a1206;
+  font: 700 11px var(--mono); vertical-align: middle; }
+
+/* ---- Fields (launch sheet) ---- */
+.field { display: block; margin-bottom: 12px; }
+.field .lbl { font: 600 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-dim);
+  margin-bottom: 6px; display: block; }
+.field select, .field input { width: 100%; }
+.two { display: flex; gap: 10px; }
+.two .field { flex: 1; }
+.toggle { display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--surface-hi);
+  border: 1px solid var(--border-hi); border-radius: var(--r-sm); font-size: 14px; cursor: pointer; }
+.toggle input { width: auto; accent-color: var(--accent); }
+.err-text { color: var(--err); font-size: 13px; margin: 10px 0 0; }
+
+/* ---- Sheet ---- */
+.sheet-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); display: flex; align-items: flex-end; z-index: 100; }
+.sheet { background: var(--surface); border: 1px solid var(--border); border-bottom: none; width: 100%;
+  padding: 20px 16px 32px; border-radius: 16px 16px 0 0; max-height: 85vh; overflow-y: auto;
+  box-sizing: border-box; box-shadow: var(--shadow); }
+.sheet h3 { margin: 0 0 16px; }
+
+/* ---- Terminal view ---- */
+.term-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border);
+  background: var(--surface); }
+.term-head .back { width: 32px; height: 32px; border-radius: 8px; background: var(--surface-hi);
+  border: 1px solid var(--border-hi); color: var(--text); font-size: 18px; cursor: pointer; flex: none; }
+.term-head .id { font: 700 13px var(--mono); }
+.term-head .status { font: 500 12px var(--mono); color: var(--text-dim); }
+.acc { display: flex; gap: 6px; overflow-x: auto; padding: 8px; border-top: 1px solid var(--border); background: var(--surface); }
+.acc .k { flex: none; padding: 10px 12px; border-radius: 8px; background: var(--surface-hi);
+  border: 1px solid var(--border-hi); color: var(--text); font: 600 13px var(--mono); cursor: pointer; }
+.acc .k:active { background: var(--border); }
+.gate { border-top: 1px solid var(--border); background: var(--surface); }
+.gate .btns { display: flex; gap: 8px; padding: 8px; }
+.gate .btns .btn { flex: 1; padding: 13px; }
+
+/* ---- Token gate ---- */
+.gate-screen { padding: 24px; max-width: 420px; margin: 0 auto; }
+.gate-screen h1 { color: var(--accent); letter-spacing: -.02em; }
+.gate-screen p { color: var(--text-dim); }

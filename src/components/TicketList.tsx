@@ -14,16 +14,17 @@ export default function TicketList(
   }, {});
 
   return (
-    <div style={{ padding: 12 }}>
+    <div className="pad">
       {Object.entries(groups).map(([project, items]) => (
         <section key={project}>
-          <h4 style={{ opacity: 0.6 }}>{project}</h4>
+          <h4 className="sect">{project}</h4>
           {items.map((t) => (
-            <button key={t.identifier} onClick={() => setPicked(t)}
-              style={{ display: "block", width: "100%", textAlign: "left", padding: 14, margin: "8px 0", background: "#151517", border: "1px solid #222", borderRadius: 12 }}>
-              <strong>{t.identifier}</strong> · {t.statusName}
-              <div>{t.title}</div>
-              {t.labels.length > 0 && <div style={{ opacity: 0.6, fontSize: 12 }}>{t.labels.join(", ")}</div>}
+            <button key={t.identifier} className="card tap" onClick={() => setPicked(t)}>
+              <div><span className="id">{t.identifier}</span> <span className="status">· {t.statusName}</span></div>
+              <div className="title">{t.title}</div>
+              {t.labels.length > 0 && (
+                <div className="meta">{t.labels.map((l) => <span key={l} className="chip">{l}</span>)}</div>
+              )}
             </button>
           ))}
         </section>

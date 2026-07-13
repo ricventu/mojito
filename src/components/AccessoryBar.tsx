@@ -16,10 +16,9 @@ const KEYS: { label: string; bytes: string }[] = [
 
 export default function AccessoryBar({ onSend }: { onSend: (bytes: string) => void }) {
   return (
-    <div style={{ display: "flex", gap: 6, overflowX: "auto", padding: 8, borderTop: "1px solid #222" }}>
+    <div className="acc">
       {KEYS.map((k) => (
-        <button key={k.label} onClick={() => onSend(k.bytes)}
-          style={{ padding: "10px 12px", background: "#222", borderRadius: 8, whiteSpace: "nowrap" }}>{k.label}</button>
+        <button key={k.label} className="k" onClick={() => onSend(k.bytes)}>{k.label}</button>
       ))}
     </div>
   );

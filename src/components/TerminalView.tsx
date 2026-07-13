@@ -4,6 +4,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import AccessoryBar from "./AccessoryBar";
+import StateBadge from "./StateBadge";
 import { apiFetch } from "@/lib/client";
 import { GATE_STATES } from "@/server/autoAdvance";
 import type { SessionMeta } from "@/server/types";
@@ -17,7 +18,12 @@ export default function TerminalView(
   const [advErr, setAdvErr] = useState<string | null>(null);
 
   useEffect(() => {
-    const term = new Terminal({ fontSize: 13, convertEol: true });
+    const term = new Terminal({
+      fontSize: 13,
+      convertEol: true,
+      fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+      theme: { background: "#08090a", foreground: "#c9d1d9", cursor: "#5ce08a" },
+    });
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(holder.current!);
@@ -78,16 +84,20 @@ export default function TerminalView(
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      <header style={{ padding: 12, borderBottom: "1px solid #222" }}>
-        <button onClick={onBack}>‹</button> {session.ticket} · {session.launchStatus}
+      <header className="term-head">
+        <button className="back" onClick={onBack}>‹</button>
+        <span className="id">{session.ticket}</span>
+        <span className="status">· {session.launchStatus}</span>
+        <span className="grow" />
+        <StateBadge state={session.state} />
       </header>
       <div ref={holder} style={{ flex: 1, overflow: "hidden" }} />
       {isGate ? (
-        <div style={{ borderTop: "1px solid #222" }}>
-          {advErr && <div style={{ padding: "8px 12px", color: "#f66", fontSize: 12 }}>{advErr}</div>}
-          <div style={{ display: "flex", gap: 8, padding: 8 }}>
+        <div className="gate">
+          {advErr && <div style={{ padding: "8px 12px", color: "var(--err)", fontSize: 12 }}>{advErr}</div>}
+          <div className="btns">
             {(session.launchStatus === "To QA" ? ["approve", "reject"] : ["local", "mr"]).map((a) => (
-              <button key={a} onClick={() => advance(a)} style={{ flex: 1, padding: 12 }}>{a}</button>
+              <button key={a} className={`btn${a === "reject" ? " danger" : " primary"}`} onClick={() => advance(a)}>{a}</button>
             ))}
           </div>
         </div>

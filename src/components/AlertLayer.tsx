@@ -24,10 +24,10 @@ export default function AlertLayer(
     <>
       <audio ref={audio} src="/alert.mp3" preload="auto" />
       <div style={{ position: "fixed", top: 8, left: 8, right: 8, zIndex: 50 }}>
-        <div onClick={() => onOpen(top.id)}
-          style={{ background: "#a70", color: "#fff", padding: 14, borderRadius: 12 }}>
-          <strong>{top.ticket}</strong> — {top.message}
-          <button onClick={(e) => { e.stopPropagation(); onClear(); }} style={{ float: "right" }}>×</button>
+        <div className="alert" onClick={() => onOpen(top.id)}>
+          <span className="id">{top.ticket}</span>
+          <span>{top.message}</span>
+          <button className="x" onClick={(e) => { e.stopPropagation(); onClear(); }}>×</button>
         </div>
       </div>
     </>

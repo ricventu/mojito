@@ -1,10 +1,7 @@
 "use client";
 import { apiFetch } from "@/lib/client";
-import type { SessionMeta, SessionState } from "@/server/types";
-
-const BADGE: Record<SessionState, string> = {
-  starting: "…", running: "●", "needs-input": "⚠", done: "✓", failed: "✕",
-};
+import StateBadge from "./StateBadge";
+import type { SessionMeta } from "@/server/types";
 
 export default function SessionList(
   { token, sessions, onOpen, onChanged }:
@@ -21,21 +18,34 @@ export default function SessionList(
   };
 
   return (
-    <div style={{ padding: 12 }}>
-      {sessions.length === 0 && <p style={{ opacity: 0.6 }}>No sessions.</p>}
-      {sessions.map((s) => (
-        <div key={s.id}
-          style={{ padding: 14, margin: "8px 0", borderRadius: 12,
-            background: s.state === "needs-input" ? "#2a1f10" : "#151517",
-            border: `1px solid ${s.state === "needs-input" ? "#a70" : "#222"}` }}>
-          <div onClick={() => onOpen(s)} style={{ cursor: "pointer" }}>
-            <strong>{s.ticket} · {s.launchStatus}</strong> <span>{BADGE[s.state]}</span>
-            <div style={{ opacity: 0.7, fontSize: 12 }}>{s.model}·{s.effort}{s.autoAdvance ? " · auto" : ""}</div>
-            {s.message && <div style={{ fontSize: 13 }}>{s.message}</div>}
+    <div className="pad">
+      {sessions.length === 0 && <p className="empty">No sessions.</p>}
+      {sessions.map((s) => {
+        const active = s.state === "running" || s.state === "needs-input" || s.state === "starting";
+        return (
+          <div key={s.id} className={`card${s.state === "needs-input" ? " attn" : ""}`}>
+            <div className="tap" onClick={() => onOpen(s)}>
+              <div className="row">
+                <span className="id">{s.ticket}</span>
+                <span className="grow" />
+                <StateBadge state={s.state} />
+              </div>
+              <div className="status">{s.launchStatus}</div>
+              {s.message && <div className="title">{s.message}</div>}
+              <div className="meta">
+                <span className="chip">{s.model} · {s.effort}</span>
+                {s.autoAdvance && <span className="chip">auto</span>}
+              </div>
+            </div>
+            <div className="row" style={{ marginTop: 12 }}>
+              <button className="btn ghost sm grow" onClick={() => onOpen(s)}>Open</button>
+              <button className={`btn sm${active ? " danger" : ""}`} onClick={() => dismiss(s)}>
+                {active ? "Kill" : "Dismiss"}
+              </button>
+            </div>
           </div>
-          <button onClick={() => dismiss(s)} style={{ marginTop: 8, fontSize: 12 }}>Dismiss</button>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

@@ -42,10 +42,10 @@ export default function Home() {
       {tab === "tickets"
         ? <TicketList token={token} tickets={tickets} sessions={sessions} onLaunched={() => { refreshSessions(); refreshTickets(); }} onOpen={setOpen} />
         : <SessionList token={token} sessions={sessions} onOpen={setOpen} onChanged={refreshSessions} />}
-      <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", borderTop: "1px solid #222" }}>
-        <button onClick={() => setTab("tickets")} style={{ flex: 1, padding: 16 }}>Tickets</button>
-        <button onClick={() => setTab("sessions")} style={{ flex: 1, padding: 16 }}>
-          Sessions{needsInput ? ` (${needsInput})` : ""}
+      <nav className="nav">
+        <button className={`tab${tab === "tickets" ? " active" : ""}`} onClick={() => setTab("tickets")}>Tickets</button>
+        <button className={`tab${tab === "sessions" ? " active" : ""}`} onClick={() => setTab("sessions")}>
+          Sessions{needsInput ? <span className="count">{needsInput}</span> : null}
         </button>
       </nav>
     </div>

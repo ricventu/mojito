@@ -32,22 +32,26 @@ export default function LaunchSheet(
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "flex-end", zIndex: 100 }} onClick={onClose}>
-      <div style={{ background: "#151517", width: "100%", padding: 20, paddingBottom: 32, borderRadius: "16px 16px 0 0", maxHeight: "85vh", overflowY: "auto", boxSizing: "border-box" }} onClick={(e) => e.stopPropagation()}>
-        <h3>{ticket.identifier} · {ticket.statusName}</h3>
+    <div className="sheet-backdrop" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <h3><span className="id" style={{ fontSize: 16 }}>{ticket.identifier}</span> <span className="chip">{ticket.statusName}</span></h3>
         {existing ? (
-          <button style={{ width: "100%", padding: 14 }} onClick={() => onOpen(existing)}>Open running session</button>
+          <button className="btn primary block" onClick={() => onOpen(existing)}>Open running session</button>
         ) : (
           <>
-            <label>Model <select value={model} onChange={(e) => setModel(e.target.value)}>{MODELS.map((m) => <option key={m}>{m}</option>)}</select></label>
-            <label style={{ marginLeft: 12 }}>Effort <select value={effort} onChange={(e) => setEffort(e.target.value)}>{EFFORTS.map((x) => <option key={x}>{x}</option>)}</select></label>
-            <label style={{ display: "block", margin: "12px 0" }}>
+            <div className="two">
+              <label className="field"><span className="lbl">Model</span>
+                <select value={model} onChange={(e) => setModel(e.target.value)}>{MODELS.map((m) => <option key={m}>{m}</option>)}</select></label>
+              <label className="field"><span className="lbl">Effort</span>
+                <select value={effort} onChange={(e) => setEffort(e.target.value)}>{EFFORTS.map((x) => <option key={x}>{x}</option>)}</select></label>
+            </div>
+            <label className="toggle" style={{ marginBottom: 12 }}>
               <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> Auto-advance
             </label>
-            <button style={{ width: "100%", padding: 14 }} onClick={start}>Start</button>
+            <button className="btn primary block" onClick={start}>Start session</button>
           </>
         )}
-        {err && <p style={{ color: "#f88" }}>{err}</p>}
+        {err && <p className="err-text">{err}</p>}
       </div>
     </div>
   );
