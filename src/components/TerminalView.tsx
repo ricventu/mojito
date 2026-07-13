@@ -75,6 +75,24 @@ export default function TerminalView(
     };
   }, [session.id, token]);
 
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      bodyOverscroll: body.style.overscrollBehavior,
+    };
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    body.style.overscrollBehavior = "none";
+    return () => {
+      html.style.overflow = prev.htmlOverflow;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.overscrollBehavior = prev.bodyOverscroll;
+    };
+  }, []);
+
   const send = (bytes: string) => wsRef.current?.send(new TextEncoder().encode(bytes));
   const isGate = GATE_STATES.includes(session.launchStatus);
   const advance = async (arg: string) => {
