@@ -30,7 +30,7 @@ export default function LaunchSheet(
     const res = await apiFetch(token, "/api/sessions", {
       method: "POST",
       body: JSON.stringify({ ticket: ticket.identifier, status: ticket.statusName, model, effort,
-        autoAdvance: auto, projectName: ticket.project }),
+        autoAdvance: auto, projectName: ticket.project, title: ticket.title, labels: ticket.labels }),
     });
     if (res.status === 409) { setErr("A session for this ticket+status already exists."); return; }
     if (!res.ok) { setErr(await res.text()); return; }

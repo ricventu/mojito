@@ -12,7 +12,7 @@ function seed(over: Partial<SessionMeta> = {}): { registry: Registry; meta: Sess
   const registry = new Registry(dir);
   const meta: SessionMeta = { id: "mojito-RIC-46-planned", ticket: "RIC-46", launchStatus: "Planned",
     model: "opus", effort: "high", autoAdvance: false, state: "running", cwd: "/x",
-    createdAt: "2026-07-11T00:00:00.000Z", ...over };
+    createdAt: "2026-07-11T00:00:00.000Z", title: "Some ticket", labels: [], ...over };
   registry.upsert(meta);
   return { registry, meta };
 }

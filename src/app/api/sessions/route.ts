@@ -17,7 +17,8 @@ export async function POST(req: Request) {
   try { body = await req.json(); } catch { return new NextResponse("bad json", { status: 400 }); }
   const res = await launchSession(
     { ticket: body.ticket, status: body.status, model: body.model ?? "opus", effort: body.effort ?? "high",
-      autoAdvance: !!body.autoAdvance, projectName: body.projectName ?? null },
+      autoAdvance: !!body.autoAdvance, projectName: body.projectName ?? null,
+      title: body.title ?? "", labels: Array.isArray(body.labels) ? body.labels : [] },
     { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token, projectsPath: cfg.projectsPath,
       hasSession, newSession, pipePane },
   );

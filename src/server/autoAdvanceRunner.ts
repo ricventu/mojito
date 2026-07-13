@@ -14,6 +14,8 @@ export async function runAutoAdvance(prev: SessionMeta, newStatus: string): Prom
       effort: prev.effort,
       autoAdvance: prev.autoAdvance,
       projectName: prev.projectName ?? null,
+      title: prev.title ?? "",
+      labels: prev.labels ?? [],
     },
     { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token, projectsPath: cfg.projectsPath,
       hasSession, newSession, pipePane },

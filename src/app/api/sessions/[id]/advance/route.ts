@@ -32,7 +32,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   const res = await launchSession(
     { ticket: prev.ticket, status, model: prev.model, effort: prev.effort,
-      autoAdvance: prev.autoAdvance, projectName: prev.projectName ?? null, trailingArg: arg },
+      autoAdvance: prev.autoAdvance, projectName: prev.projectName ?? null, trailingArg: arg,
+      title: prev.title ?? "", labels: prev.labels ?? [] },
     { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token, projectsPath: cfg.projectsPath,
       hasSession, newSession, pipePane },
   );
