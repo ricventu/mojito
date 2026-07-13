@@ -21,6 +21,8 @@ export interface SessionMeta {
   createdAt: string;     // ISO
   message?: string;      // last alert message
   projectName?: string | null; // Linear project name resolved at launch, for auto/gate advance
+  // Added after the fields above: sidecars persisted before this change lack them,
+  // so readSidecar can yield `undefined` at runtime despite the types — callers must guard.
   title: string;         // Linear ticket title at launch, for the skill's launch context
   labels: string[];      // Linear label names at launch, for bug/feature classification
 }
