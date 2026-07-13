@@ -21,7 +21,7 @@ export default function SessionList(
   const filtered = sessions.filter((s) => {
     if (project !== null && (s.projectName ?? NO_PROJECT) !== project) return false;
     if (!q) return true;
-    return [s.ticket, s.launchStatus, s.model, s.message]
+    return [s.ticket, s.launchStatus, s.model, s.message, s.title]
       .some((v) => v?.toLowerCase().includes(q));
   });
   const groups = filtered.reduce<Record<string, SessionMeta[]>>((acc, s) => {
@@ -68,6 +68,7 @@ export default function SessionList(
                     <span className="grow" />
                     <StateBadge state={s.state} />
                   </div>
+                  {s.title && <div className="session-title">{s.title}</div>}
                   <div className="status">{s.launchStatus}</div>
                   {s.message && <div className="title">{s.message}</div>}
                   <div className="meta">
