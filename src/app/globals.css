@@ -2,3 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 html, body { height: 100%; margin: 0; background: #0b0b0c; color: #e7e7ea; }
+
+/* Native form controls default to a light system background; without explicit
+   colors they render light text on a light control = unreadable in this dark UI.
+   Give every control a dark surface with light text. */
+select, input, textarea, button {
+  background: #1b1b1e;
+  color: #e7e7ea;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+}
+select { padding-right: 8px; }
+/* The dropdown popup list (rendered by the OS) needs its own colors. */
+option { background: #1b1b1e; color: #e7e7ea; }
+button { cursor: pointer; }
+label { color: #e7e7ea; }
