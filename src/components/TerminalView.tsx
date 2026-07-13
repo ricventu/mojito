@@ -109,7 +109,7 @@ export default function TerminalView(
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
       <header className="term-head">
         <button className="back" onClick={onBack}>‹</button>
         <span className="id">{session.ticket}</span>
