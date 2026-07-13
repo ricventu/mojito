@@ -8,6 +8,18 @@ describe("mapHook", () => {
     expect(o.alert?.kind).toBe("needs-input");
   });
 
+  it("AskUserQuestion (PreToolUse) needs input immediately", () => {
+    const o = mapHook("PreToolUse", false);
+    expect(o.state).toBe("needs-input");
+    expect(o.alert?.kind).toBe("needs-input");
+  });
+
+  it("answered question (PostToolUse) returns to running with no alert", () => {
+    const o = mapHook("PostToolUse", false);
+    expect(o.state).toBe("running");
+    expect(o.alert).toBeNull();
+  });
+
   it("stop with advanced status is done", () => {
     const o = mapHook("Stop", true);
     expect(o.state).toBe("done");

@@ -2,6 +2,13 @@ import type { HookEventName } from "./types.js";
 
 const EVENTS: HookEventName[] = ["PermissionRequest", "Notification", "Stop", "SessionEnd"];
 
+// PreToolUse/PostToolUse fire for every tool, so they must be scoped by a matcher.
+// Only AskUserQuestion should drive the session's needs-input signal.
+const MATCHED_EVENTS: { event: HookEventName; matcher: string }[] = [
+  { event: "PreToolUse", matcher: "AskUserQuestion" },
+  { event: "PostToolUse", matcher: "AskUserQuestion" },
+];
+
 function command(sessionId: string, port: number, event: HookEventName, token: string): string {
   const url = `http://127.0.0.1:${port}/api/hook?session=${encodeURIComponent(sessionId)}&event=${event}`;
   const tok = token.replace(/'/g, "'\\''");
@@ -12,6 +19,9 @@ export function buildHookSettings(sessionId: string, port: number, token: string
   const hooks: Record<string, unknown[]> = {};
   for (const event of EVENTS) {
     hooks[event] = [{ hooks: [{ type: "command", command: command(sessionId, port, event, token) }] }];
+  }
+  for (const { event, matcher } of MATCHED_EVENTS) {
+    hooks[event] = [{ matcher, hooks: [{ type: "command", command: command(sessionId, port, event, token) }] }];
   }
   return { hooks };
 }

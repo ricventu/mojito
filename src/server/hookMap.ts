@@ -11,6 +11,13 @@ export function mapHook(event: HookEventName, statusAdvanced: boolean): HookOutc
       return { state: "needs-input", alert: { kind: "needs-input", message: "claude needs permission" } };
     case "Notification":
       return { state: "needs-input", alert: { kind: "needs-input", message: "claude needs your attention" } };
+    case "PreToolUse":
+      // AskUserQuestion fires PreToolUse the instant the prompt appears — the only
+      // hook that signals "waiting for input" immediately (Notification is idle-timed).
+      return { state: "needs-input", alert: { kind: "needs-input", message: "claude is asking a question" } };
+    case "PostToolUse":
+      // The question was answered; the agent is working again. No alert.
+      return { state: "running", alert: null };
     case "Stop":
       return statusAdvanced
         ? { state: "done", alert: { kind: "stage-done", message: "stage complete" } }

@@ -1,6 +1,12 @@
 export type SessionState = "starting" | "running" | "needs-input" | "done" | "failed";
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
-export type HookEventName = "PermissionRequest" | "Notification" | "Stop" | "SessionEnd";
+export type HookEventName =
+  | "PermissionRequest"
+  | "Notification"
+  | "PreToolUse"
+  | "PostToolUse"
+  | "Stop"
+  | "SessionEnd";
 
 export interface SessionMeta {
   id: string;            // tmux session name, e.g. "mojito-RIC-46-to-review"

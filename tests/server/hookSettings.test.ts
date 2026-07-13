@@ -4,10 +4,19 @@ import { buildHookSettings } from "@/server/hookSettings";
 describe("buildHookSettings", () => {
   const s = buildHookSettings("mojito-RIC-46-planned", 4711, "secret-tok");
 
-  it("defines all four hook events", () => {
+  it("defines every hook event, including the AskUserQuestion signals", () => {
     expect(Object.keys(s.hooks).sort()).toEqual(
-      ["Notification", "PermissionRequest", "SessionEnd", "Stop"].sort(),
+      ["Notification", "PermissionRequest", "PostToolUse", "PreToolUse", "SessionEnd", "Stop"].sort(),
     );
+  });
+
+  it("scopes PreToolUse/PostToolUse to the AskUserQuestion tool", () => {
+    const pre = s.hooks.PreToolUse as { matcher?: string }[];
+    const post = s.hooks.PostToolUse as { matcher?: string }[];
+    expect(pre[0].matcher).toBe("AskUserQuestion");
+    expect(post[0].matcher).toBe("AskUserQuestion");
+    expect(JSON.stringify(s.hooks.PreToolUse)).toContain("event=PreToolUse");
+    expect(JSON.stringify(s.hooks.PostToolUse)).toContain("event=PostToolUse");
   });
 
   it("each command targets the localhost sink with session and event", () => {
