@@ -87,6 +87,15 @@ export default function TerminalView(
     const res = await apiFetch(token, `/api/sessions/${session.id}`, { method: "PATCH", body: JSON.stringify({ autoAdvance: nextValue }) });
     if (res.ok) setAuto(nextValue);
   };
+  const active = session.state === "running" || session.state === "needs-input" || session.state === "starting";
+  const kill = async () => {
+    const prompt = active
+      ? `Kill the running session for ${session.ticket}?`
+      : `Dismiss the session for ${session.ticket}?`;
+    if (!confirm(prompt)) return;
+    await apiFetch(token, `/api/sessions/${session.id}`, { method: "DELETE" });
+    onBack();
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
@@ -99,6 +108,9 @@ export default function TerminalView(
           auto: {auto ? "on" : "off"}
         </button>
         <StateBadge state={session.state} />
+        <button className={`btn sm${active ? " danger" : ""}`} onClick={kill}>
+          {active ? "Kill" : "Dismiss"}
+        </button>
       </header>
       <div ref={holder} style={{ flex: 1, overflow: "hidden" }} />
       {isGate ? (

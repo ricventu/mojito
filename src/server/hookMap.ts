@@ -7,6 +7,9 @@ export interface HookOutcome {
 
 export function mapHook(event: HookEventName, statusAdvanced: boolean): HookOutcome {
   switch (event) {
+    case "SessionStart":
+      // claude has booted and is now working — leave the transient "starting" state.
+      return { state: "running", alert: null };
     case "PermissionRequest":
       return { state: "needs-input", alert: { kind: "needs-input", message: "claude needs permission" } };
     case "Notification":

@@ -1,6 +1,7 @@
 export type SessionState = "starting" | "running" | "needs-input" | "done" | "failed";
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 export type HookEventName =
+  | "SessionStart"
   | "PermissionRequest"
   | "Notification"
   | "PreToolUse"

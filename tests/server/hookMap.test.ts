@@ -2,6 +2,12 @@ import { describe, it, expect } from "vitest";
 import { mapHook } from "@/server/hookMap";
 
 describe("mapHook", () => {
+  it("session start moves out of starting into running with no alert", () => {
+    const o = mapHook("SessionStart", false);
+    expect(o.state).toBe("running");
+    expect(o.alert).toBeNull();
+  });
+
   it("permission request needs input", () => {
     const o = mapHook("PermissionRequest", false);
     expect(o.state).toBe("needs-input");

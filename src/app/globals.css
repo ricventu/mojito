@@ -102,6 +102,13 @@ label { color: var(--text); }
 .sect::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 .sect:first-child { margin-top: 2px; }
 
+/* ---- Filter bar (tickets / sessions) ---- */
+.filter { margin: 2px 2px 8px; }
+.filter .search { width: 100%; box-sizing: border-box; -webkit-appearance: none; appearance: none; }
+.filter-chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 2px; scrollbar-width: none; }
+.filter-chips::-webkit-scrollbar { display: none; }
+.filter-chips .chip { flex: none; white-space: nowrap; }
+
 /* ---- Chips (labels / meta) ---- */
 .chip {
   display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px;

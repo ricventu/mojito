@@ -6,7 +6,7 @@ describe("buildHookSettings", () => {
 
   it("defines every hook event, including the AskUserQuestion signals", () => {
     expect(Object.keys(s.hooks).sort()).toEqual(
-      ["Notification", "PermissionRequest", "PostToolUse", "PreToolUse", "SessionEnd", "Stop"].sort(),
+      ["Notification", "PermissionRequest", "PostToolUse", "PreToolUse", "SessionEnd", "SessionStart", "Stop"].sort(),
     );
   });
 

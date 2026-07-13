@@ -6,7 +6,7 @@ import { handleHook } from "@/server/hookHandler";
 import { runAutoAdvance } from "@/server/autoAdvanceRunner";
 import type { HookEventName } from "@/server/types";
 
-const VALID: HookEventName[] = ["PermissionRequest", "Notification", "PreToolUse", "PostToolUse", "Stop", "SessionEnd"];
+const VALID: HookEventName[] = ["SessionStart", "PermissionRequest", "Notification", "PreToolUse", "PostToolUse", "Stop", "SessionEnd"];
 
 export async function POST(req: Request) {
   const cfg = getConfig();

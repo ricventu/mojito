@@ -1,6 +1,6 @@
 import type { HookEventName } from "./types.js";
 
-const EVENTS: HookEventName[] = ["PermissionRequest", "Notification", "Stop", "SessionEnd"];
+const EVENTS: HookEventName[] = ["SessionStart", "PermissionRequest", "Notification", "Stop", "SessionEnd"];
 
 // PreToolUse/PostToolUse fire for every tool, so they must be scoped by a matcher.
 // Only AskUserQuestion should drive the session's needs-input signal.
