@@ -22,7 +22,7 @@ export async function handleHook(id: string, event: HookEventName, deps: HookDep
       newStatus = await deps.getIssueStatus(meta.ticket);
       statusAdvanced = newStatus !== meta.launchStatus;
     } catch {
-      statusAdvanced = false; // treat a fetch failure as "not advanced" → surfaces as needs-input
+      statusAdvanced = false; // fetch failure => treat as not advanced (Stop => needs-input, SessionEnd => failed)
     }
   }
 

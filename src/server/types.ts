@@ -13,6 +13,7 @@ export interface SessionMeta {
   cwd: string;
   createdAt: string;     // ISO
   message?: string;      // last alert message
+  projectName?: string | null; // Linear project name resolved at launch, for auto/gate advance
 }
 
 export interface TicketSummary {

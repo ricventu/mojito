@@ -13,7 +13,7 @@ export async function runAutoAdvance(prev: SessionMeta, newStatus: string): Prom
       model: prev.model,
       effort: prev.effort,
       autoAdvance: prev.autoAdvance,
-      projectName: null, // repo already resolvable from the map/worktree
+      projectName: prev.projectName ?? null,
     },
     { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token, projectsPath: cfg.projectsPath,
       hasSession, newSession, pipePane },

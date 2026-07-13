@@ -13,6 +13,11 @@ import { attachEvents } from "./src/server/eventsWs.js";
 // destructure instead of `import { loadEnvConfig } from "@next/env"`.
 const { loadEnvConfig } = nextEnv;
 
+// Last-resort backstops: log and keep the server alive rather than crashing
+// the whole process on an unforeseen async error (e.g. a stray ws message).
+process.on("uncaughtException", (e) => console.error("uncaughtException:", e));
+process.on("unhandledRejection", (e) => console.error("unhandledRejection:", e));
+
 const dev = process.env.NODE_ENV !== "production";
 
 // Custom servers bypass Next's CLI env loading, so load .env* files ourselves

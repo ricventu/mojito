@@ -83,6 +83,7 @@ export async function launchSession(
     state: "starting",
     cwd,
     createdAt: (deps.nowIso ?? (() => new Date().toISOString()))(),
+    projectName: req.projectName,
   };
   deps.registry.upsert(meta);
   return { ok: true, meta };

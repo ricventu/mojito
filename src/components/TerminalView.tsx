@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -14,6 +14,7 @@ export default function TerminalView(
   const holder = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const termRef = useRef<Terminal | null>(null);
+  const [advErr, setAdvErr] = useState<string | null>(null);
 
   useEffect(() => {
     const term = new Terminal({ fontSize: 13, convertEol: true });
@@ -59,7 +60,20 @@ export default function TerminalView(
   const send = (bytes: string) => wsRef.current?.send(new TextEncoder().encode(bytes));
   const isGate = GATE_STATES.includes(session.launchStatus);
   const advance = async (arg: string) => {
-    await apiFetch(token, `/api/sessions/${session.id}/advance`, { method: "POST", body: JSON.stringify({ arg }) });
+    const res = await apiFetch(token, `/api/sessions/${session.id}/advance`, { method: "POST", body: JSON.stringify({ arg }) });
+    if (res.ok) {
+      setAdvErr(null);
+      onBack();
+    } else {
+      let message = `advance failed (${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.error) message = body.error;
+      } catch {
+        /* non-JSON error body */
+      }
+      setAdvErr(message);
+    }
   };
 
   return (
@@ -69,10 +83,13 @@ export default function TerminalView(
       </header>
       <div ref={holder} style={{ flex: 1, overflow: "hidden" }} />
       {isGate ? (
-        <div style={{ display: "flex", gap: 8, padding: 8, borderTop: "1px solid #222" }}>
-          {(session.launchStatus === "To QA" ? ["approve", "reject"] : ["local", "mr"]).map((a) => (
-            <button key={a} onClick={() => advance(a)} style={{ flex: 1, padding: 12 }}>{a}</button>
-          ))}
+        <div style={{ borderTop: "1px solid #222" }}>
+          {advErr && <div style={{ padding: "8px 12px", color: "#f66", fontSize: 12 }}>{advErr}</div>}
+          <div style={{ display: "flex", gap: 8, padding: 8 }}>
+            {(session.launchStatus === "To QA" ? ["approve", "reject"] : ["local", "mr"]).map((a) => (
+              <button key={a} onClick={() => advance(a)} style={{ flex: 1, padding: 12 }}>{a}</button>
+            ))}
+          </div>
         </div>
       ) : (
         <AccessoryBar onSend={send} />

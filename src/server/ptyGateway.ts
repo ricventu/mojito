@@ -66,7 +66,11 @@ export function attachPty(ws: WebSocket, id: string): void {
 
   ws.on("message", (data: Buffer, isBinary: boolean) => {
     if (isBinary) {
-      pty.write(data.toString("utf8")); // keystrokes
+      try {
+        pty.write(data.toString("utf8")); // keystrokes
+      } catch (err) {
+        console.error("pty write failed:", err);
+      }
       return;
     }
     try {

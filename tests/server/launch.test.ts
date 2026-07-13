@@ -64,6 +64,7 @@ describe("launchSession", () => {
     expect(d.newSession).toHaveBeenCalledOnce();
     expect(d.pipePane).toHaveBeenCalledOnce();
     expect(d.registry.get("mojito-RIC-46-planned")?.state).toBe("starting");
+    expect(d.registry.get("mojito-RIC-46-planned")?.projectName).toBe("Lime");
   });
 
   it("writes the hook settings file with owner-only permissions", async () => {

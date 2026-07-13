@@ -11,7 +11,7 @@ export default function SessionList(
   { token: string; sessions: SessionMeta[]; onOpen: (s: SessionMeta) => void; onChanged: () => void },
 ) {
   const dismiss = async (s: SessionMeta) => {
-    if (s.state === "running" || s.state === "needs-input") {
+    if (s.state === "running" || s.state === "needs-input" || s.state === "starting") {
       if (!confirm(`Kill the running session for ${s.ticket}?`)) return;
     }
     await apiFetch(token, `/api/sessions/${s.id}`, { method: "DELETE" });
