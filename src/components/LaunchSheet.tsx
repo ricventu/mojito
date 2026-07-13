@@ -32,8 +32,8 @@ export default function LaunchSheet(
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "flex-end" }} onClick={onClose}>
-      <div style={{ background: "#151517", width: "100%", padding: 20, borderRadius: "16px 16px 0 0" }} onClick={(e) => e.stopPropagation()}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "flex-end", zIndex: 100 }} onClick={onClose}>
+      <div style={{ background: "#151517", width: "100%", padding: 20, paddingBottom: 32, borderRadius: "16px 16px 0 0", maxHeight: "85vh", overflowY: "auto", boxSizing: "border-box" }} onClick={(e) => e.stopPropagation()}>
         <h3>{ticket.identifier} · {ticket.statusName}</h3>
         {existing ? (
           <button style={{ width: "100%", padding: 14 }} onClick={() => onOpen(existing)}>Open running session</button>
