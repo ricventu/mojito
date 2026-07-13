@@ -110,7 +110,6 @@ label { color: var(--text); }
 }
 button.chip {
   cursor: pointer; -webkit-appearance: none; appearance: none;
-  font: 600 11px/1 var(--mono);
 }
 button.chip:active { transform: scale(.96); }
 .chip.on { color: var(--run); border-color: color-mix(in srgb, var(--run) 40%, transparent); }
