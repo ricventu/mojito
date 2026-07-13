@@ -1,6 +1,6 @@
 # Mojito smoke checklist
 
-**Automated gate verified:** Item 0 (Stop-vs-SessionEnd hook behavior) and the full unit/integration/build suite (`npm run test`, `npm run typecheck`, `npm run build`) are run in CI/CD. Items 1–13 below are live end-to-end steps for the operator to execute against a real environment (phone on LAN, real Linear ticket, `npm run dev` active).
+**Live operator steps:** Items 0–13 are ALL live operator steps, run by a person against a real environment (phone on LAN, real Linear ticket, `npm run dev` active). Item 0 (Stop-vs-SessionEnd hook behavior) is the first verification. **Automated gate verified:** the unit/integration/build suite (`npm run test` 44/44, `npm run typecheck`, `npm run build`) is verified automatically in CI/CD and is currently green.
 
 Prereqs (for live steps): tmux + claude on PATH, a real non-closed Linear ticket, `.env` filled in, `npm run dev` running, phone on the same LAN.
 
