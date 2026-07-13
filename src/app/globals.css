@@ -197,6 +197,14 @@ button.chip:active { transform: scale(.96); }
 .gate .btns { display: flex; gap: 8px; padding: 8px; }
 .gate .btns .btn { flex: 1; padding: 13px; }
 
+/* xterm's scrollable viewport must own touch scrolling on mobile so the
+   scrollback scrolls instead of chaining out to the (locked) document. */
+.xterm .xterm-viewport {
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* ---- Token gate ---- */
 .gate-screen { padding: 24px; max-width: 420px; margin: 0 auto; }
 .gate-screen h1 { color: var(--accent); letter-spacing: -.02em; }
