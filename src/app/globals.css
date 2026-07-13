@@ -108,6 +108,12 @@ label { color: var(--text); }
   background: var(--surface-hi); border: 1px solid var(--border); color: var(--text-dim);
   font: 600 11px/1 var(--mono);
 }
+button.chip {
+  cursor: pointer; -webkit-appearance: none; appearance: none;
+  font: 600 11px/1 var(--mono);
+}
+button.chip:active { transform: scale(.96); }
+.chip.on { color: var(--run); border-color: color-mix(in srgb, var(--run) 40%, transparent); }
 
 /* ---- State badges ---- */
 .badge {
