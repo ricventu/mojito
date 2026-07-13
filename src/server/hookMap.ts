@@ -1,0 +1,23 @@
+import type { HookEventName, SessionState } from "./types.js";
+
+export interface HookOutcome {
+  state: SessionState;
+  alert: { kind: "needs-input" | "stage-done" | "failed"; message: string } | null;
+}
+
+export function mapHook(event: HookEventName, statusAdvanced: boolean): HookOutcome {
+  switch (event) {
+    case "PermissionRequest":
+      return { state: "needs-input", alert: { kind: "needs-input", message: "claude needs permission" } };
+    case "Notification":
+      return { state: "needs-input", alert: { kind: "needs-input", message: "claude needs your attention" } };
+    case "Stop":
+      return statusAdvanced
+        ? { state: "done", alert: { kind: "stage-done", message: "stage complete" } }
+        : { state: "needs-input", alert: { kind: "needs-input", message: "claude is waiting for you" } };
+    case "SessionEnd":
+      return statusAdvanced
+        ? { state: "done", alert: { kind: "stage-done", message: "stage complete" } }
+        : { state: "failed", alert: { kind: "failed", message: "session ended unexpectedly" } };
+  }
+}
