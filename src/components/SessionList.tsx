@@ -17,6 +17,12 @@ export default function SessionList(
     onChanged();
   };
 
+  const toggleAuto = async (e: React.MouseEvent, s: SessionMeta) => {
+    e.stopPropagation();
+    await apiFetch(token, `/api/sessions/${s.id}`, { method: "PATCH", body: JSON.stringify({ autoAdvance: !s.autoAdvance }) });
+    onChanged();
+  };
+
   return (
     <div className="pad">
       {sessions.length === 0 && <p className="empty">No sessions.</p>}
@@ -34,7 +40,9 @@ export default function SessionList(
               {s.message && <div className="title">{s.message}</div>}
               <div className="meta">
                 <span className="chip">{s.model} · {s.effort}</span>
-                {s.autoAdvance && <span className="chip">auto</span>}
+                <button className={`chip toggle${s.autoAdvance ? " on" : ""}`} onClick={(e) => toggleAuto(e, s)}>
+                  auto: {s.autoAdvance ? "on" : "off"}
+                </button>
               </div>
             </div>
             <div className="row" style={{ marginTop: 12 }}>
