@@ -112,6 +112,7 @@ export default function TerminalView(
           {active ? "Kill" : "Dismiss"}
         </button>
       </header>
+      {session.title && <div className="term-title">{session.title}</div>}
       <div ref={holder} style={{ flex: 1, overflow: "hidden" }} />
       {isGate ? (
         <div className="gate">

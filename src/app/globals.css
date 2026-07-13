@@ -185,6 +185,7 @@ button.chip:active { transform: scale(.96); }
   border: 1px solid var(--border-hi); color: var(--text); font-size: 18px; cursor: pointer; flex: none; }
 .term-head .id { font: 700 13px var(--mono); }
 .term-head .status { font: 500 12px var(--mono); color: var(--text-dim); }
+.term-title { padding: 8px 14px; font: 600 14px/1.35 var(--mono); color: var(--text); border-bottom: 1px solid var(--border); }
 .acc { display: flex; gap: 6px; overflow-x: auto; padding: 8px; border-top: 1px solid var(--border); background: var(--surface); }
 .acc .k { flex: none; padding: 10px 12px; border-radius: 8px; background: var(--surface-hi);
   border: 1px solid var(--border-hi); color: var(--text); font: 600 13px var(--mono); cursor: pointer; }
