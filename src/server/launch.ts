@@ -7,6 +7,7 @@ import { loadProjectMap, resolveRepoFromMap } from "./limeProjects.js";
 import { resolveWorktree } from "./worktree.js";
 import { logfilePath } from "./sidecar.js";
 import type { Registry } from "./registry.js";
+import { writeLaunchContext } from "./launchContext.js";
 
 export interface LaunchRequest {
   ticket: string;
@@ -15,6 +16,8 @@ export interface LaunchRequest {
   effort: Effort;
   autoAdvance: boolean;
   projectName: string | null;
+  title: string;
+  labels: string[];
   trailingArg?: string;
 }
 
@@ -40,10 +43,11 @@ function defaultResolveCwd(projectsPath: string) {
   };
 }
 
-export function buildClaudeCommand(req: LaunchRequest, settingsPath: string): string {
+export function buildClaudeCommand(req: LaunchRequest, settingsPath: string, contextPath?: string): string {
   const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
+  const envPrefix = contextPath ? `LIME_SESSION_CONTEXT=${q(contextPath)} ` : "";
   return (
-    `claude --model ${q(req.model)} --effort ${q(req.effort)} ` +
+    `${envPrefix}claude --model ${q(req.model)} --effort ${q(req.effort)} ` +
     `--settings ${q(settingsPath)} ${q(`/lime-next ${req.ticket}${req.trailingArg ? ` ${req.trailingArg}` : ""}`)}`
   );
 }
@@ -69,7 +73,15 @@ export async function launchSession(
   });
   chmodSync(settingsPath, 0o600); // mode on writeFileSync is ignored if the file pre-existed
 
-  const command = buildClaudeCommand(req, settingsPath);
+  const contextPath = writeLaunchContext(deps.stateDir, id, {
+    identifier: req.ticket,
+    statusName: req.status,
+    title: req.title,
+    project: req.projectName,
+    labels: req.labels,
+  });
+
+  const command = buildClaudeCommand(req, settingsPath, contextPath);
   await deps.newSession(id, cwd, command);
   await deps.pipePane(id, logfilePath(deps.stateDir, id));
 
@@ -84,6 +96,8 @@ export async function launchSession(
     cwd,
     createdAt: (deps.nowIso ?? (() => new Date().toISOString()))(),
     projectName: req.projectName,
+    title: req.title,
+    labels: req.labels,
   };
   deps.registry.upsert(meta);
   return { ok: true, meta };

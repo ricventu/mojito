@@ -15,6 +15,8 @@ const meta: SessionMeta = {
   state: "running",
   cwd: "/code/lime",
   createdAt: "2026-07-11T00:00:00.000Z",
+  title: "Auto-advance toggle",
+  labels: ["Feature"],
 };
 
 let dir: string;

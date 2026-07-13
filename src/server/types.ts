@@ -21,6 +21,8 @@ export interface SessionMeta {
   createdAt: string;     // ISO
   message?: string;      // last alert message
   projectName?: string | null; // Linear project name resolved at launch, for auto/gate advance
+  title: string;         // Linear ticket title at launch, for the skill's launch context
+  labels: string[];      // Linear label names at launch, for bug/feature classification
 }
 
 export interface TicketSummary {

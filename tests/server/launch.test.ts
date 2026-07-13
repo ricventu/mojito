@@ -11,6 +11,7 @@ beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "mojito-")); });
 const baseReq = {
   ticket: "RIC-46", status: "Planned", model: "opus", effort: "high" as const,
   autoAdvance: false, projectName: "Lime",
+  title: "Auto-advance toggle", labels: ["Feature"],
 };
 
 function deps(over: Record<string, unknown> = {}) {
@@ -73,5 +74,36 @@ describe("launchSession", () => {
     expect(res.ok).toBe(true);
     const mode = statSync(join(dir, "settings", "mojito-RIC-46-planned.json")).mode & 0o777;
     expect(mode).toBe(0o600);
+  });
+
+  it("prefixes LIME_SESSION_CONTEXT when a context path is given", () => {
+    const cmd = buildClaudeCommand(baseReq, "/state/settings/x.json", "/state/context/x.json");
+    expect(cmd).toMatch(/^LIME_SESSION_CONTEXT='\/state\/context\/x.json' claude /);
+  });
+
+  it("omits LIME_SESSION_CONTEXT when no context path is given", () => {
+    const cmd = buildClaudeCommand(baseReq, "/state/settings/x.json");
+    expect(cmd).not.toContain("LIME_SESSION_CONTEXT");
+    expect(cmd.startsWith("claude ")).toBe(true);
+  });
+
+  it("writes the launch context file with owner-only permissions", async () => {
+    const { readFileSync } = await import("node:fs");
+    const d = deps();
+    await launchSession(baseReq, d);
+    const p = join(dir, "context", "mojito-RIC-46-planned.json");
+    expect(statSync(p).mode & 0o777).toBe(0o600);
+    expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({
+      identifier: "RIC-46", statusName: "Planned",
+      title: "Auto-advance toggle", project: "Lime", labels: ["Feature"],
+    });
+  });
+
+  it("records title and labels on the session meta", async () => {
+    const d = deps();
+    await launchSession(baseReq, d);
+    const meta = d.registry.get("mojito-RIC-46-planned");
+    expect(meta?.title).toBe("Auto-advance toggle");
+    expect(meta?.labels).toEqual(["Feature"]);
   });
 });
