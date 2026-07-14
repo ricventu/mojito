@@ -6,6 +6,8 @@ import "@xterm/xterm/css/xterm.css";
 import AccessoryBar from "./AccessoryBar";
 import StateBadge from "./StateBadge";
 import { apiFetch } from "@/lib/client";
+import { computeTouchScroll } from "@/lib/touchScroll";
+import { GATE_STATES } from "@/server/autoAdvance";
 import type { SessionMeta } from "@/server/types";
 
 export default function TerminalView(
@@ -91,6 +93,44 @@ export default function TerminalView(
     };
   }, []);
 
+  // Mobile touch scroll. xterm's built-in touchmove handler is unreliable on iOS
+  // Safari — the page wins the gesture and pans. Own it: capture-phase listeners
+  // (stopPropagation so xterm's own handler does not also fire and double-scroll),
+  // accumulate the drag, and drive the scrollback via the public scrollLines API.
+  useEffect(() => {
+    const el = holder.current;
+    if (!el) return;
+    let lastY = 0;
+    let acc = 0;
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      lastY = e.touches[0].clientY;
+      acc = 0;
+      e.stopPropagation();
+    };
+    const onMove = (e: TouchEvent) => {
+      const term = termRef.current;
+      if (!term || e.touches.length !== 1) return;
+      const y = e.touches[0].clientY;
+      acc += lastY - y;
+      lastY = y;
+      const rowHeightPx = term.rows > 0 ? el.clientHeight / term.rows : 0;
+      const { lines, remainderPx } = computeTouchScroll(acc, rowHeightPx);
+      if (lines !== 0) {
+        term.scrollLines(lines);
+        acc = remainderPx;
+      }
+      e.stopPropagation();
+      e.preventDefault();
+    };
+    el.addEventListener("touchstart", onStart, { passive: true, capture: true });
+    el.addEventListener("touchmove", onMove, { passive: false, capture: true });
+    return () => {
+      el.removeEventListener("touchstart", onStart, { capture: true } as EventListenerOptions);
+      el.removeEventListener("touchmove", onMove, { capture: true } as EventListenerOptions);
+    };
+  }, []);
+
   const send = (bytes: string) => wsRef.current?.send(new TextEncoder().encode(bytes));
   const toggleAuto = async () => {
     const nextValue = !auto;
@@ -108,7 +148,7 @@ export default function TerminalView(
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
+    <div className="term-root">
       <header className="term-head">
         <button className="back" onClick={onBack}>‹</button>
         <span className="id">{session.ticket}</span>
