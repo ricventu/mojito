@@ -289,9 +289,10 @@ Open the app on the iPhone 11 in Safari (the dev server prints a Wi-Fi URL), ent
 
 - Drag up/down **inside** the terminal → the terminal scrollback scrolls under the finger; the page does **not** move.
 - Drag down at the top of the scrollback → stays put (no page pan / rubber-band into the page).
+- **Tap the terminal → the soft keyboard appears and typed text reaches the session.** The custom handler `preventDefault`s every `touchmove` and captures `touchstart`, so confirm a tap (with slight finger jitter) still focuses xterm and raises the keyboard. If it fails, add a movement threshold so near-pure taps pass through before the first `preventDefault`.
 - Tap "‹" back → the tickets/sessions list scrolls normally again (document scroll restored on unmount).
 
-Expected: terminal scrolls under the finger; page stays fixed while the terminal is open; list scroll works after backing out.
+Expected: terminal scrolls under the finger; page stays fixed while the terminal is open; tapping still focuses the terminal and shows the keyboard; list scroll works after backing out.
 
 - [ ] **Step 3: Final checks**
 
