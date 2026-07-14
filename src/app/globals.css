@@ -203,12 +203,26 @@ button.chip:active { transform: scale(.96); }
   resize: vertical;
 }
 
-/* xterm's scrollable viewport must own touch scrolling on mobile so the
-   scrollback scrolls instead of chaining out to the (locked) document. */
-.xterm .xterm-viewport {
-  touch-action: pan-y;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+/* The terminal view replaces the whole page. Pin it to the visible viewport
+   with position:fixed (100dvh alone is not enough — iOS Safari still lets the
+   page pan). A fixed element is out of page flow, so there is nothing to pan. */
+.term-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: none;
+}
+
+/* The terminal body is not a browser pan surface — iOS must not start a page
+   pan when a drag begins over it. Scrolling is driven in JS (see TerminalView).
+   The accessory bar keeps its default touch-action so its horizontal scroll
+   still works. */
+.term-root .xterm {
+  touch-action: none;
 }
 
 /* ---- Token gate ---- */
