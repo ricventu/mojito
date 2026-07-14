@@ -5,6 +5,9 @@ import FilterBar, { NO_PROJECT } from "./FilterBar";
 import { usePersistedState } from "@/lib/usePersistedState";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 import { activeSessionLevel, type ActiveLevel } from "@/lib/ticketSessionLevel";
+import { groupByStatus } from "@/lib/groupByStatus";
+import { orderTickets } from "@/lib/orderTickets";
+import StatusBadge from "./StatusBadge";
 
 export default function TicketList(
   { token, tickets, sessions, onLaunched, onOpen }:
@@ -55,23 +58,28 @@ export default function TicketList(
       {Object.entries(groups).map(([project, items]) => (
         <section key={project}>
           <h4 className="sect">{project}</h4>
-          {items.map((t) => (
-            <button key={t.identifier} className="card tap" onClick={() => setPicked(t)}>
-              <div>
-                <span className="id">{t.identifier}</span> <span className="status">· {t.statusName}</span>
-                {levels.get(t.identifier) && (
-                  <span
-                    className={`s-dot ${levels.get(t.identifier)}`}
-                    aria-label={levels.get(t.identifier) === "attn" ? "needs input" : "session running"}
-                    title={levels.get(t.identifier) === "attn" ? "needs input" : "session running"}
-                  />
-                )}
-              </div>
-              <div className="title">{t.title}</div>
-              {t.labels.length > 0 && (
-                <div className="meta">{t.labels.map((l) => <span key={l} className="chip">{l}</span>)}</div>
-              )}
-            </button>
+          {groupByStatus(items, (t) => t.statusName).map((group) => (
+            <div key={group.status}>
+              <div className="substatus"><StatusBadge status={group.status} /></div>
+              {orderTickets(group.items).map((t) => (
+                <button key={t.identifier} className="card tap" onClick={() => setPicked(t)}>
+                  <div>
+                    <span className="id">{t.identifier}</span>
+                    {levels.get(t.identifier) && (
+                      <span
+                        className={`s-dot ${levels.get(t.identifier)}`}
+                        aria-label={levels.get(t.identifier) === "attn" ? "needs input" : "session running"}
+                        title={levels.get(t.identifier) === "attn" ? "needs input" : "session running"}
+                      />
+                    )}
+                  </div>
+                  <div className="title">{t.title}</div>
+                  {t.labels.length > 0 && (
+                    <div className="meta">{t.labels.map((l) => <span key={l} className="chip">{l}</span>)}</div>
+                  )}
+                </button>
+              ))}
+            </div>
           ))}
         </section>
       ))}
