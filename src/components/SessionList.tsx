@@ -7,6 +7,8 @@ import NewSessionSheet from "./NewSessionSheet";
 import { usePersistedState } from "@/lib/usePersistedState";
 import type { SessionMeta } from "@/server/types";
 import { orderSessions } from "@/lib/orderSessions";
+import { groupByStatus } from "@/lib/groupByStatus";
+import StatusBadge from "./StatusBadge";
 
 export default function SessionList(
   { token, sessions, onOpen, onChanged }:
@@ -80,51 +82,55 @@ export default function SessionList(
       {Object.entries(groups).map(([proj, items]) => (
         <section key={proj}>
           <h4 className="sect">{proj}</h4>
-          {orderSessions(items).map((s) => {
-            const active = s.state === "running" || s.state === "needs-input" || s.state === "starting";
-            return (
-              <div key={s.id} className={`card${s.state === "needs-input" ? " attn" : ""}`}>
-                <div className="tap" onClick={() => onOpen(s)}>
-                  {s.kind === "custom" ? (
-                    <>
-                      <div className="row">
-                        <span className="session-title">{s.title}</span>
-                        <span className="grow" />
-                        <StateBadge state={s.state} />
+          {groupByStatus(items, (s) => s.launchStatus).map((group) => (
+            <div key={group.status}>
+              {group.status && <div className="substatus"><StatusBadge status={group.status} /></div>}
+              {orderSessions(group.items).map((s) => {
+                const active = s.state === "running" || s.state === "needs-input" || s.state === "starting";
+                return (
+                  <div key={s.id} className={`card${s.state === "needs-input" ? " attn" : ""}`}>
+                    <div className="tap" onClick={() => onOpen(s)}>
+                      {s.kind === "custom" ? (
+                        <>
+                          <div className="row">
+                            <span className="session-title">{s.title}</span>
+                            <span className="grow" />
+                            <StateBadge state={s.state} />
+                          </div>
+                          <div className="meta"><span className="chip">custom</span></div>
+                          {s.message && <div className="title">{s.message}</div>}
+                        </>
+                      ) : (
+                        <>
+                          <div className="row">
+                            <span className="id">{s.ticket}</span>
+                            <span className="grow" />
+                            <StateBadge state={s.state} />
+                          </div>
+                          {s.title && <div className="session-title">{s.title}</div>}
+                          {s.message && <div className="title">{s.message}</div>}
+                        </>
+                      )}
+                      <div className="meta">
+                        <span className="chip">{s.model} · {s.effort}</span>
+                        {s.kind !== "custom" && (
+                          <button className={`chip toggle${s.autoAdvance ? " on" : ""}`} onClick={(e) => toggleAuto(e, s)}>
+                            auto: {s.autoAdvance ? "on" : "off"}
+                          </button>
+                        )}
                       </div>
-                      <div className="meta"><span className="chip">custom</span></div>
-                      {s.message && <div className="title">{s.message}</div>}
-                    </>
-                  ) : (
-                    <>
-                      <div className="row">
-                        <span className="id">{s.ticket}</span>
-                        <span className="grow" />
-                        <StateBadge state={s.state} />
-                      </div>
-                      {s.title && <div className="session-title">{s.title}</div>}
-                      <div className="status">{s.launchStatus}</div>
-                      {s.message && <div className="title">{s.message}</div>}
-                    </>
-                  )}
-                  <div className="meta">
-                    <span className="chip">{s.model} · {s.effort}</span>
-                    {s.kind !== "custom" && (
-                      <button className={`chip toggle${s.autoAdvance ? " on" : ""}`} onClick={(e) => toggleAuto(e, s)}>
-                        auto: {s.autoAdvance ? "on" : "off"}
+                    </div>
+                    <div className="row" style={{ marginTop: 12 }}>
+                      <button className="btn ghost sm grow" onClick={() => onOpen(s)}>Open</button>
+                      <button className={`btn sm${active ? " danger" : ""}`} onClick={() => dismiss(s)}>
+                        {active ? "Kill" : "Dismiss"}
                       </button>
-                    )}
+                    </div>
                   </div>
-                </div>
-                <div className="row" style={{ marginTop: 12 }}>
-                  <button className="btn ghost sm grow" onClick={() => onOpen(s)}>Open</button>
-                  <button className={`btn sm${active ? " danger" : ""}`} onClick={() => dismiss(s)}>
-                    {active ? "Kill" : "Dismiss"}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          ))}
         </section>
       ))}
       {newOpen && <NewSessionSheet token={token} onClose={() => setNewOpen(false)} onLaunched={onChanged} />}
