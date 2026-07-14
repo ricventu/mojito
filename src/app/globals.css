@@ -27,6 +27,8 @@
   --ok: #57d977;    --ok-bg: #143020;
   --err: #ff6b6b;   --err-bg: #37191b;
   --wait: #9aa1ab;  --wait-bg: #1f242a;
+  --indigo: #a08cff; --indigo-bg: #20203b;
+  --teal: #3fd0c9;   --teal-bg: #0e2b2a;
 
   --r: 12px;
   --r-sm: 9px;
@@ -103,6 +105,9 @@ label { color: var(--text); }
 .sect::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 .sect:first-child { margin-top: 2px; }
 
+/* ---- Status sub-group header (within a project section) ---- */
+.substatus { margin: 12px 2px 8px; }
+
 /* ---- Filter bar (tickets / sessions) ---- */
 .filter { margin: 2px 2px 8px; }
 .filter-top { display: flex; align-items: center; gap: 8px; }
@@ -137,6 +142,17 @@ button.chip:active { transform: scale(.96); }
 .badge.ok   { color: var(--ok);   background: var(--ok-bg);   border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
 .badge.err  { color: var(--err);  background: var(--err-bg);  border-color: color-mix(in srgb, var(--err) 40%, transparent); }
 .badge.wait { color: var(--wait); background: var(--wait-bg); border-color: var(--border-hi); }
+
+/* ---- Status badges (Linear lifecycle) ---- */
+.badge.grey   { color: var(--wait);       background: var(--wait-bg);   border-color: var(--border-hi); }
+.badge.blue   { color: var(--run);        background: var(--run-bg);    border-color: color-mix(in srgb, var(--run) 40%, transparent); }
+.badge.indigo { color: var(--indigo);     background: var(--indigo-bg); border-color: color-mix(in srgb, var(--indigo) 45%, transparent); }
+.badge.amber  { color: var(--attn);       background: var(--attn-bg);   border-color: color-mix(in srgb, var(--attn) 45%, transparent); }
+.badge.teal   { color: var(--teal);       background: var(--teal-bg);   border-color: color-mix(in srgb, var(--teal) 45%, transparent); }
+.badge.green  { color: var(--ok);         background: var(--ok-bg);     border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.badge.red    { color: var(--err);        background: var(--err-bg);    border-color: color-mix(in srgb, var(--err) 40%, transparent); }
+.badge.muted  { color: var(--text-faint); background: var(--surface-hi); border-color: var(--border); }
+
 .badge.run .dot, .badge.wait .dot { animation: mojito-pulse 1.6s ease-in-out infinite; }
 @keyframes mojito-pulse { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .badge .dot { animation: none; } }
