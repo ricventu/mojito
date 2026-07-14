@@ -32,7 +32,10 @@ export default function Home() {
   useEvents(token, onEvent);
 
   if (!token) return <TokenGate onSet={setToken} />;
-  if (open) return <TerminalView token={token} session={open} onBack={() => setOpen(null)} />;
+  // Refresh on leaving the terminal: dismiss/advance mutate server state, and a
+  // dead session (tmux gone) emits no hook event to trigger a refresh on its own,
+  // so without this its card would linger in the list after being deleted.
+  if (open) return <TerminalView token={token} session={open} onBack={() => { setOpen(null); refreshSessions(); }} />;
 
   const needsInput = sessions.filter((s) => s.state === "needs-input").length;
 
