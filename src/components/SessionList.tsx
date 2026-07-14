@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/client";
 import StateBadge from "./StateBadge";
 import FilterBar, { NO_PROJECT } from "./FilterBar";
 import type { SessionMeta } from "@/server/types";
+import { orderSessions } from "@/lib/orderSessions";
 
 export default function SessionList(
   { token, sessions, onOpen, onChanged }:
@@ -65,7 +66,7 @@ export default function SessionList(
       {Object.entries(groups).map(([proj, items]) => (
         <section key={proj}>
           <h4 className="sect">{proj}</h4>
-          {items.map((s) => {
+          {orderSessions(items).map((s) => {
             const active = s.state === "running" || s.state === "needs-input" || s.state === "starting";
             return (
               <div key={s.id} className={`card${s.state === "needs-input" ? " attn" : ""}`}>
