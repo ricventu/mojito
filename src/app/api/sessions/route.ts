@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getConfig, getRegistry } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
-import { launchSession } from "@/server/launch";
+import { launchSession, launchCustomSession } from "@/server/launch";
 import { hasSession, newSession, pipePane } from "@/server/tmux";
 
 export async function GET(req: Request) {
@@ -19,6 +19,15 @@ export async function POST(req: Request) {
   // launch command can never carry an arbitrary token.
   if (body.trailingArg !== undefined && body.trailingArg !== "local" && body.trailingArg !== "mr") {
     return NextResponse.json({ error: "invalid trailingArg" }, { status: 400 });
+  }
+  if (body.kind === "custom") {
+    const res = await launchCustomSession(
+      { projectName: body.projectName ?? null, model: body.model ?? "opus", effort: body.effort ?? "high" },
+      { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
+        projectsPath: cfg.projectsPath, hasSession, newSession, pipePane },
+    );
+    if (!res.ok) return NextResponse.json({ error: res.reason }, { status: 422 });
+    return NextResponse.json(res.meta, { status: 201 });
   }
   const res = await launchSession(
     { ticket: body.ticket, status: body.status, model: body.model ?? "opus", effort: body.effort ?? "high",
