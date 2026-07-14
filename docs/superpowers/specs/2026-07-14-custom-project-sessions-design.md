@@ -159,12 +159,12 @@ else the existing `launchSession`. A `no-repo` result → 422.
   `{ kind: "custom", projectName, model, effort }` to `/api/sessions`, then
   `onLaunched()` + close. Mirrors `LaunchSheet`'s styling and error handling.
 
-### Guards (`src/server/autoAdvance.ts` / `autoAdvanceRunner.ts`)
+### Guards
 
-Custom sessions must never auto-advance. `autoAdvance` is already `false` for them (so
-`decideAutoAdvance` returns no-launch), and `handleHook`'s custom branch never calls
-`onAutoAdvance`. Add an explicit early-out for `kind === "custom"` in the runner as
-defense-in-depth.
+Custom sessions must never auto-advance. The guard lives entirely in `handleHook`: its
+custom branch returns before the lifecycle logic and never calls `onAutoAdvance` (the only
+caller of `runAutoAdvance`). `autoAdvance` is also `false` on their meta. No change to
+`autoAdvance.ts` / `autoAdvanceRunner.ts` is required.
 
 ## Backward compatibility
 
@@ -204,6 +204,5 @@ All under `npx tsc --noEmit && npx vitest run`.
 - `src/app/api/sessions/route.ts` — branch on `kind`.
 - `src/app/api/projects/route.ts` — new.
 - `src/server/sidecar.ts` — `readSidecar` defaults missing `kind` to `"lime"`.
-- `src/server/autoAdvanceRunner.ts` — skip custom.
 - `src/components/SessionList.tsx` — button + custom card rendering.
 - `src/components/NewSessionSheet.tsx` — new.
