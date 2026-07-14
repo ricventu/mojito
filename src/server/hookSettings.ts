@@ -2,6 +2,9 @@ import type { HookEventName } from "./types.js";
 
 const EVENTS: HookEventName[] = ["SessionStart", "UserPromptSubmit", "PermissionRequest", "Notification", "PostToolUse", "Stop", "SessionEnd"];
 
+// EVENTS and MATCHED_EVENTS must be disjoint: any event in both would have its unmatched
+// entry (line 22) clobbered by the matched entry (line 25) when buildHookSettings writes
+// into the same hooks[event] map.
 // PreToolUse fires for every tool, so it MUST be scoped by a matcher: only AskUserQuestion
 // should drive the "the agent is asking a question" (needs-input) signal. PostToolUse is
 // intentionally unmatched (all tools, incl. subagent tool calls) — any finished tool means

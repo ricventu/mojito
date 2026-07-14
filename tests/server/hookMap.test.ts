@@ -26,6 +26,12 @@ describe("mapHook", () => {
     expect(o.alert).toBeNull();
   });
 
+  it("user prompt submit returns to running with no alert", () => {
+    const o = mapHook("UserPromptSubmit", false);
+    expect(o.state).toBe("running");
+    expect(o.alert).toBeNull();
+  });
+
   it("stop with advanced status is done", () => {
     const o = mapHook("Stop", true);
     expect(o.state).toBe("done");
