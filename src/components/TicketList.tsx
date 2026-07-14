@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import LaunchSheet from "./LaunchSheet";
 import FilterBar, { NO_PROJECT } from "./FilterBar";
 import type { SessionMeta, TicketSummary } from "@/server/types";
+import { activeSessionLevel, type ActiveLevel } from "@/lib/ticketSessionLevel";
 
 export default function TicketList(
   { token, tickets, sessions, onLaunched, onOpen }:
@@ -16,6 +17,15 @@ export default function TicketList(
     () => Array.from(new Set(tickets.map((t) => t.project ?? NO_PROJECT))).sort(),
     [tickets],
   );
+
+  const levels = useMemo(() => {
+    const m = new Map<string, ActiveLevel>();
+    for (const t of tickets) {
+      const level = activeSessionLevel(t.identifier, sessions);
+      if (level) m.set(t.identifier, level);
+    }
+    return m;
+  }, [tickets, sessions]);
 
   const q = query.trim().toLowerCase();
   const filtered = tickets.filter((t) => {
@@ -44,7 +54,16 @@ export default function TicketList(
           <h4 className="sect">{project}</h4>
           {items.map((t) => (
             <button key={t.identifier} className="card tap" onClick={() => setPicked(t)}>
-              <div><span className="id">{t.identifier}</span> <span className="status">· {t.statusName}</span></div>
+              <div>
+                <span className="id">{t.identifier}</span> <span className="status">· {t.statusName}</span>
+                {levels.get(t.identifier) && (
+                  <span
+                    className={`s-dot ${levels.get(t.identifier)}`}
+                    aria-label={levels.get(t.identifier) === "attn" ? "needs input" : "session running"}
+                    title={levels.get(t.identifier) === "attn" ? "needs input" : "session running"}
+                  />
+                )}
+              </div>
               <div className="title">{t.title}</div>
               {t.labels.length > 0 && (
                 <div className="meta">{t.labels.map((l) => <span key={l} className="chip">{l}</span>)}</div>
