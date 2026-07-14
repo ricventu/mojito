@@ -10,6 +10,10 @@ describe("stageAdvanced", () => {
   it("is false when the status is unchanged", () => {
     expect(stageAdvanced("To Code", "To Code")).toBe(false);
   });
+  it("is false for a same-stage move (Backlog and Todo are both stage 1)", () => {
+    expect(stageAdvanced("Backlog", "Todo")).toBe(false);
+    expect(stageAdvanced("Todo", "Backlog")).toBe(false);
+  });
   it("is false on a backward move (QA reject sends To QA -> To Code)", () => {
     // Reject is a manual/GUI action; a stray Stop hook seeing the backward move
     // must not be read as a completed stage and relaunch Stage 2.
