@@ -31,4 +31,11 @@ describe("status metadata", () => {
     expect(statusColorClass("To Code")).toBe("blue");
     expect(statusColorClass("Done")).toBe("green");
   });
+
+  it("only uses hues that have a matching badge CSS rule", () => {
+    const ALLOWED_HUES = new Set(["grey", "blue", "indigo", "amber", "teal", "green", "red", "muted"]);
+    for (const hue of Object.values(STATUS_COLOR)) {
+      expect(ALLOWED_HUES, `hue ${hue}`).toContain(hue);
+    }
+  });
 });
