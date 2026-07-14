@@ -8,6 +8,7 @@ const KEYS: { label: string; bytes: string }[] = [
   { label: "←", bytes: "\x1b[D" },
   { label: "→", bytes: "\x1b[C" },
   { label: "⏎", bytes: "\r" },
+  { label: "⇧⏎", bytes: "\n" },
   { label: "^C", bytes: "\x03" },
   { label: "1", bytes: "1" },
   { label: "2", bytes: "2" },

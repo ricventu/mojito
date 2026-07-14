@@ -31,6 +31,17 @@ export default function TerminalView(
     fit.fit();
     termRef.current = term;
 
+    // Enter submits in claude's TUI; Shift+Enter must insert a newline instead.
+    // xterm emits a bare CR for Enter regardless of Shift, so intercept the keydown
+    // and send LF (0x0A, claude's `chat:newline`) ourselves, suppressing the CR.
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type === "keydown" && e.key === "Enter" && e.shiftKey) {
+        wsRef.current?.send(new TextEncoder().encode("\n"));
+        return false;
+      }
+      return true;
+    });
+
     let closed = false;
     let retry: ReturnType<typeof setTimeout>;
     const connect = () => {
