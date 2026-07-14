@@ -21,3 +21,7 @@ export function tmuxName(ticket: string, status: string): string {
   validateTicket(ticket);
   return `mojito-${ticket}-${statusSlug(status)}`;
 }
+
+export function customSessionName(slug: string, unique: string): string {
+  return `mojito-custom-${slug}-${unique}`;
+}

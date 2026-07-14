@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { statusSlug, tmuxName, parseIdentifier, validateTicket } from "@/server/sessionKey";
+import { statusSlug, tmuxName, parseIdentifier, validateTicket, customSessionName } from "@/server/sessionKey";
 
 describe("sessionKey", () => {
   it("slugs a status", () => {
@@ -20,5 +20,17 @@ describe("sessionKey", () => {
   it("rejects a malformed ticket", () => {
     expect(() => validateTicket("nonsense")).toThrow();
     expect(() => validateTicket("RIC-46")).not.toThrow();
+  });
+});
+
+describe("customSessionName", () => {
+  it("builds a prefixed name from slug and unique id", () => {
+    expect(customSessionName("mojito", "a1b2c3")).toBe("mojito-custom-mojito-a1b2c3");
+  });
+  it("uses the general slug form", () => {
+    expect(customSessionName("general", "ffffff")).toBe("mojito-custom-general-ffffff");
+  });
+  it("distinct unique ids yield distinct names", () => {
+    expect(customSessionName("x", "aaa")).not.toBe(customSessionName("x", "bbb"));
   });
 });
