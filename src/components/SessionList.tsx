@@ -38,6 +38,12 @@ export default function SessionList(
     onChanged();
   };
 
+  const cleanup = async () => {
+    if (!confirm("Remove all orphaned sessions (their tmux is gone)?")) return;
+    await apiFetch(token, "/api/sessions/sweep", { method: "POST" });
+    onChanged();
+  };
+
   const toggleAuto = async (e: React.MouseEvent, s: SessionMeta) => {
     e.stopPropagation();
     await apiFetch(token, `/api/sessions/${s.id}`, { method: "PATCH", body: JSON.stringify({ autoAdvance: !s.autoAdvance }) });
@@ -51,6 +57,7 @@ export default function SessionList(
           query={query} onQuery={setQuery}
           projects={projects} active={project} onProject={setProject}
           placeholder="Filter sessions…"
+          action={<button className="btn ghost sm" onClick={cleanup}>Clean up</button>}
         />
       )}
       {sessions.length === 0 && <p className="empty">No sessions.</p>}
