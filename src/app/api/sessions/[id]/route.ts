@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getConfig, getRegistry, getBus } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
-import { killSession } from "@/server/tmux";
+import { closeSession } from "@/server/tmux";
 import { removeSidecar } from "@/server/sidecar";
 import { updateAutoAdvance } from "@/server/updateSession";
 
@@ -9,7 +9,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const cfg = getConfig();
   if (!tokenFromHeaders(req.headers, cfg.token)) return new NextResponse("unauthorized", { status: 401 });
   const { id } = await params;
-  await killSession(id);
+  await closeSession(id);
   getRegistry().remove(id);
   removeSidecar(cfg.stateDir, id);
   return new NextResponse(null, { status: 204 });

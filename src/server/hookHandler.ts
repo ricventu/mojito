@@ -2,7 +2,7 @@ import type { HookEventName, SessionMeta } from "./types.js";
 import type { Registry } from "./registry.js";
 import type { EventBus } from "./events.js";
 import { mapHook } from "./hookMap.js";
-import { decideAutoAdvance } from "./autoAdvance.js";
+import { decideAutoAdvance, stageAdvanced } from "./autoAdvance.js";
 
 export interface HookDeps {
   registry: Registry;
@@ -20,7 +20,10 @@ export async function handleHook(id: string, event: HookEventName, deps: HookDep
   if (event === "Stop" || event === "SessionEnd") {
     try {
       newStatus = await deps.getIssueStatus(meta.ticket);
-      statusAdvanced = newStatus !== meta.launchStatus;
+      // Advance only on a genuine stage handoff. Planned→In Progress is Stage 2
+      // flagging itself in-flight, not a completed stage — treating it as an
+      // advance would mark the session done and launch a duplicate Stage 2.
+      statusAdvanced = stageAdvanced(meta.launchStatus, newStatus);
     } catch {
       statusAdvanced = false; // fetch failure => treat as not advanced (Stop => needs-input, SessionEnd => failed)
     }

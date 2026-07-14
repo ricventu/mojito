@@ -19,4 +19,14 @@ run("tmux control (requires tmux)", () => {
     await tmux.killSession(NAME);
     expect(await tmux.hasSession(NAME)).toBe(false);
   });
+
+  it("closeSession interrupts the process and lets the session auto-close (no force)", async () => {
+    const CLOSE_NAME = "mojito-test-ric-1-close";
+    await tmux.newSession(CLOSE_NAME, tmpdir(), "sleep 30");
+    expect(await tmux.hasSession(CLOSE_NAME)).toBe(true);
+    // C-c interrupts sleep, the session command exits, and tmux tears the session down.
+    const res = await tmux.closeSession(CLOSE_NAME, {}, 8000, 100);
+    expect(res).toEqual({ closed: true, forced: false });
+    expect(await tmux.hasSession(CLOSE_NAME)).toBe(false);
+  });
 });

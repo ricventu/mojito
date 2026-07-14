@@ -31,15 +31,28 @@ describe("handleHook", () => {
     expect(events).toContainEqual({ type: "session.state", id: "mojito-RIC-46-planned", state: "needs-input" });
   });
 
-  it("stop with advanced status marks done and triggers auto-advance when enabled", async () => {
+  it("stop with a stage advance marks done and triggers auto-advance when enabled", async () => {
+    const { registry } = seed({ autoAdvance: true });
+    const bus = new EventBus();
+    const onAutoAdvance = vi.fn();
+    await handleHook("mojito-RIC-46-planned", "Stop", {
+      registry, bus, getIssueStatus: async () => "To Review", onAutoAdvance,
+    });
+    expect(registry.get("mojito-RIC-46-planned")?.state).toBe("done");
+    expect(onAutoAdvance).toHaveBeenCalledWith(expect.objectContaining({ ticket: "RIC-46" }), "To Review");
+  });
+
+  it("stop while status only moved within the same stage does NOT advance", async () => {
+    // Planned→In Progress is Stage 2 marking itself in-flight, not a handoff.
+    // Marking done here would spuriously launch a duplicate Stage 2 session.
     const { registry } = seed({ autoAdvance: true });
     const bus = new EventBus();
     const onAutoAdvance = vi.fn();
     await handleHook("mojito-RIC-46-planned", "Stop", {
       registry, bus, getIssueStatus: async () => "In Progress", onAutoAdvance,
     });
-    expect(registry.get("mojito-RIC-46-planned")?.state).toBe("done");
-    expect(onAutoAdvance).toHaveBeenCalledWith(expect.objectContaining({ ticket: "RIC-46" }), "In Progress");
+    expect(registry.get("mojito-RIC-46-planned")?.state).not.toBe("done");
+    expect(onAutoAdvance).not.toHaveBeenCalled();
   });
 
   it("stop with unchanged status is needs-input (claude asked something)", async () => {
