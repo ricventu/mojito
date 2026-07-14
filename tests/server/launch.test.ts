@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mkdtempSync, statSync } from "node:fs";
+import { mkdtempSync, statSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { launchSession, buildClaudeCommand } from "@/server/launch";
+import { launchSession, buildClaudeCommand, launchCustomSession, buildCustomClaudeCommand } from "@/server/launch";
 import { Registry } from "@/server/registry";
+import type { SessionMeta } from "@/server/types";
 
 let dir: string;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "mojito-")); });
@@ -113,5 +114,71 @@ describe("launchSession", () => {
     const meta = d.registry.get("mojito-RIC-46-planned");
     expect(meta?.title).toBe("Auto-advance toggle");
     expect(meta?.labels).toEqual(["Feature"]);
+  });
+});
+
+function customDeps(over: Record<string, unknown> = {}) {
+  return {
+    registry: new Registry(dir), stateDir: dir, port: 4711, token: "test-token",
+    projectsPath: "/nope.json",
+    hasSession: vi.fn(async () => false),
+    newSession: vi.fn(async () => {}),
+    pipePane: vi.fn(async () => {}),
+    nowIso: () => "2026-07-11T00:00:00.000Z",
+    genId: () => "abc123",
+    homeDir: () => "/home/me",
+    ...over,
+  };
+}
+
+describe("buildCustomClaudeCommand", () => {
+  it("builds a bare claude command with no slash command", () => {
+    const cmd = buildCustomClaudeCommand({ projectName: null, model: "opus", effort: "high" }, "/s/x.json");
+    expect(cmd).toBe("claude --model 'opus' --effort 'high' --settings '/s/x.json'");
+    expect(cmd).not.toContain("/lime-next");
+  });
+});
+
+describe("launchCustomSession", () => {
+  it("General opens in the home directory with a home label", async () => {
+    const d = customDeps();
+    const res = await launchCustomSession({ projectName: null, model: "opus", effort: "high" }, d);
+    expect(res.ok).toBe(true);
+    const meta = (res as { ok: true; meta: SessionMeta }).meta;
+    expect(meta).toMatchObject({ kind: "custom", id: "mojito-custom-general-abc123", ticket: "",
+      launchStatus: "", cwd: "/home/me", projectName: null, title: "home", autoAdvance: false });
+    expect(d.newSession).toHaveBeenCalledWith("mojito-custom-general-abc123", "/home/me",
+      expect.stringContaining("claude --model 'opus'"));
+  });
+
+  it("a mapped project opens in its folder with the basename label", async () => {
+    const projectsPath = join(dir, "projects.json");
+    writeFileSync(projectsPath, JSON.stringify({ RIC: { projects: { Mojito: "/code/Lime/mojito" } } }));
+    const d = customDeps({ projectsPath });
+    const res = await launchCustomSession({ projectName: "Mojito", model: "sonnet", effort: "low" }, d);
+    expect(res.ok).toBe(true);
+    const meta = (res as { ok: true; meta: SessionMeta }).meta;
+    expect(meta).toMatchObject({ kind: "custom", id: "mojito-custom-mojito-abc123",
+      cwd: "/code/Lime/mojito", projectName: "Mojito", title: "mojito" });
+  });
+
+  it("writes hook settings but NO launch-context file", async () => {
+    const d = customDeps();
+    await launchCustomSession({ projectName: null, model: "opus", effort: "high" }, d);
+    expect(existsSync(join(dir, "settings", "mojito-custom-general-abc123.json"))).toBe(true);
+    expect(existsSync(join(dir, "context", "mojito-custom-general-abc123.json"))).toBe(false);
+  });
+
+  it("refuses an unmapped project", async () => {
+    const d = customDeps();
+    const res = await launchCustomSession({ projectName: "Ghost", model: "opus", effort: "high" }, d);
+    expect(res).toMatchObject({ ok: false, reason: "no-repo" });
+  });
+
+  it("registers the session in the registry", async () => {
+    const d = customDeps();
+    const res = await launchCustomSession({ projectName: null, model: "opus", effort: "high" }, d);
+    const id = (res as { ok: true; meta: SessionMeta }).meta.id;
+    expect(d.registry.get(id)?.kind).toBe("custom");
   });
 });

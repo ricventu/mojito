@@ -1,9 +1,11 @@
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, basename } from "node:path";
+import { homedir } from "node:os";
+import { randomBytes } from "node:crypto";
 import type { Effort, SessionMeta } from "./types.js";
-import { tmuxName, parseIdentifier, validateTicket } from "./sessionKey.js";
+import { tmuxName, parseIdentifier, validateTicket, statusSlug, customSessionName } from "./sessionKey.js";
 import { buildHookSettings } from "./hookSettings.js";
-import { loadProjectMap, resolveRepoFromMap } from "./limeProjects.js";
+import { loadProjectMap, resolveRepoFromMap, resolvePathForProject } from "./limeProjects.js";
 import { resolveWorktree } from "./worktree.js";
 import { logfilePath } from "./sidecar.js";
 import type { Registry } from "./registry.js";
@@ -99,6 +101,67 @@ export async function launchSession(
     projectName: req.projectName,
     title: req.title,
     labels: req.labels,
+  };
+  deps.registry.upsert(meta);
+  return { ok: true, meta };
+}
+
+export interface CustomLaunchRequest {
+  projectName: string | null;
+  model: string;
+  effort: Effort;
+}
+
+export function buildCustomClaudeCommand(req: CustomLaunchRequest, settingsPath: string): string {
+  const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
+  return `claude --model ${q(req.model)} --effort ${q(req.effort)} --settings ${q(settingsPath)}`;
+}
+
+export async function launchCustomSession(
+  req: CustomLaunchRequest,
+  deps: LaunchDeps & { genId?: () => string; homeDir?: () => string },
+): Promise<{ ok: true; meta: SessionMeta } | { ok: false; reason: "no-repo" }> {
+  const homeDir = deps.homeDir ?? (() => homedir());
+  const genId = deps.genId ?? (() => randomBytes(3).toString("hex"));
+
+  let cwd: string;
+  if (req.projectName) {
+    const path = resolvePathForProject(loadProjectMap(deps.projectsPath), req.projectName);
+    if (!path) return { ok: false, reason: "no-repo" };
+    cwd = path;
+  } else {
+    cwd = homeDir();
+  }
+
+  const slug = req.projectName ? statusSlug(req.projectName) : "general";
+  const id = customSessionName(slug, genId());
+
+  const settingsDir = join(deps.stateDir, "settings");
+  mkdirSync(settingsDir, { recursive: true, mode: 0o700 });
+  const settingsPath = join(settingsDir, `${id}.json`);
+  writeFileSync(settingsPath, JSON.stringify(buildHookSettings(id, deps.port, deps.token), null, 2), { mode: 0o600 });
+  chmodSync(settingsPath, 0o600); // mode on writeFileSync is ignored if the file pre-existed
+
+  // No launch-context file: custom sessions run bare `claude`, not /lime-next.
+  const command = buildCustomClaudeCommand(req, settingsPath);
+  await deps.newSession(id, cwd, command);
+  await deps.pipePane(id, logfilePath(deps.stateDir, id));
+
+  const title = cwd === homeDir() ? "home" : basename(cwd);
+  const meta: SessionMeta = {
+    kind: "custom",
+    id,
+    ticket: "",
+    launchStatus: "",
+    model: req.model,
+    effort: req.effort,
+    autoAdvance: false,
+    state: "starting",
+    cwd,
+    createdAt: (deps.nowIso ?? (() => new Date().toISOString()))(),
+    projectName: req.projectName,
+    title,
+    labels: [],
   };
   deps.registry.upsert(meta);
   return { ok: true, meta };
