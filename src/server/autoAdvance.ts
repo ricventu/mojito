@@ -4,12 +4,12 @@ export const GATE_STATES = ["To QA", "To Merge"];
 export const TERMINAL_STATES = ["Done", "Canceled", "Duplicate"];
 
 // Map each Linear workflow status to the lifecycle stage (per lime-next's dispatch
-// table) that handles it. Statuses sharing a stage — Planned and In Progress both
-// run Stage 2 — are NOT a handoff: In Progress is the working sub-state Stage 2
-// sets on itself, so entering it must never mark the stage done or launch a successor.
+// table) that handles it. Stage boundaries are the only status changes: each stage
+// has exactly one entry status, so any move to a LATER stage is a genuine handoff
+// and a backward move (a QA reject: To QA -> To Code) is not.
 const STAGE_OF: Record<string, number> = {
   Backlog: 1, Todo: 1,
-  Planned: 2, "In Progress": 2,
+  "To Code": 2,
   "To Review": 3,
   "To QA": 4,
   "To Merge": 5,
