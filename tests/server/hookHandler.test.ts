@@ -118,29 +118,46 @@ describe("handleHook — custom sessions", () => {
   });
 
   it("SessionEnd on a custom session is done, not failed", async () => {
-    const registry = seedCustom();
+    // launchStatus/getIssueStatus are chosen so that, on the lime fall-through path,
+    // stageAdvanced("To Code", "To Code") would be false, and mapHook("SessionEnd", false)
+    // maps to "failed" — not "done". A "done" result here can only come from the
+    // custom branch's unconditional done-on-SessionEnd override, so this fails if that
+    // branch is deleted.
+    const registry = seedCustom({ launchStatus: "To Code" });
     const bus = new EventBus();
+    const getIssueStatus = vi.fn(async () => "To Code");
     await handleHook("mojito-custom-general-abc", "SessionEnd",
-      { registry, bus, getIssueStatus: vi.fn(async () => "x"), onAutoAdvance: () => {} });
+      { registry, bus, getIssueStatus, onAutoAdvance: () => {} });
     expect(registry.get("mojito-custom-general-abc")?.state).toBe("done");
+    expect(getIssueStatus).not.toHaveBeenCalled();
   });
 
   it("never auto-advances a custom session", async () => {
-    const registry = seedCustom();
+    // autoAdvance is on AND the mocked status is a genuine stage handoff
+    // (To Code -> To Review, so stageAdvanced is true) — on the lime fall-through path
+    // this combination would map SessionEnd to "done" and then call onAutoAdvance.
+    // onAutoAdvance NOT being called here proves the custom branch suppresses
+    // auto-advance itself, rather than merely inheriting a false autoAdvance flag.
+    const registry = seedCustom({ autoAdvance: true, launchStatus: "To Code" });
     const bus = new EventBus();
     const onAutoAdvance = vi.fn();
+    const getIssueStatus = vi.fn(async () => "To Review");
     await handleHook("mojito-custom-general-abc", "SessionEnd",
-      { registry, bus, getIssueStatus: vi.fn(async () => "x"), onAutoAdvance });
+      { registry, bus, getIssueStatus, onAutoAdvance });
     expect(onAutoAdvance).not.toHaveBeenCalled();
+    expect(getIssueStatus).not.toHaveBeenCalled();
+    expect(registry.get("mojito-custom-general-abc")?.state).toBe("done");
   });
 
   it("keeps an empty session_title from clobbering the fallback label", async () => {
     const registry = seedCustom();
     const bus = new EventBus();
+    const getIssueStatus = vi.fn(async () => "x");
     await handleHook("mojito-custom-general-abc", "SessionStart",
-      { registry, bus, getIssueStatus: vi.fn(async () => "x"), onAutoAdvance: () => {} },
+      { registry, bus, getIssueStatus, onAutoAdvance: () => {} },
       { sessionTitle: "" });
     expect(registry.get("mojito-custom-general-abc")?.title).toBe("home");
+    expect(getIssueStatus).not.toHaveBeenCalled();
   });
 });
 
