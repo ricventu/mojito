@@ -1,8 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
-import { listOpenIssues, getIssueStatus } from "@/server/linear";
+import { listOpenIssues, getIssueStatus, getIssueRef, setIssueStatus, postComment } from "@/server/linear";
 
 function fakeFetch(payload: unknown) {
   return vi.fn(async () => ({ ok: true, json: async () => ({ data: payload }) })) as unknown as typeof fetch;
+}
+
+function seqFetch(payloads: unknown[]) {
+  let i = 0;
+  return vi.fn(async () => ({ ok: true, json: async () => ({ data: payloads[i++] }) })) as unknown as typeof fetch;
 }
 
 describe("linear client", () => {
@@ -34,5 +39,44 @@ describe("linear client", () => {
   it("returns a single issue status", async () => {
     const f = fakeFetch({ issues: { nodes: [{ state: { name: "Planned" } }] } });
     expect(await getIssueStatus("k", "RIC-46", f)).toBe("Planned");
+  });
+});
+
+describe("linear mutations", () => {
+  it("resolves an issue ref (node id + team id + status)", async () => {
+    const f = fakeFetch({ issues: { nodes: [{ id: "issue-uuid", state: { name: "To QA" }, team: { id: "team-uuid" } }] } });
+    expect(await getIssueRef("k", "RIC-110", f)).toEqual({ id: "issue-uuid", teamId: "team-uuid", statusName: "To QA" });
+  });
+
+  it("sets issue status by resolving the target state name to an id", async () => {
+    const f = seqFetch([
+      { issues: { nodes: [{ id: "issue-uuid", state: { name: "To QA" }, team: { id: "team-uuid" } }] } },
+      { team: { states: { nodes: [{ id: "s1", name: "To Code" }, { id: "s2", name: "To Merge" }] } } },
+      { issueUpdate: { success: true } },
+    ]);
+    await setIssueStatus("k", "RIC-110", "To Merge", f);
+    const updateCall = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[2][1] as { body: string };
+    expect(updateCall.body).toContain("issueUpdate");
+    expect(updateCall.body).toContain("s2");
+    expect(updateCall.body).toContain("issue-uuid");
+  });
+
+  it("throws when the target state does not exist in the team", async () => {
+    const f = seqFetch([
+      { issues: { nodes: [{ id: "issue-uuid", state: { name: "To QA" }, team: { id: "team-uuid" } }] } },
+      { team: { states: { nodes: [{ id: "s1", name: "To Code" }] } } },
+    ]);
+    await expect(setIssueStatus("k", "RIC-110", "To Merge", f)).rejects.toThrow(/To Merge/);
+  });
+
+  it("posts a comment on the resolved issue node", async () => {
+    const f = seqFetch([
+      { issues: { nodes: [{ id: "issue-uuid", state: { name: "To QA" }, team: { id: "team-uuid" } }] } },
+      { commentCreate: { success: true } },
+    ]);
+    await postComment("k", "RIC-110", "QA rejected — nope", f);
+    const commentCall = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[1][1] as { body: string };
+    expect(commentCall.body).toContain("commentCreate");
+    expect(commentCall.body).toContain("issue-uuid");
   });
 });
