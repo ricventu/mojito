@@ -10,6 +10,10 @@ export function mapHook(event: HookEventName, statusAdvanced: boolean): HookOutc
     case "SessionStart":
       // claude has booted and is now working — leave the transient "starting" state.
       return { state: "running", alert: null };
+    case "UserPromptSubmit":
+      // The user submitted a prompt — they have responded, so the session is no longer
+      // waiting on the human. Back to running (clears a stale needs-input badge).
+      return { state: "running", alert: null };
     case "PermissionRequest":
       return { state: "needs-input", alert: { kind: "needs-input", message: "claude needs permission" } };
     case "Notification":
@@ -19,7 +23,8 @@ export function mapHook(event: HookEventName, statusAdvanced: boolean): HookOutc
       // hook that signals "waiting for input" immediately (Notification is idle-timed).
       return { state: "needs-input", alert: { kind: "needs-input", message: "claude is asking a question" } };
     case "PostToolUse":
-      // The question was answered; the agent is working again. No alert.
+      // A tool call finished — the agent is working, not waiting. Clears needs-input
+      // (an answered AskUserQuestion, a granted permission's tool, or resumed work).
       return { state: "running", alert: null };
     case "Stop":
       return statusAdvanced

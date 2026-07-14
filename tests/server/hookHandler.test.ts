@@ -71,4 +71,27 @@ describe("handleHook", () => {
     // no throw, nothing emitted
     expect(registry.get("nope")).toBeUndefined();
   });
+
+  it("UserPromptSubmit clears needs-input back to running (RIC-117)", async () => {
+    const { registry } = seed({ state: "needs-input", message: "claude is waiting for you" });
+    const bus = new EventBus();
+    const events: unknown[] = [];
+    bus.subscribe((e) => events.push(e));
+    await handleHook("mojito-RIC-46-to-code", "UserPromptSubmit", {
+      registry, bus, getIssueStatus: async () => "To Code", onAutoAdvance: () => {},
+    });
+    const m = registry.get("mojito-RIC-46-to-code");
+    expect(m?.state).toBe("running");
+    expect(m?.message).toBeUndefined();
+    expect(events).toContainEqual({ type: "session.state", id: "mojito-RIC-46-to-code", state: "running" });
+  });
+
+  it("PostToolUse (any tool) clears needs-input back to running (RIC-117)", async () => {
+    const { registry } = seed({ state: "needs-input", message: "claude needs your attention" });
+    const bus = new EventBus();
+    await handleHook("mojito-RIC-46-to-code", "PostToolUse", {
+      registry, bus, getIssueStatus: async () => "To Code", onAutoAdvance: () => {},
+    });
+    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("running");
+  });
 });
