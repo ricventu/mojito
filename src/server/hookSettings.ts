@@ -1,12 +1,13 @@
 import type { HookEventName } from "./types.js";
 
-const EVENTS: HookEventName[] = ["SessionStart", "PermissionRequest", "Notification", "Stop", "SessionEnd"];
+const EVENTS: HookEventName[] = ["SessionStart", "UserPromptSubmit", "PermissionRequest", "Notification", "PostToolUse", "Stop", "SessionEnd"];
 
-// PreToolUse/PostToolUse fire for every tool, so they must be scoped by a matcher.
-// Only AskUserQuestion should drive the session's needs-input signal.
+// PreToolUse fires for every tool, so it MUST be scoped by a matcher: only AskUserQuestion
+// should drive the "the agent is asking a question" (needs-input) signal. PostToolUse is
+// intentionally unmatched (all tools, incl. subagent tool calls) — any finished tool means
+// the agent is working again, which clears a stale needs-input (mapHook: PostToolUse -> running).
 const MATCHED_EVENTS: { event: HookEventName; matcher: string }[] = [
   { event: "PreToolUse", matcher: "AskUserQuestion" },
-  { event: "PostToolUse", matcher: "AskUserQuestion" },
 ];
 
 function command(sessionId: string, port: number, event: HookEventName, token: string): string {
