@@ -11,9 +11,31 @@ export interface HookDeps {
   onAutoAdvance: (meta: SessionMeta, newStatus: string) => void;
 }
 
-export async function handleHook(id: string, event: HookEventName, deps: HookDeps): Promise<void> {
+export async function handleHook(
+  id: string,
+  event: HookEventName,
+  deps: HookDeps,
+  payload?: { sessionTitle?: string },
+): Promise<void> {
   const meta = deps.registry.get(id);
   if (!meta) return;
+
+  if (meta.kind === "custom") {
+    // Custom sessions have no ticket or lifecycle: never call Linear, never auto-advance.
+    // SessionEnd is a clean close (done), not a failure.
+    const outcome = event === "SessionEnd"
+      ? { state: "done" as const, alert: null }
+      : mapHook(event, false);
+    const patch: Partial<SessionMeta> = { state: outcome.state, message: outcome.alert?.message };
+    const title = payload?.sessionTitle;
+    if (typeof title === "string" && title.length > 0 && title !== meta.title) patch.title = title;
+    deps.registry.patch(id, patch);
+    deps.bus.emit({ type: "session.state", id, state: outcome.state });
+    if (outcome.alert) {
+      deps.bus.emit({ type: "session.alert", id, kind: outcome.alert.kind, ticket: "", message: outcome.alert.message });
+    }
+    return;
+  }
 
   let statusAdvanced = false;
   let newStatus = meta.launchStatus;

@@ -95,3 +95,60 @@ describe("handleHook", () => {
     expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("running");
   });
 });
+
+function seedCustom(over: Partial<SessionMeta> = {}): Registry {
+  const registry = new Registry(dir);
+  registry.upsert({ kind: "custom", id: "mojito-custom-general-abc", ticket: "", launchStatus: "",
+    model: "opus", effort: "high", autoAdvance: false, state: "running", cwd: "/home/me",
+    createdAt: "2026-07-11T00:00:00.000Z", title: "home", labels: [], ...over });
+  return registry;
+}
+
+describe("handleHook — custom sessions", () => {
+  it("patches the title from session_title without calling Linear", async () => {
+    const registry = seedCustom();
+    const bus = new EventBus();
+    const getIssueStatus = vi.fn(async () => "unused");
+    await handleHook("mojito-custom-general-abc", "SessionStart",
+      { registry, bus, getIssueStatus, onAutoAdvance: () => {} },
+      { sessionTitle: "refactor auth flow" });
+    expect(registry.get("mojito-custom-general-abc")?.title).toBe("refactor auth flow");
+    expect(registry.get("mojito-custom-general-abc")?.state).toBe("running");
+    expect(getIssueStatus).not.toHaveBeenCalled();
+  });
+
+  it("SessionEnd on a custom session is done, not failed", async () => {
+    const registry = seedCustom();
+    const bus = new EventBus();
+    await handleHook("mojito-custom-general-abc", "SessionEnd",
+      { registry, bus, getIssueStatus: vi.fn(async () => "x"), onAutoAdvance: () => {} });
+    expect(registry.get("mojito-custom-general-abc")?.state).toBe("done");
+  });
+
+  it("never auto-advances a custom session", async () => {
+    const registry = seedCustom();
+    const bus = new EventBus();
+    const onAutoAdvance = vi.fn();
+    await handleHook("mojito-custom-general-abc", "SessionEnd",
+      { registry, bus, getIssueStatus: vi.fn(async () => "x"), onAutoAdvance });
+    expect(onAutoAdvance).not.toHaveBeenCalled();
+  });
+
+  it("keeps an empty session_title from clobbering the fallback label", async () => {
+    const registry = seedCustom();
+    const bus = new EventBus();
+    await handleHook("mojito-custom-general-abc", "SessionStart",
+      { registry, bus, getIssueStatus: vi.fn(async () => "x"), onAutoAdvance: () => {} },
+      { sessionTitle: "" });
+    expect(registry.get("mojito-custom-general-abc")?.title).toBe("home");
+  });
+});
+
+it("does not overwrite a lime session's title", async () => {
+  const { registry } = seed({ title: "Linear title" });
+  const bus = new EventBus();
+  await handleHook("mojito-RIC-46-to-code", "SessionStart",
+    { registry, bus, getIssueStatus: async () => "To Code", onAutoAdvance: () => {} },
+    { sessionTitle: "should be ignored" });
+  expect(registry.get("mojito-RIC-46-to-code")?.title).toBe("Linear title");
+});
