@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveRepoFromMap } from "@/server/limeProjects";
+import { resolveRepoFromMap, listMappedProjects, resolvePathForProject } from "@/server/limeProjects";
 
 describe("resolveRepoFromMap", () => {
   const map = {
@@ -17,5 +17,34 @@ describe("resolveRepoFromMap", () => {
   });
   it("returns null for an unknown team", () => {
     expect(resolveRepoFromMap(map, "NOPE", null)).toBeNull();
+  });
+});
+
+describe("listMappedProjects", () => {
+  const map = {
+    ENG: "/code/backend",
+    WEB: { path: "/code/web", projects: { "Design System": "/code/ds", "Marketing": "/code/mkt" } },
+    OPS: { path: "/code/ops" },
+  };
+  it("flattens string, object-with-projects, and path-only entries, sorted by name", () => {
+    expect(listMappedProjects(map)).toEqual([
+      { name: "Design System", path: "/code/ds" },
+      { name: "ENG", path: "/code/backend" },
+      { name: "Marketing", path: "/code/mkt" },
+      { name: "OPS", path: "/code/ops" },
+    ]);
+  });
+  it("returns an empty array for an empty map", () => {
+    expect(listMappedProjects({})).toEqual([]);
+  });
+});
+
+describe("resolvePathForProject", () => {
+  const map = { WEB: { path: "/code/web", projects: { "Design System": "/code/ds" } } };
+  it("resolves a named project", () => {
+    expect(resolvePathForProject(map, "Design System")).toBe("/code/ds");
+  });
+  it("returns null for an unmapped name", () => {
+    expect(resolvePathForProject(map, "Nope")).toBeNull();
   });
 });

@@ -21,3 +21,21 @@ export function resolveRepoFromMap(
   if (projectName && entry.projects && entry.projects[projectName]) return entry.projects[projectName];
   return entry.path ?? null;
 }
+
+export function listMappedProjects(map: ProjectMap): { name: string; path: string }[] {
+  const out: { name: string; path: string }[] = [];
+  for (const [key, entry] of Object.entries(map)) {
+    if (typeof entry === "string") {
+      out.push({ name: key, path: entry });
+    } else if (entry.projects && Object.keys(entry.projects).length > 0) {
+      for (const [name, path] of Object.entries(entry.projects)) out.push({ name, path });
+    } else if (entry.path) {
+      out.push({ name: key, path: entry.path });
+    }
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function resolvePathForProject(map: ProjectMap, name: string): string | null {
+  return listMappedProjects(map).find((p) => p.name === name)?.path ?? null;
+}
