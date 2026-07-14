@@ -10,7 +10,7 @@ import type { SessionMeta } from "@/server/types";
 let dir: string;
 function seed(over: Partial<SessionMeta> = {}): Registry {
   const registry = new Registry(dir);
-  const meta: SessionMeta = { id: "mojito-RIC-46-planned", ticket: "RIC-46", launchStatus: "Planned",
+  const meta: SessionMeta = { kind: "lime", id: "mojito-RIC-46-planned", ticket: "RIC-46", launchStatus: "Planned",
     model: "opus", effort: "high", autoAdvance: false, state: "running", cwd: "/x",
     createdAt: "2026-07-11T00:00:00.000Z", title: "Some ticket", labels: [], ...over };
   registry.upsert(meta);

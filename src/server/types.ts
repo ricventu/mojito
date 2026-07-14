@@ -11,9 +11,10 @@ export type HookEventName =
   | "SessionEnd";
 
 export interface SessionMeta {
+  kind: "lime" | "custom"; // "lime" = ticket-lifecycle session; "custom" = standalone claude session
   id: string;            // tmux session name, e.g. "mojito-RIC-46-to-review"
-  ticket: string;        // "RIC-46"
-  launchStatus: string;  // Linear status name at launch, e.g. "Planned"
+  ticket: string;        // "RIC-46" (empty for custom sessions)
+  launchStatus: string;  // Linear status name at launch (empty for custom sessions)
   model: string;         // "opus" | "sonnet" | "fable" | full id
   effort: Effort;
   autoAdvance: boolean;

@@ -20,7 +20,9 @@ export function writeSidecar(stateDir: string, meta: SessionMeta): void {
 
 export function readSidecar(stateDir: string, id: string): SessionMeta | null {
   try {
-    return JSON.parse(readFileSync(join(sessionsDir(stateDir), `${id}.json`), "utf8")) as SessionMeta;
+    const meta = JSON.parse(readFileSync(join(sessionsDir(stateDir), `${id}.json`), "utf8"));
+    // Sidecars written before `kind` existed default to the original lime behavior.
+    return { kind: "lime", ...meta } as SessionMeta;
   } catch {
     return null;
   }

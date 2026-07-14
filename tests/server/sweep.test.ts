@@ -11,7 +11,7 @@ const sidecarPath = (stateDir: string, id: string) => join(stateDir, "sessions",
 let dir: string;
 function seed(id: string, registry: Registry): void {
   const meta: SessionMeta = {
-    id, ticket: "RIC-107", launchStatus: "To Review", model: "opus", effort: "high",
+    kind: "lime", id, ticket: "RIC-107", launchStatus: "To Review", model: "opus", effort: "high",
     autoAdvance: true, state: "running", cwd: "/x", createdAt: "2026-07-13T00:00:00.000Z",
     title: "scroll", labels: [],
   };

@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeSidecar, readSidecar, listSidecars, removeSidecar } from "@/server/sidecar";
 import type { SessionMeta } from "@/server/types";
 
 const meta: SessionMeta = {
+  kind: "lime",
   id: "mojito-RIC-46-planned",
   ticket: "RIC-46",
   launchStatus: "Planned",
@@ -37,5 +38,28 @@ describe("sidecar", () => {
   });
   it("returns null for a missing session", () => {
     expect(readSidecar(dir, "nope")).toBeNull();
+  });
+
+  it("defaults a missing kind to lime when reading a legacy sidecar", () => {
+    const sdir = join(dir, "sessions");
+    mkdirSync(sdir, { recursive: true });
+    // legacy sidecar: no `kind` field
+    writeFileSync(join(sdir, "mojito-RIC-1-to-code.json"), JSON.stringify({
+      id: "mojito-RIC-1-to-code", ticket: "RIC-1", launchStatus: "To Code", model: "opus",
+      effort: "high", autoAdvance: false, state: "running", cwd: "/x",
+      createdAt: "2026-07-11T00:00:00.000Z", title: "t", labels: [],
+    }));
+    expect(readSidecar(dir, "mojito-RIC-1-to-code")?.kind).toBe("lime");
+  });
+
+  it("preserves an explicit kind", () => {
+    const sdir = join(dir, "sessions");
+    mkdirSync(sdir, { recursive: true });
+    writeFileSync(join(sdir, "mojito-custom-general-abc.json"), JSON.stringify({
+      kind: "custom", id: "mojito-custom-general-abc", ticket: "", launchStatus: "", model: "opus",
+      effort: "high", autoAdvance: false, state: "running", cwd: "/x",
+      createdAt: "2026-07-11T00:00:00.000Z", title: "home", labels: [],
+    }));
+    expect(readSidecar(dir, "mojito-custom-general-abc")?.kind).toBe("custom");
   });
 });

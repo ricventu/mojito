@@ -7,7 +7,7 @@ import { writeSidecar } from "@/server/sidecar";
 import type { SessionMeta } from "@/server/types";
 
 function meta(id: string, state: SessionMeta["state"] = "running"): SessionMeta {
-  return { id, ticket: "RIC-46", launchStatus: "Planned", model: "opus", effort: "high",
+  return { kind: "lime", id, ticket: "RIC-46", launchStatus: "Planned", model: "opus", effort: "high",
     autoAdvance: false, state, cwd: "/x", createdAt: "2026-07-11T00:00:00.000Z",
     title: "Some ticket", labels: [] };
 }
