@@ -18,6 +18,10 @@ const STAGE_OF: Record<string, number> = {
   Done: 6, Canceled: 6, Duplicate: 6,
 };
 
+// The authoritative set of lifecycle status names (keys of STAGE_OF). Consumed by
+// src/lib/status.ts's sync-guard test so status metadata cannot drift from the model.
+export const KNOWN_STATUSES: string[] = Object.keys(STAGE_OF);
+
 export function stageOf(status: string): number | undefined {
   return STAGE_OF[status];
 }
