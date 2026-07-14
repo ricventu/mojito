@@ -17,6 +17,8 @@ export default function TerminalView(
   const termRef = useRef<Terminal | null>(null);
   const [advErr, setAdvErr] = useState<string | null>(null);
   const [auto, setAuto] = useState(session.autoAdvance);
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
 
   useEffect(() => {
     const term = new Terminal({
@@ -95,8 +97,11 @@ export default function TerminalView(
 
   const send = (bytes: string) => wsRef.current?.send(new TextEncoder().encode(bytes));
   const isGate = GATE_STATES.includes(session.launchStatus);
-  const advance = async (arg: string) => {
-    const res = await apiFetch(token, `/api/sessions/${session.id}/advance`, { method: "POST", body: JSON.stringify({ arg }) });
+  const advance = async (arg: string, reason?: string) => {
+    const res = await apiFetch(token, `/api/sessions/${session.id}/advance`, {
+      method: "POST",
+      body: JSON.stringify(reason === undefined ? { arg } : { arg, reason }),
+    });
     if (res.ok) {
       setAdvErr(null);
       onBack();
@@ -147,9 +152,34 @@ export default function TerminalView(
         <div className="gate">
           {advErr && <div style={{ padding: "8px 12px", color: "var(--err)", fontSize: 12 }}>{advErr}</div>}
           <div className="btns">
-            {(session.launchStatus === "To QA" ? ["approve", "reject"] : ["local", "mr"]).map((a) => (
-              <button key={a} className={`btn${a === "reject" ? " danger" : " primary"}`} onClick={() => advance(a)}>{a}</button>
-            ))}
+            {session.launchStatus === "To QA" ? (
+              <>
+                <button className="btn primary" onClick={() => advance("approve")}>approve</button>
+                {rejecting ? (
+                  <>
+                    <textarea
+                      className="reason"
+                      placeholder="Rejection reason…"
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                    />
+                    <button
+                      className="btn danger"
+                      disabled={!reason.trim()}
+                      onClick={() => advance("reject", reason)}
+                    >
+                      confirm reject
+                    </button>
+                  </>
+                ) : (
+                  <button className="btn danger" onClick={() => setRejecting(true)}>reject</button>
+                )}
+              </>
+            ) : (
+              ["local", "mr"].map((a) => (
+                <button key={a} className="btn primary" onClick={() => advance(a)}>{a}</button>
+              ))
+            )}
           </div>
         </div>
       ) : (
