@@ -6,7 +6,6 @@ import "@xterm/xterm/css/xterm.css";
 import AccessoryBar from "./AccessoryBar";
 import StateBadge from "./StateBadge";
 import { apiFetch } from "@/lib/client";
-import { GATE_STATES } from "@/server/autoAdvance";
 import type { SessionMeta } from "@/server/types";
 
 export default function TerminalView(
@@ -15,10 +14,7 @@ export default function TerminalView(
   const holder = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const termRef = useRef<Terminal | null>(null);
-  const [advErr, setAdvErr] = useState<string | null>(null);
   const [auto, setAuto] = useState(session.autoAdvance);
-  const [rejecting, setRejecting] = useState(false);
-  const [reason, setReason] = useState("");
 
   useEffect(() => {
     const term = new Terminal({
@@ -96,26 +92,6 @@ export default function TerminalView(
   }, []);
 
   const send = (bytes: string) => wsRef.current?.send(new TextEncoder().encode(bytes));
-  const isGate = GATE_STATES.includes(session.launchStatus);
-  const advance = async (arg: string, reason?: string) => {
-    const res = await apiFetch(token, `/api/sessions/${session.id}/advance`, {
-      method: "POST",
-      body: JSON.stringify(reason === undefined ? { arg } : { arg, reason }),
-    });
-    if (res.ok) {
-      setAdvErr(null);
-      onBack();
-    } else {
-      let message = `advance failed (${res.status})`;
-      try {
-        const body = await res.json();
-        if (body?.error) message = body.error;
-      } catch {
-        /* non-JSON error body */
-      }
-      setAdvErr(message);
-    }
-  };
   const toggleAuto = async () => {
     const nextValue = !auto;
     const res = await apiFetch(token, `/api/sessions/${session.id}`, { method: "PATCH", body: JSON.stringify({ autoAdvance: nextValue }) });
@@ -148,43 +124,7 @@ export default function TerminalView(
       </header>
       {session.title && <div className="term-title">{session.title}</div>}
       <div ref={holder} style={{ flex: 1, overflow: "hidden" }} />
-      {isGate ? (
-        <div className="gate">
-          {advErr && <div style={{ padding: "8px 12px", color: "var(--err)", fontSize: 12 }}>{advErr}</div>}
-          <div className="btns">
-            {session.launchStatus === "To QA" ? (
-              <>
-                <button className="btn primary" onClick={() => advance("approve")}>approve</button>
-                {rejecting ? (
-                  <>
-                    <textarea
-                      className="reason"
-                      placeholder="Rejection reason…"
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                    />
-                    <button
-                      className="btn danger"
-                      disabled={!reason.trim()}
-                      onClick={() => advance("reject", reason)}
-                    >
-                      confirm reject
-                    </button>
-                  </>
-                ) : (
-                  <button className="btn danger" onClick={() => setRejecting(true)}>reject</button>
-                )}
-              </>
-            ) : (
-              ["local", "mr"].map((a) => (
-                <button key={a} className="btn primary" onClick={() => advance(a)}>{a}</button>
-              ))
-            )}
-          </div>
-        </div>
-      ) : (
-        <AccessoryBar onSend={send} />
-      )}
+      <AccessoryBar onSend={send} />
     </div>
   );
 }
