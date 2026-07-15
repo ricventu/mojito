@@ -24,6 +24,13 @@ degrades gracefully without Mojito (bare-terminal mode). So for a cross-cutting 
    on stages 2–5. If you change these fields, update lime's context-consumption step in
    `skills/lime-next/SKILL.md` to match.
 
+1b. **New-ticket context** — for the "New ticket" UI flow, Mojito writes a
+   `LIME_NEW_CONTEXT` file (`writeNewTicketContext` in `src/server/launchContext.ts`,
+   called from `launchNewTicketSession` in `src/server/launch.ts`) holding
+   `{ brief, project }`. The spawned `claude … /lime-new` session reads it to analyze the
+   brief and associate the project. If you change these fields, update lime's
+   `skills/lime-new/SKILL.md` context-read step to match.
+
 2. **Status / stage model** — the ticket lifecycle is:
    `Backlog/Todo → To Code → To Review → To QA → To Merge → Done`.
    - lime side: the dispatch table + stage bodies in `skills/lime-next/SKILL.md` (and the
