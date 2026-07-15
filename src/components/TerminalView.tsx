@@ -8,6 +8,7 @@ import AccessoryBar from "./AccessoryBar";
 import StateBadge from "./StateBadge";
 import { apiFetch } from "@/lib/client";
 import { computeTouchScroll, wheelSequences } from "@/lib/touchScroll";
+import { SESSION_GONE_CODE } from "@/lib/ptyClose";
 import type { SessionMeta } from "@/server/types";
 
 export default function TerminalView(
@@ -60,7 +61,17 @@ export default function TerminalView(
         ws.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }));
       };
       ws.onmessage = (m) => term.write(typeof m.data === "string" ? m.data : new Uint8Array(m.data));
-      ws.onclose = () => { if (!closed) retry = setTimeout(connect, 1500); };
+      ws.onclose = (ev) => {
+        if (closed) return;
+        // The tmux session is gone for good (retired on auto-advance, killed, or
+        // crashed). Reconnecting would just respawn a doomed `tmux attach` that
+        // prints "can't find session" and exits — an endless loop. Stop here.
+        if (ev.code === SESSION_GONE_CODE) {
+          term.write("\r\n\x1b[90m— session ended —\x1b[0m\r\n");
+          return;
+        }
+        retry = setTimeout(connect, 1500);
+      };
     };
     connect();
 
