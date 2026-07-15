@@ -6,7 +6,7 @@ import "@xterm/xterm/css/xterm.css";
 import AccessoryBar from "./AccessoryBar";
 import StateBadge from "./StateBadge";
 import { apiFetch } from "@/lib/client";
-import { computeTouchScroll } from "@/lib/touchScroll";
+import { computeTouchScroll, wheelSequences } from "@/lib/touchScroll";
 import { GATE_STATES } from "@/server/autoAdvance";
 import type { SessionMeta } from "@/server/types";
 
@@ -93,10 +93,12 @@ export default function TerminalView(
     };
   }, []);
 
-  // Mobile touch scroll. xterm's built-in touchmove handler is unreliable on iOS
-  // Safari — the page wins the gesture and pans. Own it: capture-phase listeners
-  // (stopPropagation so xterm's own handler does not also fire and double-scroll),
-  // accumulate the drag, and drive the scrollback via the public scrollLines API.
+  // Mobile touch scroll. Claude's TUI runs in the alternate screen buffer, so
+  // xterm has no scrollback to move — scrollLines() is a no-op. Instead forward
+  // the drag to Claude as SGR mouse-wheel events (it enables mouse tracking and
+  // scrolls its own transcript), exactly what a real trackpad wheel would send.
+  // Capture-phase listeners with stopPropagation keep xterm's own handler and
+  // the page pan from also firing.
   useEffect(() => {
     const el = holder.current;
     if (!el) return;
@@ -117,7 +119,8 @@ export default function TerminalView(
       const rowHeightPx = term.rows > 0 ? el.clientHeight / term.rows : 0;
       const { lines, remainderPx } = computeTouchScroll(acc, rowHeightPx);
       if (lines !== 0) {
-        term.scrollLines(lines);
+        const seq = wheelSequences(lines);
+        if (seq) wsRef.current?.send(new TextEncoder().encode(seq));
         acc = remainderPx;
       }
       e.stopPropagation();

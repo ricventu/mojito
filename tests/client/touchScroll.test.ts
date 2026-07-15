@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeTouchScroll } from "@/lib/touchScroll";
+import { computeTouchScroll, wheelSequences } from "@/lib/touchScroll";
 
 describe("computeTouchScroll", () => {
   it("returns zero lines and carries a sub-row drag as remainder", () => {
@@ -21,5 +21,32 @@ describe("computeTouchScroll", () => {
   it("guards against a zero or negative row height", () => {
     expect(computeTouchScroll(100, 0)).toEqual({ lines: 0, remainderPx: 0 });
     expect(computeTouchScroll(100, -5)).toEqual({ lines: 0, remainderPx: 0 });
+  });
+});
+
+describe("wheelSequences", () => {
+  const UP = "\x1b[<64;1;1M"; // into history
+  const DOWN = "\x1b[<65;1;1M"; // toward present
+
+  it("emits nothing for zero lines", () => {
+    expect(wheelSequences(0)).toBe("");
+  });
+
+  it("maps a negative (scroll-up) line count to wheel-up events", () => {
+    expect(wheelSequences(-1)).toBe(UP);
+  });
+
+  it("maps a positive (scroll-down) line count to wheel-down events", () => {
+    expect(wheelSequences(1)).toBe(DOWN);
+  });
+
+  it("repeats one wheel event per line", () => {
+    expect(wheelSequences(-3)).toBe(UP.repeat(3));
+    expect(wheelSequences(2)).toBe(DOWN.repeat(2));
+  });
+
+  it("ignores non-finite input", () => {
+    expect(wheelSequences(Number.NaN)).toBe("");
+    expect(wheelSequences(Number.POSITIVE_INFINITY)).toBe("");
   });
 });
