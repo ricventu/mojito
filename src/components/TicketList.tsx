@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import LaunchSheet from "./LaunchSheet";
+import NewTicketSheet from "./NewTicketSheet";
 import FilterBar, { NO_PROJECT } from "./FilterBar";
 import { usePersistedState } from "@/lib/usePersistedState";
 import type { SessionMeta, TicketSummary } from "@/server/types";
@@ -18,6 +19,7 @@ export default function TicketList(
   const [projectRaw, setProjectRaw] = usePersistedState("mojito-tickets-project", "");
   const project = projectRaw === "" ? null : projectRaw;
   const setProject = (p: string | null) => setProjectRaw(p ?? "");
+  const [newOpen, setNewOpen] = useState(false);
 
   const projects = useMemo(
     () => Array.from(new Set(tickets.map((t) => t.project ?? NO_PROJECT))).sort(),
@@ -47,6 +49,10 @@ export default function TicketList(
 
   return (
     <div className="pad">
+      <div className="row" style={{ marginBottom: 12 }}>
+        <span className="grow" />
+        <button className="btn primary sm" onClick={() => setNewOpen(true)}>+ New ticket</button>
+      </div>
       {tickets.length > 0 && (
         <FilterBar
           query={query} onQuery={setQuery}
@@ -86,6 +92,11 @@ export default function TicketList(
       {picked && (
         <LaunchSheet token={token} ticket={picked} sessions={sessions}
           onClose={() => setPicked(null)} onLaunched={onLaunched} onOpen={(s) => { setPicked(null); onOpen(s); }} />
+      )}
+      {newOpen && (
+        <NewTicketSheet token={token}
+          onClose={() => setNewOpen(false)}
+          onCreated={(meta) => { onLaunched(); onOpen(meta); }} />
       )}
     </div>
   );
