@@ -291,6 +291,11 @@ start:
 only the supervisor; waiting specifically on it lets the recipe's EXIT trap reap ngrok
 afterward, instead of a bare `wait` blocking forever on ngrok.
 
+Additionally, prefix the recipe's PID-setup line with `set -m; ` (i.e.
+`set -m; DEV_PID=""; NGROK_PID=""; \`): without job control, POSIX makes `&`-backgrounded
+jobs ignore SIGINT, so the supervisor's poll sleep would survive Ctrl-C and the interrupt
+would be completely inert.
+
 `start-tailscale` (currently `exec caffeinate -is pnpm dev`): replace only that line —
 
 ```makefile

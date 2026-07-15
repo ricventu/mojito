@@ -47,7 +47,7 @@ start:
 start-ngrok:
 	@$(LOAD_ENV); \
 	if [ -z "$$TOKEN" ]; then echo "ERROR: MOJITO_TOKEN missing in .env.local"; exit 1; fi; \
-	DEV_PID=""; NGROK_PID=""; \
+	set -m; DEV_PID=""; NGROK_PID=""; \
 	trap 'kill $$DEV_PID $$NGROK_PID 2>/dev/null || true' EXIT INT TERM; \
 	MOJITO_PORT="$$PORT" caffeinate -is ./scripts/dev-supervisor.sh & DEV_PID=$$!; \
 	ngrok http "$$PORT" --log=stdout > /tmp/mojito-ngrok.log 2>&1 & NGROK_PID=$$!; \
