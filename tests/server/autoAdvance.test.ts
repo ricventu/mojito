@@ -55,8 +55,8 @@ describe("defaultEffortForStatus", () => {
   it("uses low for the mechanical QA gate (To QA)", () => {
     expect(defaultEffortForStatus("To QA")).toBe("low");
   });
-  it("uses medium for the procedural merge stage (To Merge)", () => {
-    expect(defaultEffortForStatus("To Merge")).toBe("medium");
+  it("uses xhigh for the merge stage (To Merge) — it may run a merge-gating inline review", () => {
+    expect(defaultEffortForStatus("To Merge")).toBe("xhigh");
   });
   it("falls back to high for statuses outside the known workflow", () => {
     expect(defaultEffortForStatus("In Progress")).toBe("high");

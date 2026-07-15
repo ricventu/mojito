@@ -32,14 +32,16 @@ export function stageOf(status: string): number | undefined {
 //     there is no over-engineering risk, so xhigh.
 //   To QA (human-approval gate) — mechanical: print a summary, dispatch on the verdict,
 //     set status, so low.
-//   To Merge (rebase + merge) — a bounded, procedural git decision tree, so medium.
+//   To Merge (rebase + merge) — usually procedural, but a content-changing rebase runs a
+//     merge-gating inline review (and possibly inline fixes) with no re-QA behind the
+//     clean path, so xhigh (same rationale as To Review).
 // Anything outside the known workflow falls back to the app-wide default (high).
 const EFFORT_OF_STATUS: Record<string, Effort> = {
   Backlog: "xhigh", Todo: "xhigh",
   "To Code": "high",
   "To Review": "xhigh",
   "To QA": "low",
-  "To Merge": "medium",
+  "To Merge": "xhigh",
 };
 
 export function defaultEffortForStatus(status: string): Effort {
