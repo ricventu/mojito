@@ -2,6 +2,7 @@
 import { useCallback, useState } from "react";
 import dynamic from "next/dynamic";
 import { useToken } from "@/lib/useToken";
+import { usePersistedState } from "@/lib/usePersistedState";
 import { useTickets } from "@/lib/useTickets";
 import { useSessions } from "@/lib/useSessions";
 import { useEvents } from "@/lib/useEvents";
@@ -19,7 +20,7 @@ const TerminalView = dynamic(() => import("@/components/TerminalView"), { ssr: f
 
 export default function Home() {
   const { token, setToken } = useToken();
-  const [tab, setTab] = useState<"tickets" | "sessions">("tickets");
+  const [tab, setTab] = usePersistedState("mojito-tab", "tickets");
   const [open, setOpen] = useState<SessionMeta | null>(null);
   const [alerts, setAlerts] = useState<{ id: string; ticket: string; message: string }[]>([]);
   const { tickets, refresh: refreshTickets } = useTickets(token);
