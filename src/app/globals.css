@@ -193,10 +193,9 @@ button.chip:active { transform: scale(.96); }
 .acc .k { flex: none; padding: 10px 12px; border-radius: 8px; background: var(--surface-hi);
   border: 1px solid var(--border-hi); color: var(--text); font: 600 13px var(--mono); cursor: pointer; }
 .acc .k:active { background: var(--border); }
-.gate { border-top: 1px solid var(--border); background: var(--surface); }
-.gate .btns { display: flex; gap: 8px; padding: 8px; }
-.gate .btns .btn { flex: 1; padding: 13px; }
-.gate .reason {
+.btns { display: flex; gap: 8px; padding: 8px; }
+.btns .btn { flex: 1; padding: 13px; }
+.reason {
   width: 100%;
   min-height: 60px;
   padding: 8px;

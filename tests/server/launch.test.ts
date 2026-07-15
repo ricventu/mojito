@@ -39,6 +39,13 @@ describe("launchSession", () => {
     expect(cmd).toContain("'/lime-next RIC-46 approve'");
   });
 
+  it("appends the To Merge mode as the trailing gate arg", () => {
+    expect(buildClaudeCommand({ ...baseReq, trailingArg: "local" }, "/s/x.json"))
+      .toContain("'/lime-next RIC-46 local'");
+    expect(buildClaudeCommand({ ...baseReq, trailingArg: "mr" }, "/s/x.json"))
+      .toContain("'/lime-next RIC-46 mr'");
+  });
+
   it("neutralizes shell metacharacters in model/effort", () => {
     const cmd = buildClaudeCommand({ ...baseReq, model: "opus; touch pwned" }, "/s/x.json");
     // the injection payload is contained inside a single-quoted token, not a live command

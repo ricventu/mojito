@@ -15,10 +15,16 @@ export async function POST(req: Request) {
   if (!tokenFromHeaders(req.headers, cfg.token)) return new NextResponse("unauthorized", { status: 401 });
   let body;
   try { body = await req.json(); } catch { return new NextResponse("bad json", { status: 400 }); }
+  // Only the To Merge gate passes a trailing arg (the Stage-5 mode); whitelist it so the
+  // launch command can never carry an arbitrary token.
+  if (body.trailingArg !== undefined && body.trailingArg !== "local" && body.trailingArg !== "mr") {
+    return NextResponse.json({ error: "invalid trailingArg" }, { status: 400 });
+  }
   const res = await launchSession(
     { ticket: body.ticket, status: body.status, model: body.model ?? "opus", effort: body.effort ?? "high",
       autoAdvance: !!body.autoAdvance, projectName: body.projectName ?? null,
-      title: body.title ?? "", labels: Array.isArray(body.labels) ? body.labels : [] },
+      title: body.title ?? "", labels: Array.isArray(body.labels) ? body.labels : [],
+      trailingArg: body.trailingArg },
     { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token, projectsPath: cfg.projectsPath,
       hasSession, newSession, pipePane },
   );
