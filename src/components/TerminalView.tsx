@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 import AccessoryBar from "./AccessoryBar";
 import StateBadge from "./StateBadge";
@@ -26,6 +27,12 @@ export default function TerminalView(
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
+    // Make http(s) URLs in terminal output clickable; open in a new tab.
+    term.loadAddon(
+      new WebLinksAddon((event, uri) => {
+        window.open(uri, "_blank", "noopener,noreferrer");
+      }),
+    );
     term.open(holder.current!);
     fit.fit();
     termRef.current = term;
