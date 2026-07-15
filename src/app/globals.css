@@ -179,7 +179,8 @@ button.chip:active { transform: scale(.96); }
 .sheet { background: var(--surface); border: 1px solid var(--border); border-bottom: none; width: 100%;
   padding: 20px 16px 32px; border-radius: 16px 16px 0 0; max-height: 85vh; overflow-y: auto;
   box-sizing: border-box; box-shadow: var(--shadow); }
-.sheet h3 { margin: 0 0 16px; }
+.sheet h3 { margin: 0 0 6px; }
+.sheet-title { margin: 0 0 16px; font: 600 14px/1.35 var(--mono); color: var(--text); }
 
 /* ---- Terminal view ---- */
 .term-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border);

@@ -61,6 +61,7 @@ export default function LaunchSheet(
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <h3><span className="id" style={{ fontSize: 16 }}>{ticket.identifier}</span> <span className="chip">{ticket.statusName}</span></h3>
+        {ticket.title && <p className="sheet-title">{ticket.title}</p>}
         {isToQa ? (
           <QaVerdictButtons onApprove={() => submitVerdict("approve")} onReject={(reason) => submitVerdict("reject", reason)} />
         ) : existingActive ? (
