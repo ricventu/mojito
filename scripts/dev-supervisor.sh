@@ -31,11 +31,24 @@ kill_dev() {
     if ! kill -0 "$DEV_PID" 2>/dev/null; then
       break
     fi
-    sleep 1
+    # Plain sleep (snooze would re-enter kill_dev): if Ctrl-C lands here the
+    # grace loop just shortens; the next snooze catches the shutdown intent.
+    sleep 1 || true
   done
   kill -KILL -- "-$DEV_PID" 2>/dev/null || true
   wait "$DEV_PID" 2>/dev/null || true
   DEV_PID=""
+}
+
+# Interruptible sleep: under `set -m` the terminal's Ctrl-C (SIGINT) goes to
+# the foreground child — this sleep — not to the script, so the INT trap
+# alone never sees a keyboard interrupt. A sleep killed by a signal (exit
+# status >= 128) therefore means "the user interrupted us": shut down.
+snooze() {
+  sleep "$1" && return 0
+  echo "[supervisor] interrupted — shutting down"
+  kill_dev
+  exit 0
 }
 
 trap 'echo "[supervisor] shutting down"; kill_dev; exit 0' INT TERM
@@ -49,7 +62,7 @@ while true; do
   failures=0
 
   while [ -n "$DEV_PID" ] && kill -0 "$DEV_PID" 2>/dev/null; do
-    sleep "$POLL_INTERVAL"
+    snooze "$POLL_INTERVAL"
     code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$HEALTH_URL") || true
     [ -n "$code" ] || code=000
     fail=false
@@ -79,5 +92,5 @@ while true; do
     DEV_PID=""
   fi
   echo "[supervisor] dev server gone — respawning in 2s"
-  sleep 2
+  snooze 2
 done
