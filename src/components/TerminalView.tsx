@@ -97,7 +97,13 @@ export default function TerminalView(
       root.style.height = style.height;
       root.style.transform = style.transform;
       fit.fit();
-      wsRef.current?.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }));
+      // At mount, applyViewport() runs synchronously while the socket is still
+      // CONNECTING (onopen can't fire yet) — send() on a CONNECTING socket
+      // throws InvalidStateError, so only send the resize frame once OPEN.
+      // ws.onopen already sends the initial resize once connected.
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }));
+      }
       term.scrollToBottom();
     };
     if (vv) {
