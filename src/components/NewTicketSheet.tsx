@@ -17,6 +17,7 @@ export default function NewTicketSheet(
   const [model, setModel] = useState("opus");
   const [effort, setEffort] = useState("high");
   const [err, setErr] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     apiFetch(token, "/api/projects")
@@ -26,17 +27,24 @@ export default function NewTicketSheet(
   }, [token]);
 
   const create = async () => {
-    const res = await apiFetch(token, "/api/sessions", {
-      method: "POST",
-      body: JSON.stringify({
-        kind: "new-ticket", brief: brief.trim(),
-        projectName: project === GENERAL ? null : project, model, effort,
-      }),
-    });
-    if (!res.ok) { setErr(await res.text()); return; }
-    const meta: SessionMeta = await res.json();
-    onCreated(meta);
-    onClose();
+    if (isSubmitting) return;
+    setErr(null);
+    setIsSubmitting(true);
+    try {
+      const res = await apiFetch(token, "/api/sessions", {
+        method: "POST",
+        body: JSON.stringify({
+          kind: "new-ticket", brief: brief.trim(),
+          projectName: project === GENERAL ? null : project, model, effort,
+        }),
+      });
+      if (!res.ok) { setErr(await res.text()); return; }
+      const meta: SessionMeta = await res.json();
+      onCreated(meta);
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -58,7 +66,7 @@ export default function NewTicketSheet(
           <label className="field"><span className="lbl">Effort</span>
             <select value={effort} onChange={(e) => setEffort(e.target.value)}>{EFFORTS.map((x) => <option key={x}>{x}</option>)}</select></label>
         </div>
-        <button className="btn primary block" disabled={!brief.trim()} onClick={create}>Create ticket</button>
+        <button className="btn primary block" disabled={!brief.trim() || isSubmitting} onClick={create}>Create ticket</button>
         {err && <p className="err-text">{err}</p>}
       </div>
     </div>
