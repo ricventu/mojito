@@ -48,11 +48,14 @@ Bash script owning the restart loop:
   - **3 consecutive failures** → log the reason and kill the child's process group
     (`kill -- -$PID`, SIGTERM; SIGKILL after 5s if still alive).
 - When the child exits (killed or crashed on its own), log it, sleep 2s, respawn.
-- Traps INT/TERM: kills the child's process group and exits — Ctrl-C behaves as today.
+- Shutdown: a TERM trap, plus interrupt detection on the poll sleep — under `set -m`
+  Ctrl-C's SIGINT hits the foreground sleep rather than the script, so a sleep killed by
+  a signal triggers the same clean kill-group-and-exit. Ctrl-C behaves as today.
 - Port comes from `MOJITO_PORT` env (default `4711`), exported by the Makefile, which
   already loads `.env.local`.
 
-Worst-case recovery time: ~15–20s after the wedge (3 × 5s poll + kill/respawn).
+Worst-case time to kill: ~20s after the wedge (3 × 5s poll + TERM→KILL grace); full
+recovery adds Next's recompile on respawn (~40s observed end-to-end).
 
 ### 3. Log noise suppression — `next.config.mjs` (edit)
 

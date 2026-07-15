@@ -59,7 +59,7 @@ start-ngrok:
 	done; \
 	if [ -z "$$URL" ]; then echo "ERROR: ngrok did not come up — see /tmp/mojito-ngrok.log"; exit 1; fi; \
 	$(SHOW_URLS); \
-	wait
+	wait "$$DEV_PID"
 
 ## start-tailscale: dev server reachable over the tailnet from any network. The server
 ## already binds 0.0.0.0, so the phone (on the same tailnet) hits the Mac's tailnet IP

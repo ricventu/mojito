@@ -114,6 +114,9 @@ Create `scripts/dev-supervisor.sh`:
 set -u -o pipefail
 set -m # job control: background children get their own process group
 
+# Run from the repo root regardless of where the script is invoked from.
+cd "$(dirname "$0")/.."
+
 PORT="${MOJITO_PORT:-4711}"
 HEALTH_URL="http://localhost:${PORT}/api/health"
 POLL_INTERVAL=5
@@ -127,24 +130,31 @@ DEV_PID=""
 # the port and every respawn would die on EADDRINUSE.
 kill_dev() {
   [ -n "$DEV_PID" ] || return 0
+  interrupted=false
   kill -TERM -- "-$DEV_PID" 2>/dev/null || true
   for _ in $(seq 1 "$KILL_GRACE"); do
     if ! kill -0 "$DEV_PID" 2>/dev/null; then
       break
     fi
-    # Plain sleep (snooze would re-enter kill_dev): if Ctrl-C lands here the
-    # grace loop just shortens; the next snooze catches the shutdown intent.
-    sleep 1 || true
+    # Plain sleep (snooze would re-enter kill_dev). A Ctrl-C landing here
+    # kills only this sleep under set -m: remember it and shut down once
+    # the kill has completed, instead of dropping the interrupt.
+    sleep 1 || interrupted=true
   done
   kill -KILL -- "-$DEV_PID" 2>/dev/null || true
   wait "$DEV_PID" 2>/dev/null || true
   DEV_PID=""
+  if [ "$interrupted" = "true" ]; then
+    echo "[supervisor] interrupted — shutting down"
+    exit 0
+  fi
 }
 
 # Interruptible sleep: under `set -m` the terminal's Ctrl-C (SIGINT) goes to
 # the foreground child — this sleep — not to the script, so the INT trap
-# alone never sees a keyboard interrupt. A sleep killed by a signal (exit
-# status >= 128) therefore means "the user interrupted us": shut down.
+# alone never sees a keyboard interrupt. The sleep can only fail by being
+# killed (its argument is a literal number), so any failure means "the user
+# interrupted us": shut down.
 snooze() {
   sleep "$1" && return 0
   echo "[supervisor] interrupted — shutting down"
@@ -270,11 +280,16 @@ start:
 	exec caffeinate -is ./scripts/dev-supervisor.sh
 ```
 
-`start-ngrok` (currently `caffeinate -is pnpm dev & DEV_PID=$$!`): replace only that line —
+`start-ngrok` (currently `caffeinate -is pnpm dev & DEV_PID=$$!`): replace that line —
 
 ```makefile
 	MOJITO_PORT="$$PORT" caffeinate -is ./scripts/dev-supervisor.sh & DEV_PID=$$!; \
 ```
+
+— and also change the recipe's final `wait` to `wait "$$DEV_PID"`: the supervisor's
+`set -m` moves the terminal foreground pgrp onto its poll sleep, so Ctrl-C now reaches
+only the supervisor; waiting specifically on it lets the recipe's EXIT trap reap ngrok
+afterward, instead of a bare `wait` blocking forever on ngrok.
 
 `start-tailscale` (currently `exec caffeinate -is pnpm dev`): replace only that line —
 
