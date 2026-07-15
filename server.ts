@@ -29,6 +29,8 @@ async function main() {
   const app = next({ dev });
   const handle = app.getRequestHandler();
   await app.prepare();
+  // getUpgradeHandler() must run after prepare() — Next throws otherwise.
+  const upgradeHandle = app.getUpgradeHandler();
 
   // Boot recovery: reconcile the registry with live tmux sessions.
   getRegistry().recover(await listSessions("mojito-"));
@@ -39,11 +41,21 @@ async function main() {
   server.on("upgrade", (req, socket, head) => {
     try {
       const url = req.url ?? "";
+      const path = url.split("?")[0];
+      // Next's dev Fast Refresh connects over its own WebSocket
+      // (/_next/webpack-hmr). A custom server must hand Next's internal upgrade
+      // requests back to Next, or HMR never connects and the browser stops
+      // receiving hot updates while the server runs. These are Next-internal and
+      // carry no Mojito token, so route them before the token gate. In production
+      // (dev=false) there is no such socket, so this branch is inert.
+      if (path.startsWith("/_next")) {
+        upgradeHandle(req, socket, head);
+        return;
+      }
       if (!tokenFromUrl(url, cfg.token)) {
         socket.destroy();
         return;
       }
-      const path = url.split("?")[0];
       if (path === "/ws/pty") {
         const id = new URLSearchParams(url.split("?")[1] ?? "").get("session") ?? "";
         if (!id) {
