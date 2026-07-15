@@ -40,7 +40,8 @@ start:
 	$(SHOW_URLS); \
 	echo "  (Mac kept awake — Ctrl-C to stop)"; \
 	echo ""; \
-	exec caffeinate -is pnpm dev
+	export MOJITO_PORT="$$PORT"; \
+	exec caffeinate -is ./scripts/dev-supervisor.sh
 
 ## start-ngrok: dev server + ngrok; prints local + Wi-Fi + the public ngrok URL
 start-ngrok:
@@ -48,7 +49,7 @@ start-ngrok:
 	if [ -z "$$TOKEN" ]; then echo "ERROR: MOJITO_TOKEN missing in .env.local"; exit 1; fi; \
 	DEV_PID=""; NGROK_PID=""; \
 	trap 'kill $$DEV_PID $$NGROK_PID 2>/dev/null || true' EXIT INT TERM; \
-	caffeinate -is pnpm dev & DEV_PID=$$!; \
+	MOJITO_PORT="$$PORT" caffeinate -is ./scripts/dev-supervisor.sh & DEV_PID=$$!; \
 	ngrok http "$$PORT" --log=stdout > /tmp/mojito-ngrok.log 2>&1 & NGROK_PID=$$!; \
 	URL=""; \
 	for i in $$(seq 1 30); do \
@@ -74,6 +75,7 @@ start-tailscale:
 	echo "  Tailscale: http://$$TSIP:$$PORT$$Q   (open on your phone, any network, via VPN)"; \
 	echo "  (Mac kept awake — Ctrl-C to stop)"; \
 	echo ""; \
-	exec caffeinate -is pnpm dev
+	export MOJITO_PORT="$$PORT"; \
+	exec caffeinate -is ./scripts/dev-supervisor.sh
 
 .PHONY: help start start-ngrok start-tailscale
