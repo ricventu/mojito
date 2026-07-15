@@ -9,12 +9,14 @@ import StateBadge from "./StateBadge";
 import { apiFetch } from "@/lib/client";
 import { computeTouchScroll, wheelSequences } from "@/lib/touchScroll";
 import { SESSION_GONE_CODE } from "@/lib/ptyClose";
+import { termRootStyle } from "@/lib/keyboardInset";
 import type { SessionMeta } from "@/server/types";
 
 export default function TerminalView(
   { token, session, onBack }: { token: string; session: SessionMeta; onBack: () => void },
 ) {
   const holder = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const [auto, setAuto] = useState(session.autoAdvance);
@@ -82,11 +84,37 @@ export default function TerminalView(
     };
     window.addEventListener("resize", onResize);
 
+    // The mobile virtual keyboard shrinks only the visual viewport, so pin
+    // `.term-root` to it (see keyboardInset.ts) and re-fit xterm to the reduced
+    // height, keeping the active prompt line and the accessory bar above the
+    // keyboard. `window resize` alone does not fire for a keyboard that only
+    // resizes the visual viewport, so this listener is required.
+    const vv = window.visualViewport;
+    const applyViewport = () => {
+      const root = rootRef.current;
+      if (!root || !vv) return;
+      const style = termRootStyle({ height: vv.height, offsetTop: vv.offsetTop });
+      root.style.height = style.height;
+      root.style.transform = style.transform;
+      fit.fit();
+      wsRef.current?.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }));
+      term.scrollToBottom();
+    };
+    if (vv) {
+      vv.addEventListener("resize", applyViewport);
+      vv.addEventListener("scroll", applyViewport);
+      applyViewport();
+    }
+
     return () => {
       closed = true;
       clearTimeout(retry);
       onData.dispose();
       window.removeEventListener("resize", onResize);
+      if (vv) {
+        vv.removeEventListener("resize", applyViewport);
+        vv.removeEventListener("scroll", applyViewport);
+      }
       wsRef.current?.close();
       term.dispose();
     };
@@ -172,7 +200,7 @@ export default function TerminalView(
   };
 
   return (
-    <div className="term-root">
+    <div className="term-root" ref={rootRef}>
       <header className="term-head">
         <button className="back" onClick={onBack}>‹</button>
         <span className="id">{session.ticket}</span>
