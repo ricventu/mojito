@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import LaunchSheet from "./LaunchSheet";
 import FilterBar, { NO_PROJECT } from "./FilterBar";
+import { usePersistedState } from "@/lib/usePersistedState";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 import { activeSessionLevel, type ActiveLevel } from "@/lib/ticketSessionLevel";
 
@@ -10,8 +11,10 @@ export default function TicketList(
   { token: string; tickets: TicketSummary[]; sessions: SessionMeta[]; onLaunched: () => void; onOpen: (s: SessionMeta) => void },
 ) {
   const [picked, setPicked] = useState<TicketSummary | null>(null);
-  const [query, setQuery] = useState("");
-  const [project, setProject] = useState<string | null>(null);
+  const [query, setQuery] = usePersistedState("mojito-tickets-q", "");
+  const [projectRaw, setProjectRaw] = usePersistedState("mojito-tickets-project", "");
+  const project = projectRaw === "" ? null : projectRaw;
+  const setProject = (p: string | null) => setProjectRaw(p ?? "");
 
   const projects = useMemo(
     () => Array.from(new Set(tickets.map((t) => t.project ?? NO_PROJECT))).sort(),

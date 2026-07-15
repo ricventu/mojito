@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/client";
 import StateBadge from "./StateBadge";
 import FilterBar, { NO_PROJECT } from "./FilterBar";
 import NewSessionSheet from "./NewSessionSheet";
+import { usePersistedState } from "@/lib/usePersistedState";
 import type { SessionMeta } from "@/server/types";
 import { orderSessions } from "@/lib/orderSessions";
 
@@ -11,8 +12,10 @@ export default function SessionList(
   { token, sessions, onOpen, onChanged }:
   { token: string; sessions: SessionMeta[]; onOpen: (s: SessionMeta) => void; onChanged: () => void },
 ) {
-  const [query, setQuery] = useState("");
-  const [project, setProject] = useState<string | null>(null);
+  const [query, setQuery] = usePersistedState("mojito-sessions-q", "");
+  const [projectRaw, setProjectRaw] = usePersistedState("mojito-sessions-project", "");
+  const project = projectRaw === "" ? null : projectRaw;
+  const setProject = (p: string | null) => setProjectRaw(p ?? "");
   const [newOpen, setNewOpen] = useState(false);
 
   const projects = useMemo(
