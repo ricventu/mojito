@@ -5,7 +5,7 @@ import type { SessionMeta, SessionState } from "@/server/types";
 // minimal SessionMeta factory — only ticket and state matter here
 function s(ticket: string, state: SessionState): SessionMeta {
   return {
-    id: `${ticket}-${state}`, ticket, state,
+    id: `${ticket}-${state}`, kind: "lime", ticket, state,
     launchStatus: "", model: "", effort: "low", autoAdvance: false,
     cwd: "", createdAt: "2026-07-14T10:00:00.000Z", title: "", labels: [],
   } as SessionMeta;
