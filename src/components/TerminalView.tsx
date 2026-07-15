@@ -51,6 +51,17 @@ export default function TerminalView(
       return true;
     });
 
+    // Send the current terminal dimensions to the pty, but only once the socket
+    // is OPEN — send() on a CONNECTING socket (at mount, or during the 1.5s
+    // reconnect window) throws InvalidStateError. ws.onopen sends the initial
+    // resize; the window and visual-viewport resize handlers route through here
+    // too, so the OPEN guard lives in exactly one place.
+    const sendResize = () => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }));
+      }
+    };
+
     let closed = false;
     let retry: ReturnType<typeof setTimeout>;
     const connect = () => {
@@ -60,7 +71,7 @@ export default function TerminalView(
       wsRef.current = ws;
       ws.onopen = () => {
         fit.fit();
-        ws.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }));
+        sendResize();
       };
       ws.onmessage = (m) => term.write(typeof m.data === "string" ? m.data : new Uint8Array(m.data));
       ws.onclose = (ev) => {
@@ -80,7 +91,7 @@ export default function TerminalView(
     const onData = term.onData((d) => wsRef.current?.send(new TextEncoder().encode(d)));
     const onResize = () => {
       fit.fit();
-      wsRef.current?.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }));
+      sendResize();
     };
     window.addEventListener("resize", onResize);
 
@@ -98,12 +109,9 @@ export default function TerminalView(
       root.style.transform = style.transform;
       fit.fit();
       // At mount, applyViewport() runs synchronously while the socket is still
-      // CONNECTING (onopen can't fire yet) — send() on a CONNECTING socket
-      // throws InvalidStateError, so only send the resize frame once OPEN.
-      // ws.onopen already sends the initial resize once connected.
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }));
-      }
+      // CONNECTING; sendResize() no-ops until it is OPEN (ws.onopen sends the
+      // initial resize once connected).
+      sendResize();
       term.scrollToBottom();
     };
     if (vv) {
