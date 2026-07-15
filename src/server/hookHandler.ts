@@ -25,7 +25,7 @@ export async function handleHook(
     // SessionEnd is a clean close (done), not a failure.
     const outcome = event === "SessionEnd"
       ? { state: "done" as const, alert: null }
-      : mapHook(event, false);
+      : mapHook(event, false, meta.state);
     const patch: Partial<SessionMeta> = { state: outcome.state, message: outcome.alert?.message };
     const title = payload?.sessionTitle;
     if (typeof title === "string" && title.length > 0 && title !== meta.title) patch.title = title;
@@ -51,14 +51,18 @@ export async function handleHook(
     }
   }
 
-  const outcome = mapHook(event, statusAdvanced);
+  const outcome = mapHook(event, statusAdvanced, meta.state);
   const updated = deps.registry.patch(id, { state: outcome.state, message: outcome.alert?.message });
   deps.bus.emit({ type: "session.state", id, state: outcome.state });
   if (outcome.alert) {
     deps.bus.emit({ type: "session.alert", id, kind: outcome.alert.kind, ticket: meta.ticket, message: outcome.alert.message });
   }
 
-  if (outcome.state === "done" && updated) {
+  // Auto-advance only on a genuine stage handoff (a fresh Stop/SessionEnd that moved the
+  // ticket forward). statusAdvanced is set only for those events; a passive signal that
+  // merely preserves an already-done state (e.g. an idle Notification, RIC-117) leaves it
+  // false, so it can never relaunch a duplicate stage off the stale launchStatus.
+  if (outcome.state === "done" && statusAdvanced && updated) {
     const decision = decideAutoAdvance(newStatus, updated.autoAdvance);
     if (decision.action === "launch") deps.onAutoAdvance(updated, newStatus);
   }

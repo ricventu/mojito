@@ -120,3 +120,51 @@ respected: only `PreToolUse` (still `AskUserQuestion`-scoped) maps to `needs-inp
 - Manual: launch a session, trigger a permission prompt (badge → needs input), approve it,
   confirm the badge returns to running once the agent runs the next tool; type a prompt and
   confirm it returns to running immediately.
+
+---
+
+## Follow-up (2026-07-15): the terminal case the first fix missed
+
+**Symptom reported after merge:** a session that has finished its stage — e.g. a Stage 5
+run that reaches **Done** and prints "Lifecycle finished" — still shows the **needs input**
+badge. The very state the ticket is about is still stuck, now at the *end* of a session
+instead of mid-run.
+
+**Root cause (why the first fix was incomplete).** `mapHook` was **stateless**: it mapped
+`(event, statusAdvanced)` → state without considering the session's *current* state. The
+first fix reasoned only about clearing `needs-input` **while the agent is still working**
+(`UserPromptSubmit`/`PostToolUse` → running) and deliberately left an idle `Notification`
+mapping to `needs-input` (see "Legitimately-blocked states" above). But it never reasoned
+about a `Notification` arriving **after** a session is already `done`:
+
+1. The stage completes → `Stop` with a stage advance → `done` (badge correct).
+2. The prompt sits idle; Claude Code fires an idle `Notification` ~60s later.
+3. `mapHook("Notification")` unconditionally returns `needs-input`, clobbering `done`.
+4. Nothing clears it — the lifecycle is over, so no further `PostToolUse`/`UserPromptSubmit`
+   arrives. The badge sticks on **needs input** forever.
+
+This also hits gate stops (a `To QA`/`To Merge` handoff with auto-advance off lands on
+`done`, then the idle `Notification` flips it) and every completed session that lingers.
+
+**The fix.** Make the state machine **terminal-state-aware**:
+
+1. `mapHook` takes the session's `currentState`. When it is terminal (`done`/`failed`), a
+   **passive** signal (idle `Notification`, a late `PermissionRequest`/`PreToolUse`, a stray
+   `Stop`) leaves the terminal state unchanged. Only an **activity** signal
+   (`SessionStart`/`UserPromptSubmit`/`PostToolUse`) revives a finished session to `running`
+   — so a user can still reuse a done session by typing a new prompt.
+2. `handleHook` gates auto-advance on `statusAdvanced` (a genuine fresh Stop/SessionEnd
+   handoff), not merely `outcome.state === "done"`. Otherwise a passive event that *preserves*
+   `done` would re-read the stale `launchStatus` and relaunch a duplicate stage.
+
+No hook **wiring** change is needed (`Notification` was already delivered), so unlike the
+first fix this corrects **already-running** sessions immediately — no relaunch required.
+
+**Non-goals (unchanged):** no new `SessionState`, no `Registry` guard, no UI/badge change.
+
+**Testing (added).** Unit (`mapHook`): a `Notification` on a `done`/`failed` session keeps
+that state with no alert; `UserPromptSubmit`/`PostToolUse` still revive a `done` session to
+`running`. Integration (`handleHook`): a `Notification` on a `done` session stays `done`,
+emits no `needs-input`, and never re-triggers auto-advance. Manual/QA: let a session finish
+a stage, leave it idle past the notification timeout, and confirm the badge stays done
+rather than flipping to needs input.

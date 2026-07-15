@@ -94,6 +94,38 @@ describe("handleHook", () => {
     });
     expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("running");
   });
+
+  it("an idle Notification does NOT resurrect a finished (done) session (RIC-117)", async () => {
+    // The reported bug: a session finishes its stage (done), then Claude Code fires an
+    // idle Notification ~60s later. Before the fix that flipped the badge back to
+    // needs-input and it stuck forever. A finished session must stay done.
+    const { registry } = seed({ state: "done", message: "stage complete" });
+    const bus = new EventBus();
+    const events: unknown[] = [];
+    bus.subscribe((e) => events.push(e));
+    await handleHook("mojito-RIC-46-to-code", "Notification", {
+      registry, bus, getIssueStatus: async () => "To Code", onAutoAdvance: () => {},
+    });
+    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("done");
+    expect(events).not.toContainEqual(
+      expect.objectContaining({ type: "session.state", state: "needs-input" }),
+    );
+  });
+
+  it("an idle Notification on a finished session never re-triggers auto-advance (RIC-117)", async () => {
+    // Auto-advance must fire only on a genuine stage-completing Stop/SessionEnd, never on a
+    // passive event that merely preserves an already-done state. Notification does not
+    // re-fetch the status, so the stale launchStatus (To Code) would otherwise be read as a
+    // fresh handoff and relaunch a duplicate stage.
+    const { registry } = seed({ state: "done", autoAdvance: true, launchStatus: "To Code" });
+    const bus = new EventBus();
+    const onAutoAdvance = vi.fn();
+    await handleHook("mojito-RIC-46-to-code", "Notification", {
+      registry, bus, getIssueStatus: async () => "To Code", onAutoAdvance,
+    });
+    expect(onAutoAdvance).not.toHaveBeenCalled();
+    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("done");
+  });
 });
 
 function seedCustom(over: Partial<SessionMeta> = {}): Registry {
