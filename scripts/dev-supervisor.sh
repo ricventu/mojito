@@ -50,7 +50,8 @@ while true; do
 
   while [ -n "$DEV_PID" ] && kill -0 "$DEV_PID" 2>/dev/null; do
     sleep "$POLL_INTERVAL"
-    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$HEALTH_URL" || echo 000)
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$HEALTH_URL") || true
+    [ -n "$code" ] || code=000
     fail=false
     if [ "$code" = "000" ]; then
       # No response: only a failure once the server has responded before —
