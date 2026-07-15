@@ -69,10 +69,10 @@ so the 5s poll doesn't spam the dev console with `GET /api/health 200` lines.
 
 ### 4. Makefile (edit)
 
-`start`, `start-ngrok`, and `start-tailscale` swap `pnpm dev` for
-`scripts/dev-supervisor.sh`, still under `caffeinate -is`. The Makefile exports
-`MOJITO_PORT` to the supervisor. Behavior otherwise unchanged (URL printing, ngrok
-bring-up, traps).
+`start` and `start-tailscale` swap `pnpm dev` for `scripts/dev-supervisor.sh`, still
+under `caffeinate -is`. The Makefile exports `MOJITO_PORT` to the supervisor. Behavior
+otherwise unchanged (URL printing). The `start-ngrok` target was dropped during
+implementation at the user's request — remote access goes through Tailscale.
 
 ## What restarts and what doesn't
 

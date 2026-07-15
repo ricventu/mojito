@@ -239,6 +239,11 @@ git commit -m "feat(mojito): add dev-server health-check supervisor"
 - Modify: `Makefile` (targets `start`, `start-ngrok`, `start-tailscale` — lines 38-43, 46-61, 68-77)
 - Modify: `next.config.mjs`
 
+> **Post-implementation note:** the `start-ngrok` target (and the ngrok URL line in
+> `SHOW_URLS`) was removed from the Makefile after this task executed, at the user's
+> request — remote access goes through Tailscale. The ngrok steps below are kept as an
+> execution record.
+
 **Interfaces:**
 - Consumes: `./scripts/dev-supervisor.sh` from Task 2; `LOAD_ENV` Makefile snippet (already sets `PORT` from `.env.local`/default).
 - Produces: `make start`, `make start-ngrok`, `make start-tailscale` run the supervisor with `MOJITO_PORT` exported. `next.config.mjs` stops logging `GET /api/health` request lines.
