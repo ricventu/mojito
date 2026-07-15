@@ -4,7 +4,11 @@
 
 **Goal:** Make touch-dragging inside the terminal scroll the terminal scrollback (not the whole page) on mobile Safari / iPhone 11 (RIC-107), after the first fix shipped but failed on the device.
 
-**Architecture:** Own the vertical drag gesture explicitly instead of relying on xterm's internal touch handler (which loses to iOS page panning) or on `overflow: hidden` (which iOS ignores for touch). Four changes: (1) pin `TerminalView`'s root with `position: fixed` + `100dvh`; (2) `touch-action: none` on the terminal body so iOS never starts a page pan; (3) a custom capture-phase touch handler that converts drag pixels to rows and calls the public `term.scrollLines()`; (4) drop the inert `.xterm-viewport` CSS from the first attempt. The pixels→rows math is a pure, unit-tested helper. Corrected root cause and rationale: `docs/superpowers/specs/2026-07-14-mobile-terminal-scroll-redo-design.md`.
+**Architecture:** Own the vertical drag gesture explicitly instead of relying on xterm's internal touch handler (which loses to iOS page panning) or on `overflow: hidden` (which iOS ignores for touch). Four changes: (1) pin `TerminalView`'s root with `position: fixed` + `100dvh`; (2) `touch-action: none` on the terminal body so iOS never starts a page pan; (3) a custom capture-phase touch handler that converts drag pixels to rows and scrolls the terminal; (4) drop the inert `.xterm-viewport` CSS from the first attempt. The pixels→rows math is a pure, unit-tested helper.
+
+> **Implementation note (supersedes step 3 below where it says `scrollLines`).** During implementation we found `term.scrollLines()` is a no-op here: Claude's TUI runs in the alternate screen buffer, which has no xterm scrollback. The handler instead forwards the drag to the pty as SGR (1006) mouse-wheel events via a second pure helper `wheelSequences(lines)`, gated on `term.modes.mouseTrackingMode !== "none"` so it never injects literal bytes when the foreground app has mouse tracking off. Task 3's code snippet is kept as originally written for the record; the shipped `src/components/TerminalView.tsx` and `src/lib/touchScroll.ts` reflect the wheel-event version.
+
+Corrected root cause and rationale: `docs/superpowers/specs/2026-07-14-mobile-terminal-scroll-redo-design.md`.
 
 **Tech Stack:** Next.js (client component), React `useEffect`, `@xterm/xterm` ^5.5.0 (`Terminal.scrollLines`, `Terminal.rows` — public API), plain CSS in `src/app/globals.css`, vitest (`node` env).
 
@@ -287,8 +291,8 @@ Open the app on the iPhone 11 in Safari (the dev server prints a Wi-Fi URL), ent
 
 - [ ] **Step 2: Verify the gesture on the device**
 
-- Drag up/down **inside** the terminal → the terminal scrollback scrolls under the finger; the page does **not** move.
-- Drag down at the top of the scrollback → stays put (no page pan / rubber-band into the page).
+- Drag up/down **inside** the terminal (with Claude's TUI in the foreground) → Claude scrolls its own transcript under the finger; the page does **not** move. (Scrolling is driven by forwarded wheel events, so boundary behaviour at the top/bottom is Claude's, not xterm's — this is expected.)
+- Drag at the top of the transcript → the page does not pan / rubber-band into the page.
 - **Tap the terminal → the soft keyboard appears and typed text reaches the session.** The custom handler `preventDefault`s every `touchmove` and captures `touchstart`, so confirm a tap (with slight finger jitter) still focuses xterm and raises the keyboard. If it fails, add a movement threshold so near-pure taps pass through before the first `preventDefault`.
 - Tap "‹" back → the tickets/sessions list scrolls normally again (document scroll restored on unmount).
 

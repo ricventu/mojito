@@ -68,19 +68,31 @@ iOS honoring `overflow: hidden`. Four coordinated changes:
    page pan when the drag begins over the terminal. (The accessory bar keeps its
    own default `touch-action` so its horizontal scroll still works.)
 
-3. **Drive the scrollback from a custom touch handler.** In `TerminalView`, add
+3. **Drive scrolling from a custom touch handler.** In `TerminalView`, add
    `touchstart`/`touchmove` listeners on the terminal holder, registered in the
    **capture** phase with `stopPropagation()` (so xterm's own touch handler does
    not also fire and double-scroll) and `{passive:false}` `preventDefault()`.
-   Accumulate the vertical drag in pixels, convert to whole rows, and call the
-   public `term.scrollLines(lines)` API. This path does not depend on
+   Accumulate the vertical drag in pixels and convert to whole rows.
+
+   **Implementation finding — forward wheel events, do not call `scrollLines()`.**
+   The original plan was to call `term.scrollLines(lines)`. That does nothing
+   here: Claude's TUI runs in the **alternate screen buffer**, where xterm keeps
+   no scrollback, so `scrollLines()` is a no-op. Instead we forward the drag to
+   the pty as **SGR (mode 1006) mouse-wheel events** — the exact bytes a real
+   trackpad wheel produces (`ESC[<64;1;1M` wheel-up / `ESC[<65;1;1M` wheel-down,
+   one per row). Claude has mouse tracking on and scrolls its own transcript in
+   response. **Guard:** only send when the foreground app actually enabled mouse
+   tracking (`term.modes.mouseTrackingMode !== "none"`); otherwise the pty would
+   deliver those bytes as literal keystrokes and corrupt the input line, so when
+   tracking is off the drag is a no-op. This path does not depend on
    `.xterm-viewport`, on xterm's boundary math, or on iOS overflow behaviour.
 
 4. **Remove the inert `.xterm .xterm-viewport` rule** added by the first fix.
 
-The pixels→rows conversion (the sign- and accumulation-sensitive part) is
-extracted into a pure helper `computeTouchScroll(accumulatedPx, rowHeightPx)` so
-it can be unit-tested in the `node` vitest environment; the DOM wiring itself
+The pixels→rows conversion and the wheel-event encoding (the sign- and
+accumulation-sensitive parts) are extracted into pure helpers
+`computeTouchScroll(accumulatedPx, rowHeightPx)` and `wheelSequences(lines)` so
+they can be unit-tested in the `node` vitest environment; the DOM wiring itself
 remains manually verified.
 
 The existing mount-time `html/body { overflow: hidden; overscroll-behavior:
@@ -89,12 +101,14 @@ non-iOS), but it is no longer the primary mechanism.
 
 ### Sign convention
 
-`term.scrollLines(n)`: `n > 0` scrolls **down** (toward the present), `n < 0`
-scrolls **up** (into history). Dragging the finger **down** (clientY increases)
-reveals older content → scroll up (negative); dragging **up** → scroll down
-(positive). The handler accumulates `lastY - currentY`, so a downward drag
-produces a negative accumulator and an upward drag a positive one, matching the
-API sign directly.
+The line count keeps the `scrollLines`-style sign the helper was designed around:
+`n > 0` means scroll **down** (toward the present), `n < 0` scroll **up** (into
+history). Dragging the finger **down** (clientY increases) reveals older content
+→ scroll up (negative); dragging **up** → scroll down (positive). The handler
+accumulates `lastY - currentY`, so a downward drag produces a negative
+accumulator and an upward drag a positive one. `wheelSequences` maps that sign to
+wheel buttons: negative → button 64 (wheel-up / into history), positive → button
+65 (wheel-down / toward present).
 
 ## Non-goals
 
@@ -105,12 +119,14 @@ API sign directly.
 ## Verification
 
 - **Unit (automated):** `computeTouchScroll` — sign, whole-row truncation,
-  sub-row remainder carry, zero/negative row height guard. Runs under the
-  existing `node` vitest config.
-- **Behavioural (manual — the QA gate):** real iPhone 11 / Safari. Open a
-  session with enough output to overflow, drag up/down **inside** the terminal →
-  the scrollback scrolls under the finger and the page stays fixed. Back out →
-  the tickets/sessions list scrolls normally again. (Chrome DevTools device mode
-  does not reproduce iOS WebKit touch behaviour, so it is not sufficient for this
-  gate.)
+  sub-row remainder carry, zero/negative row height guard; and `wheelSequences`
+  — button/sign mapping, per-row repeat, zero/non-finite guard. Both run under
+  the existing `node` vitest config.
+- **Behavioural (manual — the QA gate):** real iPhone 11 / Safari, with Claude's
+  TUI running (mouse tracking on). Open a session with enough output to overflow,
+  drag up/down **inside** the terminal → Claude scrolls its own transcript under
+  the finger and the page stays fixed. Boundary behaviour at the top/bottom is
+  Claude's, not xterm's. Back out → the tickets/sessions list scrolls normally
+  again. (Chrome DevTools device mode does not reproduce iOS WebKit touch
+  behaviour, so it is not sufficient for this gate.)
 - `npm run typecheck` and `npm run build` pass.

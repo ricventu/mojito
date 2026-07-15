@@ -118,7 +118,11 @@ export default function TerminalView(
       lastY = y;
       const rowHeightPx = term.rows > 0 ? el.clientHeight / term.rows : 0;
       const { lines, remainderPx } = computeTouchScroll(acc, rowHeightPx);
-      if (lines !== 0) {
+      // Only forward wheel events when the foreground app has mouse tracking on.
+      // Otherwise (bare shell, a no-mouse pager, a plain prompt) the pty would
+      // deliver the SGR bytes as literal keystrokes and corrupt the input line.
+      // When off, leave `acc` untouched so the drag simply does nothing.
+      if (lines !== 0 && term.modes.mouseTrackingMode !== "none") {
         const seq = wheelSequences(lines);
         if (seq) wsRef.current?.send(new TextEncoder().encode(seq));
         acc = remainderPx;
