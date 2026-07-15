@@ -18,7 +18,7 @@ export default function LaunchSheet(
   const [model, setModel] = useState("opus");
   // Pre-fill the effort optimal for this ticket's stage (overridable via the selector).
   const [effort, setEffort] = useState<string>(() => defaultEffortForStatus(ticket.statusName));
-  const [auto, setAuto] = useState(false);
+  const [auto, setAuto] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const existingId = tmuxName(ticket.identifier, ticket.statusName);
   const existing = sessions.find((s) => s.id === existingId);
