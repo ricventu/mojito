@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getConfig, getRegistry } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
-import { launchSession, launchCustomSession } from "@/server/launch";
+import { launchSession, launchCustomSession, launchNewTicketSession } from "@/server/launch";
 import { hasSession, newSession, pipePane } from "@/server/tmux";
 
 export async function GET(req: Request) {
@@ -23,6 +23,17 @@ export async function POST(req: Request) {
   if (body.kind === "custom") {
     const res = await launchCustomSession(
       { projectName: body.projectName ?? null, model: body.model ?? "opus", effort: body.effort ?? "high" },
+      { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
+        projectsPath: cfg.projectsPath, hasSession, newSession, pipePane },
+    );
+    if (!res.ok) return NextResponse.json({ error: res.reason }, { status: 422 });
+    return NextResponse.json(res.meta, { status: 201 });
+  }
+  if (body.kind === "new-ticket") {
+    const brief = typeof body.brief === "string" ? body.brief.trim() : "";
+    if (!brief) return NextResponse.json({ error: "empty brief" }, { status: 400 });
+    const res = await launchNewTicketSession(
+      { brief, projectName: body.projectName ?? null, model: body.model ?? "opus", effort: body.effort ?? "high" },
       { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
         projectsPath: cfg.projectsPath, hasSession, newSession, pipePane },
     );

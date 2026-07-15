@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mkdtempSync, statSync, existsSync, writeFileSync } from "node:fs";
+import { mkdtempSync, statSync, existsSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { launchSession, buildClaudeCommand, launchCustomSession, buildCustomClaudeCommand } from "@/server/launch";
+import {
+  launchSession, buildClaudeCommand, launchCustomSession, buildCustomClaudeCommand,
+  launchNewTicketSession, buildNewTicketClaudeCommand,
+} from "@/server/launch";
 import { Registry } from "@/server/registry";
 import type { SessionMeta } from "@/server/types";
 
@@ -180,5 +183,69 @@ describe("launchCustomSession", () => {
     const res = await launchCustomSession({ projectName: null, model: "opus", effort: "high" }, d);
     const id = (res as { ok: true; meta: SessionMeta }).meta.id;
     expect(d.registry.get(id)?.kind).toBe("custom");
+  });
+});
+
+describe("buildNewTicketClaudeCommand", () => {
+  it("prefixes LIME_NEW_CONTEXT and runs /lime-new", () => {
+    const cmd = buildNewTicketClaudeCommand(
+      { projectName: null, model: "opus", effort: "high", brief: "x" },
+      "/s/x.json",
+      "/state/context/mojito-custom-general-abc123.json",
+    );
+    expect(cmd).toMatch(/^LIME_NEW_CONTEXT='\/state\/context\/mojito-custom-general-abc123.json' claude /);
+    expect(cmd).toContain("--model 'opus' --effort 'high'");
+    expect(cmd).toContain("--settings '/s/x.json'");
+    expect(cmd).toContain("'/lime-new'");
+    expect(cmd).not.toContain("/lime-next");
+  });
+});
+
+describe("launchNewTicketSession", () => {
+  it("General opens in the home directory with a New ticket · home title", async () => {
+    const d = customDeps();
+    const res = await launchNewTicketSession(
+      { brief: "Aggiungi export CSV", projectName: null, model: "opus", effort: "high" }, d,
+    );
+    expect(res.ok).toBe(true);
+    const meta = (res as { ok: true; meta: SessionMeta }).meta;
+    expect(meta).toMatchObject({
+      kind: "custom", id: "mojito-custom-new-ticket-abc123", ticket: "", launchStatus: "",
+      cwd: "/home/me", projectName: null, title: "New ticket · home", autoAdvance: false,
+    });
+    expect(d.newSession).toHaveBeenCalledWith(
+      "mojito-custom-new-ticket-abc123", "/home/me",
+      expect.stringContaining("'/lime-new'"),
+    );
+  });
+
+  it("a mapped project opens in its folder with the project in the title", async () => {
+    const projectsPath = join(dir, "projects.json");
+    writeFileSync(projectsPath, JSON.stringify({ RIC: { projects: { Mojito: "/code/Lime/mojito" } } }));
+    const d = customDeps({ projectsPath });
+    const res = await launchNewTicketSession(
+      { brief: "x", projectName: "Mojito", model: "sonnet", effort: "low" }, d,
+    );
+    expect(res.ok).toBe(true);
+    const meta = (res as { ok: true; meta: SessionMeta }).meta;
+    expect(meta).toMatchObject({
+      kind: "custom", id: "mojito-custom-mojito-abc123", cwd: "/code/Lime/mojito",
+      projectName: "Mojito", title: "New ticket · Mojito",
+    });
+  });
+
+  it("writes the LIME_NEW_CONTEXT file with the brief and project", async () => {
+    const projectsPath = join(dir, "projects.json");
+    writeFileSync(projectsPath, JSON.stringify({ RIC: { projects: { Mojito: "/code/Lime/mojito" } } }));
+    const d = customDeps({ projectsPath });
+    await launchNewTicketSession({ brief: "Aggiungi export CSV", projectName: "Mojito", model: "opus", effort: "high" }, d);
+    const p = join(dir, "context", "mojito-custom-mojito-abc123.json");
+    expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({ brief: "Aggiungi export CSV", project: "Mojito" });
+  });
+
+  it("refuses an unmapped project", async () => {
+    const d = customDeps();
+    const res = await launchNewTicketSession({ brief: "x", projectName: "Ghost", model: "opus", effort: "high" }, d);
+    expect(res).toMatchObject({ ok: false, reason: "no-repo" });
   });
 });
