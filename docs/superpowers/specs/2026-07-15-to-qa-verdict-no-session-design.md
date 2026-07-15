@@ -1,57 +1,63 @@
-# RIC-110 follow-up — Resolve the To QA verdict without opening a claude session
+# RIC-110 follow-up — Choose gate actions in Mojito before launching (no post-launch gate)
 
 ## Problem
 
 RIC-110 stopped the **advance** route from launching a *second* claude session when the
-user clicks `approve` / `reject` at the To QA gate. But the gate buttons live inside
-`TerminalView`, and the only way to reach them is to launch a To QA session first:
+user clicks a gate action. But the gate buttons live inside `TerminalView`, and the only
+way to reach them is to launch a session first. Both lifecycle gates suffer from this:
 
-1. Tap a To QA ticket → `LaunchSheet` → **Start session** → `POST /api/sessions` →
-   `launchSession` spawns `claude … /lime-next <TICKET>` (Stage 4 gate).
-2. Open that terminal → `TerminalView` shows approve / reject.
-3. Click → `advance` route resolves the verdict server-side (no 2nd launch — the RIC-110
-   fix).
+- **To QA** — approve / reject is a pure Linear mutation (`resolveQaVerdict` in
+  `qaVerdict.ts`), yet the user must first launch a claude Stage-4 session just to see the
+  buttons. Claude is spawned for nothing.
+- **To Merge** — `local` / `mr` picks the Stage-5 merge mode. Today the user launches a
+  gate session *with no arg*, opens it, then clicks `local`/`mr`, which **relaunches** a
+  second session with the arg as `trailingArg`. The mode should be chosen *before* the one
+  and only launch.
 
-So a claude session still opens (step 1) purely to reach buttons whose verdict Mojito
-already resolves as a pure Linear mutation (`resolveQaVerdict` in `qaVerdict.ts`).
-`launch.ts` always spawns claude regardless of status — there is no To-QA-specific path.
+Root cause for both: the gate choice happens *after* a session exists, inside
+`TerminalView`. `launch.ts` always spawns `claude … /lime-next <TICKET>` regardless of
+status, and `POST /api/sessions` ignores `trailingArg` entirely (only the `advance` route
+forwards it).
 
 ## Goal
 
-For a ticket at status **To QA**, let the user approve / reject **directly in the
-interface**, with no claude session ever spawned. The verdict stays a pure Linear
-mutation:
+Move both gate choices *before* the launch, into `LaunchSheet` (the sheet opened by tapping
+a ticket):
 
-- **approve** → set Linear status to **To Merge**. No comment.
-- **reject** → require a typed reason → post it as a Linear comment → set status to
-  **To Code**.
+- **To QA** → resolve the verdict directly, **no claude session**:
+  - **approve** → set Linear status to **To Merge**. No comment.
+  - **reject** → require a typed reason → post it as a Linear comment → set status to
+    **To Code**.
+- **To Merge** → pick `local` / `mr` in the sheet, then launch **one** claude Stage-5
+  session with that arg as `trailingArg`.
 
-Everything else is unchanged. The **To Merge** gate (`local` / `mr`) still launches a lime
-Stage 5 session — real merge work needs claude.
+`TerminalView` no longer has any gate UI — it always shows the terminal + `AccessoryBar`.
+The `/api/sessions/[id]/advance` route is removed (it was only ever called by the
+`TerminalView` gate).
 
 ## Non-goals / not touched
 
-- **No lime change.** lime's Stage 4 still exists for bare-terminal use. The Mojito→lime
-  dependency stays one-directional.
+- **No lime change.** lime's Stage 4 / Stage 5 still exist for bare-terminal use. The
+  Mojito→lime dependency stays one-directional.
 - `resolveQaVerdict` / `qaVerdict.ts` — reused as-is, not modified.
-- `STAGE_OF`, `GATE_STATES`, `decideAutoAdvance` in `autoAdvance.ts` — unchanged. To QA
-  stays a `GATE_STATE` so auto-advance still stops at it.
-- The `advance` route (`/api/sessions/[id]/advance`) — unchanged. Its To QA branch stays
-  as a harmless safety net for any pre-existing To QA session.
-- The To Merge gate path (`local` / `mr`) — unchanged.
+- `STAGE_OF`, `GATE_STATES`, `decideAutoAdvance` in `autoAdvance.ts` — unchanged. To QA and
+  To Merge stay `GATE_STATES` so auto-advance still **stops** at them (a human then acts in
+  the sheet). This is why auto-advance never needs `trailingArg`.
+- `launch.ts` / `LaunchRequest` — already carries `trailingArg`; unchanged.
 
 ## Design
 
-### Server — testable orchestration + thin route
+### Server
 
-The `advance` route is keyed by session id and reads `prev.ticket` from the registry. A
-To QA ticket now has **no session**, so we need a path keyed by ticket identifier.
+**1. `POST /api/sessions` — forward `trailingArg`.** The route currently drops it. Add:
 
-The repo convention (CLAUDE.md) is: logic lives in `src/server/` and is unit-tested;
-route handlers under `src/app/api/` are thin, untested glue (the `advance` route follows
-this). So the new orchestration goes in a `src/server/` module, not the route.
+- Read `body.trailingArg`. If present, validate it against `{"local","mr"}` → else `400`
+  `{ error: "invalid trailingArg" }`. (`launchSession`/`buildClaudeCommand` already
+  shell-quote it, but a whitelist keeps the surface tight and the intent explicit — mirrors
+  the old advance route's `VALID_ARGS`.)
+- Pass `trailingArg` through to `launchSession` in the `LaunchRequest`.
 
-**New `src/server/ticketVerdict.ts` — pure, unit-testable orchestration.**
+**2. New `src/server/ticketVerdict.ts` — pure, unit-testable orchestration** (To QA only).
 
 ```
 export type VerdictResult =
@@ -76,16 +82,13 @@ export async function resolveTicketVerdict(
 3. `await deps.resolveVerdict({ ticket, arg, reason })`.
    - `QaVerdictError` (empty reject reason) → `{ ok:false, code:400, error }`.
    - Any other throw (Linear / network / missing workflow state) →
-     `{ ok:false, code:422, error }`. The stale-session cleanup is **not** run on error,
-     so the user can retry.
+     `{ ok:false, code:422, error }`. Stale-session cleanup is **not** run on error, so the
+     user can retry.
 4. `await deps.supersedeStaleSession(ticket)` — retires any pre-existing To QA session
-   (belt-and-suspenders; a no-op when none exists).
+   (belt-and-suspenders; no-op when none exists).
 5. `{ ok:true, arg }`.
 
-Ticket-id validation (`validateTicket`) happens in the route before calling this, since it
-throws rather than returns.
-
-**New `src/app/api/tickets/[id]/verdict/route.ts`** — thin wiring, mirrors `advance`:
+**3. New `src/app/api/tickets/[id]/verdict/route.ts`** — thin wiring:
 
 - Auth via `tokenFromHeaders`; parse `{ arg, reason }`; `validateTicket(id)` (invalid →
   `400`).
@@ -93,16 +96,19 @@ throws rather than returns.
   - `getIssueStatus: (t) => getIssueStatus(cfg.linearApiKey, t)`
   - `resolveVerdict: (i) => resolveQaVerdict(i, { setIssueStatus: (t,s)=>setIssueStatus(cfg.linearApiKey,t,s), postComment: (t,b)=>postComment(cfg.linearApiKey,t,b) })`
   - `supersedeStaleSession: async (t) => { const sid = tmuxName(t,"To QA"); if (getRegistry().get(sid)) await supersedeSession(sid, { closeSession, registry: getRegistry() }); }`
-- Call `resolveTicketVerdict`, then map the result: `ok` → `200 { ok:true, arg }`;
-  otherwise `NextResponse.json({ error }, { status: code })`.
+- Call `resolveTicketVerdict`; `ok` → `200 { ok:true, arg }`, else
+  `NextResponse.json({ error }, { status: code })`.
 
-No changes to `linear.ts` — `getIssueStatus`, `setIssueStatus`, `postComment` all already
-exist (added in RIC-110). No changes to `qaVerdict.ts`.
+**4. Delete `src/app/api/sessions/[id]/advance/route.ts`** and its directory. No other
+caller (verified: only `TerminalView` used it). `resolveQaVerdict`, `setIssueStatus`,
+`postComment`, `supersedeSession` all stay (used elsewhere / by the new route).
 
-### Client — extract `QaVerdictButtons`, wire it into `LaunchSheet`
+No changes to `linear.ts` or `qaVerdict.ts`.
 
-**New `src/components/QaVerdictButtons.tsx`** — the approve / reject-with-inline-reason UI,
-lifted verbatim from `TerminalView`'s current To QA branch. One source of truth.
+### Client
+
+**1. New `src/components/QaVerdictButtons.tsx`** — the approve / reject-with-inline-reason
+UI, lifted verbatim from `TerminalView`'s current To QA branch. One source of truth.
 
 ```
 export default function QaVerdictButtons(
@@ -111,75 +117,78 @@ export default function QaVerdictButtons(
 )
 ```
 
-- Owns its own `rejecting` / `reason` state (moved out of `TerminalView`).
-- `approve` button → `onApprove()`.
-- `reject` button → reveals inline `<textarea>` + `confirm reject` button; confirm →
-  `onReject(reason)`, disabled while `reason.trim()` is empty.
-- Renders only the buttons (the caller supplies the surrounding container / error display).
+- Owns its own `rejecting` / `reason` state.
+- `approve` → `onApprove()`. `reject` → reveals inline `<textarea>` + `confirm reject`
+  (disabled while `reason.trim()` is empty) → `onReject(reason)`.
+- Renders only the buttons; the caller supplies the container / error display.
 
-**`src/components/LaunchSheet.tsx`** — branch on `To QA` at the top of the sheet body:
+**2. `src/components/LaunchSheet.tsx`** — branch on `ticket.statusName`:
 
-- When `ticket.statusName === "To QA"`: render `<QaVerdictButtons>` instead of the
-  model/effort/auto/Start form (and instead of the "open existing session" affordances).
-  - `onApprove` → `submitVerdict("approve")`.
-  - `onReject(reason)` → `submitVerdict("reject", reason)`.
-  - `submitVerdict` → `POST /api/tickets/${ticket.identifier}/verdict` with `{ arg, reason? }`.
-    - Success → `onLaunched()` (refreshes tickets + sessions) then `onClose()`.
-    - Failure → set `err` to the response's `error` (or a status fallback), shown via the
-      existing `err-text` display.
-- All other statuses render the launch form exactly as today.
+- **`"To QA"`** → render `<QaVerdictButtons>` (no model/effort/auto form, no
+  open-existing-session affordances):
+  - `onApprove` → `submitVerdict("approve")`; `onReject(reason)` → `submitVerdict("reject", reason)`.
+  - `submitVerdict` → `POST /api/tickets/${ticket.identifier}/verdict` `{ arg, reason? }`.
+    Success → `onLaunched()` then `onClose()`. Failure → set `err` from the response's
+    `error`, shown via the existing `err-text` display.
+- **`"To Merge"`** → the model / effort / auto form, but the single `Start` button is
+  replaced by **two** buttons: `Start · local` and `Start · mr`. Each calls
+  `start(mode)` which sends `trailingArg: mode` in the `POST /api/sessions` body (all other
+  launch fields unchanged, including the existing "clear a finished same-name session
+  first" step).
+- **Any other status** → the launch form exactly as today (single `Start`, no
+  `trailingArg`).
 
-**`src/components/TerminalView.tsx`** — remove the now-dead To QA branch:
+`start` is generalized to accept an optional `trailingArg` and include it in the POST body
+when present.
 
-- Delete the `rejecting` / `reason` state and the `To QA` arm of the gate `<div>`.
-- The gate block renders **only** for `To Merge` (the `local` / `mr` buttons). Replace the
-  `isGate = GATE_STATES.includes(...)` gate condition with a To-Merge-specific check
-  (e.g. `launchStatus === "To Merge"`), so a To QA session (should one exist) falls back to
-  the normal `AccessoryBar` rather than rendering an empty/incorrect gate.
-- `advance(arg, reason?)` stays (To Merge still uses `advance("local")` / `advance("mr")`),
-  but the `reason` parameter is no longer exercised from here; keep the signature since the
-  advance route still accepts it.
+**3. `src/components/TerminalView.tsx`** — remove all gate UI:
+
+- Delete the `isGate` / `GATE_STATES` import usage, the `rejecting` / `reason` / `advErr`
+  state, the `advance()` function, and the entire gate `<div>`.
+- The component now always renders the terminal + `<AccessoryBar>`.
 
 ### Data flow
 
 ```
-Tap To QA ticket → LaunchSheet detects statusName==="To QA"
-  → QaVerdictButtons
-    approve      → POST /api/tickets/RIC-110/verdict {arg:"approve"}
-    reject+reason→ POST /api/tickets/RIC-110/verdict {arg:"reject", reason}
-      → route: getIssueStatus guard → resolveQaVerdict → (supersede stale session)
-      → 200 → onLaunched()+onClose()
-```
+Tap To QA ticket → LaunchSheet (statusName==="To QA") → QaVerdictButtons
+  approve/reject → POST /api/tickets/<id>/verdict
+    → resolveTicketVerdict: getIssueStatus guard → resolveQaVerdict → supersede stale
+    → 200 → onLaunched()+onClose()
+  (no /api/sessions, no claude)
 
-No `POST /api/sessions`, no `launchSession`, no claude. ✓
+Tap To Merge ticket → LaunchSheet (statusName==="To Merge") → [Start·local]/[Start·mr]
+  → POST /api/sessions { …, trailingArg:"local"|"mr" }
+    → launchSession → claude … /lime-next <TICKET> local|mr   (one session, arg upfront)
+```
 
 ## Error handling
 
-- Invalid `arg` / invalid ticket id → `400`.
-- Ticket not at To QA (stale UI) → `409`, surfaced in the sheet's `err-text`.
-- Empty / whitespace reject reason → `400` (server-enforced; the confirm button is also
-  disabled client-side).
-- Missing workflow state (`To Merge` / `To Code` absent) or Linear/network failure → `422`
-  with the message; surfaced in `err-text`; no session superseded so retry is safe.
+- **Verdict route:** invalid `arg` / invalid ticket id → `400`; ticket not at To QA (stale
+  UI) → `409`; empty reject reason → `400` (also disabled client-side); Linear/network /
+  missing workflow state → `422`. All surfaced in the sheet's `err-text`; no session
+  superseded on error → retry is safe.
+- **Sessions route (To Merge):** invalid `trailingArg` → `400`; `duplicate` → `409`;
+  `no-repo` → `422` (unchanged). Surfaced in the sheet.
 
 ## Testing
 
 - **`tests/server/ticketVerdict.test.ts`** (new) — unit-tests `resolveTicketVerdict` with
   stubbed deps (spies for `getIssueStatus` / `resolveVerdict` / `supersedeStaleSession`),
-  the same style as `qaVerdict.test.ts`:
-  - To QA + `approve` → calls `resolveVerdict({arg:"approve"})` then
-    `supersedeStaleSession`; returns `{ ok:true }`.
-  - To QA + `reject` + reason → passes the reason through to `resolveVerdict`; returns
+  same style as `qaVerdict.test.ts`:
+  - To QA + `approve` → `resolveVerdict({arg:"approve"})` then `supersedeStaleSession`;
     `{ ok:true }`.
+  - To QA + `reject` + reason → reason passed through; `{ ok:true }`.
   - Status not To QA → `{ ok:false, code:409 }`; `resolveVerdict` / `supersedeStaleSession`
     **not** called.
   - Invalid `arg` → `{ ok:false, code:400 }`; `getIssueStatus` not called.
   - `resolveVerdict` throws `QaVerdictError` → `{ ok:false, code:400 }`;
     `supersedeStaleSession` **not** called.
-  - `resolveVerdict` throws a generic error → `{ ok:false, code:422 }`.
-- `qaVerdict.test.ts` — already covers approve/reject/empty-reason orchestration;
-  unchanged. `linear.test.ts` — `setIssueStatus` / `postComment` already covered;
-  unchanged. The route handler stays thin, untested glue (as the `advance` route is).
+  - `resolveVerdict` throws generic error → `{ ok:false, code:422 }`.
+- **`tests/server/launch.test.ts`** — already asserts `buildClaudeCommand` appends
+  `trailingArg` (`… /lime-next RIC-1 approve`). Add a case asserting `local` / `mr` append
+  the same way (guards the To Merge command shape).
+- `qaVerdict.test.ts`, `linear.test.ts` — unchanged. Route handlers and `LaunchSheet` /
+  `TerminalView` are thin glue / UI, untested (as the deleted advance route was).
 - Full gate: `npx tsc --noEmit && npx vitest run`.
 
 ## Rollout
