@@ -7,7 +7,6 @@ import AccessoryBar from "./AccessoryBar";
 import StateBadge from "./StateBadge";
 import { apiFetch } from "@/lib/client";
 import { computeTouchScroll, wheelSequences } from "@/lib/touchScroll";
-import { GATE_STATES } from "@/server/autoAdvance";
 import type { SessionMeta } from "@/server/types";
 
 export default function TerminalView(
