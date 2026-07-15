@@ -1,3 +1,5 @@
+import type { Effort } from "./types.js";
+
 export type AdvanceDecision = { action: "stop" } | { action: "gate"; gate: string } | { action: "launch" };
 
 export const GATE_STATES = ["To QA", "To Merge"];
@@ -18,6 +20,30 @@ const STAGE_OF: Record<string, number> = {
 
 export function stageOf(status: string): number | undefined {
   return STAGE_OF[status];
+}
+
+// Optimal reasoning effort per lifecycle stage, tuned to each stage's cognitive load
+// (see lime-next's dispatch table for what each stage does):
+//   Backlog/Todo (design: brainstorm/debug -> plan) — high stakes, a bad plan poisons
+//     everything downstream, so xhigh.
+//   To Code (subagent-driven implementation) — the heavy lifting is delegated to
+//     subagents, the orchestrator only coordinates, so high.
+//   To Review (code review) — analytical, read-only bug hunting where depth pays and
+//     there is no over-engineering risk, so xhigh.
+//   To QA (human-approval gate) — mechanical: print a summary, dispatch on the verdict,
+//     set status, so low.
+//   To Merge (rebase + merge) — a bounded, procedural git decision tree, so medium.
+// Anything outside the known workflow falls back to the app-wide default (high).
+const EFFORT_OF_STATUS: Record<string, Effort> = {
+  Backlog: "xhigh", Todo: "xhigh",
+  "To Code": "high",
+  "To Review": "xhigh",
+  "To QA": "low",
+  "To Merge": "medium",
+};
+
+export function defaultEffortForStatus(status: string): Effort {
+  return EFFORT_OF_STATUS[status] ?? "high";
 }
 
 /**

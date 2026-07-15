@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { apiFetch } from "@/lib/client";
+import { defaultEffortForStatus } from "@/server/autoAdvance";
 import { tmuxName } from "@/server/sessionKey";
 import StateBadge from "./StateBadge";
 import QaVerdictButtons from "./QaVerdictButtons";
@@ -15,7 +16,8 @@ export default function LaunchSheet(
     onLaunched: () => void; onOpen: (s: SessionMeta) => void },
 ) {
   const [model, setModel] = useState("opus");
-  const [effort, setEffort] = useState("high");
+  // Pre-fill the effort optimal for this ticket's stage (overridable via the selector).
+  const [effort, setEffort] = useState<string>(() => defaultEffortForStatus(ticket.statusName));
   const [auto, setAuto] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const existingId = tmuxName(ticket.identifier, ticket.statusName);

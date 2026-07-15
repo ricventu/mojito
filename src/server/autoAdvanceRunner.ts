@@ -1,10 +1,16 @@
 import type { SessionMeta } from "./types.js";
+import { defaultEffortForStatus } from "./autoAdvance.js";
 import { getConfig, getRegistry } from "./app.js";
 import { launchSession } from "./launch.js";
 import { hasSession, newSession, pipePane, closeSession } from "./tmux.js";
 import { supersedeSession } from "./supersede.js";
 
-/** Launch the next stage for a ticket, reusing its model/effort. Best-effort. */
+/**
+ * Launch the next stage for a ticket, reusing its model but picking the effort optimal
+ * for the new stage (see defaultEffortForStatus). Auto-advance is hands-off, so each
+ * stage runs at its own optimal effort rather than inheriting the manually-chosen effort
+ * of whichever stage the user launched by hand. Best-effort.
+ */
 export async function runAutoAdvance(prev: SessionMeta, newStatus: string): Promise<void> {
   const cfg = getConfig();
   const registry = getRegistry();
@@ -13,7 +19,7 @@ export async function runAutoAdvance(prev: SessionMeta, newStatus: string): Prom
       ticket: prev.ticket,
       status: newStatus,
       model: prev.model,
-      effort: prev.effort,
+      effort: defaultEffortForStatus(newStatus),
       autoAdvance: prev.autoAdvance,
       projectName: prev.projectName ?? null,
       title: prev.title ?? "",

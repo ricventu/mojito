@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { decideAutoAdvance, stageAdvanced } from "@/server/autoAdvance";
+import { decideAutoAdvance, defaultEffortForStatus, stageAdvanced } from "@/server/autoAdvance";
 
 describe("stageAdvanced", () => {
   it("is true when moving to a later stage", () => {
@@ -38,5 +38,28 @@ describe("decideAutoAdvance", () => {
   });
   it("launches otherwise", () => {
     expect(decideAutoAdvance("Planned", true)).toEqual({ action: "launch" });
+  });
+});
+
+describe("defaultEffortForStatus", () => {
+  it("uses xhigh for the design stage (Backlog/Todo), where a bad plan poisons the pipeline", () => {
+    expect(defaultEffortForStatus("Backlog")).toBe("xhigh");
+    expect(defaultEffortForStatus("Todo")).toBe("xhigh");
+  });
+  it("uses high for implementation (To Code), where subagents do the heavy lifting", () => {
+    expect(defaultEffortForStatus("To Code")).toBe("high");
+  });
+  it("uses xhigh for code review (To Review), an analytical read-only stage", () => {
+    expect(defaultEffortForStatus("To Review")).toBe("xhigh");
+  });
+  it("uses low for the mechanical QA gate (To QA)", () => {
+    expect(defaultEffortForStatus("To QA")).toBe("low");
+  });
+  it("uses medium for the procedural merge stage (To Merge)", () => {
+    expect(defaultEffortForStatus("To Merge")).toBe("medium");
+  });
+  it("falls back to high for statuses outside the known workflow", () => {
+    expect(defaultEffortForStatus("In Progress")).toBe("high");
+    expect(defaultEffortForStatus("Done")).toBe("high");
   });
 });
