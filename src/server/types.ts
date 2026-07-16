@@ -11,7 +11,7 @@ export type HookEventName =
   | "SessionEnd";
 
 export interface SessionMeta {
-  kind: "lime" | "custom"; // "lime" = ticket-lifecycle session; "custom" = standalone claude session
+  kind: "lime" | "custom" | "rebase"; // "lime" = ticket-lifecycle; "custom" = standalone; "rebase" = one-off To-QA rebase
   id: string;            // tmux session name, e.g. "mojito-RIC-46-to-review"
   ticket: string;        // "RIC-46" (empty for custom sessions)
   launchStatus: string;  // Linear status name at launch (empty for custom sessions)

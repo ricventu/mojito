@@ -25,3 +25,8 @@ export function tmuxName(ticket: string, status: string): string {
 export function customSessionName(slug: string, unique: string): string {
   return `mojito-custom-${slug}-${unique}`;
 }
+
+export function rebaseSessionName(ticket: string): string {
+  validateTicket(ticket);
+  return `mojito-${ticket}-rebase`;
+}

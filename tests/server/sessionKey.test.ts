@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { statusSlug, tmuxName, parseIdentifier, validateTicket, customSessionName } from "@/server/sessionKey";
+import { statusSlug, tmuxName, parseIdentifier, validateTicket, customSessionName, rebaseSessionName } from "@/server/sessionKey";
 
 describe("sessionKey", () => {
   it("slugs a status", () => {
@@ -32,5 +32,17 @@ describe("customSessionName", () => {
   });
   it("distinct unique ids yield distinct names", () => {
     expect(customSessionName("x", "aaa")).not.toBe(customSessionName("x", "bbb"));
+  });
+});
+
+describe("rebaseSessionName", () => {
+  it("builds the rebase session name for a ticket", () => {
+    expect(rebaseSessionName("RIC-120")).toBe("mojito-RIC-120-rebase");
+  });
+  it("does not collide with the To QA gate session name", () => {
+    expect(rebaseSessionName("RIC-120")).not.toBe(tmuxName("RIC-120", "To QA"));
+  });
+  it("rejects a malformed ticket", () => {
+    expect(() => rebaseSessionName("nonsense")).toThrow();
   });
 });
