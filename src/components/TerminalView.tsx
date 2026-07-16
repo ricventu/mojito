@@ -10,6 +10,7 @@ import { apiFetch } from "@/lib/client";
 import { computeTouchScroll, wheelSequences } from "@/lib/touchScroll";
 import { SESSION_GONE_CODE } from "@/lib/ptyClose";
 import { termRootStyle } from "@/lib/keyboardInset";
+import { terminalTabTitle } from "@/lib/terminalTabTitle";
 import type { SessionMeta } from "@/server/types";
 
 export default function TerminalView(
@@ -183,6 +184,16 @@ export default function TerminalView(
       body.style.overscrollBehavior = prev.bodyOverscroll;
     };
   }, []);
+
+  // Reflect the open ticket in the browser tab title, then restore the previous
+  // title when the terminal closes. Mirrors the overflow save/restore effect above.
+  useEffect(() => {
+    const prev = document.title;
+    document.title = terminalTabTitle(session);
+    return () => {
+      document.title = prev;
+    };
+  }, [session.ticket, session.title]);
 
   // Mobile touch scroll. Claude's TUI runs in the alternate screen buffer, so
   // xterm has no scrollback to move — scrollLines() is a no-op. Instead forward
