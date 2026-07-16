@@ -3,7 +3,7 @@ import { join, basename } from "node:path";
 import { homedir } from "node:os";
 import { randomBytes } from "node:crypto";
 import type { Effort, SessionMeta } from "./types.js";
-import { tmuxName, parseIdentifier, validateTicket, statusSlug, customSessionName } from "./sessionKey.js";
+import { tmuxName, parseIdentifier, validateTicket, statusSlug, customSessionName, rebaseSessionName } from "./sessionKey.js";
 import { buildHookSettings } from "./hookSettings.js";
 import { loadProjectMap, resolveRepoFromMap, resolvePathForProject } from "./limeProjects.js";
 import { resolveWorktree } from "./worktree.js";
@@ -231,6 +231,85 @@ export async function launchNewTicketSession(
     projectName: req.projectName,
     title: `New ticket · ${req.projectName ?? "home"}`,
     labels: [],
+  };
+  deps.registry.upsert(meta);
+  return { ok: true, meta };
+}
+
+export interface RebaseLaunchRequest {
+  ticket: string;
+  projectName: string | null;
+  title: string;
+  labels: string[];
+  model: string;
+  effort: Effort;
+}
+
+export function buildRebaseClaudeCommand(
+  req: RebaseLaunchRequest,
+  settingsPath: string,
+  contextPath: string,
+): string {
+  const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
+  return (
+    `LIME_SESSION_CONTEXT=${q(contextPath)} ` +
+    `claude --model ${q(req.model)} --effort ${q(req.effort)} ` +
+    `--settings ${q(settingsPath)} ${q(`/lime-rebase ${req.ticket}`)}`
+  );
+}
+
+/**
+ * Launch a one-off session that rebases the ticket's worktree branch onto the default
+ * branch (the To-Merge "first part", no merge). Distinct session name so it never collides
+ * with the To-QA gate session; autoAdvance is always off (this is not a lifecycle handoff).
+ */
+export async function launchRebaseSession(
+  req: RebaseLaunchRequest,
+  deps: LaunchDeps,
+): Promise<{ ok: true; meta: SessionMeta } | { ok: false; reason: "duplicate" | "no-repo"; id?: string }> {
+  validateTicket(req.ticket);
+  const id = rebaseSessionName(req.ticket);
+
+  if (await deps.hasSession(id)) return { ok: false, reason: "duplicate", id };
+
+  const resolveCwd = deps.resolveCwd ?? defaultResolveCwd(deps.projectsPath);
+  const cwd = resolveCwd(req.ticket, req.projectName);
+  if (!cwd) return { ok: false, reason: "no-repo" };
+
+  const settingsDir = join(deps.stateDir, "settings");
+  mkdirSync(settingsDir, { recursive: true, mode: 0o700 });
+  const settingsPath = join(settingsDir, `${id}.json`);
+  writeFileSync(settingsPath, JSON.stringify(buildHookSettings(id, deps.port, deps.token), null, 2), {
+    mode: 0o600,
+  });
+  chmodSync(settingsPath, 0o600); // mode on writeFileSync is ignored if the file pre-existed
+
+  const contextPath = writeLaunchContext(deps.stateDir, id, {
+    identifier: req.ticket,
+    statusName: "To QA",
+    title: req.title,
+    project: req.projectName,
+    labels: req.labels,
+  });
+
+  const command = buildRebaseClaudeCommand(req, settingsPath, contextPath);
+  await deps.newSession(id, cwd, command);
+  await deps.pipePane(id, logfilePath(deps.stateDir, id));
+
+  const meta: SessionMeta = {
+    kind: "rebase",
+    id,
+    ticket: req.ticket,
+    launchStatus: "To QA",
+    model: req.model,
+    effort: req.effort,
+    autoAdvance: false,
+    state: "starting",
+    cwd,
+    createdAt: (deps.nowIso ?? (() => new Date().toISOString()))(),
+    projectName: req.projectName,
+    title: req.title,
+    labels: req.labels,
   };
   deps.registry.upsert(meta);
   return { ok: true, meta };

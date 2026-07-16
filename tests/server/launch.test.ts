@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   launchSession, buildClaudeCommand, launchCustomSession, buildCustomClaudeCommand,
   launchNewTicketSession, buildNewTicketClaudeCommand,
+  launchRebaseSession, buildRebaseClaudeCommand,
 } from "@/server/launch";
 import { Registry } from "@/server/registry";
 import type { SessionMeta } from "@/server/types";
@@ -201,6 +202,22 @@ describe("buildNewTicketClaudeCommand", () => {
   });
 });
 
+const baseRebaseReq = {
+  ticket: "RIC-120", projectName: "Mojito", title: "action per fare rebase",
+  labels: [] as string[], model: "opus", effort: "xhigh" as const,
+};
+
+describe("buildRebaseClaudeCommand", () => {
+  it("runs /lime-rebase for the ticket with a launch context prefix", () => {
+    const cmd = buildRebaseClaudeCommand(baseRebaseReq, "/s/x.json", "/c/x.json");
+    expect(cmd).toMatch(/^LIME_SESSION_CONTEXT='\/c\/x.json' claude /);
+    expect(cmd).toContain("--model 'opus' --effort 'xhigh'");
+    expect(cmd).toContain("--settings '/s/x.json'");
+    expect(cmd).toContain("'/lime-rebase RIC-120'");
+    expect(cmd).not.toContain("/lime-next");
+  });
+});
+
 describe("launchNewTicketSession", () => {
   it("General opens in the home directory with a New ticket · home title", async () => {
     const d = customDeps();
@@ -246,6 +263,44 @@ describe("launchNewTicketSession", () => {
   it("refuses an unmapped project", async () => {
     const d = customDeps();
     const res = await launchNewTicketSession({ brief: "x", projectName: "Ghost", model: "opus", effort: "high" }, d);
+    expect(res).toMatchObject({ ok: false, reason: "no-repo" });
+  });
+});
+
+describe("launchRebaseSession", () => {
+  it("launches a rebase-kind session with autoAdvance off at To QA", async () => {
+    const d = deps();
+    const res = await launchRebaseSession(baseRebaseReq, d);
+    expect(res.ok).toBe(true);
+    const meta = (res as { ok: true; meta: SessionMeta }).meta;
+    expect(meta).toMatchObject({
+      kind: "rebase", id: "mojito-RIC-120-rebase", ticket: "RIC-120",
+      launchStatus: "To QA", autoAdvance: false, state: "starting", cwd: "/code/lime",
+    });
+    expect(d.newSession).toHaveBeenCalledWith(
+      "mojito-RIC-120-rebase", "/code/lime", expect.stringContaining("'/lime-rebase RIC-120'"));
+  });
+
+  it("writes a launch context with statusName To QA", async () => {
+    const { readFileSync } = await import("node:fs");
+    const d = deps();
+    await launchRebaseSession(baseRebaseReq, d);
+    const p = join(dir, "context", "mojito-RIC-120-rebase.json");
+    expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({
+      identifier: "RIC-120", statusName: "To QA",
+      title: "action per fare rebase", project: "Mojito", labels: [],
+    });
+  });
+
+  it("refuses a duplicate", async () => {
+    const d = deps({ hasSession: vi.fn(async () => true) });
+    const res = await launchRebaseSession(baseRebaseReq, d);
+    expect(res).toMatchObject({ ok: false, reason: "duplicate", id: "mojito-RIC-120-rebase" });
+  });
+
+  it("refuses when no repo resolves", async () => {
+    const d = deps({ resolveCwd: () => null });
+    const res = await launchRebaseSession(baseRebaseReq, d);
     expect(res).toMatchObject({ ok: false, reason: "no-repo" });
   });
 });
