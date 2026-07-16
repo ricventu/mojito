@@ -129,6 +129,26 @@ button.chip {
 button.chip:active { transform: scale(.96); }
 .chip.on { color: var(--run); border-color: color-mix(in srgb, var(--run) 40%, transparent); }
 
+/* Colored status chips (Tickets status filter): hue text + border when inactive,
+   filled with the hue background when active. The "All" chip has no hue class,
+   so it keeps the default .chip / .chip.on styling. Hues match src/lib/status.ts. */
+.filter-chips .chip.grey   { color: var(--wait);       border-color: var(--border-hi); }
+.filter-chips .chip.blue   { color: var(--run);        border-color: color-mix(in srgb, var(--run) 40%, transparent); }
+.filter-chips .chip.indigo { color: var(--indigo);     border-color: color-mix(in srgb, var(--indigo) 45%, transparent); }
+.filter-chips .chip.amber  { color: var(--attn);       border-color: color-mix(in srgb, var(--attn) 45%, transparent); }
+.filter-chips .chip.teal   { color: var(--teal);       border-color: color-mix(in srgb, var(--teal) 45%, transparent); }
+.filter-chips .chip.green  { color: var(--ok);         border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.filter-chips .chip.red    { color: var(--err);        border-color: color-mix(in srgb, var(--err) 40%, transparent); }
+.filter-chips .chip.muted  { color: var(--text-faint); border-color: var(--border); }
+.filter-chips .chip.grey.on   { background: var(--wait-bg); }
+.filter-chips .chip.blue.on   { background: var(--run-bg); }
+.filter-chips .chip.indigo.on { background: var(--indigo-bg); }
+.filter-chips .chip.amber.on  { background: var(--attn-bg); }
+.filter-chips .chip.teal.on   { background: var(--teal-bg); }
+.filter-chips .chip.green.on  { background: var(--ok-bg); }
+.filter-chips .chip.red.on    { background: var(--err-bg); }
+.filter-chips .chip.muted.on  { background: var(--surface-hi); }
+
 /* ---- State badges ---- */
 .badge {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px 4px 8px; border-radius: 999px;

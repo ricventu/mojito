@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import LaunchSheet from "./LaunchSheet";
 import NewTicketSheet from "./NewTicketSheet";
 import FilterBar, { NO_PROJECT } from "./FilterBar";
+import { filterTickets, ticketStatuses } from "@/lib/ticketFilter";
 import { usePersistedState } from "@/lib/usePersistedState";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 import { activeSessionLevel, type ActiveLevel } from "@/lib/ticketSessionLevel";
@@ -20,11 +21,15 @@ export default function TicketList(
   const project = projectRaw === "" ? null : projectRaw;
   const setProject = (p: string | null) => setProjectRaw(p ?? "");
   const [newOpen, setNewOpen] = useState(false);
+  const [statusRaw, setStatusRaw] = usePersistedState("mojito-tickets-status", "");
+  const status = statusRaw === "" ? null : statusRaw;
+  const setStatus = (s: string | null) => setStatusRaw(s ?? "");
 
   const projects = useMemo(
     () => Array.from(new Set(tickets.map((t) => t.project ?? NO_PROJECT))).sort(),
     [tickets],
   );
+  const statuses = useMemo(() => ticketStatuses(tickets), [tickets]);
 
   const levels = useMemo(() => {
     const m = new Map<string, ActiveLevel>();
@@ -35,13 +40,7 @@ export default function TicketList(
     return m;
   }, [tickets, sessions]);
 
-  const q = query.trim().toLowerCase();
-  const filtered = tickets.filter((t) => {
-    if (project !== null && (t.project ?? NO_PROJECT) !== project) return false;
-    if (!q) return true;
-    return [t.identifier, t.title, t.statusName, ...t.labels]
-      .some((v) => v.toLowerCase().includes(q));
-  });
+  const filtered = filterTickets(tickets, { query, project, status });
   const groups = filtered.reduce<Record<string, TicketSummary[]>>((acc, t) => {
     (acc[t.project ?? NO_PROJECT] ??= []).push(t);
     return acc;
@@ -57,6 +56,7 @@ export default function TicketList(
         <FilterBar
           query={query} onQuery={setQuery}
           projects={projects} active={project} onProject={setProject}
+          statuses={statuses} activeStatus={status} onStatus={setStatus}
           placeholder="Filter tickets…"
         />
       )}
