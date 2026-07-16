@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getConfig, getRegistry } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
-import { launchSession, launchCustomSession, launchNewTicketSession } from "@/server/launch";
+import { launchSession, launchCustomSession, launchNewTicketSession, launchRebaseSession } from "@/server/launch";
+import { validateTicket } from "@/server/sessionKey";
 import { hasSession, newSession, pipePane } from "@/server/tmux";
 
 export async function GET(req: Request) {
@@ -38,6 +39,21 @@ export async function POST(req: Request) {
         projectsPath: cfg.projectsPath, hasSession, newSession, pipePane },
     );
     if (!res.ok) return NextResponse.json({ error: res.reason }, { status: 422 });
+    return NextResponse.json(res.meta, { status: 201 });
+  }
+  if (body.kind === "rebase") {
+    try { validateTicket(body.ticket); } catch { return new NextResponse("invalid ticket", { status: 400 }); }
+    const res = await launchRebaseSession(
+      { ticket: body.ticket, projectName: body.projectName ?? null, title: body.title ?? "",
+        labels: Array.isArray(body.labels) ? body.labels : [],
+        model: body.model ?? "opus", effort: body.effort ?? "xhigh" },
+      { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
+        projectsPath: cfg.projectsPath, hasSession, newSession, pipePane },
+    );
+    if (!res.ok) {
+      const status = res.reason === "duplicate" ? 409 : 422;
+      return NextResponse.json({ error: res.reason, id: res.id }, { status });
+    }
     return NextResponse.json(res.meta, { status: 201 });
   }
   const res = await launchSession(
