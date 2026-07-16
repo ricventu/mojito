@@ -193,6 +193,64 @@ describe("handleHook — custom sessions", () => {
   });
 });
 
+function seedRebase(over: Partial<SessionMeta> = {}): Registry {
+  const registry = new Registry(dir);
+  registry.upsert({ kind: "rebase", id: "mojito-rebase-RIC-46", ticket: "RIC-46", launchStatus: "To QA",
+    model: "opus", effort: "high", autoAdvance: false, state: "running", cwd: "/x",
+    createdAt: "2026-07-11T00:00:00.000Z", title: "Rebase RIC-46", labels: [], ...over });
+  return registry;
+}
+
+describe("handleHook — rebase sessions", () => {
+  it("SessionEnd on a rebase session is done, not failed, and never calls Linear", async () => {
+    // A rebase session stays at To QA (or escalates backward to To Code) by design, so on
+    // the lime fall-through path getIssueStatus would return a non-advanced status and
+    // stageAdvanced would always be false, mapping SessionEnd to "failed". A clean rebase
+    // must land on "done" instead, without ever reading Linear.
+    const registry = seedRebase();
+    const bus = new EventBus();
+    const getIssueStatus = vi.fn(async () => "To QA");
+    await handleHook("mojito-rebase-RIC-46", "SessionEnd",
+      { registry, bus, getIssueStatus, onAutoAdvance: () => {} });
+    expect(registry.get("mojito-rebase-RIC-46")?.state).toBe("done");
+    expect(getIssueStatus).not.toHaveBeenCalled();
+  });
+
+  it("Stop on a rebase session with a genuine prompt still maps to needs-input", async () => {
+    const registry = seedRebase();
+    const bus = new EventBus();
+    const getIssueStatus = vi.fn(async () => "To QA");
+    await handleHook("mojito-rebase-RIC-46", "Stop",
+      { registry, bus, getIssueStatus, onAutoAdvance: () => {} });
+    expect(registry.get("mojito-rebase-RIC-46")?.state).toBe("needs-input");
+    expect(getIssueStatus).not.toHaveBeenCalled();
+  });
+
+  it("never auto-advances a rebase session even when autoAdvance is enabled", async () => {
+    const registry = seedRebase({ autoAdvance: true });
+    const bus = new EventBus();
+    const onAutoAdvance = vi.fn();
+    const getIssueStatus = vi.fn(async () => "To Merge");
+    await handleHook("mojito-rebase-RIC-46", "SessionEnd",
+      { registry, bus, getIssueStatus, onAutoAdvance });
+    expect(onAutoAdvance).not.toHaveBeenCalled();
+    expect(getIssueStatus).not.toHaveBeenCalled();
+    expect(registry.get("mojito-rebase-RIC-46")?.state).toBe("done");
+  });
+
+  it("a rebase alert carries the real ticket, not an empty string", async () => {
+    const registry = seedRebase();
+    const bus = new EventBus();
+    const events: unknown[] = [];
+    bus.subscribe((e) => events.push(e));
+    await handleHook("mojito-rebase-RIC-46", "PermissionRequest",
+      { registry, bus, getIssueStatus: async () => "To QA", onAutoAdvance: () => {} });
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: "session.alert", ticket: "RIC-46" }),
+    );
+  });
+});
+
 it("does not overwrite a lime session's title", async () => {
   const { registry } = seed({ title: "Linear title" });
   const bus = new EventBus();

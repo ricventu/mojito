@@ -20,8 +20,10 @@ export async function handleHook(
   const meta = deps.registry.get(id);
   if (!meta) return;
 
-  if (meta.kind === "custom") {
-    // Custom sessions have no ticket or lifecycle: never call Linear, never auto-advance.
+  if (meta.kind === "custom" || meta.kind === "rebase") {
+    // Custom sessions have no ticket and no lifecycle; a rebase session has a real ticket
+    // but no forward lifecycle (it stays at To QA or escalates backward to To Code, neither
+    // of which we auto-advance on). Neither kind calls Linear or auto-advances, and
     // SessionEnd is a clean close (done), not a failure.
     const outcome = event === "SessionEnd"
       ? { state: "done" as const, alert: null }
@@ -32,7 +34,7 @@ export async function handleHook(
     deps.registry.patch(id, patch);
     deps.bus.emit({ type: "session.state", id, state: outcome.state });
     if (outcome.alert) {
-      deps.bus.emit({ type: "session.alert", id, kind: outcome.alert.kind, ticket: "", message: outcome.alert.message });
+      deps.bus.emit({ type: "session.alert", id, kind: outcome.alert.kind, ticket: meta.ticket, message: outcome.alert.message });
     }
     return;
   }
