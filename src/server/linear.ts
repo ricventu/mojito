@@ -145,3 +145,35 @@ export async function postComment(
     fetchImpl,
   );
 }
+
+export async function uploadImage(
+  apiKey: string,
+  file: { filename: string; contentType: string; size: number; bytes: Uint8Array },
+  fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+  const data = await query<{
+    fileUpload: {
+      success: boolean;
+      uploadFile?: { uploadUrl: string; assetUrl: string; headers: { key: string; value: string }[] };
+    };
+  }>(
+    apiKey,
+    {
+      query: `mutation ($size: Int!, $contentType: String!, $filename: String!) {
+        fileUpload(size: $size, contentType: $contentType, filename: $filename) {
+          success
+          uploadFile { uploadUrl assetUrl headers { key value } }
+        }
+      }`,
+      variables: { size: file.size, contentType: file.contentType, filename: file.filename },
+    },
+    fetchImpl,
+  );
+  const uf = data.fileUpload.uploadFile;
+  if (!data.fileUpload.success || !uf) throw new Error("Linear fileUpload failed");
+  const headers: Record<string, string> = { "Content-Type": file.contentType };
+  for (const h of uf.headers) headers[h.key] = h.value;
+  const put = await fetchImpl(uf.uploadUrl, { method: "PUT", headers, body: file.bytes });
+  if (!put.ok) throw new Error(`Linear asset upload failed: ${put.status}`);
+  return uf.assetUrl;
+}

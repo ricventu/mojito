@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { listOpenIssues, getIssueStatus, getIssueRef, setIssueStatus, postComment } from "@/server/linear";
+import { listOpenIssues, getIssueStatus, getIssueRef, setIssueStatus, postComment, uploadImage } from "@/server/linear";
 
 function fakeFetch(payload: unknown) {
   return vi.fn(async () => ({ ok: true, json: async () => ({ data: payload }) })) as unknown as typeof fetch;
@@ -78,5 +78,36 @@ describe("linear mutations", () => {
     const commentCall = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[1][1] as { body: string };
     expect(commentCall.body).toContain("commentCreate");
     expect(commentCall.body).toContain("issue-uuid");
+  });
+});
+
+describe("uploadImage", () => {
+  it("uploads bytes to the presigned URL and returns the asset URL", async () => {
+    const f = seqFetch([
+      { fileUpload: { success: true, uploadFile: {
+        uploadUrl: "https://up.example/put",
+        assetUrl: "https://uploads.linear.app/abc.png",
+        headers: [{ key: "x-amz-acl", value: "public-read" }],
+      } } },
+      {}, // the PUT response body (unused)
+    ]);
+    const url = await uploadImage(
+      "k",
+      { filename: "a.png", contentType: "image/png", size: 3, bytes: new Uint8Array([1, 2, 3]) },
+      f,
+    );
+    expect(url).toBe("https://uploads.linear.app/abc.png");
+    const putCall = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[1];
+    expect(putCall[0]).toBe("https://up.example/put");
+    expect(putCall[1].method).toBe("PUT");
+    expect(putCall[1].headers["x-amz-acl"]).toBe("public-read");
+    expect(putCall[1].headers["Content-Type"]).toBe("image/png");
+  });
+
+  it("throws when fileUpload is unsuccessful", async () => {
+    const f = fakeFetch({ fileUpload: { success: false } });
+    await expect(
+      uploadImage("k", { filename: "a.png", contentType: "image/png", size: 1, bytes: new Uint8Array([1]) }, f),
+    ).rejects.toThrow(/fileUpload/);
   });
 });
