@@ -62,3 +62,9 @@ The terminal shows gate buttons; tapping posts the arg.
 ## 13. Restart `npm run dev` mid-session → the session reappears (boot recovery)
 
 The terminal reattaches.
+
+## 14. To QA rebase button (RIC-120)
+
+A To QA ticket with no active session shows a "Rebase onto default branch" button in the
+launch sheet; clicking it starts a `rebase` session (visible in the session list with a
+`rebase` chip, no auto toggle) and the button disappears while it runs.

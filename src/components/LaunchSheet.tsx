@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { apiFetch } from "@/lib/client";
 import { defaultEffortForStatus } from "@/server/autoAdvance";
-import { tmuxName } from "@/server/sessionKey";
+import { tmuxName, rebaseSessionName } from "@/server/sessionKey";
+import { activeSessionLevel } from "@/lib/ticketSessionLevel";
 import StateBadge from "./StateBadge";
 import QaVerdictButtons from "./QaVerdictButtons";
 import type { SessionMeta, TicketSummary } from "@/server/types";
@@ -37,6 +38,29 @@ export default function LaunchSheet(
     setErr(message);
   };
 
+  // Launch a one-off session that rebases the ticket's worktree branch (To-QA action).
+  const startRebase = async () => {
+    const rebaseId = rebaseSessionName(ticket.identifier);
+    // A finished rebase session keeps the same tmux name — clear it before relaunching,
+    // else the server rejects the launch as a duplicate.
+    if (sessions.some((s) => s.id === rebaseId)) {
+      await apiFetch(token, `/api/sessions/${rebaseId}`, { method: "DELETE" });
+    }
+    const res = await apiFetch(token, "/api/sessions", {
+      method: "POST",
+      // effort is fixed at "xhigh" (not the To-QA state default, which is "low") — a rebase
+      // is an analytical task regardless of the ticket's stage-default effort.
+      body: JSON.stringify({ kind: "rebase", ticket: ticket.identifier, model, effort: "xhigh",
+        projectName: ticket.project, title: ticket.title, labels: ticket.labels }),
+    });
+    if (res.status === 409) { setErr("A rebase session for this ticket already exists."); return; }
+    if (!res.ok) { setErr(await res.text()); return; }
+    onLaunched();
+    onClose();
+  };
+
+  const noActiveSession = activeSessionLevel(ticket.identifier, sessions) === null;
+
   // Launch a claude session. trailingArg carries the To Merge mode (local|mr) when present.
   const start = async (trailingArg?: "local" | "mr") => {
     // A finished session for this ticket+status keeps the same tmux name, so clear it first
@@ -63,7 +87,14 @@ export default function LaunchSheet(
         <h3><span className="id" style={{ fontSize: 16 }}>{ticket.identifier}</span> <span className="chip">{ticket.statusName}</span></h3>
         {ticket.title && <p className="sheet-title">{ticket.title}</p>}
         {isToQa ? (
-          <QaVerdictButtons onApprove={() => submitVerdict("approve")} onReject={(reason) => submitVerdict("reject", reason)} />
+          <>
+            <QaVerdictButtons onApprove={() => submitVerdict("approve")} onReject={(reason) => submitVerdict("reject", reason)} />
+            {noActiveSession && (
+              <button className="btn ghost block" style={{ marginTop: 12 }} onClick={startRebase}>
+                Rebase onto default branch
+              </button>
+            )}
+          </>
         ) : existingActive ? (
           <button className="btn primary block" onClick={() => onOpen(existing!)}>Open running session</button>
         ) : (

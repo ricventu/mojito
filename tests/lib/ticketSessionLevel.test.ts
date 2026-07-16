@@ -42,3 +42,13 @@ describe("activeSessionLevel", () => {
     expect(activeSessionLevel("RIC-1", [s("RIC-2", "running")])).toBeNull();
   });
 });
+
+describe("rebase button gate", () => {
+  // The To-QA rebase button shows only when the ticket has no active session.
+  it("is eligible (null) when only a finished rebase session exists", () => {
+    expect(activeSessionLevel("RIC-120", [s("RIC-120", "done")])).toBeNull();
+  });
+  it("is not eligible while a rebase session is starting/running", () => {
+    expect(activeSessionLevel("RIC-120", [s("RIC-120", "starting")])).toBe("run");
+  });
+});

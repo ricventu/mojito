@@ -113,7 +113,8 @@ export default function SessionList(
                       )}
                       <div className="meta">
                         <span className="chip">{s.model} · {s.effort}</span>
-                        {s.kind !== "custom" && (
+                        {s.kind === "rebase" && <span className="chip">rebase</span>}
+                        {s.kind === "lime" && (
                           <button className={`chip toggle${s.autoAdvance ? " on" : ""}`} onClick={(e) => toggleAuto(e, s)}>
                             auto: {s.autoAdvance ? "on" : "off"}
                           </button>
