@@ -48,16 +48,21 @@ export default function TicketList(
 
   return (
     <div className="pad">
-      <div className="row" style={{ marginBottom: 12 }}>
-        <span className="grow" />
-        <button className="btn primary sm" onClick={() => setNewOpen(true)}>+ New ticket</button>
-      </div>
+      {tickets.length === 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <p className="empty">No tickets.</p>
+          <button className="btn primary block" onClick={() => setNewOpen(true)}>+ New ticket</button>
+        </div>
+      )}
       {tickets.length > 0 && (
         <FilterBar
           query={query} onQuery={setQuery}
           projects={projects} active={project} onProject={setProject}
           statuses={statuses} activeStatus={status} onStatus={setStatus}
           placeholder="Filter tickets…"
+          action={
+            <button className="btn primary sm" onClick={() => setNewOpen(true)}>+ New ticket</button>
+          }
         />
       )}
       {tickets.length > 0 && filtered.length === 0 && <p className="empty">No matching tickets.</p>}
