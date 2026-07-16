@@ -110,6 +110,12 @@ export interface CustomLaunchRequest {
   projectName: string | null;
   model: string;
   effort: Effort;
+  // Ticket-scoped custom session (RIC-128). When `ticket` is set, cwd resolves through the
+  // ticket→worktree chain and a launch-context file is written. Absent = project-scoped (RIC-115).
+  ticket?: string;
+  status?: string;
+  title?: string;
+  labels?: string[];
 }
 
 export function buildCustomClaudeCommand(req: CustomLaunchRequest, settingsPath: string, contextPath?: string): string {
@@ -125,16 +131,26 @@ export async function launchCustomSession(
   const homeDir = deps.homeDir ?? (() => homedir());
   const genId = deps.genId ?? (() => randomBytes(3).toString("hex"));
 
+  // cwd + id + slug differ for a ticket-scoped launch vs a project-scoped one.
   let cwd: string;
-  if (req.projectName) {
+  let slug: string;
+  if (req.ticket) {
+    // Same resolver the lime path uses: worktree if one exists for the ticket, else repo root.
+    const resolveCwd = deps.resolveCwd ?? defaultResolveCwd(deps.projectsPath);
+    const resolved = resolveCwd(req.ticket, req.projectName);
+    if (!resolved) return { ok: false, reason: "no-repo" };
+    cwd = resolved;
+    slug = statusSlug(req.ticket);
+  } else if (req.projectName) {
     const path = resolvePathForProject(loadProjectMap(deps.projectsPath), req.projectName);
     if (!path) return { ok: false, reason: "no-repo" };
     cwd = path;
+    slug = statusSlug(req.projectName);
   } else {
     cwd = homeDir();
+    slug = "general";
   }
 
-  const slug = req.projectName ? statusSlug(req.projectName) : "general";
   const id = customSessionName(slug, genId());
 
   const settingsDir = join(deps.stateDir, "settings");
@@ -143,16 +159,27 @@ export async function launchCustomSession(
   writeFileSync(settingsPath, JSON.stringify(buildHookSettings(id, deps.port, deps.token), null, 2), { mode: 0o600 });
   chmodSync(settingsPath, 0o600); // mode on writeFileSync is ignored if the file pre-existed
 
-  // No launch-context file: custom sessions run bare `claude`, not /lime-next.
-  const command = buildCustomClaudeCommand(req, settingsPath);
+  // Ticket-scoped custom sessions get a launch-context file so a later /lime-next can read it;
+  // project-scoped custom sessions run fully bare (no context file).
+  const contextPath = req.ticket
+    ? writeLaunchContext(deps.stateDir, id, {
+        identifier: req.ticket,
+        statusName: req.status ?? "",
+        title: req.title ?? "",
+        project: req.projectName,
+        labels: req.labels ?? [],
+      })
+    : undefined;
+
+  const command = buildCustomClaudeCommand(req, settingsPath, contextPath);
   await deps.newSession(id, cwd, command);
   await deps.pipePane(id, logfilePath(deps.stateDir, id));
 
-  const title = cwd === homeDir() ? "home" : basename(cwd);
+  const title = req.ticket ? (req.title ?? basename(cwd)) : cwd === homeDir() ? "home" : basename(cwd);
   const meta: SessionMeta = {
     kind: "custom",
     id,
-    ticket: "",
+    ticket: req.ticket ?? "",
     launchStatus: "",
     model: req.model,
     effort: req.effort,
@@ -162,7 +189,7 @@ export async function launchCustomSession(
     createdAt: (deps.nowIso ?? (() => new Date().toISOString()))(),
     projectName: req.projectName,
     title,
-    labels: [],
+    labels: req.ticket ? (req.labels ?? []) : [],
   };
   deps.registry.upsert(meta);
   return { ok: true, meta };

@@ -128,6 +128,7 @@ function customDeps(over: Record<string, unknown> = {}) {
     hasSession: vi.fn(async () => false),
     newSession: vi.fn(async () => {}),
     pipePane: vi.fn(async () => {}),
+    resolveCwd: () => "/code/Lime/mojito/.worktrees/ricventu/ric-128-x",
     nowIso: () => "2026-07-11T00:00:00.000Z",
     genId: () => "abc123",
     homeDir: () => "/home/me",
@@ -314,6 +315,50 @@ describe("launchRebaseSession", () => {
   it("refuses when no repo resolves", async () => {
     const d = deps({ resolveCwd: () => null });
     const res = await launchRebaseSession(baseRebaseReq, d);
+    expect(res).toMatchObject({ ok: false, reason: "no-repo" });
+  });
+});
+
+describe("launchCustomSession from a ticket (RIC-128)", () => {
+  const ticketReq = { projectName: "Mojito", model: "opus", effort: "high" as const,
+    ticket: "RIC-128", status: "Todo", title: "Custom session from a ticket", labels: ["Feature"] };
+
+  it("opens in the ticket's worktree and carries ticket/title/labels on the meta", async () => {
+    const d = customDeps({ resolveCwd: () => "/wt/ric-128" });
+    const res = await launchCustomSession(ticketReq, d);
+    expect(res.ok).toBe(true);
+    const meta = (res as { ok: true; meta: SessionMeta }).meta;
+    expect(meta).toMatchObject({ kind: "custom", id: "mojito-custom-ric-128-abc123",
+      ticket: "RIC-128", launchStatus: "", cwd: "/wt/ric-128", projectName: "Mojito",
+      title: "Custom session from a ticket", labels: ["Feature"], autoAdvance: false });
+  });
+
+  it("writes a launch-context file and prefixes LIME_SESSION_CONTEXT (no /lime-next)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const d = customDeps({ resolveCwd: () => "/wt/ric-128" });
+    await launchCustomSession(ticketReq, d);
+    const p = join(dir, "context", "mojito-custom-ric-128-abc123.json");
+    expect(statSync(p).mode & 0o777).toBe(0o600);
+    expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({
+      identifier: "RIC-128", statusName: "Todo",
+      title: "Custom session from a ticket", project: "Mojito", labels: ["Feature"],
+    });
+    expect(d.newSession).toHaveBeenCalledWith("mojito-custom-ric-128-abc123", "/wt/ric-128",
+      expect.stringMatching(/^LIME_SESSION_CONTEXT='[^']+' claude /));
+    expect(d.newSession).toHaveBeenCalledWith("mojito-custom-ric-128-abc123", "/wt/ric-128",
+      expect.not.stringContaining("/lime-next"));
+  });
+
+  it("falls back to the repo root when no worktree exists", async () => {
+    const d = customDeps({ resolveCwd: () => "/code/Lime/mojito" });
+    const res = await launchCustomSession(ticketReq, d);
+    expect(res.ok).toBe(true);
+    expect((res as { ok: true; meta: SessionMeta }).meta.cwd).toBe("/code/Lime/mojito");
+  });
+
+  it("refuses when the ticket's team/project is unmapped", async () => {
+    const d = customDeps({ resolveCwd: () => null });
+    const res = await launchCustomSession(ticketReq, d);
     expect(res).toMatchObject({ ok: false, reason: "no-repo" });
   });
 });
