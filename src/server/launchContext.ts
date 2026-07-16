@@ -26,6 +26,7 @@ export function writeLaunchContext(stateDir: string, id: string, ctx: LaunchCont
 export interface NewTicketContext {
   brief: string;
   project: string | null;
+  images: string[];
 }
 
 /**

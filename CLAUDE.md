@@ -27,9 +27,10 @@ degrades gracefully without Mojito (bare-terminal mode). So for a cross-cutting 
 1b. **New-ticket context** — for the "New ticket" UI flow, Mojito writes a
    `LIME_NEW_CONTEXT` file (`writeNewTicketContext` in `src/server/launchContext.ts`,
    called from `launchNewTicketSession` in `src/server/launch.ts`) holding
-   `{ brief, project }`. The spawned `claude … /lime-new` session reads it to analyze the
-   brief and associate the project. If you change these fields, update lime's
-   `skills/lime-new/SKILL.md` context-read step to match.
+   `{ brief, project, images }`. `images` is a list of Linear asset URLs that the spawned
+   session appends to the created issue's description. The spawned `claude … /lime-new`
+   session reads it to analyze the brief and associate the project. If you change these
+   fields, update lime's `skills/lime-new/SKILL.md` context-read step to match.
 
 2. **Status / stage model** — the ticket lifecycle is:
    `Backlog/Todo → To Code → To Review → To QA → To Merge → Done`.

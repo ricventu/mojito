@@ -28,7 +28,7 @@ describe("writeLaunchContext", () => {
   });
 });
 
-const newCtx: NewTicketContext = { brief: "Aggiungi un pulsante per esportare in CSV", project: "Mojito" };
+const newCtx: NewTicketContext = { brief: "Aggiungi un pulsante per esportare in CSV", project: "Mojito", images: [] };
 
 describe("writeNewTicketContext", () => {
   it("writes the { brief, project } JSON and returns its path", () => {
@@ -43,7 +43,7 @@ describe("writeNewTicketContext", () => {
   });
 
   it("accepts a null project", () => {
-    const p = writeNewTicketContext(dir, "mojito-custom-general-abc123", { brief: "x", project: null });
-    expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({ brief: "x", project: null });
+    const p = writeNewTicketContext(dir, "mojito-custom-general-abc123", { brief: "x", project: null, images: [] });
+    expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({ brief: "x", project: null, images: [] });
   });
 });

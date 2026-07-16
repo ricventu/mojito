@@ -271,7 +271,19 @@ describe("launchNewTicketSession", () => {
     const d = customDeps({ projectsPath });
     await launchNewTicketSession({ brief: "Aggiungi export CSV", projectName: "Mojito", model: "opus", effort: "high" }, d);
     const p = join(dir, "context", "mojito-custom-mojito-abc123.json");
-    expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({ brief: "Aggiungi export CSV", project: "Mojito" });
+    expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({ brief: "Aggiungi export CSV", project: "Mojito", images: [] });
+  });
+
+  it("writes provided image URLs into the context", async () => {
+    const projectsPath = join(dir, "projects.json");
+    writeFileSync(projectsPath, JSON.stringify({ RIC: { projects: { Mojito: "/code/Lime/mojito" } } }));
+    const d = customDeps({ projectsPath });
+    await launchNewTicketSession(
+      { brief: "x", projectName: "Mojito", model: "opus", effort: "high", images: ["https://uploads.linear.app/a.png"] },
+      d,
+    );
+    const p = join(dir, "context", "mojito-custom-mojito-abc123.json");
+    expect(JSON.parse(readFileSync(p, "utf8")).images).toEqual(["https://uploads.linear.app/a.png"]);
   });
 
   it("refuses an unmapped project", async () => {

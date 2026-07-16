@@ -200,6 +200,7 @@ export interface NewTicketLaunchRequest {
   projectName: string | null;
   model: string;
   effort: Effort;
+  images?: string[];
 }
 
 export function buildNewTicketClaudeCommand(
@@ -239,7 +240,11 @@ export async function launchNewTicketSession(
   writeFileSync(settingsPath, JSON.stringify(buildHookSettings(id, deps.port, deps.token), null, 2), { mode: 0o600 });
   chmodSync(settingsPath, 0o600); // mode on writeFileSync is ignored if the file pre-existed
 
-  const contextPath = writeNewTicketContext(deps.stateDir, id, { brief: req.brief, project: req.projectName });
+  const contextPath = writeNewTicketContext(deps.stateDir, id, {
+    brief: req.brief,
+    project: req.projectName,
+    images: req.images ?? [],
+  });
 
   const command = buildNewTicketClaudeCommand(req, settingsPath, contextPath);
   await deps.newSession(id, cwd, command);
