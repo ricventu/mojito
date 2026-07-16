@@ -23,7 +23,11 @@ export async function POST(req: Request) {
   }
   if (body.kind === "custom") {
     const res = await launchCustomSession(
-      { projectName: body.projectName ?? null, model: body.model ?? "opus", effort: body.effort ?? "high" },
+      { projectName: body.projectName ?? null, model: body.model ?? "opus", effort: body.effort ?? "high",
+        ...(typeof body.ticket === "string" && body.ticket
+          ? { ticket: body.ticket, status: body.status ?? "", title: body.title ?? "",
+              labels: Array.isArray(body.labels) ? body.labels : [] }
+          : {}) },
       { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
         projectsPath: cfg.projectsPath, hasSession, newSession, pipePane },
     );
