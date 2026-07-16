@@ -49,10 +49,24 @@ export default function NewTicketSheet(
       if (f.size > MAX_IMAGE_BYTES) { setErr(`Image too large (max ${MAX_IMAGE_BYTES / (1024 * 1024)} MB)`); return; }
     }
     if (images.length + picked.length > MAX_IMAGES) { setErr(`Too many images (max ${MAX_IMAGES})`); return; }
-    const decoded: PendingImage[] = await Promise.all(picked.map(async (f) => ({
-      id: crypto.randomUUID(), name: f.name || "image", type: f.type, dataUrl: await readAsDataUrl(f),
-    })));
-    setImages((prev) => [...prev, ...decoded]);
+    let decoded: PendingImage[];
+    try {
+      decoded = await Promise.all(picked.map(async (f) => ({
+        id: crypto.randomUUID(), name: f.name || "image", type: f.type, dataUrl: await readAsDataUrl(f),
+      })));
+    } catch {
+      setErr("Failed to read one or more images");
+      return;
+    }
+    // Enforce the cap against the true previous state (not the stale `images` closure)
+    // so concurrent capture events (e.g. paste + drop) can't both slip past the check above.
+    let truncated = false;
+    setImages((prev) => {
+      const room = Math.max(MAX_IMAGES - prev.length, 0);
+      if (decoded.length > room) truncated = true;
+      return room > 0 ? [...prev, ...decoded.slice(0, room)] : prev;
+    });
+    if (truncated) setErr(`Too many images (max ${MAX_IMAGES})`);
   };
 
   const onPaste = (e: React.ClipboardEvent) => {
