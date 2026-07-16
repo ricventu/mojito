@@ -112,9 +112,10 @@ export interface CustomLaunchRequest {
   effort: Effort;
 }
 
-export function buildCustomClaudeCommand(req: CustomLaunchRequest, settingsPath: string): string {
+export function buildCustomClaudeCommand(req: CustomLaunchRequest, settingsPath: string, contextPath?: string): string {
   const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
-  return `claude --model ${q(req.model)} --effort ${q(req.effort)} --settings ${q(settingsPath)}`;
+  const envPrefix = contextPath ? `LIME_SESSION_CONTEXT=${q(contextPath)} ` : "";
+  return `${envPrefix}claude --model ${q(req.model)} --effort ${q(req.effort)} --settings ${q(settingsPath)}`;
 }
 
 export async function launchCustomSession(

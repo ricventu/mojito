@@ -141,6 +141,19 @@ describe("buildCustomClaudeCommand", () => {
     expect(cmd).toBe("claude --model 'opus' --effort 'high' --settings '/s/x.json'");
     expect(cmd).not.toContain("/lime-next");
   });
+
+  it("prefixes LIME_SESSION_CONTEXT when a context path is given", () => {
+    const cmd = buildCustomClaudeCommand({ projectName: null, model: "opus", effort: "high" },
+      "/s/x.json", "/state/context/mojito-custom-ric-128-abc123.json");
+    expect(cmd).toMatch(/^LIME_SESSION_CONTEXT='\/state\/context\/mojito-custom-ric-128-abc123.json' claude /);
+    expect(cmd).not.toContain("/lime-next");
+  });
+
+  it("omits LIME_SESSION_CONTEXT when no context path is given", () => {
+    const cmd = buildCustomClaudeCommand({ projectName: null, model: "opus", effort: "high" }, "/s/x.json");
+    expect(cmd).not.toContain("LIME_SESSION_CONTEXT");
+    expect(cmd.startsWith("claude ")).toBe(true);
+  });
 });
 
 describe("launchCustomSession", () => {
