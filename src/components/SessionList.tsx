@@ -5,6 +5,7 @@ import StateBadge from "./StateBadge";
 import FilterBar, { NO_PROJECT } from "./FilterBar";
 import NewSessionSheet from "./NewSessionSheet";
 import { usePersistedState } from "@/lib/usePersistedState";
+import { filterSessions, sessionStatuses } from "@/lib/sessionFilter";
 import type { SessionMeta } from "@/server/types";
 import { orderSessions } from "@/lib/orderSessions";
 import { groupByStatus } from "@/lib/groupByStatus";
@@ -18,20 +19,18 @@ export default function SessionList(
   const [projectRaw, setProjectRaw] = usePersistedState("mojito-sessions-project", "");
   const project = projectRaw === "" ? null : projectRaw;
   const setProject = (p: string | null) => setProjectRaw(p ?? "");
+  const [statusRaw, setStatusRaw] = usePersistedState("mojito-sessions-status", "");
+  const status = statusRaw === "" ? null : statusRaw;
+  const setStatus = (s: string | null) => setStatusRaw(s ?? "");
   const [newOpen, setNewOpen] = useState(false);
 
   const projects = useMemo(
     () => Array.from(new Set(sessions.map((s) => s.projectName ?? NO_PROJECT))).sort(),
     [sessions],
   );
+  const statuses = useMemo(() => sessionStatuses(sessions), [sessions]);
 
-  const q = query.trim().toLowerCase();
-  const filtered = sessions.filter((s) => {
-    if (project !== null && (s.projectName ?? NO_PROJECT) !== project) return false;
-    if (!q) return true;
-    return [s.ticket, s.launchStatus, s.model, s.message, s.title]
-      .some((v) => v?.toLowerCase().includes(q));
-  });
+  const filtered = filterSessions(sessions, { query, project, status });
   const groups = filtered.reduce<Record<string, SessionMeta[]>>((acc, s) => {
     (acc[s.projectName ?? NO_PROJECT] ??= []).push(s);
     return acc;
@@ -63,6 +62,7 @@ export default function SessionList(
         <FilterBar
           query={query} onQuery={setQuery}
           projects={projects} active={project} onProject={setProject}
+          statuses={statuses} activeStatus={status} onStatus={setStatus}
           placeholder="Filter sessions…"
           action={
             <>
