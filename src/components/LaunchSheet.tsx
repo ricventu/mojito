@@ -78,8 +78,33 @@ export default function LaunchSheet(
     onClose();
   };
 
+  // Launch a bare, ticket-scoped custom session (RIC-128). Opens in the ticket's worktree if one
+  // exists (else the repo root). Custom ids are random-suffixed, so no need to clear an existing one.
+  const startCustom = async () => {
+    const res = await apiFetch(token, "/api/sessions", {
+      method: "POST",
+      body: JSON.stringify({ kind: "custom", ticket: ticket.identifier, status: ticket.statusName,
+        projectName: ticket.project, title: ticket.title, labels: ticket.labels, model, effort }),
+    });
+    if (!res.ok) { setErr(await res.text()); return; }
+    onLaunched();
+    onClose();
+  };
+
   const isToQa = ticket.statusName === "To QA";
   const isToMerge = ticket.statusName === "To Merge";
+
+  const selectors = (
+    <div className="two">
+      <label className="field"><span className="lbl">Model</span>
+        <select value={model} onChange={(e) => setModel(e.target.value)}>{MODELS.map((m) => <option key={m}>{m}</option>)}</select></label>
+      <label className="field"><span className="lbl">Effort</span>
+        <select value={effort} onChange={(e) => setEffort(e.target.value)}>{EFFORTS.map((x) => <option key={x}>{x}</option>)}</select></label>
+    </div>
+  );
+  const customBtn = (
+    <button className="btn ghost block" style={{ marginTop: 12 }} onClick={() => startCustom()}>Custom session</button>
+  );
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
@@ -94,9 +119,15 @@ export default function LaunchSheet(
                 Rebase onto default branch
               </button>
             )}
+            {selectors}
+            {customBtn}
           </>
         ) : existingActive ? (
-          <button className="btn primary block" onClick={() => onOpen(existing!)}>Open running session</button>
+          <>
+            <button className="btn primary block" onClick={() => onOpen(existing!)}>Open running session</button>
+            {selectors}
+            {customBtn}
+          </>
         ) : (
           <>
             {existing && (
@@ -104,12 +135,7 @@ export default function LaunchSheet(
                 Open session (<StateBadge state={existing.state} />)
               </button>
             )}
-            <div className="two">
-              <label className="field"><span className="lbl">Model</span>
-                <select value={model} onChange={(e) => setModel(e.target.value)}>{MODELS.map((m) => <option key={m}>{m}</option>)}</select></label>
-              <label className="field"><span className="lbl">Effort</span>
-                <select value={effort} onChange={(e) => setEffort(e.target.value)}>{EFFORTS.map((x) => <option key={x}>{x}</option>)}</select></label>
-            </div>
+            {selectors}
             <label className="toggle" style={{ marginBottom: 12 }}>
               <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> Auto-advance
             </label>
@@ -121,6 +147,7 @@ export default function LaunchSheet(
             ) : (
               <button className="btn primary block" onClick={() => start()}>{existing ? "Start new session" : "Start session"}</button>
             )}
+            {customBtn}
           </>
         )}
         {err && <p className="err-text">{err}</p>}
