@@ -34,6 +34,13 @@ describe("validateImages", () => {
     expect(res).toEqual({ ok: false, error: "malformed image data" });
   });
 
+  it("rejects a garbage (non-base64) payload despite a valid data-url prefix", () => {
+    const res = validateImages([
+      { name: "a.png", type: "image/png", dataUrl: "data:image/png;base64,@@@@not base64@@@@" },
+    ]);
+    expect(res).toEqual({ ok: false, error: "malformed image data" });
+  });
+
   it("rejects a type/data mismatch", () => {
     const res = validateImages([{ name: "a.png", type: "image/png", dataUrl: `data:image/jpeg;base64,${tiny}` }]);
     expect(res).toEqual({ ok: false, error: "image type mismatch" });

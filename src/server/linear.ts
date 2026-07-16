@@ -173,7 +173,7 @@ export async function uploadImage(
   if (!data.fileUpload.success || !uf) throw new Error("Linear fileUpload failed");
   const headers: Record<string, string> = { "Content-Type": file.contentType };
   for (const h of uf.headers) headers[h.key] = h.value;
-  const put = await fetchImpl(uf.uploadUrl, { method: "PUT", headers, body: file.bytes });
+  const put = await fetchImpl(uf.uploadUrl, { method: "PUT", headers, body: file.bytes as BodyInit });
   if (!put.ok) throw new Error(`Linear asset upload failed: ${put.status}`);
   return uf.assetUrl;
 }

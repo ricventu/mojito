@@ -7,9 +7,34 @@ export interface DecodedImage {
   bytes: Buffer;
 }
 
+const BASE64_CHAR = /^[A-Za-z0-9+/]$/;
+
+function isValidBase64(payload: string): boolean {
+  // `Buffer.from(x, "base64")` silently ignores invalid characters instead of
+  // throwing, so a strict charset/padding check is required to reject garbage.
+  // Checked char-by-char (rather than one large regex) to avoid catastrophic
+  // backtracking / stack overflow on large (multi-MB) payloads.
+  if (payload.length === 0) return true;
+  if (payload.length % 4 !== 0) return false;
+  let paddingSeen = false;
+  for (let i = 0; i < payload.length; i++) {
+    const ch = payload[i];
+    if (ch === "=") {
+      paddingSeen = true;
+      // Padding, once it starts, must run to the end and be at most 2 chars.
+      if (payload.length - i > 2) return false;
+      continue;
+    }
+    if (paddingSeen) return false; // non-padding char after padding started
+    if (!BASE64_CHAR.test(ch)) return false;
+  }
+  return true;
+}
+
 function parseDataUrl(dataUrl: string): { contentType: string; bytes: Buffer } | null {
   const m = /^data:([^;,]+);base64,(.*)$/s.exec(dataUrl);
   if (!m) return null;
+  if (!isValidBase64(m[2])) return null;
   try {
     return { contentType: m[1], bytes: Buffer.from(m[2], "base64") };
   } catch {
