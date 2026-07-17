@@ -10,6 +10,13 @@ const GENERAL = "__general__";
 
 interface PendingImage { id: string; name: string; type: string; dataUrl: string; }
 
+// `crypto.randomUUID` is only defined in secure contexts (HTTPS / localhost). The app is
+// served over plain HTTP, so over a LAN IP (mobile access) it is undefined and throws.
+// The id is only a React key / removal handle, so a non-crypto fallback is fine.
+function newImageId(): string {
+  return crypto.randomUUID?.() ?? `img-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -52,7 +59,7 @@ export default function NewTicketSheet(
     let decoded: PendingImage[];
     try {
       decoded = await Promise.all(picked.map(async (f) => ({
-        id: crypto.randomUUID(), name: f.name || "image", type: f.type, dataUrl: await readAsDataUrl(f),
+        id: newImageId(), name: f.name || "image", type: f.type, dataUrl: await readAsDataUrl(f),
       })));
     } catch {
       setErr("Failed to read one or more images");
