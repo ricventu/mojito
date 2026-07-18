@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sessionStatuses, filterSessions } from "@/lib/sessionFilter";
+import { sessionStatuses, filterSessions, sessionStatus, CUSTOM_STATUS } from "@/lib/sessionFilter";
 import { NO_PROJECT } from "@/lib/ticketFilter";
 import type { SessionMeta } from "@/server/types";
 
@@ -38,12 +38,20 @@ describe("sessionStatuses", () => {
     expect(sessionStatuses(sessions)).toEqual(["To Code", "To Review", "Done"]);
   });
 
-  it("excludes custom sessions (empty launch status)", () => {
+  it("surfaces custom sessions as the CUSTOM_STATUS bucket, sorted last", () => {
     const sessions = [
       session({ kind: "custom", launchStatus: "" }),
       session({ launchStatus: "To QA" }),
     ];
-    expect(sessionStatuses(sessions)).toEqual(["To QA"]);
+    expect(sessionStatuses(sessions)).toEqual(["To QA", CUSTOM_STATUS]);
+  });
+
+  it("collapses multiple custom sessions into a single CUSTOM_STATUS entry", () => {
+    const sessions = [
+      session({ kind: "custom", launchStatus: "" }),
+      session({ kind: "custom", launchStatus: "" }),
+    ];
+    expect(sessionStatuses(sessions)).toEqual([CUSTOM_STATUS]);
   });
 
   it("sorts unknown statuses last with alphabetical tie-break", () => {
@@ -71,6 +79,15 @@ describe("filterSessions", () => {
   it("filters by status", () => {
     const out = filterSessions(sessions, { query: "", project: null, status: "To Code" });
     expect(out.map((s) => s.id)).toEqual(["a", "c"]);
+  });
+
+  it("filters custom sessions via the CUSTOM_STATUS bucket", () => {
+    const withCustom = [
+      ...sessions,
+      session({ id: "d", kind: "custom", launchStatus: "", ticket: "", projectName: "Mojito", title: "Custom one" }),
+    ];
+    const out = filterSessions(withCustom, { query: "", project: null, status: CUSTOM_STATUS });
+    expect(out.map((s) => s.id)).toEqual(["d"]);
   });
 
   it("filters by project, using the NO_PROJECT sentinel for projectless sessions", () => {

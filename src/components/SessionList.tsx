@@ -5,7 +5,7 @@ import StateBadge from "./StateBadge";
 import FilterBar, { NO_PROJECT } from "./FilterBar";
 import NewSessionSheet from "./NewSessionSheet";
 import { usePersistedState } from "@/lib/usePersistedState";
-import { filterSessions, sessionStatuses } from "@/lib/sessionFilter";
+import { filterSessions, sessionStatuses, sessionStatus } from "@/lib/sessionFilter";
 import type { SessionMeta } from "@/server/types";
 import { orderSessions } from "@/lib/orderSessions";
 import { groupByStatus } from "@/lib/groupByStatus";
@@ -82,7 +82,7 @@ export default function SessionList(
       {Object.entries(groups).map(([proj, items]) => (
         <section key={proj}>
           <h4 className="sect">{proj}</h4>
-          {groupByStatus(items, (s) => s.launchStatus).map((group) => (
+          {groupByStatus(items, sessionStatus).map((group) => (
             <div key={group.status}>
               {group.status && <div className="substatus"><StatusBadge status={group.status} /></div>}
               {orderSessions(group.items).map((s) => {
@@ -97,7 +97,6 @@ export default function SessionList(
                             <span className="grow" />
                             <StateBadge state={s.state} />
                           </div>
-                          <div className="meta"><span className="chip">custom</span></div>
                           {s.message && <div className="title">{s.message}</div>}
                         </>
                       ) : (
