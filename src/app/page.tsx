@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useToken } from "@/lib/useToken";
 import { usePersistedState } from "@/lib/usePersistedState";
@@ -10,6 +10,7 @@ import TokenGate from "@/components/TokenGate";
 import TicketList from "@/components/TicketList";
 import SessionList from "@/components/SessionList";
 import AlertLayer from "@/components/AlertLayer";
+import { tabTitle } from "@/lib/tabTitle";
 import type { MojitoEvent } from "@/server/events";
 import type { SessionMeta } from "@/server/types";
 
@@ -31,6 +32,14 @@ export default function Home() {
     if (e.type === "session.alert") setAlerts((a) => [{ id: e.id, ticket: e.ticket, message: e.message }, ...a].slice(0, 20));
   }, [refreshSessions]);
   useEvents(token, onEvent);
+
+  // Own the browser tab title on the client: the active tab when signed in, the
+  // app name on the token gate. Skipped while a terminal is open — TerminalView
+  // sets the ticket title and restores this one on close.
+  useEffect(() => {
+    if (open) return;
+    document.title = token ? tabTitle(tab) : "Mojito";
+  }, [tab, token, open]);
 
   if (!token) return <TokenGate onSet={setToken} />;
   // Refresh on leaving the terminal: dismiss/advance mutate server state, and a
