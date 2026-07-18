@@ -14,6 +14,14 @@ export const STATUS_ORDER: Record<string, number> = {
   Duplicate: 8,
 };
 
+/**
+ * Synthetic non-lifecycle status for custom sessions (see sessionFilter, which
+ * re-exports this). It is intentionally absent from STATUS_ORDER/STATUS_COLOR
+ * (which mirror Linear lifecycle states); its rank falls through to "last" and
+ * its hue is handled explicitly in statusColorClass.
+ */
+export const CUSTOM_STATUS = "Custom";
+
 export const STATUS_COLOR: Record<string, string> = {
   Backlog: "grey",
   Todo: "grey",
@@ -31,7 +39,9 @@ export function statusRank(name: string): number {
   return STATUS_ORDER[name] ?? Number.MAX_SAFE_INTEGER;
 }
 
-/** Badge color-hue class for a status; unknown statuses are muted. */
+/** Badge color-hue class for a status; custom sessions get their own hue,
+ *  other unknown statuses are muted. */
 export function statusColorClass(name: string): string {
+  if (name === CUSTOM_STATUS) return "pink";
   return STATUS_COLOR[name] ?? "muted";
 }

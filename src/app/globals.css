@@ -29,6 +29,7 @@
   --wait: #9aa1ab;  --wait-bg: #1f242a;
   --indigo: #a08cff; --indigo-bg: #20203b;
   --teal: #3fd0c9;   --teal-bg: #0e2b2a;
+  --pink: #e06cc4;   --pink-bg: #2c1826;   /* custom sessions (non-lifecycle) */
 
   --r: 12px;
   --r-sm: 9px;
@@ -139,6 +140,7 @@ button.chip:active { transform: scale(.96); }
 .filter-chips .chip.green  { color: var(--ok);         border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
 .filter-chips .chip.red    { color: var(--err);        border-color: color-mix(in srgb, var(--err) 40%, transparent); }
 .filter-chips .chip.muted  { color: var(--text-faint); border-color: var(--border); }
+.filter-chips .chip.pink   { color: var(--pink);       border-color: color-mix(in srgb, var(--pink) 45%, transparent); }
 
 /* Selected filter chip — one uniform brand-lime "active" state across BOTH the
    project row and the status row, so selection reads the same everywhere
@@ -170,6 +172,7 @@ button.chip:active { transform: scale(.96); }
 .badge.green  { color: var(--ok);         background: var(--ok-bg);     border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
 .badge.red    { color: var(--err);        background: var(--err-bg);    border-color: color-mix(in srgb, var(--err) 40%, transparent); }
 .badge.muted  { color: var(--text-faint); background: var(--surface-hi); border-color: var(--border); }
+.badge.pink   { color: var(--pink);       background: var(--pink-bg);   border-color: color-mix(in srgb, var(--pink) 45%, transparent); }
 
 .badge.run .dot, .badge.wait .dot { animation: mojito-pulse 1.6s ease-in-out infinite; }
 @keyframes mojito-pulse { 50% { opacity: .35; } }

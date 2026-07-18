@@ -1,13 +1,14 @@
 import type { SessionMeta } from "@/server/types";
-import { statusRank } from "@/lib/status";
+import { statusRank, CUSTOM_STATUS } from "@/lib/status";
 import { NO_PROJECT } from "@/lib/ticketFilter";
 
 /**
  * Synthetic status bucket for custom sessions, which have no Linear launch status.
  * Used both as a status-filter option and as the group-divider label so custom
  * sessions are filterable and visually separated like lifecycle statuses.
+ * Defined in status.ts (with its hue) and re-exported here for filter callers.
  */
-export const CUSTOM_STATUS = "Custom";
+export { CUSTOM_STATUS };
 
 /**
  * Effective status of a session for grouping/filtering: custom sessions have no
