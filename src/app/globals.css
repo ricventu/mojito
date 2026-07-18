@@ -129,6 +129,13 @@ button.chip {
 button.chip:active { transform: scale(.96); }
 .chip.on { color: var(--run); border-color: color-mix(in srgb, var(--run) 40%, transparent); }
 
+/* Project filter chips: brand-lime active state (tinted like status chips) so a
+   selected project reads distinct from the blue status filters below it. */
+.filter-chips.projects .chip.on {
+  color: var(--accent); background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
 /* Colored status chips (Tickets status filter): hue text + border when inactive,
    filled with the hue background when active. The "All" chip has no hue class,
    so it keeps the default .chip / .chip.on styling. Hues match src/lib/status.ts. */

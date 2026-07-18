@@ -31,7 +31,7 @@ export default function FilterBar(
         {action}
       </div>
       {(projects.length > 1 || active !== null) && (
-        <div className="filter-chips">
+        <div className="filter-chips projects">
           <button className={`chip toggle${active === null ? " on" : ""}`} onClick={() => onProject(null)}>All</button>
           {projects.map((p) => (
             <button key={p} className={`chip toggle${active === p ? " on" : ""}`} onClick={() => onProject(p)}>{p}</button>
