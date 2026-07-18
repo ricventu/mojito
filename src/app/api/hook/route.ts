@@ -3,6 +3,7 @@ import { getConfig, getRegistry, getBus } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
 import { getIssueStatus } from "@/server/linear";
 import { handleHook } from "@/server/hookHandler";
+import { readTranscriptTitle } from "@/server/sessionTitle";
 import { runAutoAdvance } from "@/server/autoAdvanceRunner";
 import type { HookEventName } from "@/server/types";
 
@@ -16,10 +17,12 @@ export async function POST(req: Request) {
   const event = url.searchParams.get("event") as HookEventName | null;
   if (!event || !VALID.includes(event)) return new NextResponse("bad event", { status: 400 });
   const raw = await req.text(); // forwarded hook payload (JSON on stdin from Claude Code)
-  let payload: { sessionTitle?: string } | undefined;
+  let payload: { sessionTitle?: string; transcriptPath?: string } | undefined;
   try {
-    const json = JSON.parse(raw) as { session_title?: unknown };
-    if (typeof json.session_title === "string") payload = { sessionTitle: json.session_title };
+    const json = JSON.parse(raw) as { session_title?: unknown; transcript_path?: unknown };
+    payload = {};
+    if (typeof json.session_title === "string") payload.sessionTitle = json.session_title;
+    if (typeof json.transcript_path === "string") payload.transcriptPath = json.transcript_path;
   } catch {
     /* non-JSON or empty body — no title to forward */
   }
@@ -28,6 +31,7 @@ export async function POST(req: Request) {
     bus: getBus(),
     getIssueStatus: (ticket) => getIssueStatus(cfg.linearApiKey, ticket),
     onAutoAdvance: (meta, newStatus) => void runAutoAdvance(meta, newStatus),
+    readTranscriptTitle,
   }, payload);
   return new NextResponse(null, { status: 204 });
 }

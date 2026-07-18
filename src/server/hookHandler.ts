@@ -9,13 +9,16 @@ export interface HookDeps {
   bus: EventBus;
   getIssueStatus: (ticket: string) => Promise<string>;
   onAutoAdvance: (meta: SessionMeta, newStatus: string) => void;
+  // Reads Claude Code's auto-generated session title from a transcript file (see
+  // sessionTitle.ts). Optional so tests that don't exercise titling can omit it.
+  readTranscriptTitle?: (transcriptPath: string) => string | null;
 }
 
 export async function handleHook(
   id: string,
   event: HookEventName,
   deps: HookDeps,
-  payload?: { sessionTitle?: string },
+  payload?: { sessionTitle?: string; transcriptPath?: string },
 ): Promise<void> {
   const meta = deps.registry.get(id);
   if (!meta) return;
@@ -29,7 +32,16 @@ export async function handleHook(
       ? { state: "done" as const, alert: null }
       : mapHook(event, false, meta.state);
     const patch: Partial<SessionMeta> = { state: outcome.state, message: outcome.alert?.message };
-    const title = payload?.sessionTitle;
+    // Label from Claude Code's session name. An explicit `session_title` (from --name /
+    // /rename, delivered on SessionStart) wins; otherwise fall back to CC's auto-generated
+    // title read from the transcript. Skip the transcript read on PostToolUse — it fires on
+    // every tool call, and the title barely changes, so re-reading the transcript each time
+    // would be pure overhead.
+    const explicit = payload?.sessionTitle;
+    let title: string | undefined = explicit && explicit.length > 0 ? explicit : undefined;
+    if (!title && event !== "PostToolUse" && payload?.transcriptPath) {
+      title = deps.readTranscriptTitle?.(payload.transcriptPath) ?? undefined;
+    }
     if (typeof title === "string" && title.length > 0 && title !== meta.title) patch.title = title;
     deps.registry.patch(id, patch);
     deps.bus.emit({ type: "session.state", id, state: outcome.state });

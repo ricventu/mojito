@@ -191,6 +191,49 @@ describe("handleHook — custom sessions", () => {
     expect(registry.get("mojito-custom-general-abc")?.title).toBe("home");
     expect(getIssueStatus).not.toHaveBeenCalled();
   });
+
+  it("labels the session from Claude Code's transcript title on a Stop hook", async () => {
+    const registry = seedCustom();
+    const bus = new EventBus();
+    const readTranscriptTitle = vi.fn(() => "Cosmetic spray base inquiry response");
+    await handleHook("mojito-custom-general-abc", "Stop",
+      { registry, bus, getIssueStatus: async () => "x", onAutoAdvance: () => {}, readTranscriptTitle },
+      { transcriptPath: "/some/transcript.jsonl" });
+    expect(readTranscriptTitle).toHaveBeenCalledWith("/some/transcript.jsonl");
+    expect(registry.get("mojito-custom-general-abc")?.title).toBe("Cosmetic spray base inquiry response");
+  });
+
+  it("prefers an explicit session_title over the transcript title", async () => {
+    const registry = seedCustom();
+    const bus = new EventBus();
+    const readTranscriptTitle = vi.fn(() => "Auto guessed title");
+    await handleHook("mojito-custom-general-abc", "SessionStart",
+      { registry, bus, getIssueStatus: async () => "x", onAutoAdvance: () => {}, readTranscriptTitle },
+      { sessionTitle: "renamed by user", transcriptPath: "/some/transcript.jsonl" });
+    expect(registry.get("mojito-custom-general-abc")?.title).toBe("renamed by user");
+    expect(readTranscriptTitle).not.toHaveBeenCalled();
+  });
+
+  it("does not read the transcript on the high-frequency PostToolUse hook", async () => {
+    const registry = seedCustom();
+    const bus = new EventBus();
+    const readTranscriptTitle = vi.fn(() => "Should not be read");
+    await handleHook("mojito-custom-general-abc", "PostToolUse",
+      { registry, bus, getIssueStatus: async () => "x", onAutoAdvance: () => {}, readTranscriptTitle },
+      { transcriptPath: "/some/transcript.jsonl" });
+    expect(readTranscriptTitle).not.toHaveBeenCalled();
+    expect(registry.get("mojito-custom-general-abc")?.title).toBe("home");
+  });
+
+  it("keeps the fallback label when the transcript has no title yet", async () => {
+    const registry = seedCustom();
+    const bus = new EventBus();
+    const readTranscriptTitle = vi.fn(() => null);
+    await handleHook("mojito-custom-general-abc", "Stop",
+      { registry, bus, getIssueStatus: async () => "x", onAutoAdvance: () => {}, readTranscriptTitle },
+      { transcriptPath: "/some/transcript.jsonl" });
+    expect(registry.get("mojito-custom-general-abc")?.title).toBe("home");
+  });
 });
 
 function seedRebase(over: Partial<SessionMeta> = {}): Registry {
@@ -257,5 +300,16 @@ it("does not overwrite a lime session's title", async () => {
   await handleHook("mojito-RIC-46-to-code", "SessionStart",
     { registry, bus, getIssueStatus: async () => "To Code", onAutoAdvance: () => {} },
     { sessionTitle: "should be ignored" });
+  expect(registry.get("mojito-RIC-46-to-code")?.title).toBe("Linear title");
+});
+
+it("never reads the transcript title for a lime session", async () => {
+  const { registry } = seed({ title: "Linear title" });
+  const bus = new EventBus();
+  const readTranscriptTitle = vi.fn(() => "auto title");
+  await handleHook("mojito-RIC-46-to-code", "Stop",
+    { registry, bus, getIssueStatus: async () => "To Code", onAutoAdvance: () => {}, readTranscriptTitle },
+    { transcriptPath: "/some/transcript.jsonl" });
+  expect(readTranscriptTitle).not.toHaveBeenCalled();
   expect(registry.get("mojito-RIC-46-to-code")?.title).toBe("Linear title");
 });
