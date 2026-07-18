@@ -129,9 +129,11 @@ button.chip {
 button.chip:active { transform: scale(.96); }
 .chip.on { color: var(--run); border-color: color-mix(in srgb, var(--run) 40%, transparent); }
 
-/* Project filter chips: brand-lime active state (tinted like status chips) so a
-   selected project reads distinct from the blue status filters below it. */
-.filter-chips.projects .chip.on {
+/* Neutral "reset" chips (selected project, status "All"): brand-lime active
+   state (tinted like status chips) so they read distinct from the blue status
+   hue (To Code) that otherwise shares the default .chip.on blue. */
+.filter-chips.projects .chip.on,
+.filter-chips .chip.all.on {
   color: var(--accent); background: var(--accent-soft);
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }

@@ -40,7 +40,7 @@ export default function FilterBar(
       )}
       {statuses && onStatus && (statuses.length > 1 || (activeStatus ?? null) !== null) && (
         <div className="filter-chips">
-          <button className={`chip toggle${(activeStatus ?? null) === null ? " on" : ""}`} onClick={() => onStatus(null)}>All</button>
+          <button className={`chip toggle all${(activeStatus ?? null) === null ? " on" : ""}`} onClick={() => onStatus(null)}>All</button>
           {statuses.map((s) => (
             <button
               key={s}
