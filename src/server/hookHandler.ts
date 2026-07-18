@@ -1,7 +1,7 @@
 import type { HookEventName, SessionMeta } from "./types.js";
 import type { Registry } from "./registry.js";
 import type { EventBus } from "./events.js";
-import { mapHook } from "./hookMap.js";
+import { mapHook, mapCustomHook } from "./hookMap.js";
 import { decideAutoAdvance, stageAdvanced } from "./autoAdvance.js";
 
 export interface HookDeps {
@@ -27,10 +27,14 @@ export async function handleHook(
     // Custom sessions have no ticket and no lifecycle; a rebase session has a real ticket
     // but no forward lifecycle (it stays at To QA or escalates backward to To Code, neither
     // of which we auto-advance on). Neither kind calls Linear or auto-advances, and
-    // SessionEnd is a clean close (done), not a failure.
-    const outcome = event === "SessionEnd"
-      ? { state: "done" as const, alert: null }
-      : mapHook(event, false, meta.state);
+    // SessionEnd is a clean close (done), not a failure. A custom session is interactive
+    // (mapCustomHook: rests at "idle" between turns); a rebase session is automated, so a
+    // Stop that isn't a stage handoff is a genuine "waiting for you" (mapHook, needs-input).
+    const outcome = meta.kind === "custom"
+      ? mapCustomHook(event, meta.state)
+      : event === "SessionEnd"
+        ? { state: "done" as const, alert: null }
+        : mapHook(event, false, meta.state);
     const patch: Partial<SessionMeta> = { state: outcome.state, message: outcome.alert?.message };
     // Label from Claude Code's session name. An explicit `session_title` (from --name /
     // /rename, delivered on SessionStart) wins; otherwise fall back to CC's auto-generated

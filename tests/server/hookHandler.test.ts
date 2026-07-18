@@ -234,6 +234,55 @@ describe("handleHook — custom sessions", () => {
       { transcriptPath: "/some/transcript.jsonl" });
     expect(registry.get("mojito-custom-general-abc")?.title).toBe("home");
   });
+
+  it("Stop on a custom session is idle (waiting), not needs-input, and emits no alert", async () => {
+    // A custom session is an interactive terminal: after each turn it rests waiting for the
+    // user. That's the calm "idle" state, not the amber needs-input alert (RIC "always
+    // needs input"). needs-input is reserved for a genuine block (permission / question).
+    const registry = seedCustom();
+    const bus = new EventBus();
+    const events: unknown[] = [];
+    bus.subscribe((e) => events.push(e));
+    await handleHook("mojito-custom-general-abc", "Stop",
+      { registry, bus, getIssueStatus: async () => "x", onAutoAdvance: () => {} });
+    expect(registry.get("mojito-custom-general-abc")?.state).toBe("idle");
+    expect(events).not.toContainEqual(expect.objectContaining({ type: "session.alert" }));
+  });
+
+  it("an idle Notification on a custom session is idle, not needs-input", async () => {
+    const registry = seedCustom();
+    const bus = new EventBus();
+    await handleHook("mojito-custom-general-abc", "Notification",
+      { registry, bus, getIssueStatus: async () => "x", onAutoAdvance: () => {} });
+    expect(registry.get("mojito-custom-general-abc")?.state).toBe("idle");
+  });
+
+  it("a custom session still needs input for a permission request", async () => {
+    const registry = seedCustom();
+    const bus = new EventBus();
+    const events: unknown[] = [];
+    bus.subscribe((e) => events.push(e));
+    await handleHook("mojito-custom-general-abc", "PermissionRequest",
+      { registry, bus, getIssueStatus: async () => "x", onAutoAdvance: () => {} });
+    expect(registry.get("mojito-custom-general-abc")?.state).toBe("needs-input");
+    expect(events).toContainEqual(expect.objectContaining({ type: "session.alert", kind: "needs-input" }));
+  });
+
+  it("a custom session still needs input when claude asks a question (PreToolUse)", async () => {
+    const registry = seedCustom();
+    const bus = new EventBus();
+    await handleHook("mojito-custom-general-abc", "PreToolUse",
+      { registry, bus, getIssueStatus: async () => "x", onAutoAdvance: () => {} });
+    expect(registry.get("mojito-custom-general-abc")?.state).toBe("needs-input");
+  });
+
+  it("PostToolUse revives a custom session from idle back to running", async () => {
+    const registry = seedCustom({ state: "idle" });
+    const bus = new EventBus();
+    await handleHook("mojito-custom-general-abc", "PostToolUse",
+      { registry, bus, getIssueStatus: async () => "x", onAutoAdvance: () => {} });
+    expect(registry.get("mojito-custom-general-abc")?.state).toBe("running");
+  });
 });
 
 function seedRebase(over: Partial<SessionMeta> = {}): Registry {

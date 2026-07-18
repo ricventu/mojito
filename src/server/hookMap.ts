@@ -47,3 +47,34 @@ export function mapHook(event: HookEventName, statusAdvanced: boolean, currentSt
         : { state: "failed", alert: { kind: "failed", message: "session ended unexpectedly" } };
   }
 }
+
+/**
+ * State mapping for a custom (interactive, no-lifecycle) session. Unlike a lime session,
+ * a custom session has no stage handoff: it rests between turns waiting for the user. That
+ * resting state — a finished turn (Stop) or an idle Notification — is the calm "idle" state,
+ * NOT the amber needs-input alert. needs-input is reserved for a genuine block: a permission
+ * request or an AskUserQuestion (PreToolUse). A clean SessionEnd is a close (done).
+ */
+export function mapCustomHook(event: HookEventName, currentState: SessionState): HookOutcome {
+  // Same terminal-stickiness guard as mapHook: once done/failed, a passive idle signal must
+  // not revive the session — only genuine activity does (the user reusing the terminal).
+  const terminal = currentState === "done" || currentState === "failed";
+  const activity = event === "SessionStart" || event === "UserPromptSubmit" || event === "PostToolUse";
+  if (terminal && !activity) return { state: currentState, alert: null };
+
+  switch (event) {
+    case "SessionStart":
+    case "UserPromptSubmit":
+    case "PostToolUse":
+      return { state: "running", alert: null };
+    case "PermissionRequest":
+      return { state: "needs-input", alert: { kind: "needs-input", message: "claude needs permission" } };
+    case "PreToolUse":
+      return { state: "needs-input", alert: { kind: "needs-input", message: "claude is asking a question" } };
+    case "Notification":
+    case "Stop":
+      return { state: "idle", alert: null };
+    case "SessionEnd":
+      return { state: "done", alert: null };
+  }
+}

@@ -246,7 +246,7 @@ export default function TerminalView(
     const res = await apiFetch(token, `/api/sessions/${session.id}`, { method: "PATCH", body: JSON.stringify({ autoAdvance: nextValue }) });
     if (res.ok) setAuto(nextValue);
   };
-  const active = session.state === "running" || session.state === "needs-input" || session.state === "starting";
+  const active = session.state === "running" || session.state === "needs-input" || session.state === "starting" || session.state === "idle";
   const kill = async () => {
     const prompt = active
       ? `Kill the running session for ${session.ticket}?`

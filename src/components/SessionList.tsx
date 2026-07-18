@@ -36,7 +36,7 @@ export default function SessionList(
     return acc;
   }, {});
   const dismiss = async (s: SessionMeta) => {
-    const active = s.state === "running" || s.state === "needs-input" || s.state === "starting";
+    const active = s.state === "running" || s.state === "needs-input" || s.state === "starting" || s.state === "idle";
     const label = s.ticket || s.title;
     const prompt = active ? `Kill the running session for ${label}?` : `Dismiss the session for ${label}?`;
     if (!confirm(prompt)) return;
@@ -86,7 +86,7 @@ export default function SessionList(
             <div key={group.status}>
               {group.status && <div className="substatus"><StatusBadge status={group.status} /></div>}
               {orderSessions(group.items).map((s) => {
-                const active = s.state === "running" || s.state === "needs-input" || s.state === "starting";
+                const active = s.state === "running" || s.state === "needs-input" || s.state === "starting" || s.state === "idle";
                 return (
                   <div key={s.id} className={`card${s.state === "needs-input" ? " attn" : ""}`}>
                     <div className="tap" onClick={() => onOpen(s)}>

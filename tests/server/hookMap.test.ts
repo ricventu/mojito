@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapHook } from "@/server/hookMap";
+import { mapHook, mapCustomHook } from "@/server/hookMap";
 
 describe("mapHook", () => {
   it("session start moves out of starting into running with no alert", () => {
@@ -79,5 +79,46 @@ describe("mapHook", () => {
 
   it("a finished tool call revives a finished (done) session to running", () => {
     expect(mapHook("PostToolUse", false, "done").state).toBe("running");
+  });
+});
+
+describe("mapCustomHook", () => {
+  it("a finished turn (Stop) is idle, not needs-input, with no alert", () => {
+    const o = mapCustomHook("Stop", "running");
+    expect(o.state).toBe("idle");
+    expect(o.alert).toBeNull();
+  });
+
+  it("an idle Notification is idle, with no alert", () => {
+    const o = mapCustomHook("Notification", "running");
+    expect(o.state).toBe("idle");
+    expect(o.alert).toBeNull();
+  });
+
+  it("a permission request still needs input", () => {
+    const o = mapCustomHook("PermissionRequest", "idle");
+    expect(o.state).toBe("needs-input");
+    expect(o.alert?.kind).toBe("needs-input");
+  });
+
+  it("an AskUserQuestion (PreToolUse) still needs input", () => {
+    const o = mapCustomHook("PreToolUse", "idle");
+    expect(o.state).toBe("needs-input");
+    expect(o.alert?.kind).toBe("needs-input");
+  });
+
+  it("activity (SessionStart / UserPromptSubmit / PostToolUse) is running", () => {
+    expect(mapCustomHook("SessionStart", "starting").state).toBe("running");
+    expect(mapCustomHook("UserPromptSubmit", "idle").state).toBe("running");
+    expect(mapCustomHook("PostToolUse", "idle").state).toBe("running");
+  });
+
+  it("a clean SessionEnd is done", () => {
+    expect(mapCustomHook("SessionEnd", "idle").state).toBe("done");
+  });
+
+  it("a finished (done) session is not dragged back to idle by a late Stop/Notification", () => {
+    expect(mapCustomHook("Stop", "done").state).toBe("done");
+    expect(mapCustomHook("Notification", "done").state).toBe("done");
   });
 });

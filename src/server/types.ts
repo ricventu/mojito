@@ -1,4 +1,6 @@
-export type SessionState = "starting" | "running" | "needs-input" | "done" | "failed";
+// "idle" = an interactive (custom) session that finished its turn and is calmly waiting
+// for the user — distinct from "needs-input", which is a genuine block (permission / question).
+export type SessionState = "starting" | "running" | "idle" | "needs-input" | "done" | "failed";
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 export type HookEventName =
   | "SessionStart"

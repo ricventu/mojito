@@ -162,6 +162,8 @@ button.chip:active { transform: scale(.96); }
 .badge.ok   { color: var(--ok);   background: var(--ok-bg);   border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
 .badge.err  { color: var(--err);  background: var(--err-bg);  border-color: color-mix(in srgb, var(--err) 40%, transparent); }
 .badge.wait { color: var(--wait); background: var(--wait-bg); border-color: var(--border-hi); }
+/* idle: a custom session resting between turns — calm grey, static dot (no pulse), no alert. */
+.badge.idle { color: var(--wait); background: var(--wait-bg); border-color: var(--border-hi); }
 
 /* ---- Status badges (Linear lifecycle) ---- */
 .badge.grey   { color: var(--wait);       background: var(--wait-bg);   border-color: var(--border-hi); }
