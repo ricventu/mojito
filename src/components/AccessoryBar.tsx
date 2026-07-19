@@ -30,7 +30,10 @@ export default function AccessoryBar(
 
   const inject = () => {
     const text = normalizePaste(draft);
-    if (text) onPasteText(text);
+    // Empty / whitespace-only: no-op and keep the field open so the user can
+    // retry or cancel. Only a real paste clears the draft and closes the field.
+    if (!text) return;
+    onPasteText(text);
     setDraft("");
     setPasteOpen(false);
   };
