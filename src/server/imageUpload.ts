@@ -44,6 +44,7 @@ function parseDataUrl(dataUrl: string): { contentType: string; bytes: Buffer } |
 
 export function validateImages(
   input: unknown,
+  maxBytes: number = MAX_IMAGE_BYTES,
 ): { ok: true; files: DecodedImage[] } | { ok: false; error: string } {
   if (input === undefined || input === null) return { ok: true, files: [] };
   if (!Array.isArray(input)) return { ok: false, error: "images must be an array" };
@@ -59,8 +60,8 @@ export function validateImages(
     const parsed = parseDataUrl(item.dataUrl);
     if (!parsed) return { ok: false, error: "malformed image data" };
     if (parsed.contentType !== item.type) return { ok: false, error: "image type mismatch" };
-    if (parsed.bytes.length > MAX_IMAGE_BYTES) {
-      return { ok: false, error: `image too large (max ${MAX_IMAGE_BYTES} bytes)` };
+    if (parsed.bytes.length > maxBytes) {
+      return { ok: false, error: `image too large (max ${maxBytes} bytes)` };
     }
     const filename = typeof item.name === "string" && item.name ? item.name : "image";
     files.push({ filename, contentType: item.type, size: parsed.bytes.length, bytes: parsed.bytes });

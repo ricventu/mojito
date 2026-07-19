@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validateImages } from "@/server/imageUpload";
+import { CLAUDE_IMAGE_MAX_BYTES } from "@/lib/imageConstants";
 
 const png = (b64: string) => `data:image/png;base64,${b64}`;
 const tiny = Buffer.from([137, 80, 78, 71]).toString("base64"); // 4 bytes
@@ -55,5 +56,16 @@ describe("validateImages", () => {
     const big = Buffer.alloc(10 * 1024 * 1024 + 1).toString("base64");
     const res = validateImages([{ name: "big.png", type: "image/png", dataUrl: png(big) }]);
     expect(res).toEqual({ ok: false, error: "image too large (max 10485760 bytes)" });
+  });
+
+  it("accepts an image within an explicit smaller cap", () => {
+    const res = validateImages([{ name: "a.png", type: "image/png", dataUrl: png(tiny) }], CLAUDE_IMAGE_MAX_BYTES);
+    expect(res.ok).toBe(true);
+  });
+
+  it("rejects an image over an explicit smaller cap", () => {
+    const big = Buffer.alloc(CLAUDE_IMAGE_MAX_BYTES + 1).toString("base64");
+    const res = validateImages([{ name: "big.png", type: "image/png", dataUrl: png(big) }], CLAUDE_IMAGE_MAX_BYTES);
+    expect(res).toEqual({ ok: false, error: "image too large (max 5242880 bytes)" });
   });
 });
