@@ -48,6 +48,8 @@ export default function AccessoryBar(
     <div className="acc-wrap">
       {pasteOpen && (
         <div className="paste-field">
+          {/* autoFocus fires on mount (when pasteOpen flips true), so the field is
+              ready for an immediate long-press → Incolla. */}
           <textarea
             autoFocus
             className="paste-input"
