@@ -256,6 +256,14 @@ button.chip:active { transform: scale(.96); }
 .acc .k { flex: none; padding: 10px 12px; border-radius: 8px; background: var(--surface-hi);
   border: 1px solid var(--border-hi); color: var(--text); font: 600 13px var(--mono); cursor: pointer; }
 .acc .k:active { background: var(--border); }
+.acc-wrap { display: flex; flex-direction: column; }
+.paste-field { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border); background: var(--surface); }
+.paste-field .paste-input {
+  flex: 1; min-width: 0; height: 40px; resize: none;
+  padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface-hi); color: var(--text);
+  font: inherit;
+}
 .btns { display: flex; gap: 8px; padding: 8px; }
 .btns .btn { flex: 1; padding: 13px; }
 .reason {

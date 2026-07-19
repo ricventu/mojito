@@ -273,7 +273,7 @@ export default function TerminalView(
       </header>
       {session.title && <div className="term-title">{session.title}</div>}
       <div ref={holder} style={{ flex: 1, overflow: "hidden" }} />
-      <AccessoryBar onSend={send} />
+      <AccessoryBar onSend={send} onPasteText={(t) => termRef.current?.paste(t)} />
     </div>
   );
 }
