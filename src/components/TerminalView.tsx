@@ -11,6 +11,8 @@ import { computeTouchScroll, wheelSequences } from "@/lib/touchScroll";
 import { SESSION_GONE_CODE } from "@/lib/ptyClose";
 import { termRootStyle } from "@/lib/keyboardInset";
 import { terminalTabTitle } from "@/lib/terminalTabTitle";
+import { readAsDataUrl } from "@/lib/readAsDataUrl";
+import { quoteArg } from "@/lib/quoteArg";
 import type { SessionMeta } from "@/server/types";
 
 export default function TerminalView(
@@ -21,6 +23,7 @@ export default function TerminalView(
   const wsRef = useRef<WebSocket | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const [auto, setAuto] = useState(session.autoAdvance);
+  const [imgErr, setImgErr] = useState<string | null>(null);
 
   useEffect(() => {
     // React StrictMode (dev) mounts this effect, runs its cleanup, and remounts
@@ -195,6 +198,13 @@ export default function TerminalView(
     };
   }, [session.ticket, session.title]);
 
+  // Auto-dismiss the transient image-attach error.
+  useEffect(() => {
+    if (!imgErr) return;
+    const t = setTimeout(() => setImgErr(null), 6000);
+    return () => clearTimeout(t);
+  }, [imgErr]);
+
   // Mobile touch scroll. Claude's TUI runs in the alternate screen buffer, so
   // xterm has no scrollback to move — scrollLines() is a no-op. Instead forward
   // the drag to Claude as SGR mouse-wheel events (it enables mouse tracking and
@@ -241,6 +251,29 @@ export default function TerminalView(
   }, []);
 
   const send = (bytes: string) => wsRef.current?.send(new TextEncoder().encode(bytes));
+  const pickImages = async (files: File[]) => {
+    const images = files.filter((f) => f.type.startsWith("image/"));
+    if (!images.length) return;
+    setImgErr(null);
+    try {
+      const payload = await Promise.all(images.map(async (f) => ({
+        name: f.name || "image", type: f.type, dataUrl: await readAsDataUrl(f),
+      })));
+      const res = await apiFetch(token, `/api/sessions/${session.id}/paste-image`, {
+        method: "POST", body: JSON.stringify({ images: payload }),
+      });
+      if (!res.ok) {
+        let msg = "image upload failed";
+        try { msg = (await res.json()).error ?? msg; } catch { /* keep default */ }
+        setImgErr(msg);
+        return;
+      }
+      const { paths } = (await res.json()) as { paths: string[] };
+      if (paths.length) termRef.current?.paste(paths.map(quoteArg).join(" ") + " ");
+    } catch {
+      setImgErr("image upload failed");
+    }
+  };
   const toggleAuto = async () => {
     const nextValue = !auto;
     const res = await apiFetch(token, `/api/sessions/${session.id}`, { method: "PATCH", body: JSON.stringify({ autoAdvance: nextValue }) });
@@ -273,7 +306,8 @@ export default function TerminalView(
       </header>
       {session.title && <div className="term-title">{session.title}</div>}
       <div ref={holder} style={{ flex: 1, overflow: "hidden" }} />
-      <AccessoryBar onSend={send} onPasteText={(t) => termRef.current?.paste(t)} />
+      {imgErr && <div className="term-img-err err-text">{imgErr}</div>}
+      <AccessoryBar onSend={send} onPasteText={(t) => termRef.current?.paste(t)} onPickImages={pickImages} />
     </div>
   );
 }

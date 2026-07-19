@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { normalizePaste } from "@/lib/pasteText";
 
 const KEYS: { label: string; bytes: string }[] = [
@@ -18,20 +18,21 @@ const KEYS: { label: string; bytes: string }[] = [
 ];
 
 export default function AccessoryBar(
-  { onSend, onPasteText }:
-  { onSend: (bytes: string) => void; onPasteText: (text: string) => void },
+  { onSend, onPasteText, onPickImages }:
+  { onSend: (bytes: string) => void; onPasteText: (text: string) => void; onPickImages: (files: File[]) => void },
 ) {
-  // Mobile paste: the terminal itself is a non-editable xterm canvas, so iOS
-  // offers no "Incolla" on long-press. This reveals a real <textarea> the user
-  // can paste into natively (works over plain HTTP, unlike navigator.clipboard),
-  // review/edit, then inject into the terminal via xterm's own paste path.
+  // Mobile paste: the terminal itself is a non-editable xterm canvas, so iOS offers
+  // no "Incolla" on long-press. This reveals a real <textarea> the user can paste into
+  // natively (works over plain HTTP, unlike navigator.clipboard), review/edit, then
+  // inject into the terminal via xterm's own paste path.
   const [pasteOpen, setPasteOpen] = useState(false);
   const [draft, setDraft] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const inject = () => {
     const text = normalizePaste(draft);
-    // Empty / whitespace-only: no-op and keep the field open so the user can
-    // retry or cancel. Only a real paste clears the draft and closes the field.
+    // Empty / whitespace-only: no-op and keep the field open so the user can retry or
+    // cancel. Only a real paste clears the draft and closes the field.
     if (!text) return;
     onPasteText(text);
     setDraft("");
@@ -47,8 +48,6 @@ export default function AccessoryBar(
     <div className="acc-wrap">
       {pasteOpen && (
         <div className="paste-field">
-          {/* autoFocus fires on mount (when pasteOpen flips true), so the field
-              is ready for an immediate long-press → Incolla. */}
           <textarea
             autoFocus
             className="paste-input"
@@ -65,6 +64,15 @@ export default function AccessoryBar(
           <button key={k.label} className="k" onClick={() => onSend(k.bytes)}>{k.label}</button>
         ))}
         <button type="button" className="k" aria-label="Paste" onClick={() => setPasteOpen((v) => !v)}>📋</button>
+        <button type="button" className="k" aria-label="Attach image" onClick={() => fileInput.current?.click()}>📎</button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(e) => { onPickImages(Array.from(e.target.files ?? [])); e.target.value = ""; }}
+        />
       </div>
     </div>
   );

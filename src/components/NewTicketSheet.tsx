@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/client";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES, MAX_IMAGES } from "@/lib/imageConstants";
+import { readAsDataUrl } from "@/lib/readAsDataUrl";
 import type { SessionMeta } from "@/server/types";
 
 const MODELS = ["opus", "sonnet", "fable"];
@@ -15,15 +16,6 @@ interface PendingImage { id: string; name: string; type: string; dataUrl: string
 // The id is only a React key / removal handle, so a non-crypto fallback is fine.
 function newImageId(): string {
   return crypto.randomUUID?.() ?? `img-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result as string);
-    r.onerror = () => reject(r.error);
-    r.readAsDataURL(file);
-  });
 }
 
 export default function NewTicketSheet(

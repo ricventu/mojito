@@ -264,6 +264,7 @@ button.chip:active { transform: scale(.96); }
   border: 1px solid var(--border); background: var(--surface-hi); color: var(--text);
   font: inherit;
 }
+.term-img-err { margin: 0; padding: 8px 10px; border-top: 1px solid var(--border); background: var(--surface); }
 .btns { display: flex; gap: 8px; padding: 8px; }
 .btns .btn { flex: 1; padding: 13px; }
 .reason {
