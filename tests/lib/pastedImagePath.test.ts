@@ -13,6 +13,12 @@ describe("extForType", () => {
     expect(extForType("image/heic")).toBeNull();
     expect(extForType("")).toBeNull();
   });
+  it("returns null for Object.prototype key names", () => {
+    expect(extForType("constructor")).toBeNull();
+    expect(extForType("toString")).toBeNull();
+    expect(extForType("hasOwnProperty")).toBeNull();
+    expect(extForType("__proto__")).toBeNull();
+  });
 });
 
 describe("pastedImageDir", () => {
