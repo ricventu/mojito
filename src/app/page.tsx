@@ -10,6 +10,7 @@ import TokenGate from "@/components/TokenGate";
 import TicketList from "@/components/TicketList";
 import SessionList from "@/components/SessionList";
 import AlertLayer from "@/components/AlertLayer";
+import SettingsSheet from "@/components/SettingsSheet";
 import { tabTitle } from "@/lib/tabTitle";
 import type { MojitoEvent } from "@/server/events";
 import type { SessionMeta } from "@/server/types";
@@ -24,6 +25,7 @@ export default function Home() {
   const [tab, setTab] = usePersistedState("mojito-tab", "tickets");
   const [open, setOpen] = useState<SessionMeta | null>(null);
   const [alerts, setAlerts] = useState<{ id: string; ticket: string; message: string }[]>([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { tickets, refresh: refreshTickets } = useTickets(token);
   const { sessions, refresh: refreshSessions } = useSessions(token);
 
@@ -52,6 +54,7 @@ export default function Home() {
   return (
     <div style={{ paddingBottom: 64 }}>
       <AlertLayer alerts={alerts} onOpen={(id) => { const s = sessions.find((x) => x.id === id); if (s) setOpen(s); }} onClear={() => setAlerts([])} />
+      {settingsOpen && <SettingsSheet token={token} onClose={() => setSettingsOpen(false)} />}
       {tab === "tickets"
         ? <TicketList token={token} tickets={tickets} sessions={sessions} onLaunched={() => { refreshSessions(); refreshTickets(); }} onOpen={setOpen} />
         : <SessionList token={token} sessions={sessions} onOpen={setOpen} onChanged={refreshSessions} />}
@@ -60,6 +63,7 @@ export default function Home() {
         <button className={`tab${tab === "sessions" ? " active" : ""}`} onClick={() => setTab("sessions")}>
           Sessions{needsInput ? <span className="count">{needsInput}</span> : null}
         </button>
+        <button className="tab settings" aria-label="Settings" onClick={() => setSettingsOpen(true)}>⚙</button>
       </nav>
     </div>
   );

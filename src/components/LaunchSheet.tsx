@@ -1,24 +1,31 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client";
-import { resolveEffort } from "@/lib/stageDefaults";
+import { resolveEffort, resolveModel, MODELS, EFFORTS } from "@/lib/stageDefaults";
+import { useStageDefaults } from "@/lib/useStageDefaults";
 import { tmuxName, rebaseSessionName } from "@/server/sessionKey";
 import { activeSessionLevel } from "@/lib/ticketSessionLevel";
 import StateBadge from "./StateBadge";
 import QaVerdictButtons from "./QaVerdictButtons";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 
-const MODELS = ["opus", "sonnet", "fable"];
-const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
-
 export default function LaunchSheet(
   { token, ticket, sessions, onClose, onLaunched, onOpen }:
   { token: string; ticket: TicketSummary; sessions: SessionMeta[]; onClose: () => void;
     onLaunched: () => void; onOpen: (s: SessionMeta) => void },
 ) {
-  const [model, setModel] = useState("opus");
-  // Pre-fill the effort optimal for this ticket's stage (overridable via the selector).
+  const { defaults } = useStageDefaults(token);
+  // Pre-fill the model + effort optimal for this ticket's stage (overridable via the selectors).
+  const [model, setModel] = useState<string>(() => resolveModel(ticket.statusName));
   const [effort, setEffort] = useState<string>(() => resolveEffort(ticket.statusName));
+  const [touched, setTouched] = useState(false);
+  // Re-seed both selectors from the effective (possibly user-edited) defaults once they load,
+  // unless the user has already changed a selector this session.
+  useEffect(() => {
+    if (touched) return;
+    setModel(resolveModel(ticket.statusName, defaults));
+    setEffort(resolveEffort(ticket.statusName, defaults));
+  }, [defaults, ticket.statusName, touched]);
   const [auto, setAuto] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const existingId = tmuxName(ticket.identifier, ticket.statusName);
@@ -97,9 +104,9 @@ export default function LaunchSheet(
   const selectors = (
     <div className="two">
       <label className="field"><span className="lbl">Model</span>
-        <select value={model} onChange={(e) => setModel(e.target.value)}>{MODELS.map((m) => <option key={m}>{m}</option>)}</select></label>
+        <select value={model} onChange={(e) => { setModel(e.target.value); setTouched(true); }}>{MODELS.map((m) => <option key={m}>{m}</option>)}</select></label>
       <label className="field"><span className="lbl">Effort</span>
-        <select value={effort} onChange={(e) => setEffort(e.target.value)}>{EFFORTS.map((x) => <option key={x}>{x}</option>)}</select></label>
+        <select value={effort} onChange={(e) => { setEffort(e.target.value); setTouched(true); }}>{EFFORTS.map((x) => <option key={x}>{x}</option>)}</select></label>
     </div>
   );
   const customBtn = (

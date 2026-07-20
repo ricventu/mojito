@@ -199,6 +199,7 @@ button.chip:active { transform: scale(.96); }
 .nav .tab.active { color: var(--text); }
 .nav .tab.active::before { content: ""; position: absolute; top: 0; left: 30%; right: 30%; height: 2px;
   background: var(--accent); border-radius: 2px; }
+.nav .tab.settings { flex: none; padding-left: 18px; padding-right: 18px; font-size: 16px; }
 .nav .tab .count { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px;
   padding: 0 5px; margin-left: 6px; border-radius: 999px; background: var(--attn); color: #1a1206;
   font: 700 11px var(--mono); vertical-align: middle; }
