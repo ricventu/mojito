@@ -36,17 +36,20 @@ individual status name (so resolvers stay a simple `Record<string, …>` lookup)
 
 ## Built-in seed defaults
 
-Derived from each stage's cognitive load and downstream risk (effort keeps the current
-`EFFORT_OF_STATUS` values, already tuned; model is `opus` where reasoning quality matters and
-`fable` only for the one mechanical stage):
+Model cost/capability order among the three options: **`fable` > `opus` > `sonnet`** —
+`fable` is the most capable but ~2x the cost of `opus`, `sonnet` is the cheapest. Defaults are
+derived from each stage's cognitive load and downstream risk: `opus` is the ceiling for
+reasoning-heavy stages, `sonnet` for the one mechanical stage, and the premium `fable` is
+**not a default anywhere** — it stays opt-in via the UI for when the user judges the 2x cost
+worth it. Effort keeps the current `EFFORT_OF_STATUS` values (already tuned).
 
-| Status         | model | effort | rationale |
-|----------------|-------|--------|-----------|
-| Backlog / Todo | opus  | xhigh  | Design (brainstorm/debug → plan). Highest stakes — a bad plan poisons everything downstream. |
-| To Code        | opus  | high   | Subagent-driven implementation; subagents do the heavy lifting but the orchestrator's dispatch/integrate/test judgment matters. |
-| To Review      | opus  | xhigh  | Read-only code review; depth pays, no over-engineering risk. This is exactly where a weak model (the inherited `fable`) was wrong. |
-| To QA          | fable | low    | Human-approval gate: print a summary, dispatch on the verdict, set status. Mechanical — a strong model is wasted here. |
-| To Merge       | opus  | xhigh  | Usually procedural, but a content-changing rebase runs a merge-gating inline review + fixes with no re-QA behind the clean path — same profile as To Review. |
+| Status         | model  | effort | rationale |
+|----------------|--------|--------|-----------|
+| Backlog / Todo | opus   | xhigh  | Design (brainstorm/debug → plan). Highest stakes — a bad plan poisons everything downstream; opus 4.8 plans well, fable's 2x cost not justified by default. |
+| To Code        | opus   | high   | Subagent-driven implementation; subagents do the heavy lifting but the orchestrator's dispatch/integrate/test judgment matters. |
+| To Review      | opus   | xhigh  | Read-only code review; depth pays and opus covers it. This is exactly where the inherited `fable` was wrong — 2x cost for no gain over the default. |
+| To QA          | sonnet | low    | Human-approval gate: print a summary, dispatch on the verdict, set status. Mechanical — the cheapest model suffices. |
+| To Merge       | opus   | xhigh  | Usually procedural, but a content-changing rebase runs a merge-gating inline review + fixes with no re-QA behind the clean path — same profile as To Review. |
 
 Statuses outside this table fall back to `opus` / `high` (the app-wide default), preserving
 the current `defaultEffortForStatus` fallback behavior.
@@ -59,8 +62,8 @@ keys the user has changed need be present:
 
 ```json
 {
-  "To Code": { "model": "sonnet", "effort": "high" },
-  "To QA":   { "model": "opus",   "effort": "medium" }
+  "To Review": { "model": "fable",  "effort": "xhigh" },
+  "To QA":     { "model": "opus",   "effort": "medium" }
 }
 ```
 
