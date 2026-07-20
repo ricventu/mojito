@@ -3,7 +3,7 @@ import { join, basename } from "node:path";
 import { homedir } from "node:os";
 import { randomBytes } from "node:crypto";
 import type { Effort, SessionMeta } from "./types.js";
-import { tmuxName, parseIdentifier, validateTicket, statusSlug, customSessionName, rebaseSessionName } from "./sessionKey.js";
+import { tmuxName, parseIdentifier, validateTicket, statusSlug, customSessionName, rebaseSessionName, shellSessionName } from "./sessionKey.js";
 import { buildHookSettings } from "./hookSettings.js";
 import { loadProjectMap, resolveRepoFromMap, resolvePathForProject } from "./limeProjects.js";
 import { resolveWorktree } from "./worktree.js";
@@ -343,6 +343,77 @@ export async function launchRebaseSession(
     projectName: req.projectName,
     title: req.title,
     labels: req.labels,
+  };
+  deps.registry.upsert(meta);
+  return { ok: true, meta };
+}
+
+export interface ShellLaunchRequest {
+  projectName: string | null;
+  // Ticket-scoped shell (RIC-155): when `ticket` is set, cwd resolves through the
+  // ticket→worktree chain. Absent = project-scoped, or general (home) when projectName is null.
+  ticket?: string;
+  status?: string;
+  title?: string;
+  labels?: string[];
+}
+
+export function buildShellCommand(): string {
+  // A plain login shell — behaves like a normally-opened terminal (sources the user's profile).
+  // No env prefix, no --settings, no slash command: a shell fires no claude hooks.
+  return "zsh -l";
+}
+
+export async function launchShellSession(
+  req: ShellLaunchRequest,
+  deps: LaunchDeps & { genId?: () => string; homeDir?: () => string },
+): Promise<{ ok: true; meta: SessionMeta } | { ok: false; reason: "no-repo" }> {
+  const homeDir = deps.homeDir ?? (() => homedir());
+  const genId = deps.genId ?? (() => randomBytes(3).toString("hex"));
+
+  // Same cwd/slug resolution as launchCustomSession.
+  let cwd: string;
+  let slug: string;
+  if (req.ticket) {
+    const resolveCwd = deps.resolveCwd ?? defaultResolveCwd(deps.projectsPath);
+    const resolved = resolveCwd(req.ticket, req.projectName);
+    if (!resolved) return { ok: false, reason: "no-repo" };
+    cwd = resolved;
+    slug = statusSlug(req.ticket);
+  } else if (req.projectName) {
+    const path = resolvePathForProject(loadProjectMap(deps.projectsPath), req.projectName);
+    if (!path) return { ok: false, reason: "no-repo" };
+    cwd = path;
+    slug = statusSlug(req.projectName);
+  } else {
+    cwd = homeDir();
+    slug = "general";
+  }
+
+  const id = shellSessionName(slug, genId());
+
+  // A plain shell writes no hook-settings file and no launch-context file.
+  const command = buildShellCommand();
+  await deps.newSession(id, cwd, command);
+  await deps.pipePane(id, logfilePath(deps.stateDir, id));
+
+  const title = req.ticket ? (req.title ?? basename(cwd)) : cwd === homeDir() ? "home" : basename(cwd);
+  const meta: SessionMeta = {
+    kind: "shell",
+    id,
+    ticket: req.ticket ?? "",
+    launchStatus: "",
+    model: "",
+    effort: "",
+    autoAdvance: false,
+    // No hooks will ever move a shell off its initial state, so start it "running" for a
+    // sensible badge. registry.recover flips it to "failed" only when its tmux dies.
+    state: "running",
+    cwd,
+    createdAt: (deps.nowIso ?? (() => new Date().toISOString()))(),
+    projectName: req.projectName,
+    title,
+    labels: req.ticket ? (req.labels ?? []) : [],
   };
   deps.registry.upsert(meta);
   return { ok: true, meta };

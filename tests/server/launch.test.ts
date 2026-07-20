@@ -6,6 +6,7 @@ import {
   launchSession, buildClaudeCommand, launchCustomSession, buildCustomClaudeCommand,
   launchNewTicketSession, buildNewTicketClaudeCommand,
   launchRebaseSession, buildRebaseClaudeCommand,
+  buildShellCommand, launchShellSession,
 } from "@/server/launch";
 import { Registry } from "@/server/registry";
 import type { SessionMeta } from "@/server/types";
@@ -371,6 +372,80 @@ describe("launchCustomSession from a ticket (RIC-128)", () => {
   it("refuses when the ticket's team/project is unmapped", async () => {
     const d = customDeps({ resolveCwd: () => null });
     const res = await launchCustomSession(ticketReq, d);
+    expect(res).toMatchObject({ ok: false, reason: "no-repo" });
+  });
+});
+
+describe("buildShellCommand", () => {
+  it("returns a bare login zsh with no claude, settings, or slash command", () => {
+    const cmd = buildShellCommand();
+    expect(cmd).toBe("zsh -l");
+    expect(cmd).not.toContain("claude");
+    expect(cmd).not.toContain("--settings");
+    expect(cmd).not.toContain("/lime");
+  });
+});
+
+describe("launchShellSession", () => {
+  it("General opens a shell in the home directory, running, with empty model/effort", async () => {
+    const d = customDeps();
+    const res = await launchShellSession({ projectName: null }, d);
+    expect(res.ok).toBe(true);
+    const meta = (res as { ok: true; meta: SessionMeta }).meta;
+    expect(meta).toMatchObject({ kind: "shell", id: "mojito-shell-general-abc123", ticket: "",
+      launchStatus: "", cwd: "/home/me", projectName: null, title: "home", autoAdvance: false,
+      state: "running", model: "", effort: "" });
+    expect(d.newSession).toHaveBeenCalledWith("mojito-shell-general-abc123", "/home/me", "zsh -l");
+    expect(d.pipePane).toHaveBeenCalledOnce();
+  });
+
+  it("a mapped project opens a shell in its folder with the basename label", async () => {
+    const projectsPath = join(dir, "projects.json");
+    writeFileSync(projectsPath, JSON.stringify({ RIC: { projects: { Mojito: "/code/Lime/mojito" } } }));
+    const d = customDeps({ projectsPath });
+    const res = await launchShellSession({ projectName: "Mojito" }, d);
+    expect(res.ok).toBe(true);
+    const meta = (res as { ok: true; meta: SessionMeta }).meta;
+    expect(meta).toMatchObject({ kind: "shell", id: "mojito-shell-mojito-abc123",
+      cwd: "/code/Lime/mojito", projectName: "Mojito", title: "mojito" });
+  });
+
+  it("writes NEITHER a hook-settings file NOR a launch-context file", async () => {
+    const d = customDeps();
+    await launchShellSession({ projectName: null }, d);
+    expect(existsSync(join(dir, "settings", "mojito-shell-general-abc123.json"))).toBe(false);
+    expect(existsSync(join(dir, "context", "mojito-shell-general-abc123.json"))).toBe(false);
+  });
+
+  it("refuses an unmapped project", async () => {
+    const d = customDeps();
+    const res = await launchShellSession({ projectName: "Ghost" }, d);
+    expect(res).toMatchObject({ ok: false, reason: "no-repo" });
+  });
+
+  it("registers the session in the registry", async () => {
+    const d = customDeps();
+    const res = await launchShellSession({ projectName: null }, d);
+    const id = (res as { ok: true; meta: SessionMeta }).meta.id;
+    expect(d.registry.get(id)?.kind).toBe("shell");
+  });
+
+  it("a ticket-scoped shell opens in the worktree with ticket/title/labels and no context file", async () => {
+    const d = customDeps({ resolveCwd: () => "/wt/ric-155" });
+    const res = await launchShellSession(
+      { projectName: "Mojito", ticket: "RIC-155", status: "Todo", title: "Avvio terminale", labels: ["Feature"] }, d);
+    expect(res.ok).toBe(true);
+    const meta = (res as { ok: true; meta: SessionMeta }).meta;
+    expect(meta).toMatchObject({ kind: "shell", id: "mojito-shell-ric-155-abc123",
+      ticket: "RIC-155", launchStatus: "", cwd: "/wt/ric-155", projectName: "Mojito",
+      title: "Avvio terminale", labels: ["Feature"], state: "running" });
+    expect(existsSync(join(dir, "context", "mojito-shell-ric-155-abc123.json"))).toBe(false);
+    expect(d.newSession).toHaveBeenCalledWith("mojito-shell-ric-155-abc123", "/wt/ric-155", "zsh -l");
+  });
+
+  it("refuses when the ticket's team/project is unmapped", async () => {
+    const d = customDeps({ resolveCwd: () => null });
+    const res = await launchShellSession({ projectName: "Mojito", ticket: "RIC-155" }, d);
     expect(res).toMatchObject({ ok: false, reason: "no-repo" });
   });
 });
