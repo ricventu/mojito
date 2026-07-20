@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { statusSlug, tmuxName, parseIdentifier, validateTicket, customSessionName, rebaseSessionName } from "@/server/sessionKey";
+import { statusSlug, tmuxName, parseIdentifier, validateTicket, customSessionName, rebaseSessionName, shellSessionName } from "@/server/sessionKey";
 
 describe("sessionKey", () => {
   it("slugs a status", () => {
@@ -44,5 +44,17 @@ describe("rebaseSessionName", () => {
   });
   it("rejects a malformed ticket", () => {
     expect(() => rebaseSessionName("nonsense")).toThrow();
+  });
+});
+
+describe("shellSessionName", () => {
+  it("builds a prefixed name from slug and unique id", () => {
+    expect(shellSessionName("mojito", "a1b2c3")).toBe("mojito-shell-mojito-a1b2c3");
+  });
+  it("uses the general slug form", () => {
+    expect(shellSessionName("general", "ffffff")).toBe("mojito-shell-general-ffffff");
+  });
+  it("does not collide with a custom session name for the same slug/id", () => {
+    expect(shellSessionName("x", "aaa")).not.toBe(customSessionName("x", "aaa"));
   });
 });

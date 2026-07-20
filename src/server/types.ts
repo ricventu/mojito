@@ -13,12 +13,12 @@ export type HookEventName =
   | "SessionEnd";
 
 export interface SessionMeta {
-  kind: "lime" | "custom" | "rebase"; // "lime" = ticket-lifecycle; "custom" = standalone; "rebase" = one-off To-QA rebase
+  kind: "lime" | "custom" | "rebase" | "shell"; // "lime" = ticket-lifecycle; "custom" = standalone claude; "rebase" = one-off To-QA rebase; "shell" = plain zsh terminal
   id: string;            // tmux session name, e.g. "mojito-RIC-46-to-review"
   ticket: string;        // "RIC-46" (empty for custom sessions)
   launchStatus: string;  // Linear status name at launch (empty for custom sessions)
   model: string;         // "opus" | "sonnet" | "fable" | full id
-  effort: Effort;
+  effort: Effort | "";   // "" for shell sessions, which have no model/effort
   autoAdvance: boolean;
   state: SessionState;
   cwd: string;

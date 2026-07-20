@@ -26,6 +26,10 @@ export function customSessionName(slug: string, unique: string): string {
   return `mojito-custom-${slug}-${unique}`;
 }
 
+export function shellSessionName(slug: string, unique: string): string {
+  return `mojito-shell-${slug}-${unique}`;
+}
+
 export function rebaseSessionName(ticket: string): string {
   validateTicket(ticket);
   return `mojito-${ticket}-rebase`;
