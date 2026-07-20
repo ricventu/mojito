@@ -3,10 +3,11 @@ import { statusRank, CUSTOM_STATUS, TERMINAL_STATUS } from "@/lib/status";
 import { NO_PROJECT } from "@/lib/ticketFilter";
 
 /**
- * Synthetic status bucket for custom sessions, which have no Linear launch status.
- * Used both as a status-filter option and as the group-divider label so custom
+ * Synthetic status buckets for sessions with no Linear launch status: CUSTOM_STATUS
+ * for custom (bare claude) sessions and TERMINAL_STATUS for shell (plain terminal)
+ * sessions. Used both as status-filter options and as group-divider labels so those
  * sessions are filterable and visually separated like lifecycle statuses.
- * Defined in status.ts (with its hue) and re-exported here for filter callers.
+ * Defined in status.ts (each with its hue) and re-exported here for filter callers.
  */
 export { CUSTOM_STATUS, TERMINAL_STATUS };
 
@@ -22,8 +23,9 @@ export function sessionStatus(s: SessionMeta): string {
 
 /**
  * Distinct statuses present in the sessions, ordered by lifecycle rank (unknown
- * statuses — including CUSTOM_STATUS — last, alphabetical tie-break). Custom
- * sessions surface as CUSTOM_STATUS rather than being dropped.
+ * statuses — including CUSTOM_STATUS and TERMINAL_STATUS — last, alphabetical
+ * tie-break). Custom and shell sessions surface under their synthetic bucket
+ * rather than being dropped.
  */
 export function sessionStatuses(sessions: SessionMeta[]): string[] {
   return Array.from(new Set(sessions.map(sessionStatus).filter((v) => v !== "")))

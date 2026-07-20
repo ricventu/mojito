@@ -46,8 +46,8 @@ export function statusRank(name: string): number {
   return STATUS_ORDER[name] ?? Number.MAX_SAFE_INTEGER;
 }
 
-/** Badge color-hue class for a status; custom sessions get their own hue,
- *  other unknown statuses are muted. */
+/** Badge color-hue class for a status; custom and terminal sessions each get
+ *  their own hue, other unknown statuses are muted. */
 export function statusColorClass(name: string): string {
   if (name === CUSTOM_STATUS) return "pink";
   if (name === TERMINAL_STATUS) return "term";

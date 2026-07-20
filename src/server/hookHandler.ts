@@ -23,7 +23,9 @@ export async function handleHook(
   const meta = deps.registry.get(id);
   if (!meta) return;
 
-  if (meta.kind === "custom" || meta.kind === "rebase") {
+  if (meta.kind === "custom" || meta.kind === "rebase" || meta.kind === "shell") {
+    // Shell sessions fire no hooks, so this branch is unreachable for them today; guarding here
+    // future-proofs against any stray/manual hook pushing a plain terminal into the lime path.
     // Custom sessions have no ticket and no lifecycle; a rebase session has a real ticket
     // but no forward lifecycle (it stays at To QA or escalates backward to To Code, neither
     // of which we auto-advance on). Neither kind calls Linear or auto-advances, and
