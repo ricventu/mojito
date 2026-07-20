@@ -130,18 +130,6 @@ button.chip {
 button.chip:active { transform: scale(.96); }
 .chip.on { color: var(--run); border-color: color-mix(in srgb, var(--run) 40%, transparent); }
 
-/* Colored status chips (status filter): hue text + border identifies each status
-   while it's unselected. Hues match src/lib/status.ts. */
-.filter-chips .chip.grey   { color: var(--wait);       border-color: var(--border-hi); }
-.filter-chips .chip.blue   { color: var(--run);        border-color: color-mix(in srgb, var(--run) 40%, transparent); }
-.filter-chips .chip.indigo { color: var(--indigo);     border-color: color-mix(in srgb, var(--indigo) 45%, transparent); }
-.filter-chips .chip.amber  { color: var(--attn);       border-color: color-mix(in srgb, var(--attn) 45%, transparent); }
-.filter-chips .chip.teal   { color: var(--teal);       border-color: color-mix(in srgb, var(--teal) 45%, transparent); }
-.filter-chips .chip.green  { color: var(--ok);         border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
-.filter-chips .chip.red    { color: var(--err);        border-color: color-mix(in srgb, var(--err) 40%, transparent); }
-.filter-chips .chip.muted  { color: var(--text-faint); border-color: var(--border); }
-.filter-chips .chip.pink   { color: var(--pink);       border-color: color-mix(in srgb, var(--pink) 45%, transparent); }
-
 /* Selected filter chip — one uniform brand-lime "active" state across BOTH the
    project row and the status row, so selection reads the same everywhere
    regardless of hue. Placed after the hue rules so it overrides their color/border. */

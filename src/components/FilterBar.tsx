@@ -1,5 +1,4 @@
 "use client";
-import { statusColorClass } from "@/lib/status";
 export { NO_PROJECT } from "@/lib/ticketFilter";
 
 export default function FilterBar(
@@ -44,7 +43,7 @@ export default function FilterBar(
           {statuses.map((s) => (
             <button
               key={s}
-              className={`chip toggle ${statusColorClass(s)}${activeStatus === s ? " on" : ""}`}
+              className={`chip toggle${activeStatus === s ? " on" : ""}`}
               onClick={() => onStatus(s)}
             >
               {s}
