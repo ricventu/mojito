@@ -27,6 +27,7 @@ export default function LaunchSheet(
     setEffort(resolveEffort(ticket.statusName, defaults));
   }, [defaults, ticket.statusName, touched]);
   const [auto, setAuto] = useState(true);
+  const [bareMode, setBareMode] = useState<"claude" | "terminal">("claude");
   const [err, setErr] = useState<string | null>(null);
   const existingId = tmuxName(ticket.identifier, ticket.statusName);
   const existing = sessions.find((s) => s.id === existingId);
@@ -98,6 +99,19 @@ export default function LaunchSheet(
     onClose();
   };
 
+  // Launch a plain zsh terminal in the ticket's worktree (RIC-155). Like startCustom, shell ids
+  // are random-suffixed, so there is no existing session to clear first.
+  const startShell = async () => {
+    const res = await apiFetch(token, "/api/sessions", {
+      method: "POST",
+      body: JSON.stringify({ kind: "shell", ticket: ticket.identifier, status: ticket.statusName,
+        projectName: ticket.project, title: ticket.title, labels: ticket.labels }),
+    });
+    if (!res.ok) { setErr(await res.text()); return; }
+    onLaunched();
+    onClose();
+  };
+
   const isToQa = ticket.statusName === "To QA";
   const isToMerge = ticket.statusName === "To Merge";
 
@@ -110,7 +124,15 @@ export default function LaunchSheet(
     </div>
   );
   const customBtn = (
-    <button className="btn ghost block" style={{ marginTop: 12 }} onClick={() => startCustom()}>Custom session</button>
+    <div style={{ marginTop: 12 }}>
+      <div className="btns" style={{ marginBottom: 8 }}>
+        <button className={`btn ${bareMode === "claude" ? "primary" : "ghost"}`} onClick={() => setBareMode("claude")}>Claude</button>
+        <button className={`btn ${bareMode === "terminal" ? "primary" : "ghost"}`} onClick={() => setBareMode("terminal")}>Terminal</button>
+      </div>
+      {bareMode === "claude"
+        ? <button className="btn ghost block" onClick={() => startCustom()}>Custom session</button>
+        : <button className="btn ghost block" onClick={() => startShell()}>Start terminal</button>}
+    </div>
   );
 
   return (
