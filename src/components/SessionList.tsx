@@ -90,7 +90,7 @@ export default function SessionList(
                 return (
                   <div key={s.id} className={`card${s.state === "needs-input" ? " attn" : ""}`}>
                     <div className="tap" onClick={() => onOpen(s)}>
-                      {s.kind === "custom" ? (
+                      {s.kind === "custom" || s.kind === "shell" ? (
                         <>
                           <div className="row">
                             <span className="session-title">{s.title}</span>
@@ -111,8 +111,9 @@ export default function SessionList(
                         </>
                       )}
                       <div className="meta">
-                        <span className="chip">{s.model} · {s.effort}</span>
+                        {s.kind !== "shell" && <span className="chip">{s.model} · {s.effort}</span>}
                         {s.kind === "rebase" && <span className="chip">rebase</span>}
+                        {s.kind === "shell" && <span className="chip">terminal</span>}
                         {s.kind === "lime" && (
                           <button className={`chip toggle${s.autoAdvance ? " on" : ""}`} onClick={(e) => toggleAuto(e, s)}>
                             auto: {s.autoAdvance ? "on" : "off"}
