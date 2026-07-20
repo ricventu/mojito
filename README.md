@@ -1,8 +1,8 @@
 # Mojito
 
-Next.js + TypeScript app (GUI + local server) that launches and monitors `lime`
-ticket-lifecycle sessions. See [`CLAUDE.md`](./CLAUDE.md) for architecture and the
-contract with the `lime` plugin.
+Next.js + TypeScript app (GUI + local server) that launches and monitors
+[`lime`](https://github.com/ricventu/lime) ticket-lifecycle sessions. See
+[`CLAUDE.md`](./CLAUDE.md) for architecture and the contract with the `lime` plugin.
 
 ## Running
 

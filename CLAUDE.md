@@ -7,8 +7,10 @@ through its lifecycle from a web UI.
 
 ## Relationship to `lime` (separate repo — read this before cross-repo work)
 
-`lime` is a **separate** Claude Code plugin, not part of this repo. Source lives at
-`/Users/ricventu/code/Lime/lime` (skill `skills/lime-next/SKILL.md`). The two are kept in
+`lime` is a **separate** Claude Code plugin, not part of this repo. Its repo is
+[github.com/ricventu/lime](https://github.com/ricventu/lime) (skill
+`skills/lime-next/SKILL.md`); locally it's cloned at `/Users/ricventu/code/Lime/lime`,
+which is the path the instructions below use for cross-repo edits. The two are kept in
 separate repos on purpose: `lime` has standalone value (`/lime-next` runs in a bare
 terminal without Mojito), so it ships as its own installable plugin.
 
