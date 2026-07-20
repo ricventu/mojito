@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sessionStatuses, filterSessions, sessionStatus, CUSTOM_STATUS } from "@/lib/sessionFilter";
+import { sessionStatuses, filterSessions, sessionStatus, CUSTOM_STATUS, TERMINAL_STATUS } from "@/lib/sessionFilter";
 import { NO_PROJECT } from "@/lib/ticketFilter";
 import type { SessionMeta } from "@/server/types";
 
@@ -54,6 +54,14 @@ describe("sessionStatuses", () => {
     expect(sessionStatuses(sessions)).toEqual([CUSTOM_STATUS]);
   });
 
+  it("surfaces shell sessions as the TERMINAL_STATUS bucket, sorted last", () => {
+    const sessions = [
+      session({ kind: "shell", launchStatus: "" }),
+      session({ launchStatus: "To QA" }),
+    ];
+    expect(sessionStatuses(sessions)).toEqual(["To QA", TERMINAL_STATUS]);
+  });
+
   it("sorts unknown statuses last with alphabetical tie-break", () => {
     const sessions = [
       session({ launchStatus: "Zeta" }),
@@ -88,6 +96,15 @@ describe("filterSessions", () => {
     ];
     const out = filterSessions(withCustom, { query: "", project: null, status: CUSTOM_STATUS });
     expect(out.map((s) => s.id)).toEqual(["d"]);
+  });
+
+  it("filters shell sessions via the TERMINAL_STATUS bucket", () => {
+    const withShell = [
+      ...sessions,
+      session({ id: "e", kind: "shell", launchStatus: "", ticket: "", projectName: "Mojito", title: "Terminal one" }),
+    ];
+    const out = filterSessions(withShell, { query: "", project: null, status: TERMINAL_STATUS });
+    expect(out.map((s) => s.id)).toEqual(["e"]);
   });
 
   it("filters by project, using the NO_PROJECT sentinel for projectless sessions", () => {

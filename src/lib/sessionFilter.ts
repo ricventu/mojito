@@ -1,5 +1,5 @@
 import type { SessionMeta } from "@/server/types";
-import { statusRank, CUSTOM_STATUS } from "@/lib/status";
+import { statusRank, CUSTOM_STATUS, TERMINAL_STATUS } from "@/lib/status";
 import { NO_PROJECT } from "@/lib/ticketFilter";
 
 /**
@@ -8,14 +8,16 @@ import { NO_PROJECT } from "@/lib/ticketFilter";
  * sessions are filterable and visually separated like lifecycle statuses.
  * Defined in status.ts (with its hue) and re-exported here for filter callers.
  */
-export { CUSTOM_STATUS };
+export { CUSTOM_STATUS, TERMINAL_STATUS };
 
 /**
  * Effective status of a session for grouping/filtering: custom sessions have no
  * launch status, so they bucket under CUSTOM_STATUS; others use their launch status.
  */
 export function sessionStatus(s: SessionMeta): string {
-  return s.kind === "custom" ? CUSTOM_STATUS : s.launchStatus;
+  if (s.kind === "custom") return CUSTOM_STATUS;
+  if (s.kind === "shell") return TERMINAL_STATUS;
+  return s.launchStatus;
 }
 
 /**

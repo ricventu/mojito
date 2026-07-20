@@ -30,6 +30,7 @@
   --indigo: #a08cff; --indigo-bg: #20203b;
   --teal: #3fd0c9;   --teal-bg: #0e2b2a;
   --pink: #e06cc4;   --pink-bg: #2c1826;   /* custom sessions (non-lifecycle) */
+  --term: #b5d334;   --term-bg: #26290f;   /* shell/terminal sessions (non-lifecycle) */
 
   --r: 12px;
   --r-sm: 9px;
@@ -163,6 +164,7 @@ button.chip:active { transform: scale(.96); }
 .badge.red    { color: var(--err);        background: var(--err-bg);    border-color: color-mix(in srgb, var(--err) 40%, transparent); }
 .badge.muted  { color: var(--text-faint); background: var(--surface-hi); border-color: var(--border); }
 .badge.pink   { color: var(--pink);       background: var(--pink-bg);   border-color: color-mix(in srgb, var(--pink) 45%, transparent); }
+.badge.term   { color: var(--term);       background: var(--term-bg);   border-color: color-mix(in srgb, var(--term) 45%, transparent); }
 
 .badge.run .dot, .badge.wait .dot { animation: mojito-pulse 1.6s ease-in-out infinite; }
 @keyframes mojito-pulse { 50% { opacity: .35; } }

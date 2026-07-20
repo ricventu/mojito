@@ -22,6 +22,13 @@ export const STATUS_ORDER: Record<string, number> = {
  */
 export const CUSTOM_STATUS = "Custom";
 
+/**
+ * Synthetic non-lifecycle status for plain-terminal (shell) sessions, parallel to
+ * CUSTOM_STATUS. Absent from STATUS_ORDER/STATUS_COLOR; its rank falls through to
+ * "last" and its hue is handled explicitly in statusColorClass.
+ */
+export const TERMINAL_STATUS = "Terminal";
+
 export const STATUS_COLOR: Record<string, string> = {
   Backlog: "grey",
   Todo: "grey",
@@ -43,5 +50,6 @@ export function statusRank(name: string): number {
  *  other unknown statuses are muted. */
 export function statusColorClass(name: string): string {
   if (name === CUSTOM_STATUS) return "pink";
+  if (name === TERMINAL_STATUS) return "term";
   return STATUS_COLOR[name] ?? "muted";
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { KNOWN_STATUSES } from "@/server/autoAdvance";
-import { STATUS_ORDER, STATUS_COLOR, statusRank, statusColorClass } from "@/lib/status";
+import { STATUS_ORDER, STATUS_COLOR, statusRank, statusColorClass, CUSTOM_STATUS, TERMINAL_STATUS } from "@/lib/status";
 
 describe("status metadata", () => {
   it("covers every status the server model knows", () => {
@@ -30,6 +30,12 @@ describe("status metadata", () => {
   it("returns the mapped color for a known status", () => {
     expect(statusColorClass("To Code")).toBe("blue");
     expect(statusColorClass("Done")).toBe("green");
+  });
+
+  it("gives the custom and terminal buckets their own distinct hues", () => {
+    expect(statusColorClass(CUSTOM_STATUS)).toBe("pink");
+    expect(statusColorClass(TERMINAL_STATUS)).toBe("term");
+    expect(statusColorClass(CUSTOM_STATUS)).not.toBe(statusColorClass(TERMINAL_STATUS));
   });
 
   it("only uses hues that have a matching badge CSS rule", () => {
