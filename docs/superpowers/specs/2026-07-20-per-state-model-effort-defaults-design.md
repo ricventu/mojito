@@ -36,16 +36,17 @@ individual status name (so resolvers stay a simple `Record<string, …>` lookup)
 
 ## Built-in seed defaults
 
-Effort keeps the current `EFFORT_OF_STATUS` values; model seeds to `opus` everywhere (safe —
-nothing silently downgrades; the user retunes cheaper stages like To QA in the UI):
+Derived from each stage's cognitive load and downstream risk (effort keeps the current
+`EFFORT_OF_STATUS` values, already tuned; model is `opus` where reasoning quality matters and
+`fable` only for the one mechanical stage):
 
-| Status         | model | effort |
-|----------------|-------|--------|
-| Backlog / Todo | opus  | xhigh  |
-| To Code        | opus  | high   |
-| To Review      | opus  | xhigh  |
-| To QA          | opus  | low    |
-| To Merge       | opus  | xhigh  |
+| Status         | model | effort | rationale |
+|----------------|-------|--------|-----------|
+| Backlog / Todo | opus  | xhigh  | Design (brainstorm/debug → plan). Highest stakes — a bad plan poisons everything downstream. |
+| To Code        | opus  | high   | Subagent-driven implementation; subagents do the heavy lifting but the orchestrator's dispatch/integrate/test judgment matters. |
+| To Review      | opus  | xhigh  | Read-only code review; depth pays, no over-engineering risk. This is exactly where a weak model (the inherited `fable`) was wrong. |
+| To QA          | fable | low    | Human-approval gate: print a summary, dispatch on the verdict, set status. Mechanical — a strong model is wasted here. |
+| To Merge       | opus  | xhigh  | Usually procedural, but a content-changing rebase runs a merge-gating inline review + fixes with no re-QA behind the clean path — same profile as To Review. |
 
 Statuses outside this table fall back to `opus` / `high` (the app-wide default), preserving
 the current `defaultEffortForStatus` fallback behavior.
@@ -58,9 +59,8 @@ keys the user has changed need be present:
 
 ```json
 {
-  "To Code":   { "model": "opus",  "effort": "high" },
-  "To Review": { "model": "opus",  "effort": "xhigh" },
-  "To QA":     { "model": "fable", "effort": "low" }
+  "To Code": { "model": "sonnet", "effort": "high" },
+  "To QA":   { "model": "opus",   "effort": "medium" }
 }
 ```
 
