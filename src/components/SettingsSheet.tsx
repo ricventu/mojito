@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useStageDefaults } from "@/lib/useStageDefaults";
-import { MODELS, EFFORTS, STAGE_DEFAULT_ROWS, resolveModel, resolveEffort, type StageDefaults } from "@/lib/stageDefaults";
+import { MODELS, EFFORTS, STAGE_DEFAULT_ROWS, resolveModel, resolveEffort, minimalOverrides, type StageDefaults } from "@/lib/stageDefaults";
 
 export default function SettingsSheet({ token, onClose }: { token: string; onClose: () => void }) {
   const { defaults, loading, error, save } = useStageDefaults(token);
@@ -36,7 +36,9 @@ export default function SettingsSheet({ token, onClose }: { token: string; onClo
 
   const onSave = async () => {
     setSaving(true);
-    const ok = await save(draft);
+    // Persist only the entries that differ from the built-in seed, so the stored file stays a
+    // partial map and future BUILTIN_STAGE_DEFAULTS changes still reach untouched statuses.
+    const ok = await save(minimalOverrides(draft));
     setSaving(false);
     if (ok) onClose();
   };

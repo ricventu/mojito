@@ -80,3 +80,34 @@ export function validateStageDefaults(
   }
   return { ok: true, value };
 }
+
+// Lenient read-side filter: unlike validateStageDefaults (which rejects the whole map on the
+// first bad entry), this drops only the invalid entries and keeps the rest. Used when reading a
+// hand-edited (or stale) override file, so a single bad value never breaks the other statuses.
+export function sanitizeOverrides(x: unknown): StageDefaults {
+  if (x === null || typeof x !== "object" || Array.isArray(x)) return {};
+  const value: StageDefaults = {};
+  for (const [status, v] of Object.entries(x as Record<string, unknown>)) {
+    if (!LAUNCHABLE_STATUSES.includes(status)) continue;
+    if (v === null || typeof v !== "object") continue;
+    const { model, effort } = v as { model?: unknown; effort?: unknown };
+    if (typeof model !== "string" || !MODELS.includes(model as (typeof MODELS)[number])) continue;
+    if (typeof effort !== "string" || !EFFORTS.includes(effort as Effort)) continue;
+    value[status] = { model, effort: effort as Effort };
+  }
+  return value;
+}
+
+// Keep only the entries in `full` that differ from the built-in seed (or have no built-in entry
+// at all). Used before persisting a Settings draft, so the stored file stays a partial map and
+// future BUILTIN_STAGE_DEFAULTS changes keep reaching users who never touched a given status.
+export function minimalOverrides(full: StageDefaults): StageDefaults {
+  const out: StageDefaults = {};
+  for (const [status, v] of Object.entries(full)) {
+    const builtin = BUILTIN_STAGE_DEFAULTS[status];
+    if (!builtin || builtin.model !== v.model || builtin.effort !== v.effort) {
+      out[status] = v;
+    }
+  }
+  return out;
+}

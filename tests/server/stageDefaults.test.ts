@@ -48,6 +48,18 @@ describe("override file present", () => {
   });
 });
 
+describe("invalid entry in override file", () => {
+  it("drops the invalid entry and falls back to the built-in, keeping valid entries", () => {
+    writeFileSync(configPath(), JSON.stringify({
+      "To Review": { model: "gpt", effort: "ultra" },
+      "To QA": { model: "opus", effort: "medium" },
+    }));
+    _resetStageDefaultsCache();
+    expect(defaultModelForStatus("To Review")).toBe("opus"); // fell back to built-in
+    expect(defaultModelForStatus("To QA")).toBe("opus"); // valid override applied
+  });
+});
+
 describe("corrupt file", () => {
   it("is treated as no overrides and does not throw", () => {
     writeFileSync(configPath(), "{ not json");

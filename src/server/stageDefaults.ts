@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import type { Effort } from "./types.js";
 import {
-  mergeEffective, resolveModel, resolveEffort, type StageDefaults,
+  mergeEffective, resolveModel, resolveEffort, sanitizeOverrides, type StageDefaults,
 } from "@/lib/stageDefaults";
 
 let cache: StageDefaults | undefined;
@@ -14,16 +14,16 @@ export function configPath(env: NodeJS.ProcessEnv = process.env): string {
   return join(dir, "stage-defaults.json");
 }
 
-// Read the override layer. Missing or corrupt file -> {} (built-ins only). Cached in-process;
-// the single Next.js process makes a module-level cache safe. Invalidated by writeOverrides
-// and by _resetStageDefaultsCache (tests).
+// Read the override layer. Missing file, corrupt JSON, or an invalid per-entry value (unknown
+// status, bad model, bad effort) all fall back to the built-in seed for that entry -- sanitizeOverrides
+// drops only the bad entries, so a hand-edited file with one bad value doesn't lose the good ones.
+// Cached in-process; the single Next.js process makes a module-level cache safe. Invalidated by
+// writeOverrides and by _resetStageDefaultsCache (tests).
 export function readOverrides(): StageDefaults {
   if (cache) return cache;
   try {
     const parsed = JSON.parse(readFileSync(configPath(), "utf8"));
-    cache = parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as StageDefaults)
-      : {};
+    cache = sanitizeOverrides(parsed);
   } catch {
     cache = {};
   }

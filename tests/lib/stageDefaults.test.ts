@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   BUILTIN_STAGE_DEFAULTS, LAUNCHABLE_STATUSES, STAGE_DEFAULT_ROWS,
   resolveModel, resolveEffort, mergeEffective, validateStageDefaults,
+  sanitizeOverrides, minimalOverrides,
 } from "@/lib/stageDefaults";
 
 describe("built-in seed defaults", () => {
@@ -66,5 +67,32 @@ describe("validateStageDefaults", () => {
   it("rejects a non-object", () => {
     expect(validateStageDefaults(null).ok).toBe(false);
     expect(validateStageDefaults([]).ok).toBe(false);
+  });
+});
+
+describe("sanitizeOverrides", () => {
+  it("keeps only entries with a known status, valid model, and valid effort", () => {
+    const r = sanitizeOverrides({
+      "To Review": { model: "gpt", effort: "ultra" }, // invalid model + effort -> dropped
+      "To QA": { model: "opus", effort: "medium" }, // valid -> kept
+      "Nope": { model: "opus", effort: "high" }, // unknown status -> dropped
+    });
+    expect(r).toEqual({ "To QA": { model: "opus", effort: "medium" } });
+  });
+  it("returns {} for a non-object, null, or array", () => {
+    expect(sanitizeOverrides(null)).toEqual({});
+    expect(sanitizeOverrides([])).toEqual({});
+    expect(sanitizeOverrides("nope")).toEqual({});
+    expect(sanitizeOverrides(42)).toEqual({});
+  });
+});
+
+describe("minimalOverrides", () => {
+  it("returns {} when the draft equals the built-ins", () => {
+    expect(minimalOverrides(BUILTIN_STAGE_DEFAULTS)).toEqual({});
+  });
+  it("keeps only the entries that differ from the built-ins", () => {
+    const draft = { ...BUILTIN_STAGE_DEFAULTS, "To QA": { model: "opus", effort: "medium" as const } };
+    expect(minimalOverrides(draft)).toEqual({ "To QA": { model: "opus", effort: "medium" } });
   });
 });
