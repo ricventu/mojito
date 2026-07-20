@@ -1,35 +1,43 @@
 import type { SessionMeta } from "./types.js";
-import { defaultEffortForStatus } from "./autoAdvance.js";
+import type { LaunchRequest } from "./launch.js";
+import { defaultModelForStatus, defaultEffortForStatus } from "./stageDefaults.js";
 import { getConfig, getRegistry } from "./app.js";
 import { launchSession } from "./launch.js";
 import { hasSession, newSession, pipePane, closeSession } from "./tmux.js";
 import { supersedeSession } from "./supersede.js";
 
 /**
- * Launch the next stage for a ticket, reusing its model but picking the effort optimal
- * for the new stage (see defaultEffortForStatus). Auto-advance is hands-off, so each
- * stage runs at its own optimal effort rather than inheriting the manually-chosen effort
- * of whichever stage the user launched by hand. Best-effort.
+ * Build the launch request for the next stage. Auto-advance is hands-off, so each stage runs
+ * with ITS OWN default model and effort (see stageDefaults) rather than inheriting whatever the
+ * user manually picked for the launching stage — a strong stage (e.g. To Review) must never be
+ * downgraded to, or splurged on, the previous stage's model.
+ */
+export function buildAutoAdvanceRequest(prev: SessionMeta, newStatus: string): LaunchRequest {
+  return {
+    ticket: prev.ticket,
+    status: newStatus,
+    model: defaultModelForStatus(newStatus),
+    effort: defaultEffortForStatus(newStatus),
+    autoAdvance: prev.autoAdvance,
+    projectName: prev.projectName ?? null,
+    title: prev.title ?? "",
+    labels: prev.labels ?? [],
+  };
+}
+
+/**
+ * Launch the next stage for a ticket at its per-status default model/effort. Best-effort.
  */
 export async function runAutoAdvance(prev: SessionMeta, newStatus: string): Promise<void> {
   const cfg = getConfig();
   const registry = getRegistry();
   const res = await launchSession(
-    {
-      ticket: prev.ticket,
-      status: newStatus,
-      model: prev.model,
-      effort: defaultEffortForStatus(newStatus),
-      autoAdvance: prev.autoAdvance,
-      projectName: prev.projectName ?? null,
-      title: prev.title ?? "",
-      labels: prev.labels ?? [],
-    },
+    buildAutoAdvanceRequest(prev, newStatus),
     { registry, stateDir: cfg.stateDir, port: cfg.port, token: cfg.token, projectsPath: cfg.projectsPath,
       hasSession, newSession, pipePane },
   );
-  // Once the next stage is running, gracefully retire the predecessor so a
-  // ticket keeps one live session instead of one per status it passed through.
+  // Once the next stage is running, gracefully retire the predecessor so a ticket keeps one live
+  // session instead of one per status it passed through.
   if (res.ok && res.meta.id !== prev.id) {
     await supersedeSession(prev.id, { closeSession, registry });
   }
