@@ -44,8 +44,9 @@ describe("launchSession", () => {
     expect(buildClaudeCommand({ ...baseReq, status: "Backlog" }, "/s/x.json")).toContain("'/lime-design RIC-46'");
     expect(buildClaudeCommand({ ...baseReq, status: "To Code" }, "/s/x.json")).toContain("'/lime-implement RIC-46'");
     expect(buildClaudeCommand({ ...baseReq, status: "To Review" }, "/s/x.json")).toContain("'/lime-review RIC-46'");
-    expect(buildClaudeCommand({ ...baseReq, status: "To QA", trailingArg: "approve" }, "/s/x.json"))
-      .toContain("'/lime-qa RIC-46 approve'");
+    // The route whitelists trailingArg to local|mr, so a To QA launch is always bare —
+    // QA verdicts are resolved server-side without a session.
+    expect(buildClaudeCommand({ ...baseReq, status: "To QA" }, "/s/x.json")).toContain("'/lime-qa RIC-46'");
     expect(buildClaudeCommand({ ...baseReq, status: "To Merge", trailingArg: "local" }, "/s/x.json"))
       .toContain("'/lime-merge RIC-46 local'");
   });

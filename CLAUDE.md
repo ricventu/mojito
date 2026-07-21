@@ -1,7 +1,8 @@
 # Mojito
 
 Mojito is a Next.js + TypeScript app (GUI + local server) that launches and monitors
-`lime` ticket-lifecycle sessions. It spawns `claude … /lime-next <TICKET>` processes in
+`lime` ticket-lifecycle sessions. It spawns `claude … '<stage-skill> <TICKET>'` processes
+(e.g. `/lime-implement RIC-46`; `/lime-next` is the fallback for unknown statuses) in
 detached tmux sessions, tracks their state, and lets the user advance a Linear ticket
 through its lifecycle from a web UI.
 
@@ -50,7 +51,10 @@ degrades gracefully without Mojito (bare-terminal mode). So for a cross-cutting 
    Backlog/Todo → `/lime-design`, To Code → `/lime-implement`, To Review →
    `/lime-review`, To QA → `/lime-qa`, To Merge → `/lime-merge`, anything else →
    `/lime-next` (dispatcher fallback). If lime renames or re-splits its stage skills,
-   update this map in the same change.
+   update this map in the same change. **Hard floor: lime ≥ 0.19.0 must be in the plugin
+   cache before this map goes live** — against an older cache the stage commands are
+   unknown slash commands and the session stalls; only the `/lime-next` fallback
+   survives. Verify with `ls ~/.claude/plugins/cache/lime/lime/`.
 
 ### Working on a task that spans both repos
 
