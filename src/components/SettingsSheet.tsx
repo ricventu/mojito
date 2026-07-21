@@ -88,9 +88,9 @@ export default function SettingsSheet({ token, onClose }: { token: string; onClo
             </div>
           );
         })}
-        <label className="field" style={{ marginTop: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <label className="toggle" style={{ marginTop: 8 }}>
           <input type="checkbox" checked={autoScale} onChange={(e) => setAutoScale(e.target.checked)} />
-          <span className="lbl" style={{ margin: 0 }}>Auto-scale review depth on small branches</span>
+          <span>Auto-scale review depth on small branches</span>
         </label>
         <button className="btn primary block" style={{ marginTop: 12 }} disabled={saving || loading} onClick={onSave}>
           {saving ? "Saving…" : "Save"}
