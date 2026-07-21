@@ -7,10 +7,12 @@ export const SMALL_DIFF_LINES = 150;
 export const MEDIUM_DIFF_LINES = 400;
 
 const MODEL_RANK: Record<string, number> = { sonnet: 0, opus: 1, fable: 2 };
-const EFFORT_RANK: Record<string, number> = { low: 0, medium: 1, high: 2, xhigh: 3, max: 4 };
+const EFFORT_RANK: Record<Effort, number> = { low: 0, medium: 1, high: 2, xhigh: 3, max: 4 };
 
 type Run = (cmd: string, args: string[]) => string;
 
+// No line counts in a non-empty shortstat (binary-only or rename-only branches)
+// deliberately reads as 0: such diffs have no reviewable lines.
 export function parseShortstat(s: string): number {
   const ins = /(\d+) insertions?\(\+\)/.exec(s);
   const del = /(\d+) deletions?\(-\)/.exec(s);
@@ -37,7 +39,10 @@ export function detectDefaultBranch(run: Run): string | null {
 // must fail open and keep the unscaled profile.
 export function branchChangedLines(
   cwd: string,
-  run: Run = (cmd, args) => execFileSync(cmd, args, { cwd, encoding: "utf8" }),
+  // LC_ALL=C pins git's output to English: parseShortstat would read a localized
+  // shortstat as 0 lines and silently downgrade every review.
+  run: Run = (cmd, args) =>
+    execFileSync(cmd, args, { cwd, encoding: "utf8", env: { ...process.env, LC_ALL: "C" } }),
 ): number | null {
   const base = detectDefaultBranch(run);
   if (!base) return null;
@@ -59,9 +64,12 @@ export function scaleReviewProfile(
   if (changedLines < SMALL_DIFF_LINES) target = { model: "sonnet", effort: "medium" };
   else if (changedLines < MEDIUM_DIFF_LINES) target = { model, effort: "high" };
   if (!target) return { model, effort, scaled: false };
+  // An unranked model (e.g. a full model id) is kept as-is: swapping it for the target
+  // could be an upgrade, and this function promises downgrade-only.
   const outModel =
-    (MODEL_RANK[target.model] ?? Infinity) < (MODEL_RANK[model] ?? Infinity) ? target.model : model;
-  const outEffort =
-    (EFFORT_RANK[target.effort] ?? Infinity) < (EFFORT_RANK[effort] ?? Infinity) ? target.effort : effort;
+    MODEL_RANK[model] !== undefined && (MODEL_RANK[target.model] ?? Infinity) < MODEL_RANK[model]
+      ? target.model
+      : model;
+  const outEffort = EFFORT_RANK[target.effort] < EFFORT_RANK[effort] ? target.effort : effort;
   return { model: outModel, effort: outEffort, scaled: outModel !== model || outEffort !== effort };
 }

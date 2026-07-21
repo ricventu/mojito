@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,6 +12,10 @@ beforeEach(() => {
   // Point stage-defaults at an empty config dir so the built-in seeds apply
   // (To Review/To Merge default to opus/xhigh).
   process.env.MOJITO_CONFIG_DIR = mkdtempSync(join(tmpdir(), "mojito-cfg-"));
+  _resetStageDefaultsCache();
+});
+afterEach(() => {
+  delete process.env.MOJITO_CONFIG_DIR;
   _resetStageDefaultsCache();
 });
 
@@ -35,12 +39,15 @@ function req(status: string, model = "opus", effort: LaunchRequest["effort"] = "
 
 describe("launchSession diff-scaling", () => {
   it("downgrades a To Review launch at stage defaults when the diff is small", async () => {
-    const d = deps(() => 40);
+    const seen: string[] = [];
+    const d = deps((cwd) => { seen.push(cwd); return 40; });
     const res = await launchSession(req("To Review"), d);
     expect(res.ok).toBe(true);
     if (res.ok) { expect(res.meta.model).toBe("sonnet"); expect(res.meta.effort).toBe("medium"); }
     expect(d.commands[0]).toContain("--model 'sonnet'");
     expect(d.commands[0]).toContain("--effort 'medium'");
+    // The diff is measured at the resolved session cwd (the worktree), nowhere else.
+    expect(seen).toEqual(["/wt"]);
   });
 
   it("caps effort at high for a medium diff", async () => {

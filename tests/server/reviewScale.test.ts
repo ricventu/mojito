@@ -47,6 +47,13 @@ describe("detectDefaultBranch", () => {
   it("returns null when nothing resolves", () => {
     expect(detectDefaultBranch(() => { throw new Error("git failed"); })).toBeNull();
   });
+  it("preserves slashes in a slash-named default branch", () => {
+    const run = (_c: string, args: string[]) => {
+      if (args.includes("symbolic-ref")) return "origin/release/1.x\n";
+      throw new Error("unexpected");
+    };
+    expect(detectDefaultBranch(run)).toBe("release/1.x");
+  });
 });
 
 describe("branchChangedLines", () => {
@@ -84,5 +91,9 @@ describe("scaleReviewProfile", () => {
       .toEqual({ model: "sonnet", effort: "low", scaled: false });
     expect(scaleReviewProfile("opus", "high", MEDIUM_DIFF_LINES - 1))
       .toEqual({ model: "opus", effort: "high", scaled: false });
+  });
+  it("keeps an unranked model instead of swapping it for the target", () => {
+    expect(scaleReviewProfile("claude-opus-4-8", "xhigh", SMALL_DIFF_LINES - 1))
+      .toEqual({ model: "claude-opus-4-8", effort: "medium", scaled: true });
   });
 });
