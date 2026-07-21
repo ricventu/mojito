@@ -62,6 +62,17 @@ describe("launchSession diff-scaling", () => {
     if (res.ok) { expect(res.meta.model).toBe("opus"); expect(res.meta.effort).toBe("high"); }
   });
 
+  it("To Merge scales effort only — the merge-gating review keeps its model", async () => {
+    const d = deps(() => 40);
+    const res = await launchSession(req("To Merge"), d);
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.meta.model).toBe("opus");
+      expect(res.meta.effort).toBe("medium");
+      expect(res.meta.scaledFrom).toEqual({ model: "opus", effort: "xhigh" });
+    }
+  });
+
   it("never touches an explicit non-default profile", async () => {
     const d = deps(() => 40);
     const res = await launchSession(req("To Review", "fable", "xhigh"), d);

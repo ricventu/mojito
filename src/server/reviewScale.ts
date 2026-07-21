@@ -55,14 +55,20 @@ export function branchChangedLines(
 
 // Downgrade-only: the result is the per-axis minimum of the requested profile and the
 // diff-size target, so an already-cheap request is never raised.
+// `effortOnly` never touches the model — used for merge-gating reviews (To Merge),
+// where the inline review is the last gate before Done with no re-QA behind the clean
+// path, and the risk lives in upstream interaction, not in the branch size the
+// thresholds measure.
 export function scaleReviewProfile(
   model: string,
   effort: Effort,
   changedLines: number,
+  opts: { effortOnly?: boolean } = {},
 ): { model: string; effort: Effort; scaled: boolean } {
   let target: { model: string; effort: Effort } | null = null;
-  if (changedLines < SMALL_DIFF_LINES) target = { model: "sonnet", effort: "medium" };
-  else if (changedLines < MEDIUM_DIFF_LINES) target = { model, effort: "high" };
+  if (changedLines < SMALL_DIFF_LINES) {
+    target = { model: opts.effortOnly ? model : "sonnet", effort: "medium" };
+  } else if (changedLines < MEDIUM_DIFF_LINES) target = { model, effort: "high" };
   if (!target) return { model, effort, scaled: false };
   // An unranked model (e.g. a full model id) is kept as-is: swapping it for the target
   // could be an upgrade, and this function promises downgrade-only.

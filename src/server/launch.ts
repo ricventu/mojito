@@ -85,7 +85,11 @@ export async function launchSession(
   ) {
     const lines = (deps.changedLines ?? branchChangedLines)(cwd);
     if (lines !== null) {
-      const scaled = scaleReviewProfile(req.model, req.effort, lines);
+      // To Merge's inline review gates the merge with no re-QA behind the clean path:
+      // scale its effort only, never its model. To Review has human QA behind it.
+      const scaled = scaleReviewProfile(req.model, req.effort, lines, {
+        effortOnly: req.status === "To Merge",
+      });
       if (scaled.scaled) {
         scaledFrom = { model: req.model, effort: req.effort };
         req = { ...req, model: scaled.model, effort: scaled.effort };

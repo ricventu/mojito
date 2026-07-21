@@ -97,3 +97,22 @@ describe("scaleReviewProfile", () => {
       .toEqual({ model: "claude-opus-4-8", effort: "medium", scaled: true });
   });
 });
+
+describe("scaleReviewProfile effortOnly", () => {
+  it("small diff keeps the model and caps effort at medium", () => {
+    expect(scaleReviewProfile("opus", "xhigh", SMALL_DIFF_LINES - 1, { effortOnly: true }))
+      .toEqual({ model: "opus", effort: "medium", scaled: true });
+  });
+  it("medium diff keeps the model and caps effort at high", () => {
+    expect(scaleReviewProfile("opus", "xhigh", MEDIUM_DIFF_LINES - 1, { effortOnly: true }))
+      .toEqual({ model: "opus", effort: "high", scaled: true });
+  });
+  it("large diff is untouched", () => {
+    expect(scaleReviewProfile("opus", "xhigh", MEDIUM_DIFF_LINES, { effortOnly: true }))
+      .toEqual({ model: "opus", effort: "xhigh", scaled: false });
+  });
+  it("never upgrades effort", () => {
+    expect(scaleReviewProfile("opus", "low", SMALL_DIFF_LINES - 1, { effortOnly: true }))
+      .toEqual({ model: "opus", effort: "low", scaled: false });
+  });
+});
