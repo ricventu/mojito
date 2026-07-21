@@ -3,8 +3,9 @@ import type { Effort } from "./types.js";
 
 // A branch review below these thresholds does not need the top model at top effort
 // (mirrors superpowers SDD's own "scale review model to the diff" guidance).
-export const SMALL_DIFF_LINES = 150;
-export const MEDIUM_DIFF_LINES = 400;
+// The numbers live in @/lib/reviewScale so the Settings UI copy shares them.
+import { SMALL_DIFF_LINES, MEDIUM_DIFF_LINES } from "@/lib/reviewScale";
+export { SMALL_DIFF_LINES, MEDIUM_DIFF_LINES };
 
 const MODEL_RANK: Record<string, number> = { sonnet: 0, opus: 1, fable: 2 };
 const EFFORT_RANK: Record<Effort, number> = { low: 0, medium: 1, high: 2, xhigh: 3, max: 4 };

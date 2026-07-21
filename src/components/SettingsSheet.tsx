@@ -52,17 +52,24 @@ export default function SettingsSheet({ token, onClose }: { token: string; onClo
           const first = row.statuses[0];
           const cur = draft[first] ?? { model: "opus", effort: "high" };
           return (
-            <div className="two" key={row.label} style={{ alignItems: "flex-end" }}>
-              <label className="field"><span className="lbl">{row.label}</span>
-                <select value={cur.model} onChange={(e) => setRow(row.statuses, { model: e.target.value })}>
-                  {MODELS.map((m) => <option key={m}>{m}</option>)}
-                </select>
-              </label>
-              <label className="field"><span className="lbl">Effort</span>
-                <select value={cur.effort} onChange={(e) => setRow(row.statuses, { effort: e.target.value })}>
-                  {EFFORTS.map((x) => <option key={x}>{x}</option>)}
-                </select>
-              </label>
+            <div key={row.label}>
+              <div className="two" style={{ alignItems: "flex-end" }}>
+                <label className="field"><span className="lbl">{row.label}</span>
+                  <select value={cur.model} onChange={(e) => setRow(row.statuses, { model: e.target.value })}>
+                    {MODELS.map((m) => <option key={m}>{m}</option>)}
+                  </select>
+                </label>
+                <label className="field"><span className="lbl">Effort</span>
+                  <select value={cur.effort} onChange={(e) => setRow(row.statuses, { effort: e.target.value })}>
+                    {EFFORTS.map((x) => <option key={x}>{x}</option>)}
+                  </select>
+                </label>
+              </div>
+              {row.hint && (
+                <p style={{ margin: "4px 0 10px", font: "400 11px/1.4 var(--mono)", color: "var(--text-dim)" }}>
+                  ⤵ {row.hint}
+                </p>
+              )}
             </div>
           );
         })}

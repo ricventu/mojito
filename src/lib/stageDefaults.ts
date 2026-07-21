@@ -1,4 +1,5 @@
 import type { Effort } from "@/server/types";
+import { SMALL_DIFF_LINES, MEDIUM_DIFF_LINES } from "@/lib/reviewScale";
 
 export interface StageDefault {
   model: string;
@@ -37,12 +38,21 @@ export const BUILTIN_STAGE_DEFAULTS: StageDefaults = {
 export const FALLBACK: StageDefault = { model: "opus", effort: "high" };
 
 // UI rows: Backlog and Todo are the same design stage, shown as one row writing both keys.
-export const STAGE_DEFAULT_ROWS: { label: string; statuses: string[] }[] = [
+// `hint` explains rows whose value acts as a ceiling rather than a fixed profile: review
+// launches left at these defaults auto-scale DOWN on small branches (never up, and never
+// when the user retunes the launch by hand). Thresholds come from @/lib/reviewScale.
+export const STAGE_DEFAULT_ROWS: { label: string; statuses: string[]; hint?: string }[] = [
   { label: "Backlog/Todo", statuses: ["Backlog", "Todo"] },
   { label: "To Code", statuses: ["To Code"] },
-  { label: "To Review", statuses: ["To Review"] },
+  {
+    label: "To Review", statuses: ["To Review"],
+    hint: `Ceiling, not fixed: branches under ${SMALL_DIFF_LINES} changed lines auto-scale down to sonnet/medium, under ${MEDIUM_DIFF_LINES} cap effort at high. Never scales up; manual launch picks are never touched.`,
+  },
   { label: "To QA", statuses: ["To QA"] },
-  { label: "To Merge", statuses: ["To Merge"] },
+  {
+    label: "To Merge", statuses: ["To Merge"],
+    hint: `Ceiling for effort only: branches under ${SMALL_DIFF_LINES} changed lines cap effort at medium, under ${MEDIUM_DIFF_LINES} at high. The model always runs as configured (this review gates the merge).`,
+  },
 ];
 
 export function resolveModel(status: string, overrides: StageDefaults = {}): string {
