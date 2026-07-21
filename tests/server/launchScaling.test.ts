@@ -43,7 +43,12 @@ describe("launchSession diff-scaling", () => {
     const d = deps((cwd) => { seen.push(cwd); return 40; });
     const res = await launchSession(req("To Review"), d);
     expect(res.ok).toBe(true);
-    if (res.ok) { expect(res.meta.model).toBe("sonnet"); expect(res.meta.effort).toBe("medium"); }
+    if (res.ok) {
+      expect(res.meta.model).toBe("sonnet");
+      expect(res.meta.effort).toBe("medium");
+      // The pre-scaling profile is recorded so the UI can tell a downgrade from a choice.
+      expect(res.meta.scaledFrom).toEqual({ model: "opus", effort: "xhigh" });
+    }
     expect(d.commands[0]).toContain("--model 'sonnet'");
     expect(d.commands[0]).toContain("--effort 'medium'");
     // The diff is measured at the resolved session cwd (the worktree), nowhere else.
@@ -61,7 +66,11 @@ describe("launchSession diff-scaling", () => {
     const d = deps(() => 40);
     const res = await launchSession(req("To Review", "fable", "xhigh"), d);
     expect(res.ok).toBe(true);
-    if (res.ok) { expect(res.meta.model).toBe("fable"); expect(res.meta.effort).toBe("xhigh"); }
+    if (res.ok) {
+      expect(res.meta.model).toBe("fable");
+      expect(res.meta.effort).toBe("xhigh");
+      expect(res.meta.scaledFrom).toBeUndefined();
+    }
   });
 
   it("never scales other statuses", async () => {

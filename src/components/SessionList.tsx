@@ -111,7 +111,14 @@ export default function SessionList(
                         </>
                       )}
                       <div className="meta">
-                        {s.kind !== "shell" && <span className="chip">{s.model} · {s.effort}</span>}
+                        {s.kind !== "shell" && (
+                          <span
+                            className="chip"
+                            title={s.scaledFrom ? `auto-scaled down from ${s.scaledFrom.model} · ${s.scaledFrom.effort} (small diff)` : undefined}
+                          >
+                            {s.model} · {s.effort}{s.scaledFrom ? " ⤵" : ""}
+                          </span>
+                        )}
                         {s.kind === "rebase" && <span className="chip">rebase</span>}
                         {s.kind === "shell" && <span className="chip">terminal</span>}
                         {s.kind === "lime" && (

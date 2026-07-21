@@ -74,6 +74,7 @@ export async function launchSession(
   // request is exactly the stage default (auto-advance always is; a manual launch the
   // user didn't retune), downgrade model/effort for small branches. An explicit user
   // choice is never overridden, and an unmeasurable diff keeps the default profile.
+  let scaledFrom: SessionMeta["scaledFrom"];
   if (
     (req.status === "To Review" || req.status === "To Merge") &&
     req.model === defaultModelForStatus(req.status) &&
@@ -82,7 +83,10 @@ export async function launchSession(
     const lines = (deps.changedLines ?? branchChangedLines)(cwd);
     if (lines !== null) {
       const scaled = scaleReviewProfile(req.model, req.effort, lines);
-      if (scaled.scaled) req = { ...req, model: scaled.model, effort: scaled.effort };
+      if (scaled.scaled) {
+        scaledFrom = { model: req.model, effort: req.effort };
+        req = { ...req, model: scaled.model, effort: scaled.effort };
+      }
     }
   }
 
@@ -120,6 +124,7 @@ export async function launchSession(
     projectName: req.projectName,
     title: req.title,
     labels: req.labels,
+    ...(scaledFrom ? { scaledFrom } : {}),
   };
   deps.registry.upsert(meta);
   return { ok: true, meta };
