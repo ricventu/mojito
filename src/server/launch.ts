@@ -12,6 +12,7 @@ import type { Registry } from "./registry.js";
 import { writeLaunchContext, writeNewTicketContext } from "./launchContext.js";
 import { branchChangedLines, scaleReviewProfile } from "./reviewScale.js";
 import { defaultModelForStatus, defaultEffortForStatus } from "./stageDefaults.js";
+import { readAutoScale } from "./scaleSettings.js";
 import { slashForStatus } from "./stageCommand.js";
 
 export interface LaunchRequest {
@@ -79,6 +80,7 @@ export async function launchSession(
   // choice is never overridden, and an unmeasurable diff keeps the default profile.
   let scaledFrom: SessionMeta["scaledFrom"];
   if (
+    readAutoScale() &&
     (req.status === "To Review" || req.status === "To Merge") &&
     req.model === defaultModelForStatus(req.status) &&
     req.effort === defaultEffortForStatus(req.status)

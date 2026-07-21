@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useStageDefaults } from "@/lib/useStageDefaults";
+import { apiFetch } from "@/lib/client";
 import { MODELS, EFFORTS, STAGE_DEFAULT_ROWS, resolveModel, resolveEffort, minimalOverrides, type StageDefaults } from "@/lib/stageDefaults";
 
 export default function SettingsSheet({ token, onClose }: { token: string; onClose: () => void }) {
@@ -8,6 +9,16 @@ export default function SettingsSheet({ token, onClose }: { token: string; onClo
   // Local draft: one {model, effort} per launchable status, seeded from the fetched effective table.
   const [draft, setDraft] = useState<StageDefaults>({});
   const [saving, setSaving] = useState(false);
+  // Auto-scale toggle: whether review launches at stage defaults may scale down on small
+  // branches. Fetched from its own endpoint; saved together with the stage defaults.
+  const [autoScale, setAutoScale] = useState(true);
+  useEffect(() => {
+    if (!token) return;
+    apiFetch(token, "/api/config/review-scale")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => { if (b && typeof b.autoScale === "boolean") setAutoScale(b.autoScale); })
+      .catch(() => { /* keep the default-on assumption */ });
+  }, [token]);
 
   useEffect(() => {
     if (loading) return;
@@ -39,8 +50,12 @@ export default function SettingsSheet({ token, onClose }: { token: string; onClo
     // Persist only the entries that differ from the built-in seed, so the stored file stays a
     // partial map and future BUILTIN_STAGE_DEFAULTS changes still reach untouched statuses.
     const ok = await save(minimalOverrides(draft));
+    const scaleRes = await apiFetch(token, "/api/config/review-scale", {
+      method: "PUT",
+      body: JSON.stringify({ autoScale }),
+    }).catch(() => null);
     setSaving(false);
-    if (ok) onClose();
+    if (ok && scaleRes?.ok) onClose();
   };
 
   return (
@@ -66,13 +81,17 @@ export default function SettingsSheet({ token, onClose }: { token: string; onClo
                 </label>
               </div>
               {row.hint && (
-                <p style={{ margin: "4px 0 10px", font: "400 11px/1.4 var(--mono)", color: "var(--text-dim)" }}>
-                  ⤵ {row.hint}
+                <p style={{ margin: "4px 0 10px", font: "400 11px/1.4 var(--mono)", color: "var(--text-dim)", opacity: autoScale ? 1 : 0.45 }}>
+                  ⤵ {row.hint}{!autoScale && " (off)"}
                 </p>
               )}
             </div>
           );
         })}
+        <label className="field" style={{ marginTop: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <input type="checkbox" checked={autoScale} onChange={(e) => setAutoScale(e.target.checked)} />
+          <span className="lbl" style={{ margin: 0 }}>Auto-scale review depth on small branches</span>
+        </label>
         <button className="btn primary block" style={{ marginTop: 12 }} disabled={saving || loading} onClick={onSave}>
           {saving ? "Saving…" : "Save"}
         </button>

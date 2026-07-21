@@ -5,18 +5,21 @@ import { join } from "node:path";
 import { launchSession, type LaunchRequest } from "@/server/launch";
 import { Registry } from "@/server/registry";
 import { _resetStageDefaultsCache } from "@/server/stageDefaults";
+import { writeAutoScale, _resetScaleSettingsCache } from "@/server/scaleSettings";
 
 let dir: string;
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "mojito-"));
   // Point stage-defaults at an empty config dir so the built-in seeds apply
-  // (To Review/To Merge default to opus/xhigh).
+  // (To Review/To Merge default to opus/xhigh) and auto-scale defaults to on.
   process.env.MOJITO_CONFIG_DIR = mkdtempSync(join(tmpdir(), "mojito-cfg-"));
   _resetStageDefaultsCache();
+  _resetScaleSettingsCache();
 });
 afterEach(() => {
   delete process.env.MOJITO_CONFIG_DIR;
   _resetStageDefaultsCache();
+  _resetScaleSettingsCache();
 });
 
 function deps(changedLines: (cwd: string) => number | null) {
@@ -96,5 +99,17 @@ describe("launchSession diff-scaling", () => {
     const res = await launchSession(req("To Review"), d);
     expect(res.ok).toBe(true);
     if (res.ok) { expect(res.meta.model).toBe("opus"); expect(res.meta.effort).toBe("xhigh"); }
+  });
+
+  it("never scales when the auto-scale setting is off", async () => {
+    writeAutoScale(false);
+    const d = deps(() => 40);
+    const res = await launchSession(req("To Review"), d);
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.meta.model).toBe("opus");
+      expect(res.meta.effort).toBe("xhigh");
+      expect(res.meta.scaledFrom).toBeUndefined();
+    }
   });
 });
