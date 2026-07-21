@@ -36,13 +36,21 @@ degrades gracefully without Mojito (bare-terminal mode). So for a cross-cutting 
 
 2. **Status / stage model** — the ticket lifecycle is:
    `Backlog/Todo → To Code → To Review → To QA → To Merge → Done`.
-   - lime side: the dispatch table + stage bodies in `skills/lime-next/SKILL.md` (and the
-     matrix in lime's `README.md`).
+   - lime side: the dispatch table in `skills/lime-next/SKILL.md` (thin dispatcher) plus
+     the per-stage skills `lime-design` / `lime-implement` / `lime-review` / `lime-qa` /
+     `lime-merge` (and the matrix in lime's `README.md`).
    - Mojito side: `STAGE_OF` in `src/server/autoAdvance.ts` (maps each status to its
      stage; `stageAdvanced` decides auto-advance), and `tmuxName()` in
      `src/server/sessionKey.ts` (session names embed the status slug).
    These two must agree on the exact status names. A mismatch silently breaks
    auto-advance and session naming.
+
+3. **Launch command per status** — Mojito invokes the stage skill directly so a session
+   loads only the stage it runs: `slashForStatus` in `src/server/stageCommand.ts` maps
+   Backlog/Todo → `/lime-design`, To Code → `/lime-implement`, To Review →
+   `/lime-review`, To QA → `/lime-qa`, To Merge → `/lime-merge`, anything else →
+   `/lime-next` (dispatcher fallback). If lime renames or re-splits its stage skills,
+   update this map in the same change.
 
 ### Working on a task that spans both repos
 

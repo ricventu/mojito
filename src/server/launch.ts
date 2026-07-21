@@ -12,6 +12,7 @@ import type { Registry } from "./registry.js";
 import { writeLaunchContext, writeNewTicketContext } from "./launchContext.js";
 import { branchChangedLines, scaleReviewProfile } from "./reviewScale.js";
 import { defaultModelForStatus, defaultEffortForStatus } from "./stageDefaults.js";
+import { slashForStatus } from "./stageCommand.js";
 
 export interface LaunchRequest {
   ticket: string;
@@ -51,9 +52,11 @@ function defaultResolveCwd(projectsPath: string) {
 export function buildClaudeCommand(req: LaunchRequest, settingsPath: string, contextPath?: string): string {
   const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
   const envPrefix = contextPath ? `LIME_SESSION_CONTEXT=${q(contextPath)} ` : "";
+  // The status is known at launch, so invoke the matching stage skill directly — the
+  // session loads only that stage's prose instead of the whole lifecycle dispatcher.
   return (
     `${envPrefix}claude --model ${q(req.model)} --effort ${q(req.effort)} ` +
-    `--settings ${q(settingsPath)} ${q(`/lime-next ${req.ticket}${req.trailingArg ? ` ${req.trailingArg}` : ""}`)}`
+    `--settings ${q(settingsPath)} ${q(`${slashForStatus(req.status)} ${req.ticket}${req.trailingArg ? ` ${req.trailingArg}` : ""}`)}`
   );
 }
 

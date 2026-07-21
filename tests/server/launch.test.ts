@@ -40,6 +40,16 @@ describe("launchSession", () => {
     expect(cmd).toContain("'/lime-next RIC-46'");
   });
 
+  it("invokes the stage skill matching the launch status", () => {
+    expect(buildClaudeCommand({ ...baseReq, status: "Backlog" }, "/s/x.json")).toContain("'/lime-design RIC-46'");
+    expect(buildClaudeCommand({ ...baseReq, status: "To Code" }, "/s/x.json")).toContain("'/lime-implement RIC-46'");
+    expect(buildClaudeCommand({ ...baseReq, status: "To Review" }, "/s/x.json")).toContain("'/lime-review RIC-46'");
+    expect(buildClaudeCommand({ ...baseReq, status: "To QA", trailingArg: "approve" }, "/s/x.json"))
+      .toContain("'/lime-qa RIC-46 approve'");
+    expect(buildClaudeCommand({ ...baseReq, status: "To Merge", trailingArg: "local" }, "/s/x.json"))
+      .toContain("'/lime-merge RIC-46 local'");
+  });
+
   it("appends a trailing gate arg inside the quoted slash command", () => {
     const cmd = buildClaudeCommand({ ...baseReq, trailingArg: "approve" }, "/s/x.json");
     expect(cmd).toContain("'/lime-next RIC-46 approve'");
