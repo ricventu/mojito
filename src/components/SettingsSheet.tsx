@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useStageDefaults } from "@/lib/useStageDefaults";
 import { apiFetch } from "@/lib/client";
 import { MODELS, EFFORTS, STAGE_DEFAULT_ROWS, resolveModel, resolveEffort, minimalOverrides, type StageDefaults } from "@/lib/stageDefaults";
+import { initialPollState, nextPollState } from "@/lib/deployPoll";
 
 export default function SettingsSheet({ token, onClose }: { token: string; onClose: () => void }) {
   const { defaults, loading, error, save } = useStageDefaults(token);
@@ -19,6 +20,65 @@ export default function SettingsSheet({ token, onClose }: { token: string; onClo
       .then((b) => { if (b && typeof b.autoScale === "boolean") setAutoScale(b.autoScale); })
       .catch(() => { /* keep the default-on assumption */ });
   }, [token]);
+
+  // Self-update ("Pull & deploy"): only shown when the server exposes it
+  // (MOJITO_SELF_UPDATE=1). `phase` drives the button label and banners.
+  const [selfUpdateEnabled, setSelfUpdateEnabled] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "pulling" | "deploying" | "timeout">("idle");
+  const [pullMsg, setPullMsg] = useState<string | null>(null);
+  const [pullErr, setPullErr] = useState<string | null>(null);
+  useEffect(() => {
+    if (!token) return;
+    apiFetch(token, "/api/self-update")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => { if (b && typeof b.enabled === "boolean") setSelfUpdateEnabled(b.enabled); })
+      .catch(() => { /* leave the section hidden */ });
+  }, [token]);
+
+  const pollHealth = () => {
+    let state = initialPollState;
+    const startedAt = Date.now();
+    const tick = async () => {
+      if (Date.now() - startedAt > 5 * 60_000) { setPhase("timeout"); return; }
+      let up = false;
+      try { up = (await apiFetch(token, "/api/health")).ok; } catch { up = false; }
+      state = nextPollState(state, up);
+      if (state.recovered) { location.reload(); return; }
+      setTimeout(tick, 3000);
+    };
+    setTimeout(tick, 3000);
+  };
+
+  const onPull = async () => {
+    setPullErr(null);
+    setPullMsg(null);
+    setPhase("pulling");
+    let res: Response;
+    try {
+      res = await apiFetch(token, "/api/self-update", { method: "POST" });
+    } catch {
+      setPhase("idle");
+      setPullErr("Network error — could not reach the server.");
+      return;
+    }
+    const body = await res.json().catch(() => ({}));
+    if (res.status === 200 && body.status === "up-to-date") {
+      setPhase("idle");
+      setPullMsg(`Already up to date (${body.from}).`);
+      return;
+    }
+    if (res.status === 200 && body.status === "updated") {
+      setPullMsg(`Updated ${body.from} → ${body.to}.`);
+      setPhase("deploying");
+      pollHealth();
+      return;
+    }
+    setPhase("idle");
+    const detail = typeof body.detail === "string" && body.detail ? ` — ${body.detail}` : "";
+    setPullErr(body.error === "diverged"
+      ? `History diverged — resolve from a terminal${detail}`
+      : `Update failed${detail}`);
+  };
 
   useEffect(() => {
     if (loading) return;
@@ -96,6 +156,25 @@ export default function SettingsSheet({ token, onClose }: { token: string; onClo
           {saving ? "Saving…" : "Save"}
         </button>
         {error && <p className="err-text">{error}</p>}
+        {selfUpdateEnabled && (
+          <div style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+            <h3 style={{ marginTop: 0 }}>Server</h3>
+            <p className="sheet-title">Pull the latest main into this server&apos;s checkout. The deploy hook then restarts the app.</p>
+            <button
+              className="btn block"
+              disabled={phase === "pulling" || phase === "deploying"}
+              onClick={onPull}
+            >
+              {phase === "pulling" ? "Pulling…" : phase === "deploying" ? "Deploying…" : "Pull & deploy"}
+            </button>
+            {pullMsg && <p className="sheet-title" style={{ margin: "10px 0 0" }}>{pullMsg}</p>}
+            {phase === "deploying" && (
+              <p className="sheet-title" style={{ margin: "8px 0 0" }}>Deploying — the server restarts in ~1 min…</p>
+            )}
+            {phase === "timeout" && <p className="err-text">Deploy still running — reload manually.</p>}
+            {pullErr && <p className="err-text">{pullErr}</p>}
+          </div>
+        )}
       </div>
     </div>
   );
