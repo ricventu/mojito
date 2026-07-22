@@ -20,8 +20,10 @@ export class FfPullError extends Error {
 
 // LC_ALL=C pins git's output to English so the diverged markers below match a
 // localized environment too (mirrors reviewScale.ts). 60s covers a slow fetch.
+// maxBuffer prevents ENOBUFS from misreporting a successful pull (ref already moved)
+// as a failed pull when advancing many commits.
 const defaultRun: GitRun = (args, cwd) =>
-  pexec("git", args, { cwd, timeout: 60_000, encoding: "utf8", env: { ...process.env, LC_ALL: "C" } });
+  pexec("git", args, { cwd, timeout: 60_000, encoding: "utf8", env: { ...process.env, LC_ALL: "C" }, maxBuffer: 1024 * 1024 * 64 });
 
 // Markers git prints when --ff-only cannot advance because history diverged.
 const DIVERGED_MARKERS = ["Not possible to fast-forward", "Need to specify how to reconcile"];

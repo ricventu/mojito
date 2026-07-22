@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 // The route's dependency runs `git pull` (real side effects), so mock the wrapper.
 // FfPullError stays real so the route's `instanceof` check works.
