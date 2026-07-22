@@ -56,6 +56,17 @@ Compact "Stacks" panel on the main page: one row per stack-enabled project — s
 `stack-<slug>` tmux session in the existing web terminal (ptyGateway), the same viewer
 used for lime sessions. Identical on Mac and server.
 
+**Status at a glance is the primary need** (2026-07-22: the user starts stacks on
+demand and wants to see immediately which are up without ssh). The panel must show
+current status on page load without interaction; refresh via the existing events
+channel or light polling of `GET /api/stacks`.
+
+tmux gotcha learned in the field: `set-option -t <session> remain-on-exit` applies to
+the current window only — a crashed window then vanishes silently instead of leaving a
+dead pane, and `crashed` becomes undetectable. Set the option **window-scoped** right
+after creating the session (the start.sh wrapper session has one window, but the test
+suite must cover it).
+
 ## Error handling
 
 | Case | Surface |
@@ -74,11 +85,19 @@ used for lime sessions. Identical on Mac and server.
 - Route tests per the existing pattern: 401 without token, 404 unknown slug, 409
   wrong-state transitions, response shapes.
 
-## Adoption note (Factorybook)
+## Adoption note (Factorybook, GestionaleCooperativeMvp)
 
-Factorybook needs a `scripts/start.sh` implementing the contract: reuse fb-start's
-bootstrap, then foreground `npx concurrently` of backend/webapp/landing instead of tmux
-windows. Small separate change in the factorybook repo; fb-start stays for manual use.
+Both repos already ship a manual tmux launcher (`scripts/fb-start` → session `fb-dev`,
+`scripts/gc-start` → session `gc-dev`, symlinked into /usr/local/bin on the server).
+Each needs a `scripts/start.sh` implementing the contract: reuse the launcher's
+idempotent bootstrap, then run the stack in the foreground (`npx concurrently` of
+backend/webapp/landing for factorybook; `composer dev` is already foreground for
+gestionale). The launchers stay for manual use; both must not run at the same time as
+the Mojito-managed stack (same ports).
+
+Factorybook's start.sh must keep the Next heap caps
+(`NODE_OPTIONS=--max-old-space-size=1024` on webapp and landing): an uncapped
+`next dev` was OOM-killed on the 4GB cloud box.
 
 ## Out of scope
 
