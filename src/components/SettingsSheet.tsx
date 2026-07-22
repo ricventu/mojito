@@ -35,19 +35,32 @@ export default function SettingsSheet({ token, onClose }: { token: string; onClo
       .catch(() => { /* leave the section hidden */ });
   }, [token]);
 
-  const pollHealth = () => {
+  // Poll /api/health while a deploy is in flight, tied to the component lifecycle: if
+  // Settings closes mid-deploy (SettingsSheet unmounts) or phase moves away from
+  // "deploying", the cleanup cancels the pending tick so no further poll, setPhase, or
+  // reload runs after that point — the user then reloads manually (see phase === "timeout").
+  useEffect(() => {
+    if (phase !== "deploying") return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
     let state = initialPollState;
     const startedAt = Date.now();
     const tick = async () => {
+      if (cancelled) return;
       if (Date.now() - startedAt > 5 * 60_000) { setPhase("timeout"); return; }
       let up = false;
       try { up = (await apiFetch(token, "/api/health")).ok; } catch { up = false; }
+      if (cancelled) return;
       state = nextPollState(state, up);
       if (state.recovered) { location.reload(); return; }
-      setTimeout(tick, 3000);
+      timer = setTimeout(tick, 3000);
     };
-    setTimeout(tick, 3000);
-  };
+    timer = setTimeout(tick, 3000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [phase, token]);
 
   const onPull = async () => {
     setPullErr(null);
@@ -70,7 +83,6 @@ export default function SettingsSheet({ token, onClose }: { token: string; onClo
     if (res.status === 200 && body.status === "updated") {
       setPullMsg(`Updated ${body.from} → ${body.to}.`);
       setPhase("deploying");
-      pollHealth();
       return;
     }
     setPhase("idle");
