@@ -105,3 +105,47 @@ always deliverable even though the process will be stopped moments later.
   separately if divergence errors become frequent.
 - Generic per-project pull buttons.
 - Streaming deploy logs into the UI.
+
+## Addendum (RIC-164 / RIC-165 coordination): extract `ffPull(cwd)`
+
+RIC-165 (project stacks) adds a per-project Pull that uses the exact same
+fast-forward logic. To avoid duplicating it, the fast-forward core moves into its own
+module and `selfUpdate.ts` becomes a thin caller. This is the only change from the
+design above; behaviour is otherwise identical.
+
+### New module — `src/server/ffPull.ts`
+
+- `ffPull(cwd: string): Promise<FfPullResult>` — runs, all in `cwd`:
+  1. `git rev-parse --short HEAD` (before)
+  2. `git pull --ff-only` (execFile, 60s timeout, never a shell)
+  3. `git rev-parse --short HEAD` (after)
+  - Returns `{ status: "updated", from, to }` when HEAD moved,
+    `{ status: "up-to-date", from, to }` when it didn't.
+  - Throws `FfPullError` with `kind: "diverged" | "failed"` and a trimmed stderr
+    snippet. `diverged` is detected from the `--ff-only` failure output
+    ("Not possible to fast-forward" / "fatal: Need to specify how to reconcile");
+    anything else (network down, dirty tree, not a repo) is `failed`.
+- **Stateless — no single-flight inside.** Concurrency control is the caller's job,
+  because the two callers scope it differently: self-update is one global checkout
+  (module-level in-flight promise), while RIC-165 pulls many project checkouts
+  (a per-slug in-flight map keyed by cwd). Baking one policy into `ffPull` would be
+  wrong for the other.
+
+### Refactor — `src/server/selfUpdate.ts`
+
+- `isSelfUpdateEnabled()` unchanged (`process.env.MOJITO_SELF_UPDATE === "1"`).
+- `runSelfUpdate()` keeps the module-level in-flight promise and now delegates the
+  git work to `ffPull(process.cwd())`. The route mapping (diverged → 409,
+  failed → 500) still keys off the error `kind`, so `selfUpdate` surfaces
+  `ffPull`'s error kind unchanged (re-throw, or re-expose `SelfUpdateError` carrying
+  the same `kind`). `SelfUpdateResult` shape is unchanged.
+
+### Testing delta
+
+- New `tests/server/ffPull.test.ts` — execFile mocked, exercises the core:
+  updated, up-to-date, diverged (both git messages), generic failure. `cwd` is
+  passed through to execFile.
+- `tests/server/selfUpdate.test.ts` keeps flag-off gating and the in-flight-dedup
+  test (a second call while one runs gets the same result); the git-outcome cases
+  are covered by `ffPull.test.ts`, so `selfUpdate`'s tests focus on the wrapper
+  (gate + dedup + error passthrough).
