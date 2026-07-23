@@ -10,46 +10,35 @@ export interface StackRow {
   pullable: boolean; // false for the Mojito self-row
 }
 
-export interface PullResponse {
-  status?: "updated" | "up-to-date";
-  from?: string;
-  to?: string;
-  error?: string;
-  detail?: string;
+export type PullResponse =
+  | { status: "updated" | "up-to-date"; from: string; to: string }
+  | { error: string; detail?: string };
+
+export function pullMessage(res: PullResponse): { kind: "ok" | "err"; text: string; canResolve: boolean } {
+  if ("status" in res) {
+    return res.status === "updated"
+      ? { kind: "ok", text: `Updated ${res.from} → ${res.to}.`, canResolve: false }
+      : { kind: "ok", text: `Already up to date (${res.from}).`, canResolve: false };
+  }
+  const base = res.error === "diverged" ? "History diverged" : "Pull failed";
+  const text = res.detail ? `${base} — ${res.detail}` : base;
+  return { kind: "err", text, canResolve: true };
 }
 
-export function pullMessage(response: PullResponse): string {
-  if (response.error) {
-    if (response.detail) {
-      return `${response.error}: ${response.detail}`;
-    }
-    return response.error;
-  }
-  if (response.status === "updated") {
-    return `updated: ${response.from} → ${response.to}`;
-  }
-  if (response.status === "up-to-date") {
-    return `up-to-date at ${response.from}`;
-  }
-  return "unknown response";
-}
-
-export function syntheticStackSession(project: string): SessionMeta {
-  const now = new Date();
-  const uniqueSuffix = Math.random().toString(36).substring(2, 8);
+export function syntheticStackSession(slug: string, project: string): SessionMeta {
   return {
-    kind: "shell",
-    id: `stack-${uniqueSuffix}`,
+    kind: "custom",
+    id: `stack-${slug}`,
     ticket: "",
     launchStatus: "",
-    model: "fable",
+    model: "",
     effort: "",
     autoAdvance: false,
     state: "running",
-    cwd: process.cwd(),
-    createdAt: now.toISOString(),
-    title: "",
-    labels: [],
+    cwd: "",
+    createdAt: "",
     projectName: project,
+    title: `${project} · stack logs`,
+    labels: [],
   };
 }
