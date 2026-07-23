@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { listStacks, resolveStack, startStack, stopStack, type StackDeps } from "@/server/projectStack";
+import { describe, it, expect, afterEach } from "vitest";
+import { listStacks, resolveStack, startStack, stopStack, pullStack, _resetStackInflight, type StackDeps } from "@/server/projectStack";
+import { FfPullError, type FfPullResult } from "@/server/ffPull";
 
 // A fake project map: Mojito (self), Factorybook (has start.sh), Lime (no start.sh),
 // "Gestionale Cooperative" (has start.sh, space in name -> slug check).
@@ -29,6 +30,8 @@ function deps(over: Partial<StackDeps> = {}): StackDeps {
     ...over,
   };
 }
+
+afterEach(() => _resetStackInflight());
 
 describe("listStacks", () => {
   it("lists every mapped project sorted by name, with hasStack + pullable", async () => {
@@ -116,5 +119,46 @@ describe("stopStack", () => {
   });
   it("404 when the project has no start.sh", async () => {
     expect(await stopStack("lime", deps())).toEqual({ ok: false, error: "no stack", code: 404 });
+  });
+});
+
+describe("pullStack", () => {
+  it("404 when the row is not pullable (Mojito self-row)", async () => {
+    expect(await pullStack("mojito", deps())).toEqual({ ok: false, error: "not pullable", code: 404 });
+  });
+  it("404 for an unknown slug", async () => {
+    expect(await pullStack("nope", deps())).toEqual({ ok: false, error: "not pullable", code: 404 });
+  });
+  it("returns the FfPullResult on success", async () => {
+    const result: FfPullResult = { status: "updated", from: "aaa", to: "bbb" };
+    expect(await pullStack("factorybook", deps({ pull: async () => result })))
+      .toEqual({ ok: true, result });
+  });
+  it("maps diverged -> 409 and failed -> 500 with detail", async () => {
+    const diverged = await pullStack("factorybook", deps({
+      pull: async () => { throw new FfPullError("diverged", "Not possible to fast-forward"); },
+    }));
+    expect(diverged).toEqual({ ok: false, error: "diverged", code: 409, detail: "Not possible to fast-forward" });
+    const failed = await pullStack("fb2-unused", deps({
+      loadMap: () => ({ RIC: { projects: { Factorybook: "/repo/fb" } } }) as never,
+      pull: async () => { throw new FfPullError("failed", "network down"); },
+    }));
+    // (slug "factorybook" is single-flighted; use the same slug after reset)
+    _resetStackInflight();
+    const failed2 = await pullStack("factorybook", deps({
+      pull: async () => { throw new FfPullError("failed", "network down"); },
+    }));
+    expect(failed2).toEqual({ ok: false, error: "failed", code: 500, detail: "network down" });
+  });
+  it("single-flights concurrent pulls for the same slug", async () => {
+    let calls = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const d = deps({ pull: async () => { calls += 1; await gate; return { status: "up-to-date", from: "x", to: "x" }; } });
+    const p1 = pullStack("factorybook", d);
+    const p2 = pullStack("factorybook", d);
+    release();
+    await Promise.all([p1, p2]);
+    expect(calls).toBe(1);
   });
 });
