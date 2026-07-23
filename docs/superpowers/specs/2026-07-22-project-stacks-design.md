@@ -46,13 +46,14 @@ No `scripts/start.sh` → the project simply shows no stack controls.
 
 Same conventions as the other routes (`getConfig()` + `tokenFromHeaders` → 401).
 
-- `GET /api/stacks` → `{ stacks: [{ project, slug, hasStack, status }] }` (`status` is
-  meaningful only when `hasStack`, else `null`)
+- `GET /api/stacks` → `{ stacks: [{ project, slug, hasStack, status, pullable }] }`
+  (`status` is meaningful only when `hasStack`, else `null`; `pullable` is `false` for the
+  Mojito self-row, `true` otherwise — see Pull & resolve)
 - `POST /api/stacks/[slug]/start` → 200 `{ status }` | 404 unknown/no start.sh | 409 if
   already running
 - `POST /api/stacks/[slug]/stop` → 200 `{ status }` | 404 | 409 if not running
 - `POST /api/stacks/[slug]/pull` → 200 `{ status, from, to }` | 409 `diverged` | 500
-  `failed` | 404 unknown slug (see Pull & resolve)
+  `failed` | 404 unknown slug **or the Mojito self-row (not pullable)** (see Pull & resolve)
 - `POST /api/stacks/[slug]/resolve` → 201 `{ meta }` | 404 unknown slug (see Pull & resolve)
 
 ## UI
@@ -61,8 +62,9 @@ Compact "Stacks" panel on the main page: **one row per mapped project**. A stack
 project (executable `scripts/start.sh`) shows a status dot (running / stopped / crashed),
 start/stop button, and **logs** button — logs open the `stack-<slug>` tmux session in the
 existing web terminal (ptyGateway), the same viewer used for lime sessions. A project
-without `start.sh` shows none of those controls. **Every row**, stack-enabled or not, also
-has a **Pull** button (see Pull & resolve). Identical on Mac and server.
+without `start.sh` shows none of those controls. **Every row has a Pull button, with one
+exception: the Mojito self-row**, which shows no Pull (Mojito self-updates only via the
+SettingsSheet — see Pull & resolve). Identical on Mac and server.
 
 **Status at a glance is the primary need** (2026-07-22: the user starts stacks on
 demand and wants to see immediately which are up without ssh). The panel must show
@@ -80,27 +82,40 @@ suite must cover it).
 Independent of the stack lifecycle: keep a project's mapped checkout current from the UI.
 The pull runs in the **repo root** mapped in `lime-projects.json` (not a worktree — the same
 path the stack runs from), on whatever branch is checked out there. Available on every
-panel row, including pull-only projects with no `scripts/start.sh`.
+panel row — including pull-only projects with no `scripts/start.sh` — **except the Mojito
+self-row** (see below).
+
+### The Mojito self-row is not pullable (coordination with RIC-164)
+
+Mojito is itself mapped in `lime-projects.json`, so it appears as a panel row. But a generic
+`git pull` of Mojito's own server checkout would trip its `post-merge` hook → an unguarded
+deploy that bypasses the `MOJITO_SELF_UPDATE` gating and the deploy-aware UX (banner,
+health-poll, reload) that RIC-164's SettingsSheet self-update provides; on the Mac it risks
+wedging the Next dev checkout. So the Mojito row exposes **no Pull button** (`pullable:
+false`, `/pull` → 404), and start/stop/logs only if Mojito ever ships a `scripts/start.sh`.
+Mojito self-update stays exclusively in the SettingsSheet (RIC-164). The self-row is
+identified **server-side** by comparing each mapped repo path against the server's own repo
+root — not by matching the project name string.
 
 ### Fast-forward pull
 
-`POST /api/stacks/[slug]/pull` runs a fast-forward-only pull — the same shape as the
-self-update design (`2026-07-22-self-update-button-design.md`), parameterized by cwd. A
-small `ffPull(cwd)` helper in `projectStack.ts`:
+`POST /api/stacks/[slug]/pull` runs a fast-forward-only pull. **RIC-164 already extracted
+this core as the shared `ffPull(cwd, run?)` helper in `src/server/ffPull.ts`** — import it,
+do not re-implement it here. `ffPull`:
 
 1. `git rev-parse --short HEAD` (before)
 2. `git pull --ff-only` (execFile, ~60s timeout, never a shell)
 3. `git rev-parse --short HEAD` (after)
 
-- Returns `{ status: "updated", from, to }` when HEAD moved, `{ status: "up-to-date",
-  from, to }` when it didn't.
+- Returns `FfPullResult` — `{ status: "updated", from, to }` when HEAD moved,
+  `{ status: "up-to-date", from, to }` when it didn't.
 - Throws `FfPullError { kind: "diverged" | "failed", detail }`. `diverged` is detected from
   the `--ff-only` failure text ("Not possible to fast-forward" / "Need to specify how to
   reconcile"); anything else (network, dirty tree, not a repo) is `failed`. `detail` is a
   trimmed stderr snippet.
-- Concurrency: one in-flight pull per slug (module-level map); a second POST while one runs
-  returns the same result. (Mirrors self-update's single-flight; the two `ffPull`
-  implementations could later be unified.)
+- Concurrency: `projectStack.ts` keeps **only** the per-slug single-flight wrapper around
+  `ffPull` (a module-level map keyed by slug); a second POST while one runs returns the same
+  result. The fast-forward logic itself is not duplicated — it is RIC-164's `ffPull`.
 
 Never an unattended merge, never a reset — a non-fast-forwardable history is surfaced, not
 resolved automatically. Pulling while the stack is running is allowed; it does **not**
@@ -148,23 +163,27 @@ divergence/conflict work).
 | Pull git failure (network / dirty tree / not a repo) | 500 `failed` + stderr snippet; UI offers "Resolve with Claude" |
 | Resolve session | project-scoped custom `claude` in the repo, To-Merge model/effort, seeded prompt |
 | Concurrent pull clicks | single in-flight pull per slug, both callers get its result |
+| Mojito self-row | listed, but no Pull (`pullable: false`); `/pull` → 404; self-update stays SettingsSheet-only (RIC-164) |
 | Mojito restart | stacks live in the shared tmux server, untouched (same isolation as lime sessions in the keeper) |
 
 ## Testing
 
 - `tests/server/projectStack.test.ts` — fs/execFile mocked: listing includes every mapped
   project with the `hasStack` flag (executable start.sh) and status only when `hasStack`;
+  the Mojito self-row is flagged `pullable: false` and every other row `pullable: true`;
   slug sanitization; start/stop invocations; status mapping (none/live/dead pane);
   double-start guard.
-- `ffPull` — execFile mocked: updated, up-to-date, diverged (both git messages), generic
-  failure, in-flight dedup per slug (mirrors the self-update tests).
+- Pull wrapper — `ffPull` itself is already covered by RIC-164's `ffPull` tests, so here
+  test only the per-slug single-flight dedup (two concurrent pulls for one slug share the
+  in-flight result) and that `updated` / `up-to-date` / `diverged` / `failed` map to the
+  right route responses (mock `ffPull` to return/throw each shape).
 - `launchStackResolveSession` — resolves the mapped repo cwd, reads To-Merge
   model/effort, seeds the prompt (assert the template content and that no client string is
   interpolated), meta `kind: "custom"`; `buildCustomClaudeCommand` appends the prompt as the
   final quoted arg and omits it (unchanged output) when absent.
 - Route tests per the existing pattern: 401 without token, 404 unknown slug, 409
   wrong-state transitions, response shapes — plus `/pull` (200 updated/up-to-date, 409
-  diverged, 500 failed) and `/resolve` (201 meta shape).
+  diverged, 500 failed, **404 on the Mojito self-row**) and `/resolve` (201 meta shape).
 
 ## Adoption note (Factorybook, GestionaleCooperativeMvp)
 
