@@ -167,6 +167,22 @@ describe("buildCustomClaudeCommand", () => {
     expect(cmd).not.toContain("LIME_SESSION_CONTEXT");
     expect(cmd.startsWith("claude ")).toBe(true);
   });
+
+  describe("prompt", () => {
+    const base = { projectName: "Factorybook", model: "opus", effort: "high" as const };
+    it("appends the prompt as a single quoted positional arg", () => {
+      const cmd = buildCustomClaudeCommand({ ...base, prompt: "align the branch" }, "/s/x.json");
+      expect(cmd).toBe("claude --model 'opus' --effort 'high' --settings '/s/x.json' 'align the branch'");
+    });
+    it("is unchanged when no prompt is given", () => {
+      const cmd = buildCustomClaudeCommand(base, "/s/x.json");
+      expect(cmd).toBe("claude --model 'opus' --effort 'high' --settings '/s/x.json'");
+    });
+    it("escapes single quotes in the prompt", () => {
+      const cmd = buildCustomClaudeCommand({ ...base, prompt: "it's fine" }, "/s/x.json");
+      expect(cmd).toBe("claude --model 'opus' --effort 'high' --settings '/s/x.json' 'it'\\''s fine'");
+    });
+  });
 });
 
 describe("launchCustomSession", () => {
