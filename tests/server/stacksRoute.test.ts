@@ -12,7 +12,8 @@ vi.mock("@/server/projectStack", () => ({
 import { GET } from "@/app/api/stacks/route";
 import { POST as START } from "@/app/api/stacks/[slug]/start/route";
 import { POST as STOP } from "@/app/api/stacks/[slug]/stop/route";
-import { listStacks, startStack, stopStack } from "@/server/projectStack";
+import { POST as PULL } from "@/app/api/stacks/[slug]/pull/route";
+import { listStacks, startStack, stopStack, pullStack } from "@/server/projectStack";
 
 const TOKEN = "test-token";
 function req(auth = true): Request {
@@ -80,5 +81,35 @@ describe("POST /api/stacks/[slug]/stop", () => {
   it("maps 409 not running", async () => {
     vi.mocked(stopStack).mockResolvedValue({ ok: false, error: "not running", code: 409 });
     expect((await STOP(...Object.values(preq("factorybook")) as [Request, never])).status).toBe(409);
+  });
+});
+
+function pullReq(slug: string, auth = true): [Request, { params: Promise<{ slug: string }> }] {
+  return [
+    new Request(`http://localhost/api/stacks/${slug}/pull`, { method: "POST", headers: auth ? { "x-mojito-token": TOKEN } : {} }),
+    { params: Promise.resolve({ slug }) },
+  ];
+}
+
+describe("POST /api/stacks/[slug]/pull", () => {
+  it("200 returns the pull result at top level", async () => {
+    vi.mocked(pullStack).mockResolvedValue({ ok: true, result: { status: "updated", from: "a", to: "b" } });
+    const res = await PULL(...pullReq("factorybook"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "updated", from: "a", to: "b" });
+  });
+  it("404 for the Mojito self-row", async () => {
+    vi.mocked(pullStack).mockResolvedValue({ ok: false, error: "not pullable", code: 404 });
+    expect((await PULL(...pullReq("mojito"))).status).toBe(404);
+  });
+  it("409 diverged with detail", async () => {
+    vi.mocked(pullStack).mockResolvedValue({ ok: false, error: "diverged", code: 409, detail: "Not possible to fast-forward" });
+    const res = await PULL(...pullReq("factorybook"));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "diverged", detail: "Not possible to fast-forward" });
+  });
+  it("500 failed with detail", async () => {
+    vi.mocked(pullStack).mockResolvedValue({ ok: false, error: "failed", code: 500, detail: "network down" });
+    expect((await PULL(...pullReq("factorybook"))).status).toBe(500);
   });
 });
