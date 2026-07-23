@@ -76,3 +76,29 @@ export async function listStacks(deps: StackDeps): Promise<StackRow[]> {
     }),
   );
 }
+
+export type StackActionResult =
+  | { ok: true; status: StackStatus }
+  | { ok: false; error: string; code: number };
+
+export async function startStack(slug: string, deps: StackDeps): Promise<StackActionResult> {
+  const target = resolveStack(slug, deps);
+  if (!target || !target.hasStack) return { ok: false, error: "no stack", code: 404 };
+  const hasSession = deps.hasSession ?? tmuxHasSession;
+  const startSession = deps.startSession ?? startStackSession;
+  const name = stackSessionName(slug);
+  if (await hasSession(name)) return { ok: false, error: "already running", code: 409 };
+  await startSession(name, target.path, "bash -lc 'scripts/start.sh'");
+  return { ok: true, status: "running" };
+}
+
+export async function stopStack(slug: string, deps: StackDeps): Promise<StackActionResult> {
+  const target = resolveStack(slug, deps);
+  if (!target || !target.hasStack) return { ok: false, error: "no stack", code: 404 };
+  const hasSession = deps.hasSession ?? tmuxHasSession;
+  const killSession = deps.killSession ?? tmuxKillSession;
+  const name = stackSessionName(slug);
+  if (!(await hasSession(name))) return { ok: false, error: "not running", code: 409 };
+  await killSession(name);
+  return { ok: true, status: "stopped" };
+}

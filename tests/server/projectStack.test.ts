@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { listStacks, resolveStack, type StackDeps } from "@/server/projectStack";
+import { listStacks, resolveStack, startStack, stopStack, type StackDeps } from "@/server/projectStack";
 
 // A fake project map: Mojito (self), Factorybook (has start.sh), Lime (no start.sh),
 // "Gestionale Cooperative" (has start.sh, space in name -> slug check).
@@ -74,5 +74,47 @@ describe("resolveStack", () => {
   });
   it("returns null for an unknown slug", () => {
     expect(resolveStack("nope", deps())).toBeNull();
+  });
+});
+
+describe("startStack", () => {
+  it("404 when the project has no start.sh", async () => {
+    const r = await startStack("lime", deps());
+    expect(r).toEqual({ ok: false, error: "no stack", code: 404 });
+  });
+  it("404 for an unknown slug", async () => {
+    expect(await startStack("nope", deps())).toEqual({ ok: false, error: "no stack", code: 404 });
+  });
+  it("409 when already running", async () => {
+    const r = await startStack("factorybook", deps({ hasSession: async () => true }));
+    expect(r).toEqual({ ok: false, error: "already running", code: 409 });
+  });
+  it("starts the stack and returns running", async () => {
+    const calls: Array<[string, string, string]> = [];
+    const r = await startStack("factorybook", deps({
+      hasSession: async () => false,
+      startSession: async (n, c, cmd) => { calls.push([n, c, cmd]); },
+    }));
+    expect(r).toEqual({ ok: true, status: "running" });
+    expect(calls).toEqual([["stack-factorybook", "/repo/fb", "bash -lc 'scripts/start.sh'"]]);
+  });
+});
+
+describe("stopStack", () => {
+  it("409 when not running", async () => {
+    expect(await stopStack("factorybook", deps({ hasSession: async () => false })))
+      .toEqual({ ok: false, error: "not running", code: 409 });
+  });
+  it("kills the session and returns stopped", async () => {
+    const killed: string[] = [];
+    const r = await stopStack("factorybook", deps({
+      hasSession: async () => true,
+      killSession: async (n) => { killed.push(n); },
+    }));
+    expect(r).toEqual({ ok: true, status: "stopped" });
+    expect(killed).toEqual(["stack-factorybook"]);
+  });
+  it("404 when the project has no start.sh", async () => {
+    expect(await stopStack("lime", deps())).toEqual({ ok: false, error: "no stack", code: 404 });
   });
 });
