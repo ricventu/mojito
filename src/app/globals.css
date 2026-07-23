@@ -183,6 +183,11 @@ button.chip:active { transform: scale(.96); }
   background: var(--attn);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--attn) 25%, transparent);
 }
+.s-dot.running { background: var(--ok); }
+.s-dot.stopped { background: var(--text-faint); }
+.s-dot.crashed { background: var(--err); }
+.s-row { display: flex; align-items: center; gap: 8px; }
+.s-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 
 /* ---- Alert banner ---- */
 .alert {

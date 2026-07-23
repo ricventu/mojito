@@ -9,6 +9,7 @@ import { useEvents } from "@/lib/useEvents";
 import TokenGate from "@/components/TokenGate";
 import TicketList from "@/components/TicketList";
 import SessionList from "@/components/SessionList";
+import StacksPanel from "@/components/StacksPanel";
 import AlertLayer from "@/components/AlertLayer";
 import SettingsSheet from "@/components/SettingsSheet";
 import { tabTitle } from "@/lib/tabTitle";
@@ -57,12 +58,15 @@ export default function Home() {
       {settingsOpen && <SettingsSheet token={token} onClose={() => setSettingsOpen(false)} />}
       {tab === "tickets"
         ? <TicketList token={token} tickets={tickets} sessions={sessions} onLaunched={() => { refreshSessions(); refreshTickets(); }} onOpen={setOpen} />
+        : tab === "stacks"
+        ? <StacksPanel token={token} onOpenLogs={setOpen} />
         : <SessionList token={token} sessions={sessions} onOpen={setOpen} onChanged={refreshSessions} />}
       <nav className="nav">
         <button className={`tab${tab === "tickets" ? " active" : ""}`} onClick={() => setTab("tickets")}>Tickets</button>
         <button className={`tab${tab === "sessions" ? " active" : ""}`} onClick={() => setTab("sessions")}>
           Sessions{needsInput ? <span className="count">{needsInput}</span> : null}
         </button>
+        <button className={`tab${tab === "stacks" ? " active" : ""}`} onClick={() => setTab("stacks")}>Stacks</button>
         <button className="tab settings" aria-label="Settings" onClick={() => setSettingsOpen(true)}>⚙</button>
       </nav>
     </div>
