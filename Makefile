@@ -11,6 +11,9 @@ SHELL := /bin/bash
 # Load .env.local, then resolve port (default 4711) and token.
 LOAD_ENV = set -a; { [ -f .env.local ] && . ./.env.local; } || true; set +a; PORT="$${MOJITO_PORT:-4711}"; TOKEN="$${MOJITO_TOKEN:-}"
 
+# systemd user unit for the production deploy (Linux box). Overridable.
+SERVICE ?= mojito.service
+
 # Print every reachable URL (local, Wi-Fi/LAN, Tailscale direct IP, and Tailscale
 # Serve if enabled). Expects PORT and TOKEN to be set (run $(LOAD_ENV) first).
 # Appends the token query so the URL is usable as-is (auth). LAN IP is taken from
@@ -32,7 +35,8 @@ SHOW_URLS = Q=""; if [ -n "$$TOKEN" ]; then Q="/?token=$$TOKEN"; fi; \
 ## help: list targets
 help:
 	@echo "Targets:"
-	@echo "  make start  dev server (Mac kept awake), prints every URL: local, Wi-Fi, Tailscale"
+	@echo "  make start    dev server (Mac kept awake), prints every URL: local, Wi-Fi, Tailscale"
+	@echo "  make restart  prod deploy: next build, then restart $(SERVICE) (systemd --user) + health check"
 
 ## start: dev server, Mac kept awake via caffeinate; prints every reachable URL
 ## (local, Wi-Fi/LAN, and — when the tailnet is up — the Tailscale direct IP, which
@@ -45,4 +49,23 @@ start:
 	export MOJITO_PORT="$$PORT"; \
 	exec caffeinate -is ./scripts/dev-supervisor.sh
 
-.PHONY: help start
+## restart: rebuild the Next app (next build) then restart the systemd user service
+## and wait for /api/health. Production deploy path on the Linux box (NOT `make start`,
+## which is the macOS dev supervisor). A failed build aborts before the restart
+## (SHELLFLAGS -e), so the running server is never replaced by a broken build.
+restart:
+	@echo "==> Building (next build)…"; \
+	npm run build; \
+	echo "==> Restarting $(SERVICE)…"; \
+	systemctl --user restart "$(SERVICE)"; \
+	$(LOAD_ENV); \
+	echo "==> Waiting for health on http://localhost:$$PORT/api/health …"; \
+	for i in $$(seq 1 30); do \
+		code=$$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "http://localhost:$$PORT/api/health" || true); \
+		if [ "$$code" = "200" ]; then echo "OK — mojito healthy on http://localhost:$$PORT"; exit 0; fi; \
+		sleep 1; \
+	done; \
+	echo "WARN: no HTTP 200 after 30s — check: journalctl --user -u $(SERVICE) -e" >&2; \
+	exit 1
+
+.PHONY: help start restart
