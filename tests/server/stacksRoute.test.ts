@@ -9,11 +9,15 @@ vi.mock("@/server/projectStack", () => ({
   currentBranch: vi.fn(),
 }));
 
+vi.mock("@/server/launch", () => ({ launchStackResolveSession: vi.fn() }));
+
 import { GET } from "@/app/api/stacks/route";
 import { POST as START } from "@/app/api/stacks/[slug]/start/route";
 import { POST as STOP } from "@/app/api/stacks/[slug]/stop/route";
 import { POST as PULL } from "@/app/api/stacks/[slug]/pull/route";
-import { listStacks, startStack, stopStack, pullStack } from "@/server/projectStack";
+import { POST as RESOLVE } from "@/app/api/stacks/[slug]/resolve/route";
+import { listStacks, startStack, stopStack, pullStack, resolveStack, currentBranch } from "@/server/projectStack";
+import { launchStackResolveSession } from "@/server/launch";
 
 const TOKEN = "test-token";
 function req(auth = true): Request {
@@ -111,5 +115,36 @@ describe("POST /api/stacks/[slug]/pull", () => {
   it("500 failed with detail", async () => {
     vi.mocked(pullStack).mockResolvedValue({ ok: false, error: "failed", code: 500, detail: "network down" });
     expect((await PULL(...pullReq("factorybook"))).status).toBe(500);
+  });
+});
+
+function resolveReq(slug: string, auth = true): [Request, { params: Promise<{ slug: string }> }] {
+  return [
+    new Request(`http://localhost/api/stacks/${slug}/resolve`, { method: "POST", headers: auth ? { "x-mojito-token": TOKEN } : {} }),
+    { params: Promise.resolve({ slug }) },
+  ];
+}
+
+describe("POST /api/stacks/[slug]/resolve", () => {
+  it("404 when the row is unknown or not pullable", async () => {
+    vi.mocked(resolveStack).mockReturnValue(null);
+    expect((await RESOLVE(...resolveReq("nope"))).status).toBe(404);
+    vi.mocked(resolveStack).mockReturnValue({ project: "Mojito", path: "/repo/mojito", hasStack: false, pullable: false });
+    expect((await RESOLVE(...resolveReq("mojito"))).status).toBe(404);
+  });
+  it("201 with meta on success", async () => {
+    vi.mocked(resolveStack).mockReturnValue({ project: "Factorybook", path: "/repo/fb", hasStack: true, pullable: true });
+    vi.mocked(currentBranch).mockResolvedValue("main");
+    vi.mocked(launchStackResolveSession).mockResolvedValue({ ok: true, meta: { id: "mojito-custom-factorybook-abc", kind: "custom" } as never });
+    const res = await RESOLVE(...resolveReq("factorybook"));
+    expect(res.status).toBe(201);
+    expect((await res.json()).meta.id).toBe("mojito-custom-factorybook-abc");
+    expect(vi.mocked(launchStackResolveSession).mock.calls[0][0]).toEqual({ projectName: "Factorybook", branch: "main" });
+  });
+  it("422 when the repo cannot be resolved", async () => {
+    vi.mocked(resolveStack).mockReturnValue({ project: "Factorybook", path: "/repo/fb", hasStack: true, pullable: true });
+    vi.mocked(currentBranch).mockResolvedValue("main");
+    vi.mocked(launchStackResolveSession).mockResolvedValue({ ok: false, reason: "no-repo" });
+    expect((await RESOLVE(...resolveReq("factorybook"))).status).toBe(422);
   });
 });
