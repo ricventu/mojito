@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { statusSlug, tmuxName, parseIdentifier, validateTicket, customSessionName, rebaseSessionName, shellSessionName } from "@/server/sessionKey";
+import { statusSlug, tmuxName, parseIdentifier, validateTicket, customSessionName, rebaseSessionName, shellSessionName, stackSessionName } from "@/server/sessionKey";
 
 describe("sessionKey", () => {
   it("slugs a status", () => {
@@ -56,5 +56,14 @@ describe("shellSessionName", () => {
   });
   it("does not collide with a custom session name for the same slug/id", () => {
     expect(shellSessionName("x", "aaa")).not.toBe(customSessionName("x", "aaa"));
+  });
+});
+
+describe("stackSessionName", () => {
+  it("prefixes the slug with stack-", () => {
+    expect(stackSessionName("factorybook")).toBe("stack-factorybook");
+  });
+  it("uses an already-sanitized slug verbatim", () => {
+    expect(stackSessionName(statusSlug("Gestionale Cooperative"))).toBe("stack-gestionale-cooperative");
   });
 });
