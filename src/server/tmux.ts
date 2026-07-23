@@ -25,6 +25,25 @@ export async function newSession(name: string, cwd: string, command: string): Pr
   await pexec("tmux", ["new-session", "-d", "-s", name, "-c", cwd, command]);
 }
 
+export async function startStackSession(name: string, cwd: string, command: string): Promise<void> {
+  // Create the session and set remain-on-exit window-scoped in the SAME invocation,
+  // so a pane that dies immediately is retained (status "crashed") instead of vanishing.
+  await pexec("tmux", [
+    "new-session", "-d", "-s", name, "-c", cwd, command,
+    ";",
+    "set-option", "-w", "-t", name, "remain-on-exit", "on",
+  ]);
+}
+
+export async function panesDead(name: string): Promise<string> {
+  try {
+    const { stdout } = await pexec("tmux", ["list-panes", "-t", name, "-F", "#{pane_dead}"]);
+    return stdout;
+  } catch {
+    return "";
+  }
+}
+
 export async function pipePane(name: string, logfile: string): Promise<void> {
   await pexec("tmux", ["pipe-pane", "-t", name, "-o", `cat >> '${logfile.replace(/'/g, "'\\''")}'`]);
 }
