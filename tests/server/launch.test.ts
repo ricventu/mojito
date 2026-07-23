@@ -182,6 +182,9 @@ describe("buildCustomClaudeCommand", () => {
       const cmd = buildCustomClaudeCommand({ ...base, prompt: "it's fine" }, "/s/x.json");
       expect(cmd).toBe("claude --model 'opus' --effort 'high' --settings '/s/x.json' 'it'\\''s fine'");
     });
+    it("rejects a prompt starting with '-' (argv flag smuggling guard)", () => {
+      expect(() => buildCustomClaudeCommand({ ...base, prompt: "-h" }, "/s/x.json")).toThrow();
+    });
   });
 });
 

@@ -156,6 +156,9 @@ export function buildCustomClaudeCommand(req: CustomLaunchRequest, settingsPath:
   const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
   const envPrefix = contextPath ? `LIME_SESSION_CONTEXT=${q(contextPath)} ` : "";
   const base = `${envPrefix}claude --model ${q(req.model)} --effort ${q(req.effort)} --settings ${q(settingsPath)}`;
+  if (req.prompt && req.prompt.startsWith("-")) {
+    throw new Error("prompt must not start with '-'");
+  }
   return req.prompt ? `${base} ${q(req.prompt)}` : base;
 }
 
