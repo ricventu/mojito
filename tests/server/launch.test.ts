@@ -7,6 +7,7 @@ import {
   launchNewTicketSession, buildNewTicketClaudeCommand,
   launchRebaseSession, buildRebaseClaudeCommand,
   buildShellCommand, launchShellSession,
+  buildResolvePrompt, launchStackResolveSession,
 } from "@/server/launch";
 import { Registry } from "@/server/registry";
 import type { SessionMeta } from "@/server/types";
@@ -477,5 +478,47 @@ describe("launchShellSession", () => {
     const d = customDeps({ resolveCwd: () => null });
     const res = await launchShellSession({ projectName: "Mojito", ticket: "RIC-155" }, d);
     expect(res).toMatchObject({ ok: false, reason: "no-repo" });
+  });
+});
+
+describe("buildResolvePrompt", () => {
+  it("embeds only server-derived values (project, repo, branch)", () => {
+    const p = buildResolvePrompt("Factorybook", "/repo/fb", "main");
+    expect(p).toContain("Factorybook");
+    expect(p).toContain("/repo/fb");
+    expect(p).toContain("main");
+    expect(p).toMatch(/fast-forward/i);
+    expect(p).toMatch(/force-push/i); // instructs NOT to force-push
+  });
+});
+
+describe("launchStackResolveSession", () => {
+  it("launches a project-scoped custom session seeded with the resolve prompt", async () => {
+    const stateDir = mkdtempSync(join(tmpdir(), "mojito-launch-"));
+    let command = "";
+    const projectsPath = join(stateDir, "projects.json");
+    writeFileSync(projectsPath, JSON.stringify({ RIC: { projects: { Factorybook: "/repo/fb" } } }));
+    const res = await launchStackResolveSession(
+      { projectName: "Factorybook", branch: "feature/x" },
+      {
+        registry: new Registry(stateDir),
+        stateDir,
+        port: 4711,
+        token: "t",
+        projectsPath,
+        hasSession: async () => false,
+        newSession: async (_n, _c, cmd) => { command = cmd; },
+        pipePane: async () => {},
+        genId: () => "abc123",
+        homeDir: () => "/home/me",
+      },
+    );
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.meta.kind).toBe("custom");
+      expect(res.meta.projectName).toBe("Factorybook");
+    }
+    // Command carries the seeded prompt as the final quoted arg, and no client string.
+    expect(command).toMatch(/claude --model .* --effort .* --settings .* '.*force-push.*'/s);
   });
 });

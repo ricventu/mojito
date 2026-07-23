@@ -456,3 +456,28 @@ export async function launchShellSession(
   deps.registry.upsert(meta);
   return { ok: true, meta };
 }
+
+export function buildResolvePrompt(project: string, repo: string, branch: string): string {
+  return [
+    `You are in the git repository for the "${project}" project at ${repo} (branch ${branch}).`,
+    `A fast-forward-only pull (\`git pull --ff-only\`) could NOT fast-forward: this branch and its`,
+    `upstream on origin have diverged. Bring the branch up to date with origin without losing local`,
+    `work and without force-pushing.`,
+    ``,
+    `Steps: fetch origin; inspect the divergence (git status, git log --oneline --graph); rebase or`,
+    `merge as appropriate and resolve any conflicts; verify the working tree is clean and the branch`,
+    `is current. Do not force-push. Do not discard local commits.`,
+  ].join("\n");
+}
+
+export async function launchStackResolveSession(
+  req: { projectName: string; branch: string },
+  deps: LaunchDeps & { genId?: () => string; homeDir?: () => string },
+): Promise<{ ok: true; meta: SessionMeta } | { ok: false; reason: "no-repo" }> {
+  const repo = resolvePathForProject(loadProjectMap(deps.projectsPath), req.projectName);
+  if (!repo) return { ok: false, reason: "no-repo" };
+  const model = defaultModelForStatus("To Merge");
+  const effort = defaultEffortForStatus("To Merge");
+  const prompt = buildResolvePrompt(req.projectName, repo, req.branch);
+  return launchCustomSession({ projectName: req.projectName, model, effort, prompt }, deps);
+}
