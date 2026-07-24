@@ -1,24 +1,25 @@
 import { statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { listMappedProjects, loadProjectMap, type ProjectMap } from "./limeProjects.js";
 import { statusSlug, stackSessionName } from "./sessionKey.js";
-import { hasSession as tmuxHasSession, panesDead as tmuxPanesDead, startStackSession, killSession as tmuxKillSession } from "./tmux.js";
+import { listAllPanes as tmuxListAllPanes, startStackSession, stopStackSession, type PaneInfo } from "./tmux.js";
 import { ffPull, FfPullError, type FfPullResult, type GitRun } from "./ffPull.js";
 import type { StackRow, StackStatus } from "@/lib/stacks";
 
 const pexec = promisify(execFile);
+
+export type { PaneInfo } from "./tmux.js";
 
 export interface StackDeps {
   projectsPath: string;
   selfPath: string; // the server's own repo root (process.cwd()); its row is not pullable
   loadMap?: (path: string) => ProjectMap;
   isExecutable?: (p: string) => boolean;
-  hasSession?: (name: string) => Promise<boolean>;
-  panesDead?: (name: string) => Promise<string>;
+  listPanes?: () => Promise<PaneInfo[]>;
   startSession?: (name: string, cwd: string, command: string) => Promise<void>;
-  killSession?: (name: string) => Promise<void>;
+  stopSession?: (name: string) => Promise<void>;
   pull?: (cwd: string) => Promise<FfPullResult>;
 }
 
@@ -38,9 +39,44 @@ function defaultIsExecutable(p: string): boolean {
   }
 }
 
-function paneStatus(raw: string): StackStatus {
-  const panes = raw.split("\n").map((s) => s.trim()).filter(Boolean);
-  return panes.some((d) => d === "1") ? "crashed" : "running";
+// A pane belongs to the running stack when its cwd sits under the project root.
+function isUnder(root: string, cwd: string): boolean {
+  if (!cwd) return false;
+  const r = resolve(root);
+  const c = resolve(cwd);
+  return c === r || c.startsWith(r + sep);
+}
+
+// Panes launched by Mojito itself (the `stack-<slug>` launcher and `mojito-*`
+// lime sessions) run inside project trees too, so exclude them when looking for
+// the stack's own detached child session.
+function isMojitoOwnSession(name: string): boolean {
+  return name.startsWith("stack-") || name.startsWith("mojito-");
+}
+
+// Sessions that hold the actually-running stack, discovered by path: any session
+// (other than Mojito's own) with a pane whose cwd is inside the project root.
+function childSessions(root: string, panes: PaneInfo[]): Set<string> {
+  return new Set(
+    panes
+      .filter((p) => !isMojitoOwnSession(p.session) && isUnder(root, p.cwd))
+      .map((p) => p.session),
+  );
+}
+
+function deriveStatus(slug: string, root: string, panes: PaneInfo[]): StackStatus {
+  const children = childSessions(root, panes);
+  if (children.size > 0) {
+    // The stack is up in its own session(s); a dead pane means a partial crash.
+    const relevant = panes.filter((p) => children.has(p.session));
+    return relevant.some((p) => p.dead) ? "crashed" : "running";
+  }
+  // No child session yet: fall back to the launcher pane (booting or failed).
+  const launcher = panes.filter((p) => p.session === stackSessionName(slug));
+  if (launcher.length === 0) return "stopped";
+  if (launcher.some((p) => !p.dead)) return "running"; // start.sh still running
+  // All launcher panes dead: non-zero exit means start.sh failed.
+  return launcher.some((p) => p.deadStatus && p.deadStatus !== "0") ? "crashed" : "stopped";
 }
 
 export function resolveStack(slug: string, deps: StackDeps): StackTarget | null {
@@ -56,31 +92,23 @@ export function resolveStack(slug: string, deps: StackDeps): StackTarget | null 
   };
 }
 
-async function statusOf(slug: string, deps: StackDeps): Promise<StackStatus> {
-  const hasSession = deps.hasSession ?? tmuxHasSession;
-  const panesDead = deps.panesDead ?? tmuxPanesDead;
-  const name = stackSessionName(slug);
-  if (!(await hasSession(name))) return "stopped";
-  return paneStatus(await panesDead(name));
-}
-
 export async function listStacks(deps: StackDeps): Promise<StackRow[]> {
   const loadMap = deps.loadMap ?? loadProjectMap;
   const isExecutable = deps.isExecutable ?? defaultIsExecutable;
+  const listPanes = deps.listPanes ?? tmuxListAllPanes;
   const projects = listMappedProjects(loadMap(deps.projectsPath));
-  return Promise.all(
-    projects.map(async ({ name, path }): Promise<StackRow> => {
-      const slug = statusSlug(name);
-      const hasStack = isExecutable(join(path, "scripts", "start.sh"));
-      return {
-        project: name,
-        slug,
-        hasStack,
-        status: hasStack ? await statusOf(slug, deps) : null,
-        pullable: resolve(path) !== resolve(deps.selfPath),
-      };
-    }),
-  );
+  const panes = await listPanes();
+  return projects.map(({ name, path }): StackRow => {
+    const slug = statusSlug(name);
+    const hasStack = isExecutable(join(path, "scripts", "start.sh"));
+    return {
+      project: name,
+      slug,
+      hasStack,
+      status: hasStack ? deriveStatus(slug, path, panes) : null,
+      pullable: resolve(path) !== resolve(deps.selfPath),
+    };
+  });
 }
 
 export type StackActionResult =
@@ -90,10 +118,17 @@ export type StackActionResult =
 export async function startStack(slug: string, deps: StackDeps): Promise<StackActionResult> {
   const target = resolveStack(slug, deps);
   if (!target || !target.hasStack) return { ok: false, error: "no stack", code: 404 };
-  const hasSession = deps.hasSession ?? tmuxHasSession;
+  const listPanes = deps.listPanes ?? tmuxListAllPanes;
   const startSession = deps.startSession ?? startStackSession;
+  const stopSession = deps.stopSession ?? stopStackSession;
   const name = stackSessionName(slug);
-  if (await hasSession(name)) return { ok: false, error: "already running", code: 409 };
+  const panes = await listPanes();
+  if (deriveStatus(slug, target.path, panes) === "running") {
+    return { ok: false, error: "already running", code: 409 };
+  }
+  // Clear a stale launcher pane (a previous failed/exited start.sh) so the new
+  // session name is free.
+  if (panes.some((p) => p.session === name)) await stopSession(name);
   await startSession(name, target.path, "bash -lc 'scripts/start.sh'");
   return { ok: true, status: "running" };
 }
@@ -101,11 +136,19 @@ export async function startStack(slug: string, deps: StackDeps): Promise<StackAc
 export async function stopStack(slug: string, deps: StackDeps): Promise<StackActionResult> {
   const target = resolveStack(slug, deps);
   if (!target || !target.hasStack) return { ok: false, error: "no stack", code: 404 };
-  const hasSession = deps.hasSession ?? tmuxHasSession;
-  const killSession = deps.killSession ?? tmuxKillSession;
+  const listPanes = deps.listPanes ?? tmuxListAllPanes;
+  const stopSession = deps.stopSession ?? stopStackSession;
   const name = stackSessionName(slug);
-  if (!(await hasSession(name))) return { ok: false, error: "not running", code: 409 };
-  await killSession(name);
+  const panes = await listPanes();
+  const children = childSessions(target.path, panes);
+  const launcherPresent = panes.some((p) => p.session === name);
+  if (children.size === 0 && !launcherPresent) {
+    return { ok: false, error: "not running", code: 409 };
+  }
+  // Stop the real stack session(s) cleanly (reap process groups to free ports),
+  // then clear the launcher pane.
+  for (const child of children) await stopSession(child);
+  if (launcherPresent) await stopSession(name);
   return { ok: true, status: "stopped" };
 }
 

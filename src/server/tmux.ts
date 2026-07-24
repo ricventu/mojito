@@ -44,6 +44,35 @@ export async function panesDead(name: string): Promise<string> {
   }
 }
 
+export interface PaneInfo {
+  session: string;
+  dead: boolean;
+  deadStatus: string; // exit code of a dead pane ("" while alive)
+  cwd: string; // pane_current_path ("" when the pane is dead)
+}
+
+// Every pane on the tmux server, across all sessions. Used to detect a stack's
+// real liveness: launcher scripts (scripts/start.sh) spawn their own detached
+// session and exit, so the launcher pane dies — the running stack lives in a
+// child session whose panes sit under the project directory.
+export async function listAllPanes(): Promise<PaneInfo[]> {
+  try {
+    const { stdout } = await pexec("tmux", [
+      "list-panes", "-a", "-F",
+      "#{session_name}\t#{pane_dead}\t#{pane_dead_status}\t#{pane_current_path}",
+    ]);
+    return stdout
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => {
+        const [session, dead, deadStatus, cwd = ""] = line.split("\t");
+        return { session, dead: dead === "1", deadStatus, cwd };
+      });
+  } catch {
+    return [];
+  }
+}
+
 export async function pipePane(name: string, logfile: string): Promise<void> {
   await pexec("tmux", ["pipe-pane", "-t", name, "-o", `cat >> '${logfile.replace(/'/g, "'\\''")}'`]);
 }
@@ -53,6 +82,30 @@ export async function killSession(name: string): Promise<void> {
     await pexec("tmux", ["kill-session", "-t", name]);
   } catch {
     /* already gone */
+  }
+}
+
+// Stop a stack's session cleanly. `tmux kill-session` alone does not reap each
+// pane's descendant tree (dev servers -> concurrently -> php -S / next), leaving
+// ports held by orphans. Every pane's children share its process group, so
+// signal each group (SIGTERM, then SIGKILL for stragglers) before killing the
+// session. This mirrors the stacks' own `start.sh --stop` but stays generic —
+// Mojito never needs to know the child session's name or `--stop` flag.
+export async function stopStackSession(name: string): Promise<void> {
+  const script = `
+    for sig in TERM KILL; do
+      for pid in $(tmux list-panes -s -t "$1" -F '#{pane_pid}' 2>/dev/null); do
+        pgid="$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')" || pgid=
+        [ -n "$pgid" ] && kill -"$sig" -- "-$pgid" 2>/dev/null || true
+      done
+      [ "$sig" = TERM ] && sleep 2 || true
+    done
+    tmux kill-session -t "$1" 2>/dev/null || true
+  `;
+  try {
+    await pexec("bash", ["-c", script, "bash", name]);
+  } catch {
+    /* best-effort: session may already be gone */
   }
 }
 
