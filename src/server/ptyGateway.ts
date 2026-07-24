@@ -99,18 +99,17 @@ export function attachPty(ws: WebSocket, id: string, deps: Partial<AttachDeps> =
         return;
       }
 
-      // Replay recent scrollback before the live stream so a reconnect isn't blank.
-      d.capturePane(id, 200)
-        .then((s) => {
-          try {
-            ws.send(s);
-          } catch {
-            /* socket closed */
-          }
-        })
-        .catch(() => {});
-
+      // The live attach stream and the async scrollback replay race: `tmux
+      // attach-session` repaints immediately, so unordered the stale capture
+      // lands *on top of* live output — the terminal looks garbled and frozen.
+      // Buffer live output until the replay is flushed, then stream directly.
+      let replayed = false;
+      const buffered: string[] = [];
       pty.onData((chunk) => {
+        if (!replayed) {
+          buffered.push(chunk);
+          return;
+        }
         try {
           ws.send(chunk);
         } catch {
@@ -124,6 +123,30 @@ export function attachPty(ws: WebSocket, id: string, deps: Partial<AttachDeps> =
           /* already closed */
         }
       });
+
+      // Replay recent scrollback before the live stream so a reconnect isn't
+      // blank. tmux capture-pane emits bare LF; convert to CRLF or xterm stair-
+      // steps each line from where the previous one ended.
+      d.capturePane(id, 200)
+        .then((s) => {
+          try {
+            ws.send(s.replace(/\r?\n/g, "\r\n"));
+          } catch {
+            /* socket closed */
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          replayed = true;
+          for (const chunk of buffered) {
+            try {
+              ws.send(chunk);
+            } catch {
+              /* socket closed */
+            }
+          }
+          buffered.length = 0;
+        });
     })
     .catch((err) => {
       // A failed existence check is treated as gone rather than spawning a doomed

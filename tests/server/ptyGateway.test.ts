@@ -62,6 +62,46 @@ describe("attachPty", () => {
     expect(ws.close).not.toHaveBeenCalledWith(SESSION_GONE_CODE, expect.any(String));
   });
 
+  it("normalizes bare LF scrollback to CRLF so xterm does not stair-step lines", async () => {
+    // tmux capture-pane emits bare "\n"; written into xterm unchanged, every
+    // replayed line starts at the column where the previous one ended — the
+    // staircase/overlapping effect. The replay must be converted to CRLF.
+    const ws = fakeWs();
+    const deps: Partial<AttachDeps> = {
+      hasSession: vi.fn(async () => true),
+      spawn: spawnStub(),
+      capturePane: vi.fn(async () => "line1\nline2\n"),
+    };
+    attachPty(ws as never, "mojito-RIC-46-to-code", deps);
+    await vi.waitFor(() => expect(ws.send).toHaveBeenCalledWith("line1\r\nline2\r\n"));
+  });
+
+  it("flushes scrollback before live output, never on top of it", async () => {
+    // The live `tmux attach` stream and the async scrollback replay race: the
+    // attach repaints immediately, so without ordering the stale capture lands
+    // on top of live output and the terminal looks garbled and frozen.
+    const ws = fakeWs();
+    const pty = fakePty();
+    let resolveCapture!: (s: string) => void;
+    const deps: Partial<AttachDeps> = {
+      hasSession: vi.fn(async () => true),
+      spawn: vi.fn(() => pty) as unknown as AttachDeps["spawn"],
+      capturePane: vi.fn(() => new Promise<string>((res) => { resolveCapture = res; })),
+    };
+    attachPty(ws as never, "mojito-RIC-46-to-code", deps);
+
+    // Wait until the pty is attached and its data handler registered.
+    await vi.waitFor(() => expect(pty.onData).toHaveBeenCalled());
+    const emitData = pty.onData.mock.calls[0][0] as (chunk: string) => void;
+
+    // Live output arrives before the scrollback capture resolves.
+    emitData("LIVE");
+    resolveCapture("history\n");
+
+    await vi.waitFor(() => expect(ws.send).toHaveBeenCalledWith("LIVE"));
+    expect(ws.send.mock.calls.map((c) => c[0])).toEqual(["history\r\n", "LIVE"]);
+  });
+
   it("rejects a missing id without checking tmux", () => {
     const ws = fakeWs();
     const deps: Partial<AttachDeps> = { hasSession: vi.fn(async () => true), spawn: spawnStub() };
