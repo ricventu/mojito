@@ -65,17 +65,16 @@ function childSessions(root: string, panes: PaneInfo[]): Set<string> {
 }
 
 function deriveStatus(slug: string, root: string, panes: PaneInfo[]): StackStatus {
-  const children = childSessions(root, panes);
-  if (children.size > 0) {
-    // The stack is up in its own session(s); a dead pane means a partial crash.
-    const relevant = panes.filter((p) => children.has(p.session));
-    return relevant.some((p) => p.dead) ? "crashed" : "running";
-  }
-  // No child session yet: fall back to the launcher pane (booting or failed).
+  // A child session is discovered only via a LIVE pane under the project root
+  // (dead panes report no cwd), so its presence means the stack is up. A dead
+  // sibling pane — e.g. one dev server that exited while the rest keep running —
+  // does not make a working stack "crashed".
+  if (childSessions(root, panes).size > 0) return "running";
+  // No live stack session: fall back to the launcher pane (booting or failed).
   const launcher = panes.filter((p) => p.session === stackSessionName(slug));
   if (launcher.length === 0) return "stopped";
   if (launcher.some((p) => !p.dead)) return "running"; // start.sh still running
-  // All launcher panes dead: non-zero exit means start.sh failed.
+  // All launcher panes dead: non-zero exit means start.sh itself failed.
   return launcher.some((p) => p.deadStatus && p.deadStatus !== "0") ? "crashed" : "stopped";
 }
 

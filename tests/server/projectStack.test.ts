@@ -61,11 +61,12 @@ describe("listStacks", () => {
     }));
     expect(running.find((r) => r.project === "Factorybook")!.status).toBe("running");
 
-    // A dead pane in the child session is a partial crash.
-    const crashed = await listStacks(deps({
+    // A dead sibling pane (one dev server exited) still counts as running: the
+    // stack is up as long as any pane lives.
+    const partial = await listStacks(deps({
       listPanes: async () => [pane("fb-dev", "/repo/fb/backend"), pane("fb-dev", "", true, "1")],
     }));
-    expect(crashed.find((r) => r.project === "Factorybook")!.status).toBe("crashed");
+    expect(partial.find((r) => r.project === "Factorybook")!.status).toBe("running");
 
     const stopped = await listStacks(deps({ listPanes: async () => [] }));
     expect(stopped.find((r) => r.project === "Factorybook")!.status).toBe("stopped");
