@@ -7,6 +7,7 @@ import { listSessions } from "./src/server/tmux.js";
 import { tokenFromUrl } from "./src/server/auth.js";
 import { attachPty } from "./src/server/ptyGateway.js";
 import { attachEvents } from "./src/server/eventsWs.js";
+import { startHeartbeat, markAlive } from "./src/server/heartbeat.js";
 
 // @next/env is CJS bundled via ncc, whose dynamically-defined named exports
 // aren't visible to Node's cjs-module-lexer — import the default and
@@ -38,6 +39,13 @@ async function main() {
   const server = createServer((req, res) => handle(req, res));
   const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
 
+  // A WebSocket severed by an idle Tailscale/NAT timeout or a backgrounded mobile
+  // browser emits no close event, so the terminal freezes and never reconnects.
+  // Ping every client on an interval and reap the ones that stop ponging; the
+  // ping traffic also keeps otherwise-idle connections from being dropped.
+  const stopHeartbeat = startHeartbeat(wss);
+  server.on("close", stopHeartbeat);
+
   server.on("upgrade", (req, socket, head) => {
     try {
       const url = req.url ?? "";
@@ -62,9 +70,9 @@ async function main() {
           socket.destroy();
           return;
         }
-        wss.handleUpgrade(req, socket, head, (ws) => attachPty(ws, id));
+        wss.handleUpgrade(req, socket, head, (ws) => { markAlive(ws); attachPty(ws, id); });
       } else if (path === "/ws/events") {
-        wss.handleUpgrade(req, socket, head, (ws) => attachEvents(ws, getBus()));
+        wss.handleUpgrade(req, socket, head, (ws) => { markAlive(ws); attachEvents(ws, getBus()); });
       } else {
         socket.destroy();
       }
