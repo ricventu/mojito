@@ -76,8 +76,9 @@ export default function SettingsSheet({ token, onClose }: { token: string; onClo
     }
     const body = await res.json().catch(() => ({}));
     if (res.status === 200 && body.status === "up-to-date") {
-      setPhase("idle");
-      setPullMsg(`Already up to date (${body.from}).`);
+      // No new commits, but "Pull & deploy" still rebuilds and restarts.
+      setPullMsg(`Already up to date (${body.from}) — redeploying.`);
+      setPhase("deploying");
       return;
     }
     if (res.status === 200 && body.status === "updated") {
@@ -171,7 +172,7 @@ export default function SettingsSheet({ token, onClose }: { token: string; onClo
         {selfUpdateEnabled && (
           <div style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
             <h3 style={{ marginTop: 0 }}>Server</h3>
-            <p className="sheet-title">Pull the latest main into this server&apos;s checkout. The deploy hook then restarts the app.</p>
+            <p className="sheet-title">Pull the latest main into this server&apos;s checkout, then rebuild and restart the app — even when there is nothing new to pull.</p>
             <button
               className="btn block"
               disabled={phase === "pulling" || phase === "deploying"}

@@ -39,12 +39,13 @@ describe("runSelfUpdate single-flight", () => {
   });
 
   it("allows a fresh pull once the previous one settles", async () => {
+    const noop = async () => {};
     const d1 = deferredPull();
-    const p1 = runSelfUpdate(d1.pull);
+    const p1 = runSelfUpdate(d1.pull, noop);
     d1.release({ status: "up-to-date", from: "aaa", to: "aaa" });
     await p1;
     const d2 = deferredPull();
-    runSelfUpdate(d2.pull);
+    runSelfUpdate(d2.pull, noop);
     expect(d2.calls()).toBe(1);
     d2.release({ status: "up-to-date", from: "aaa", to: "aaa" });
   });
@@ -54,8 +55,37 @@ describe("runSelfUpdate single-flight", () => {
     await expect(runSelfUpdate(failing)).rejects.toThrow("boom");
     // A subsequent call must be able to start again (slot cleared in finally).
     const d = deferredPull();
-    runSelfUpdate(d.pull);
+    runSelfUpdate(d.pull, async () => {});
     expect(d.calls()).toBe(1);
     d.release({ status: "up-to-date", from: "a", to: "a" });
+  });
+});
+
+describe("runSelfUpdate deploy trigger", () => {
+  it("triggers the deploy when already up to date (no merge, so no post-merge hook)", async () => {
+    let calls = 0;
+    const res = await runSelfUpdate(
+      async () => ({ status: "up-to-date", from: "a", to: "a" }),
+      async () => { calls += 1; },
+    );
+    expect(res).toEqual({ status: "up-to-date", from: "a", to: "a" });
+    expect(calls).toBe(1);
+  });
+
+  it("does NOT trigger the deploy on a real update (the post-merge hook handles it)", async () => {
+    let calls = 0;
+    await runSelfUpdate(
+      async () => ({ status: "updated", from: "a", to: "b" }),
+      async () => { calls += 1; },
+    );
+    expect(calls).toBe(0);
+  });
+
+  it("does not trigger the deploy when the pull fails", async () => {
+    let calls = 0;
+    await expect(
+      runSelfUpdate(() => Promise.reject(new Error("boom")), async () => { calls += 1; }),
+    ).rejects.toThrow("boom");
+    expect(calls).toBe(0);
   });
 });
