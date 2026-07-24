@@ -396,18 +396,22 @@ export interface ShellLaunchRequest {
   labels?: string[];
 }
 
-export function buildShellCommand(): string {
+export function buildShellCommand(shell?: string): string {
   // A plain login shell — behaves like a normally-opened terminal (sources the user's profile).
+  // Use the host's configured login shell ($SHELL), falling back to bash: hardcoding zsh broke
+  // Linux deployments where zsh isn't installed (macOS defaults to zsh, Linux typically to bash).
   // No env prefix, no --settings, no slash command: a shell fires no claude hooks.
-  return "zsh -l";
+  const login = (shell ?? "").trim() || "/bin/bash";
+  return `${login} -l`;
 }
 
 export async function launchShellSession(
   req: ShellLaunchRequest,
-  deps: LaunchDeps & { genId?: () => string; homeDir?: () => string },
+  deps: LaunchDeps & { genId?: () => string; homeDir?: () => string; shell?: () => string | undefined },
 ): Promise<{ ok: true; meta: SessionMeta } | { ok: false; reason: "no-repo" }> {
   const homeDir = deps.homeDir ?? (() => homedir());
   const genId = deps.genId ?? (() => randomBytes(3).toString("hex"));
+  const shell = deps.shell ?? (() => process.env.SHELL);
 
   // Same cwd/slug resolution as launchCustomSession.
   let cwd: string;
@@ -431,7 +435,7 @@ export async function launchShellSession(
   const id = shellSessionName(slug, genId());
 
   // A plain shell writes no hook-settings file and no launch-context file.
-  const command = buildShellCommand();
+  const command = buildShellCommand(shell());
   await deps.newSession(id, cwd, command);
   await deps.pipePane(id, logfilePath(deps.stateDir, id));
 

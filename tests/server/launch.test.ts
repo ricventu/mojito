@@ -145,6 +145,7 @@ function customDeps(over: Record<string, unknown> = {}) {
     nowIso: () => "2026-07-11T00:00:00.000Z",
     genId: () => "abc123",
     homeDir: () => "/home/me",
+    shell: () => "/bin/zsh",
     ...over,
   };
 }
@@ -408,12 +409,17 @@ describe("launchCustomSession from a ticket (RIC-128)", () => {
 });
 
 describe("buildShellCommand", () => {
-  it("returns a bare login zsh with no claude, settings, or slash command", () => {
-    const cmd = buildShellCommand();
-    expect(cmd).toBe("zsh -l");
+  it("uses the given login shell with no claude, settings, or slash command", () => {
+    const cmd = buildShellCommand("/bin/zsh");
+    expect(cmd).toBe("/bin/zsh -l");
     expect(cmd).not.toContain("claude");
     expect(cmd).not.toContain("--settings");
     expect(cmd).not.toContain("/lime");
+  });
+  it("falls back to bash when no login shell is configured (e.g. Linux without zsh)", () => {
+    expect(buildShellCommand(undefined)).toBe("/bin/bash -l");
+    expect(buildShellCommand("")).toBe("/bin/bash -l");
+    expect(buildShellCommand("   ")).toBe("/bin/bash -l");
   });
 });
 
@@ -426,7 +432,7 @@ describe("launchShellSession", () => {
     expect(meta).toMatchObject({ kind: "shell", id: "mojito-shell-general-abc123", ticket: "",
       launchStatus: "", cwd: "/home/me", projectName: null, title: "home", autoAdvance: false,
       state: "running", model: "", effort: "" });
-    expect(d.newSession).toHaveBeenCalledWith("mojito-shell-general-abc123", "/home/me", "zsh -l");
+    expect(d.newSession).toHaveBeenCalledWith("mojito-shell-general-abc123", "/home/me", "/bin/zsh -l");
     expect(d.pipePane).toHaveBeenCalledOnce();
   });
 
@@ -471,7 +477,13 @@ describe("launchShellSession", () => {
       ticket: "RIC-155", launchStatus: "", cwd: "/wt/ric-155", projectName: "Mojito",
       title: "Avvio terminale", labels: ["Feature"], state: "running" });
     expect(existsSync(join(dir, "context", "mojito-shell-ric-155-abc123.json"))).toBe(false);
-    expect(d.newSession).toHaveBeenCalledWith("mojito-shell-ric-155-abc123", "/wt/ric-155", "zsh -l");
+    expect(d.newSession).toHaveBeenCalledWith("mojito-shell-ric-155-abc123", "/wt/ric-155", "/bin/zsh -l");
+  });
+
+  it("falls back to bash when the host has no login shell configured", async () => {
+    const d = customDeps({ shell: () => undefined });
+    await launchShellSession({ projectName: null }, d);
+    expect(d.newSession).toHaveBeenCalledWith("mojito-shell-general-abc123", "/home/me", "/bin/bash -l");
   });
 
   it("refuses when the ticket's team/project is unmapped", async () => {
