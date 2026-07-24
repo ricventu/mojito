@@ -57,7 +57,10 @@ function StackRowView({ row, token, onOpenLogs, refresh }: {
         {row.hasStack && row.status !== "running" && (
           <button className="btn sm" disabled={busy} onClick={() => act("start")}>Start</button>
         )}
-        {row.hasStack && row.status === "running" && (
+        {/* Stop is always available: detection may read "crashed"/"stopped" while
+            orphan processes still hold the ports, so the user must always be able
+            to force a clean stop. */}
+        {row.hasStack && (
           <button className="btn sm" disabled={busy} onClick={() => act("stop")}>Stop</button>
         )}
         {row.hasStack && (
