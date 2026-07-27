@@ -5,6 +5,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 import AccessoryBar from "./AccessoryBar";
+import DocsView from "./DocsView";
 import StateBadge from "./StateBadge";
 import { apiFetch } from "@/lib/client";
 import { computeTouchScroll, wheelSequences } from "@/lib/touchScroll";
@@ -27,6 +28,7 @@ export default function TerminalView(
   const termRef = useRef<Terminal | null>(null);
   const [auto, setAuto] = useState(session.autoAdvance);
   const [imgErr, setImgErr] = useState<string | null>(null);
+  const [docsOpen, setDocsOpen] = useState(false);
   // While the keyboard is up the visible band is worth ~13 rows; the header and
   // the ticket title cost 8 of them, which is what leaves claude's TUI without
   // room for its input line (see keyboardInset.ts). Hide them until it closes.
@@ -363,6 +365,7 @@ export default function TerminalView(
         <span className="id">{session.ticket}</span>
         <span className="status">· {session.launchStatus}</span>
         <span className="grow" />
+        <button className="btn sm" aria-label="Documents" onClick={() => setDocsOpen(true)}>📄</button>
         <button className={`chip toggle${auto ? " on" : ""}`} onClick={toggleAuto}>
           auto: {auto ? "on" : "off"}
         </button>
@@ -376,6 +379,14 @@ export default function TerminalView(
       <div ref={holder} className="term-body" />
       {imgErr && <div className="term-img-err err-text">{imgErr}</div>}
       <AccessoryBar onSend={send} onPasteText={(t) => termRef.current?.paste(t)} onPickImages={pickImages} />
+      {docsOpen && (
+        <DocsView
+          token={token}
+          target={{ session: session.id }}
+          label={session.ticket || session.title}
+          onClose={() => setDocsOpen(false)}
+        />
+      )}
     </div>
   );
 }

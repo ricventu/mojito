@@ -12,8 +12,9 @@ import { orderTickets } from "@/lib/orderTickets";
 import StatusBadge from "./StatusBadge";
 
 export default function TicketList(
-  { token, tickets, sessions, onLaunched, onOpen }:
-  { token: string; tickets: TicketSummary[]; sessions: SessionMeta[]; onLaunched: () => void; onOpen: (s: SessionMeta) => void },
+  { token, tickets, sessions, onLaunched, onOpen, onOpenDocs }:
+  { token: string; tickets: TicketSummary[]; sessions: SessionMeta[]; onLaunched: () => void;
+    onOpen: (s: SessionMeta) => void; onOpenDocs: (t: TicketSummary) => void },
 ) {
   const [picked, setPicked] = useState<TicketSummary | null>(null);
   const [query, setQuery] = usePersistedState("mojito-tickets-q", "");
@@ -96,7 +97,9 @@ export default function TicketList(
       ))}
       {picked && (
         <LaunchSheet token={token} ticket={picked} sessions={sessions}
-          onClose={() => setPicked(null)} onLaunched={onLaunched} onOpen={(s) => { setPicked(null); onOpen(s); }} />
+          onClose={() => setPicked(null)} onLaunched={onLaunched}
+          onOpen={(s) => { setPicked(null); onOpen(s); }}
+          onOpenDocs={() => { setPicked(null); onOpenDocs(picked); }} />
       )}
       {newOpen && (
         <NewTicketSheet token={token}

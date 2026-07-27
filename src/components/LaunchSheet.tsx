@@ -10,9 +10,9 @@ import QaVerdictButtons from "./QaVerdictButtons";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 
 export default function LaunchSheet(
-  { token, ticket, sessions, onClose, onLaunched, onOpen }:
+  { token, ticket, sessions, onClose, onLaunched, onOpen, onOpenDocs }:
   { token: string; ticket: TicketSummary; sessions: SessionMeta[]; onClose: () => void;
-    onLaunched: () => void; onOpen: (s: SessionMeta) => void },
+    onLaunched: () => void; onOpen: (s: SessionMeta) => void; onOpenDocs: () => void },
 ) {
   const { defaults } = useStageDefaults(token);
   // Pre-fill the model + effort optimal for this ticket's stage (overridable via the selectors).
@@ -179,6 +179,7 @@ export default function LaunchSheet(
             {customBtn}
           </>
         )}
+        <button className="btn ghost block" style={{ marginTop: 12 }} onClick={onOpenDocs}>Docs</button>
         {err && <p className="err-text">{err}</p>}
       </div>
     </div>
