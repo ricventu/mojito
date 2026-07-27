@@ -13,9 +13,13 @@ export default function DocsView(
   { token: string; target: DocsTarget; label: string; onClose: () => void },
 ) {
   const [selected, setSelected] = useState<string | null>(null);
-  const [reload, setReload] = useState(0);
-  const { files, error: listError } = useDocList(token, target);
-  const { content, error: docError } = useDocContent(token, target, selected, reload);
+  // Two independent counters, not one shared: bumping the list's ↻ must not
+  // re-fetch an open document (and vice versa) — the two refreshes are
+  // separate user intents even though they share one button glyph.
+  const [listReload, setListReload] = useState(0);
+  const [docReload, setDocReload] = useState(0);
+  const { files, error: listError } = useDocList(token, target, listReload);
+  const { content, error: docError } = useDocContent(token, target, selected, docReload);
   const current = files?.find((f) => f.path === selected);
 
   return (
@@ -24,9 +28,11 @@ export default function DocsView(
         <button className="back" aria-label="Back" onClick={() => (selected ? setSelected(null) : onClose())}>‹</button>
         <span className="name">{selected ? (current?.name ?? selected) : `${label} · docs`}</span>
         <span className="grow" />
-        {selected && (
-          <button className="btn sm" aria-label="Reload" onClick={() => setReload((n) => n + 1)}>↻</button>
-        )}
+        <button
+          className="btn sm"
+          aria-label="Reload"
+          onClick={() => (selected ? setDocReload((n) => n + 1) : setListReload((n) => n + 1))}
+        >↻</button>
       </header>
       <div className="docs-scroll">
         {selected ? (

@@ -13,10 +13,19 @@ export function resolveTicketCwd(
   try {
     const { teamKey } = parseIdentifier(ticket);
     const repo = resolveRepoFromMap(loadProjectMap(projectsPath), teamKey, projectName);
-    if (!repo) return null;
+    // entry.projects[projectName] can hand back the object's own prototype instead
+    // of undefined — e.g. projectName === "__proto__" against a "projects" map with
+    // no own property by that name — despite resolveRepoFromMap's string | null
+    // signature. Guard the type (on top of the original falsy check) so a
+    // non-string value never reaches resolveWorktree()/resolve() and throws a
+    // 500 downstream.
+    if (!repo || typeof repo !== "string") return null;
     return resolveWorktree(repo, ticket) ?? repo;
   } catch {
     // Malformed ticket id, or an unreadable projects file: no directory to offer.
+    // Note this catch does NOT cover the __proto__ case above — resolveWorktree()
+    // swallows its own execFileSync failure and returns null, so `?? repo` would
+    // otherwise leak the bad non-string value out instead of throwing into here.
     return null;
   }
 }

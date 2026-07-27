@@ -74,6 +74,10 @@ describe("resolveDocPath", () => {
   it("returns a path for a missing file, so the caller reports not-found", () => {
     expect(resolveDocPath(root, "docs/gone.md")).toBe(join(root, "docs/gone.md"));
   });
+
+  it("rejects a path containing a NUL byte", () => {
+    expect(resolveDocPath(root, "docs/a\0.md")).toBeNull();
+  });
 });
 
 describe("readDoc", () => {
@@ -254,5 +258,18 @@ describe("listDocs", () => {
     write("docs/superpowers/specs/a-design.md", "# a");
     const run = () => { throw new Error("no git"); };
     expect(listDocs(root, run).map((d) => d.path)).toEqual(["docs/superpowers/specs/a-design.md"]);
+  });
+
+  it("breaks a tie between equal mtimes by path", () => {
+    // Both come from the branch source, in git's own (reverse-alphabetical) order,
+    // and push order alone would keep z before a under a stable sort — so this only
+    // passes if the comparator's localeCompare tiebreak actually reorders them.
+    const zPath = write("z.md", "# z");
+    const aPath = write("a.md", "# a");
+    const same = new Date("2026-07-20T10:00:00Z");
+    utimesSync(zPath, same, same);
+    utimesSync(aPath, same, same);
+    const docs = listDocs(root, gitRun("z.md\na.md\n"));
+    expect(docs.map((d) => d.path)).toEqual(["a.md", "z.md"]);
   });
 });

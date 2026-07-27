@@ -128,7 +128,17 @@ export type Run = (cmd: string, args: string[]) => string;
 // error yields an empty list so the superpowers scan still shows on its own.
 export function branchMdPaths(
   root: string,
-  run: Run = (cmd, args) => execFileSync(cmd, args, { cwd: root, encoding: "utf8" }),
+  run: Run = (cmd, args) =>
+    execFileSync(cmd, args, {
+      cwd: root,
+      encoding: "utf8",
+      // Keep git's own stderr (e.g. "fatal: not a git repository" for a plain
+      // worktree) out of the service journal, and never let a wedged git call
+      // block Mojito's single-threaded server — which also serves the terminal
+      // WebSockets — indefinitely.
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5000,
+    }),
 ): string[] {
   const base = detectDefaultBranch(run);
   if (!base) return [];

@@ -44,7 +44,10 @@ export function docErrorMessage(status: number): string {
   return "Could not load the document.";
 }
 
-export function useDocList(token: string, target: DocsTarget) {
+// `reload` is a counter the caller bumps to re-fetch the list — mirrors
+// useDocContent's parameter below, so a session writing a new spec can be
+// picked up without closing and reopening the overlay.
+export function useDocList(token: string, target: DocsTarget, reload: number) {
   const [files, setFiles] = useState<DocEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Depend on the serialised query, not the target object: a fresh object
@@ -62,7 +65,7 @@ export function useDocList(token: string, target: DocsTarget) {
       })
       .catch(() => { if (alive) setError("Could not load documents."); });
     return () => { alive = false; };
-  }, [token, q]);
+  }, [token, q, reload]);
   return { files, error };
 }
 

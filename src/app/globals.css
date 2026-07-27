@@ -333,6 +333,7 @@ button.chip:active { transform: scale(.96); }
 .doc-body li > input[type="checkbox"] { margin-right: 6px; }
 .doc-body a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px;
   word-break: break-word; }
+.doc-body a:not([href]) { color: var(--text-dim); text-decoration: underline dotted; }
 .doc-body code { font: 500 13px var(--mono); background: var(--surface-hi);
   border: 1px solid var(--border); border-radius: 6px; padding: 1px 5px; word-break: break-word; }
 .doc-body pre { background: var(--surface); border: 1px solid var(--border);

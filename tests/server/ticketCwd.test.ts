@@ -39,4 +39,14 @@ describe("resolveTicketCwd", () => {
   it("returns null when the projects file is missing", () => {
     expect(resolveTicketCwd(join(dir, "absent.json"), "RIC-162", "Mojito")).toBeNull();
   });
+
+  it("returns null instead of Object.prototype for a __proto__ project name", () => {
+    // entry.projects["__proto__"] falls through to the object's own prototype
+    // when "projects" has no own property by that name, handing resolveRepoFromMap
+    // a non-string "repo" that must not reach resolveWorktree()/resolve().
+    const repo = join(dir, "repo");
+    mkdirSync(repo);
+    writeFileSync(projectsPath, JSON.stringify({ RIC: { path: repo, projects: {} } }));
+    expect(resolveTicketCwd(projectsPath, "RIC-1", "__proto__")).toBeNull();
+  });
 });
