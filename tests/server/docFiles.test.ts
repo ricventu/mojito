@@ -204,14 +204,22 @@ describe("branchMdPaths", () => {
     expect(branchMdPaths(root, run)).toEqual([]);
   });
 
-  it("asks git for markdown only, against the merge base", () => {
+  it("asks git for markdown only, against the merge base, relative to cwd and with quoting disabled", () => {
     const seen: string[][] = [];
     const run = (_cmd: string, args: string[]) => {
       seen.push(args);
       return args.includes("symbolic-ref") ? "origin/main\n" : "";
     };
     branchMdPaths(root, run);
-    expect(seen.at(-1)).toEqual(["diff", "--name-only", "main...HEAD", "--", "*.md"]);
+    expect(seen.at(-1)).toEqual([
+      "-c", "core.quotePath=false", "diff", "--name-only", "--relative", "main...HEAD", "--", "*.md",
+    ]);
+  });
+
+  it("keeps a non-ASCII path intact, as returned once core.quotePath is disabled", () => {
+    // Without core.quotePath=false, git would instead emit the octal-quoted
+    // "spec-perch\303\251.md"; branchMdPaths must not mangle the raw UTF-8 name.
+    expect(branchMdPaths(root, gitRun("spec-perché.md\n"))).toEqual(["spec-perché.md"]);
   });
 });
 

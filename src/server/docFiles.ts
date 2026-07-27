@@ -133,7 +133,12 @@ export function branchMdPaths(
   const base = detectDefaultBranch(run);
   if (!base) return [];
   try {
-    return run("git", ["diff", "--name-only", `${base}...HEAD`, "--", "*.md"])
+    // core.quotePath=false stops git from octal-escaping non-ASCII filenames
+    // (e.g. "spec-perché.md" -> "spec-perch\303\251.md"), which docEntry would
+    // otherwise stat verbatim and silently drop. --relative reports paths
+    // relative to cwd rather than the working-tree root, which matters when
+    // `root` is a subdirectory of the repository.
+    return run("git", ["-c", "core.quotePath=false", "diff", "--name-only", "--relative", `${base}...HEAD`, "--", "*.md"])
       .split("\n")
       .map((l) => l.trim())
       .filter(Boolean);
