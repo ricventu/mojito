@@ -143,6 +143,21 @@ describe("scanSuperpowersDocs", () => {
   it("returns an empty list for a missing root", () => {
     expect(scanSuperpowersDocs(join(root, "nope"))).toEqual([]);
   });
+
+  it("stays out of a sibling worktree nested under a dot-directory", () => {
+    write("docs/superpowers/specs/mine-design.md", "# mine");
+    write(".claude/worktrees/ric-1/docs/superpowers/specs/theirs-design.md", "# theirs");
+    expect(scanSuperpowersDocs(root).map((d) => d.path)).toEqual([
+      "docs/superpowers/specs/mine-design.md",
+    ]);
+  });
+
+  it("stays out of a nested checkout under a plainly-named directory", () => {
+    // A linked git worktree has a `.git` FILE; a clone has a `.git` directory.
+    write("worktrees/ric-1/.git", "gitdir: /elsewhere/.git/worktrees/ric-1\n");
+    write("worktrees/ric-1/docs/superpowers/specs/theirs-design.md", "# theirs");
+    expect(scanSuperpowersDocs(root)).toEqual([]);
+  });
 });
 
 describe("docEntry", () => {

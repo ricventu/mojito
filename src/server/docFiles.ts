@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, isAbsolute, join, resolve, sep } from "node:path";
 import { execFileSync } from "node:child_process";
 import { detectDefaultBranch } from "./reviewScale.js";
@@ -57,8 +57,15 @@ export interface DocEntry {
   size: number;   // bytes
 }
 
-const SKIP_DIRS = new Set(["node_modules", ".git", ".next", ".mojito"]);
+const SKIP_DIRS = new Set(["node_modules"]);
 const MAX_DEPTH = 6;
+
+// A directory holding a `.git` entry is another checkout: a linked worktree (where
+// `.git` is a file) or a clone (where it is a directory). Its documents belong to
+// that tree, not to the one being listed.
+function isNestedCheckout(abs: string): boolean {
+  return existsSync(join(abs, ".git"));
+}
 
 // null when the path is gone or unreadable: `git diff --name-only` reports files
 // the branch deleted, and those must not reach the list as dead rows.
@@ -100,14 +107,14 @@ export function scanSuperpowersDocs(root: string): DocEntry[] {
       return;
     }
     for (const e of entries) {
-      if (!e.isDirectory() || SKIP_DIRS.has(e.name)) continue;
+      if (!e.isDirectory() || SKIP_DIRS.has(e.name) || e.name.startsWith(".")) continue;
       const childRel = relDir ? `${relDir}/${e.name}` : e.name;
       if (e.name === "superpowers" && basename(relDir) === "docs") {
         out.push(...mdFilesIn(root, `${childRel}/specs`, "specs"));
         out.push(...mdFilesIn(root, `${childRel}/plans`, "plans"));
         continue; // nothing deeper under superpowers is listed
       }
-      if (depth < MAX_DEPTH) walk(childRel, depth + 1);
+      if (depth < MAX_DEPTH && !isNestedCheckout(join(root, childRel))) walk(childRel, depth + 1);
     }
   };
   walk("", 0);
