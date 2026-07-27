@@ -9,8 +9,10 @@ import StateBadge from "./StateBadge";
 import { apiFetch } from "@/lib/client";
 import { computeTouchScroll, wheelSequences } from "@/lib/touchScroll";
 import { SESSION_GONE_CODE } from "@/lib/ptyClose";
-import { termRootStyle } from "@/lib/keyboardInset";
+import { termRootStyle, isKeyboardOpen } from "@/lib/keyboardInset";
 import { terminalOptions } from "@/lib/terminalOptions";
+import { isUsableGeometry } from "@/lib/terminalFit";
+import { keepSettling } from "@/lib/viewportSettle";
 import { terminalTabTitle } from "@/lib/terminalTabTitle";
 import { readAsDataUrl } from "@/lib/readAsDataUrl";
 import { quoteArg } from "@/lib/quoteArg";
@@ -25,6 +27,13 @@ export default function TerminalView(
   const termRef = useRef<Terminal | null>(null);
   const [auto, setAuto] = useState(session.autoAdvance);
   const [imgErr, setImgErr] = useState<string | null>(null);
+  // While the keyboard is up the visible band is worth ~13 rows; the header and
+  // the ticket title cost 8 of them, which is what leaves claude's TUI without
+  // room for its input line (see keyboardInset.ts). Hide them until it closes.
+  const [kbdOpen, setKbdOpen] = useState(false);
+  const kbdOpenRef = useRef(false);
+  // Set by the mount effect so the re-fit below can reach into its closure.
+  const refitRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     // React StrictMode (dev) mounts this effect, runs its cleanup, and remounts
@@ -77,6 +86,67 @@ export default function TerminalView(
         }
       };
 
+      // The mobile virtual keyboard shrinks only the visual viewport, so the
+      // terminal is sized against that band rather than the layout viewport.
+      // `window resize` alone does not fire for it, hence the vv listeners below.
+      const vv = window.visualViewport;
+
+      // Fit, but never to a geometry the mobile keyboard is only passing through
+      // on its way to the final one (see terminalFit.ts — a mid-animation band
+      // proposes 1 row, which would resize the tmux window to a single row and
+      // take the TUI's input line with it).
+      const applyFit = () => {
+        // While the keyboard is up, leave the geometry alone entirely. The
+        // terminal keeps the rows it had and `.term-body` shows the bottom of
+        // them (see globals.css), so the input line stays on screen without the
+        // pty — and claude's whole layout — having to be resized against a band
+        // we cannot measure reliably. Also means no TUI reflow while typing.
+        if (kbdOpenRef.current) return;
+        if (!isUsableGeometry(fit.proposeDimensions())) return;
+        fit.fit();
+        sendResize();
+      };
+
+      // Pin `.term-root` to the visible band (see keyboardInset.ts). Re-read on
+      // every pass: the band is what the terminal is measured against, and a
+      // value caught mid-animation is what left the pty taller than the screen.
+      const syncViewport = () => {
+        const root = rootRef.current;
+        if (!root || !vv) return;
+        const style = termRootStyle({ height: vv.height, offsetTop: vv.offsetTop });
+        root.style.height = style.height;
+        root.style.transform = style.transform;
+        const open = isKeyboardOpen({ layoutHeight: window.innerHeight, visualHeight: vv.height });
+        // The ref is what applyFit reads: it must be current within this same
+        // pass, before React has re-rendered on the state change.
+        kbdOpenRef.current = open;
+        setKbdOpen(open);
+      };
+
+      // Keep re-reading the band until it stops moving: iOS gives no guarantee
+      // that a further event will arrive to correct the last one it sent.
+      let settle: ReturnType<typeof setTimeout>;
+      let lastBand = -1;
+      let passes = 0;
+      const settlePass = () => {
+        const band = vv ? Math.round(vv.height) : window.innerHeight;
+        syncViewport();
+        applyFit();
+        if (keepSettling({ band, lastBand, passes })) {
+          lastBand = band;
+          passes += 1;
+          clearTimeout(settle);
+          settle = setTimeout(settlePass, 250);
+        }
+      };
+      const fitWhenSettled = () => {
+        lastBand = -1;
+        passes = 0;
+        clearTimeout(settle);
+        settlePass();
+      };
+      refitRef.current = fitWhenSettled;
+
       let closed = false;
       let retry: ReturnType<typeof setTimeout>;
       const connect = () => {
@@ -90,8 +160,10 @@ export default function TerminalView(
           // unguarded `dimensions` getter and throws, so bail on the same `closed`
           // flag `onclose` already checks.
           if (closed) return;
-          fit.fit();
-          sendResize();
+          // Re-fit on (re)connect: this is also what recovers the pty's geometry
+          // after a reconnect, since the server spawns the attach at its own
+          // defaults until the first resize arrives.
+          fitWhenSettled();
         };
         ws.onmessage = (m) => {
           if (closed) return;
@@ -112,40 +184,27 @@ export default function TerminalView(
       connect();
 
       const onData = term.onData((d) => wsRef.current?.send(new TextEncoder().encode(d)));
-      const onResize = () => {
-        fit.fit();
-        sendResize();
-      };
+      const onResize = () => fitWhenSettled();
       window.addEventListener("resize", onResize);
 
-      // The mobile virtual keyboard shrinks only the visual viewport, so pin
-      // `.term-root` to it (see keyboardInset.ts) and re-fit xterm to the reduced
-      // height, keeping the active prompt line and the accessory bar above the
-      // keyboard. `window resize` alone does not fire for a keyboard that only
-      // resizes the visual viewport, so this listener is required.
-      const vv = window.visualViewport;
+      // Each viewport change starts a fresh settle run (sync the band, fit, then
+      // keep checking until it stops moving). At mount this runs while the socket
+      // is still CONNECTING; sendResize() no-ops until it is OPEN, and ws.onopen
+      // starts its own run once connected.
       const applyViewport = () => {
-        const root = rootRef.current;
-        if (!root || !vv) return;
-        const style = termRootStyle({ height: vv.height, offsetTop: vv.offsetTop });
-        root.style.height = style.height;
-        root.style.transform = style.transform;
-        fit.fit();
-        // At mount, applyViewport() runs synchronously while the socket is still
-        // CONNECTING; sendResize() no-ops until it is OPEN (ws.onopen sends the
-        // initial resize once connected).
-        sendResize();
+        fitWhenSettled();
         term.scrollToBottom();
       };
       if (vv) {
         vv.addEventListener("resize", applyViewport);
         vv.addEventListener("scroll", applyViewport);
-        applyViewport();
       }
+      applyViewport();
 
       teardown = () => {
         closed = true;
         clearTimeout(retry);
+        clearTimeout(settle);
         onData.dispose();
         window.removeEventListener("resize", onResize);
         if (vv) {
@@ -165,6 +224,13 @@ export default function TerminalView(
       teardown?.();
     };
   }, [session.id, token]);
+
+  // Showing or hiding the chrome changes the terminal's box, so re-fit once React
+  // has committed the new layout — the pty must learn about the rows we just
+  // handed back to it.
+  useEffect(() => {
+    refitRef.current();
+  }, [kbdOpen]);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -224,7 +290,11 @@ export default function TerminalView(
       const y = e.touches[0].clientY;
       acc += lastY - y;
       lastY = y;
-      const rowHeightPx = term.rows > 0 ? el.clientHeight / term.rows : 0;
+      // Measure against the terminal, not its container: with the keyboard open
+      // the terminal is taller than the box it is anchored in (globals.css), so
+      // the container's height would overstate how far one row is.
+      const termHeight = term.element?.clientHeight ?? el.clientHeight;
+      const rowHeightPx = term.rows > 0 ? termHeight / term.rows : 0;
       const { lines, remainderPx } = computeTouchScroll(acc, rowHeightPx);
       // Only forward wheel events when the foreground app has mouse tracking on.
       // Otherwise (bare shell, a no-mouse pager, a plain prompt) the pty would
@@ -287,6 +357,7 @@ export default function TerminalView(
 
   return (
     <div className="term-root" ref={rootRef}>
+      {!kbdOpen && (
       <header className="term-head">
         <button className="back" onClick={onBack}>‹</button>
         <span className="id">{session.ticket}</span>
@@ -300,8 +371,9 @@ export default function TerminalView(
           {active ? "Kill" : "Dismiss"}
         </button>
       </header>
-      {session.title && <div className="term-title">{session.title}</div>}
-      <div ref={holder} style={{ flex: 1, overflow: "hidden" }} />
+      )}
+      {session.title && !kbdOpen && <div className="term-title">{session.title}</div>}
+      <div ref={holder} className="term-body" />
       {imgErr && <div className="term-img-err err-text">{imgErr}</div>}
       <AccessoryBar onSend={send} onPasteText={(t) => termRef.current?.paste(t)} onPickImages={pickImages} />
     </div>

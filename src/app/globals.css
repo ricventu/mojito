@@ -285,6 +285,28 @@ button.chip:active { transform: scale(.96); }
   overscroll-behavior: none;
 }
 
+/* The terminal is anchored to the BOTTOM of its box, with the overflow clipped
+   at the top.
+
+   Sizing the pty to the visible band cannot be made reliable: on iOS the band
+   moves while the keyboard animates and `visualViewport.height` is not a
+   trustworthy number to fit an exact row count against. Every row of error used
+   to land on the last row — which is where claude's TUI keeps its input line, so
+   the one thing the user needs was the first thing to disappear. Anchored to the
+   bottom, the same error costs rows of transcript off the top instead. */
+.term-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+.term-body .xterm {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
 /* The terminal body is not a browser pan surface — iOS must not start a page
    pan when a drag begins over it. Scrolling is driven in JS (see TerminalView).
    The accessory bar keeps its default touch-action so its horizontal scroll
