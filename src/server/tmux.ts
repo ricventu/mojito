@@ -168,7 +168,9 @@ export async function listSessions(prefix: string): Promise<string[]> {
   }
 }
 
+// `-e` keeps the SGR escape sequences, so the scrollback the browser terminal
+// replays on attach (ptyGateway) comes back in colour instead of flat text.
 export async function capturePane(name: string, lines: number): Promise<string> {
-  const { stdout } = await pexec("tmux", ["capture-pane", "-t", name, "-p", "-S", `-${lines}`]);
+  const { stdout } = await pexec("tmux", ["capture-pane", "-t", name, "-p", "-e", "-S", `-${lines}`]);
   return stdout;
 }
