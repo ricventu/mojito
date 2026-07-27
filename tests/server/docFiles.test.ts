@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, symlinkSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, symlinkSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, basename } from "node:path";
-import { resolveDocPath, readDoc, DOC_MAX_BYTES, docEntry, scanSuperpowersDocs } from "@/server/docFiles";
+import { resolveDocPath, readDoc, DOC_MAX_BYTES, docEntry, scanSuperpowersDocs, branchMdPaths, listDocs } from "@/server/docFiles";
 
 let root: string;
 let outside: string;
@@ -156,5 +156,80 @@ describe("docEntry", () => {
 
   it("is null for a path that does not exist", () => {
     expect(docEntry(root, "docs/gone.md", "branch")).toBeNull();
+  });
+});
+
+// A fake git: origin/HEAD points at main, `diff --name-only` returns `out`.
+function gitRun(out: string) {
+  return (_cmd: string, args: string[]) => {
+    if (args.includes("symbolic-ref")) return "origin/main\n";
+    if (args.includes("diff")) return out;
+    throw new Error(`unexpected git ${args.join(" ")}`);
+  };
+}
+
+describe("branchMdPaths", () => {
+  it("returns the trimmed non-empty lines of the diff", () => {
+    expect(branchMdPaths(root, gitRun("AGENTS.md\nweb/notes.md\n\n"))).toEqual([
+      "AGENTS.md",
+      "web/notes.md",
+    ]);
+  });
+
+  it("is empty when there is no default branch", () => {
+    const run = () => { throw new Error("not a git repo"); };
+    expect(branchMdPaths(root, run)).toEqual([]);
+  });
+
+  it("is empty when the diff itself fails", () => {
+    const run = (_cmd: string, args: string[]) => {
+      if (args.includes("symbolic-ref")) return "origin/main\n";
+      throw new Error("bad revision");
+    };
+    expect(branchMdPaths(root, run)).toEqual([]);
+  });
+
+  it("asks git for markdown only, against the merge base", () => {
+    const seen: string[][] = [];
+    const run = (_cmd: string, args: string[]) => {
+      seen.push(args);
+      return args.includes("symbolic-ref") ? "origin/main\n" : "";
+    };
+    branchMdPaths(root, run);
+    expect(seen.at(-1)).toEqual(["diff", "--name-only", "main...HEAD", "--", "*.md"]);
+  });
+});
+
+describe("listDocs", () => {
+  it("unions both sources, newest first", () => {
+    write("docs/superpowers/specs/a-design.md", "# a");
+    write("AGENTS.md", "# agents");
+    const specPath = join(root, "docs/superpowers/specs/a-design.md");
+    const agentsPath = join(root, "AGENTS.md");
+    // Make AGENTS.md the newer of the two, deterministically.
+    utimesSync(specPath, new Date("2026-07-20T10:00:00Z"), new Date("2026-07-20T10:00:00Z"));
+    utimesSync(agentsPath, new Date("2026-07-26T10:00:00Z"), new Date("2026-07-26T10:00:00Z"));
+    const docs = listDocs(root, gitRun("AGENTS.md\n"));
+    expect(docs.map((d) => [d.path, d.source])).toEqual([
+      ["AGENTS.md", "branch"],
+      ["docs/superpowers/specs/a-design.md", "specs"],
+    ]);
+  });
+
+  it("keeps the specs source when the branch also touched the spec", () => {
+    write("docs/superpowers/specs/a-design.md", "# a");
+    const docs = listDocs(root, gitRun("docs/superpowers/specs/a-design.md\n"));
+    expect(docs).toHaveLength(1);
+    expect(docs[0].source).toBe("specs");
+  });
+
+  it("drops a path the branch deleted", () => {
+    expect(listDocs(root, gitRun("removed.md\n"))).toEqual([]);
+  });
+
+  it("still lists specs when git is unavailable", () => {
+    write("docs/superpowers/specs/a-design.md", "# a");
+    const run = () => { throw new Error("no git"); };
+    expect(listDocs(root, run).map((d) => d.path)).toEqual(["docs/superpowers/specs/a-design.md"]);
   });
 });

@@ -1,5 +1,7 @@
 import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, isAbsolute, join, resolve, sep } from "node:path";
+import { execFileSync } from "node:child_process";
+import { detectDefaultBranch } from "./reviewScale.js";
 
 // Read-only markdown discovery for a worktree. Nothing in this module writes.
 
@@ -110,4 +112,43 @@ export function scanSuperpowersDocs(root: string): DocEntry[] {
   };
   walk("", 0);
   return out;
+}
+
+export type Run = (cmd: string, args: string[]) => string;
+
+// Markdown the branch created or modified vs the default branch's merge base.
+// Best-effort by design: no git, no default branch, no commits yet, or any git
+// error yields an empty list so the superpowers scan still shows on its own.
+export function branchMdPaths(
+  root: string,
+  run: Run = (cmd, args) => execFileSync(cmd, args, { cwd: root, encoding: "utf8" }),
+): string[] {
+  const base = detectDefaultBranch(run);
+  if (!base) return [];
+  try {
+    return run("git", ["diff", "--name-only", `${base}...HEAD`, "--", "*.md"])
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+// The listing behind GET /api/docs: superpowers specs/plans plus any markdown the
+// branch touched, deduplicated by relative path (the folder wins over the git
+// origin) and sorted newest first.
+export function listDocs(root: string, run?: Run): DocEntry[] {
+  const docs = scanSuperpowersDocs(root);
+  const seen = new Set(docs.map((d) => d.path));
+  for (const rel of branchMdPaths(root, run)) {
+    if (seen.has(rel)) continue;
+    const entry = docEntry(root, rel, "branch");
+    if (!entry) continue;
+    seen.add(rel);
+    docs.push(entry);
+  }
+  return docs.sort((a, b) =>
+    a.mtime === b.mtime ? a.path.localeCompare(b.path) : a.mtime < b.mtime ? 1 : -1,
+  );
 }
