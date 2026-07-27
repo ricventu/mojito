@@ -348,3 +348,23 @@ button.chip:active { transform: scale(.96); }
 .doc-table th, .doc-table td { border: 1px solid var(--border); padding: 6px 10px;
   text-align: left; vertical-align: top; }
 .doc-table th { background: var(--surface-hi); font-weight: 700; white-space: nowrap; }
+
+/* ---- Docs overlay ---- */
+/* Above the terminal (z-index 100 is the sheet backdrop): the terminal stays
+   mounted underneath so its WebSocket is never closed. */
+.docs-root { position: fixed; inset: 0; z-index: 120; display: flex; flex-direction: column;
+  background: var(--bg); }
+.docs-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+  border-bottom: 1px solid var(--border); background: var(--surface); }
+.docs-head .back { width: 32px; height: 32px; border-radius: 8px; background: var(--surface-hi);
+  border: 1px solid var(--border-hi); color: var(--text); font-size: 18px; cursor: pointer; flex: none; }
+.docs-head .name { font: 600 13px/1.3 var(--mono); overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+.docs-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; }
+.docs-item { display: block; margin: 10px 14px; padding: 12px 14px; text-align: left;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+  color: var(--text); cursor: pointer; }
+.docs-item:active { transform: scale(.99); }
+.docs-item .name { font: 600 13px/1.35 var(--mono); word-break: break-all; }
+.docs-item .meta { margin-top: 6px; font: 500 12px var(--mono); color: var(--text-dim); }
