@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname, basename } from "node:path";
 import { resolveDocPath, readDoc, DOC_MAX_BYTES } from "@/server/docFiles";
 
 let root: string;
@@ -53,6 +53,24 @@ describe("resolveDocPath", () => {
     expect(resolveDocPath(root, "link.md")).toBeNull();
   });
 
+  it("rejects a sibling directory whose name starts with the root's name", () => {
+    // Verifies the separator check in inside(): naive startsWith() without sep would fail
+    const parent = dirname(root);
+    const rootBasename = basename(root);
+    const evil = join(parent, rootBasename + "-evil");
+    mkdirSync(evil);
+    write("escape.md", "# secret", evil);
+    symlinkSync(join(evil, "escape.md"), join(root, "link.md"));
+    expect(resolveDocPath(root, "link.md")).toBeNull();
+  });
+
+  it("rejects a symlinked directory component that points outside the root", () => {
+    mkdirSync(join(outside, "subdir"));
+    write("file.md", "# content", join(outside, "subdir"));
+    symlinkSync(join(outside, "subdir"), join(root, "symdir"));
+    expect(resolveDocPath(root, "symdir/file.md")).toBeNull();
+  });
+
   it("returns a path for a missing file, so the caller reports not-found", () => {
     expect(resolveDocPath(root, "docs/gone.md")).toBe(join(root, "docs/gone.md"));
   });
@@ -77,5 +95,11 @@ describe("readDoc", () => {
     const abs = write("big.md", "x".repeat(40));
     expect(readDoc(abs, 10)).toEqual({ ok: false, reason: "too-large" });
     expect(DOC_MAX_BYTES).toBe(512 * 1024);
+  });
+
+  it("reads a file of exactly maxBytes", () => {
+    const content = "x".repeat(100);
+    const abs = write("exact.md", content);
+    expect(readDoc(abs, 100)).toEqual({ ok: true, content });
   });
 });
