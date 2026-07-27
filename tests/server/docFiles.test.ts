@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, basename } from "node:path";
-import { resolveDocPath, readDoc, DOC_MAX_BYTES } from "@/server/docFiles";
+import { resolveDocPath, readDoc, DOC_MAX_BYTES, docEntry, scanSuperpowersDocs } from "@/server/docFiles";
 
 let root: string;
 let outside: string;
@@ -101,5 +101,60 @@ describe("readDoc", () => {
     const content = "x".repeat(100);
     const abs = write("exact.md", content);
     expect(readDoc(abs, 100)).toEqual({ ok: true, content });
+  });
+});
+
+describe("scanSuperpowersDocs", () => {
+  it("finds specs and plans at the root and one level down in a monorepo", () => {
+    write("docs/superpowers/specs/root-design.md", "# root");
+    write("docs/superpowers/plans/root-plan.md", "# plan");
+    write("web/docs/superpowers/specs/nested-design.md", "# nested");
+    const found = scanSuperpowersDocs(root);
+    expect(found.map((d) => d.path).sort()).toEqual([
+      "docs/superpowers/plans/root-plan.md",
+      "docs/superpowers/specs/root-design.md",
+      "web/docs/superpowers/specs/nested-design.md",
+    ]);
+    expect(found.find((d) => d.path.includes("plans"))!.source).toBe("plans");
+    expect(found.find((d) => d.path.endsWith("root-design.md"))!.source).toBe("specs");
+    expect(found.find((d) => d.path.endsWith("root-design.md"))!.name).toBe("root-design.md");
+  });
+
+  it("ignores non-markdown files and other folders under superpowers", () => {
+    write("docs/superpowers/specs/a-design.md", "# a");
+    write("docs/superpowers/specs/notes.txt", "x");
+    write("docs/superpowers/journal/entry.md", "# j");
+    expect(scanSuperpowersDocs(root).map((d) => d.path)).toEqual([
+      "docs/superpowers/specs/a-design.md",
+    ]);
+  });
+
+  it("does not descend into node_modules", () => {
+    write("node_modules/pkg/docs/superpowers/specs/dep-design.md", "# dep");
+    expect(scanSuperpowersDocs(root)).toEqual([]);
+  });
+
+  it("requires the parent directory to be named docs", () => {
+    write("superpowers/specs/a-design.md", "# a");
+    write("other/superpowers/specs/b-design.md", "# b");
+    expect(scanSuperpowersDocs(root)).toEqual([]);
+  });
+
+  it("returns an empty list for a missing root", () => {
+    expect(scanSuperpowersDocs(join(root, "nope"))).toEqual([]);
+  });
+});
+
+describe("docEntry", () => {
+  it("carries mtime and size", () => {
+    write("docs/a.md", "hello");
+    const entry = docEntry(root, "docs/a.md", "branch")!;
+    expect(entry.size).toBe(5);
+    expect(entry.source).toBe("branch");
+    expect(Number.isNaN(Date.parse(entry.mtime))).toBe(false);
+  });
+
+  it("is null for a path that does not exist", () => {
+    expect(docEntry(root, "docs/gone.md", "branch")).toBeNull();
   });
 });

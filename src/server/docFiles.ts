@@ -1,5 +1,5 @@
-import { readFileSync, realpathSync, statSync } from "node:fs";
-import { isAbsolute, resolve, sep } from "node:path";
+import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { basename, isAbsolute, join, resolve, sep } from "node:path";
 
 // Read-only markdown discovery for a worktree. Nothing in this module writes.
 
@@ -45,4 +45,69 @@ export function readDoc(abs: string, maxBytes = DOC_MAX_BYTES): ReadDocResult {
   if (!st.isFile()) return { ok: false, reason: "not-found" };
   if (st.size > maxBytes) return { ok: false, reason: "too-large" };
   return { ok: true, content: readFileSync(abs, "utf8") };
+}
+
+export interface DocEntry {
+  path: string;   // relative to the worktree root, "/" separated
+  name: string;   // basename
+  source: "specs" | "plans" | "branch";
+  mtime: string;  // ISO
+  size: number;   // bytes
+}
+
+const SKIP_DIRS = new Set(["node_modules", ".git", ".next", ".mojito"]);
+const MAX_DEPTH = 6;
+
+// null when the path is gone or unreadable: `git diff --name-only` reports files
+// the branch deleted, and those must not reach the list as dead rows.
+export function docEntry(root: string, rel: string, source: DocEntry["source"]): DocEntry | null {
+  try {
+    const st = statSync(join(root, rel));
+    if (!st.isFile()) return null;
+    return { path: rel, name: basename(rel), source, mtime: st.mtime.toISOString(), size: st.size };
+  } catch {
+    return null;
+  }
+}
+
+function mdFilesIn(root: string, relDir: string, source: DocEntry["source"]): DocEntry[] {
+  let names: string[];
+  try {
+    names = readdirSync(join(root, relDir));
+  } catch {
+    return []; // that folder simply does not exist in this worktree
+  }
+  const out: DocEntry[] = [];
+  for (const name of names) {
+    if (!name.toLowerCase().endsWith(".md")) continue;
+    const entry = docEntry(root, `${relDir}/${name}`, source);
+    if (entry) out.push(entry);
+  }
+  return out;
+}
+
+// Walks for `docs/superpowers/{specs,plans}` at any depth up to MAX_DEPTH, so a
+// monorepo's web/docs/superpowers/specs is found as well as a root-level one.
+export function scanSuperpowersDocs(root: string): DocEntry[] {
+  const out: DocEntry[] = [];
+  const walk = (relDir: string, depth: number) => {
+    let entries;
+    try {
+      entries = readdirSync(relDir ? join(root, relDir) : root, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (!e.isDirectory() || SKIP_DIRS.has(e.name)) continue;
+      const childRel = relDir ? `${relDir}/${e.name}` : e.name;
+      if (e.name === "superpowers" && basename(relDir) === "docs") {
+        out.push(...mdFilesIn(root, `${childRel}/specs`, "specs"));
+        out.push(...mdFilesIn(root, `${childRel}/plans`, "plans"));
+        continue; // nothing deeper under superpowers is listed
+      }
+      if (depth < MAX_DEPTH) walk(childRel, depth + 1);
+    }
+  };
+  walk("", 0);
+  return out;
 }
