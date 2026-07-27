@@ -23,8 +23,19 @@ Two sources, unioned:
 
 1. **Superpowers docs** — a recursive scan of the worktree for directories matching
    `docs/superpowers/specs` and `docs/superpowers/plans`, so a monorepo's
-   `web/docs/superpowers/specs/…` is found as well as a root-level one. `node_modules`,
-   `.git` and `.next` are skipped; the walk stops at depth 6.
+   `web/docs/superpowers/specs/…` is found as well as a root-level one. The walk stops at
+   depth 6 and never leaves the worktree it was given:
+
+   - `node_modules` is skipped.
+   - Every directory whose name begins with `.` is skipped. This is what keeps a worktree's
+     list to its own documents: lime nests its worktrees under `.claude/worktrees/<ticket>/`,
+     which sits at depth 3 and would otherwise be walked into. Measured on this repo, scanning
+     the main checkout returned 175 documents, 115 of them the sibling worktrees' copies of the
+     same specs. The rule also subsumes `.git`, `.next`, `.mojito` and `.superpowers`; no spec
+     or plan ever lives under a dot-directory.
+   - A nested git worktree or repository — any directory containing a `.git` entry — is not
+     descended into, so a checkout parked under a plainly-named directory (`worktrees/`,
+     `vendor/`) cannot leak its documents either.
 2. **Markdown touched by the branch** — `git diff --name-only <base>...HEAD -- '*.md'`,
    with `<base>` from the existing `detectDefaultBranch` in `src/server/reviewScale.ts`.
    This catches anything the session wrote outside the superpowers folders.

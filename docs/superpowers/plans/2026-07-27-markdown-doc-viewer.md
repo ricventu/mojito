@@ -17,7 +17,11 @@
 - Server modules under `src/server/` import each other with an explicit `.js` extension (e.g. `from "./worktree.js"`); route files and client files use the `@/` alias without an extension.
 - vitest runs with `environment: "node"` and `include: ["tests/**/*.test.ts"]` — **`.tsx` test files are not picked up**, so no React component tests. Test pure logic and routes only.
 - Document size cap: `512 * 1024` bytes, exported as `DOC_MAX_BYTES`.
-- Directory walk skips `node_modules`, `.git`, `.next`, `.mojito`, and stops at depth 6.
+- Directory walk stops at depth 6 and never leaves the worktree it was given: it skips
+  `node_modules`, skips every directory whose name begins with `.` (which subsumes `.git`,
+  `.next`, `.mojito`, `.superpowers` and — crucially — `.claude/worktrees/`, where lime nests
+  sibling worktrees), and does not descend into a nested git worktree or repository, i.e. any
+  directory containing a `.git` entry. See Task 11.
 - Dark-only palette: use the existing CSS custom properties in `src/app/globals.css` (`--bg`, `--surface`, `--surface-hi`, `--border`, `--border-hi`, `--text`, `--text-dim`, `--accent`, `--mono`, `--r`, `--r-sm`). No new colour literals.
 - Out of scope: relative `.md` links navigating inside the viewer, local images, syntax highlighting, editing.
 - Full verification, run at the end of every task: `npx tsc --noEmit && npx vitest run`.
@@ -1698,6 +1702,97 @@ Run the dev server (`npm run dev`) and, against a real ticket that has a spec in
 ```bash
 git add src/components/TerminalView.tsx src/components/SessionList.tsx src/components/LaunchSheet.tsx src/components/TicketList.tsx src/app/page.tsx
 git commit -m "feat(ui): open the docs viewer from the terminal, sessions and tickets"
+```
+
+---
+
+### Task 11: Keep the walk inside its own worktree
+
+**Files:**
+- Modify: `src/server/docFiles.ts` (`SKIP_DIRS` and the `walk` body inside `scanSuperpowersDocs`)
+- Test: `tests/server/docFiles.test.ts` (append two cases to the `scanSuperpowersDocs` block)
+
+**Interfaces:** unchanged — no signature, export, or return shape moves.
+
+**Why:** measured against this repo, `scanSuperpowersDocs("/home/mojito/code/mojito")` returned
+175 entries, of which 115 were sibling worktrees' copies of the same specs, reached through
+`.claude/worktrees/<ticket>/docs/superpowers/` at depth 5. A ticket with no worktree of its own
+resolves to the repo root, so that is a list the user would really see: two thirds noise, each
+row a duplicate title from another ticket's branch.
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to the `describe("scanSuperpowersDocs", …)` block in `tests/server/docFiles.test.ts`:
+
+```ts
+  it("stays out of a sibling worktree nested under a dot-directory", () => {
+    write("docs/superpowers/specs/mine-design.md", "# mine");
+    write(".claude/worktrees/ric-1/docs/superpowers/specs/theirs-design.md", "# theirs");
+    expect(scanSuperpowersDocs(root).map((d) => d.path)).toEqual([
+      "docs/superpowers/specs/mine-design.md",
+    ]);
+  });
+
+  it("stays out of a nested checkout under a plainly-named directory", () => {
+    // A linked git worktree has a `.git` FILE; a clone has a `.git` directory.
+    write("worktrees/ric-1/.git", "gitdir: /elsewhere/.git/worktrees/ric-1\n");
+    write("worktrees/ric-1/docs/superpowers/specs/theirs-design.md", "# theirs");
+    expect(scanSuperpowersDocs(root)).toEqual([]);
+  });
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `npx vitest run tests/server/docFiles.test.ts`
+Expected: both new cases FAIL, each listing the foreign `theirs-design.md` alongside (or instead
+of) the local document. That failure is the bug.
+
+- [ ] **Step 3: Change the walk**
+
+In `src/server/docFiles.ts`, replace the skip set and add the nested-checkout guard:
+
+```ts
+const SKIP_DIRS = new Set(["node_modules"]);
+const MAX_DEPTH = 6;
+
+// A directory holding a `.git` entry is another checkout: a linked worktree (where
+// `.git` is a file) or a clone (where it is a directory). Its documents belong to
+// that tree, not to the one being listed.
+function isNestedCheckout(abs: string): boolean {
+  return existsSync(join(abs, ".git"));
+}
+```
+
+Add `existsSync` to the `node:fs` import. Then, in `walk`, skip dot-directories and refuse to
+descend into another checkout:
+
+```ts
+    for (const e of entries) {
+      if (!e.isDirectory() || SKIP_DIRS.has(e.name) || e.name.startsWith(".")) continue;
+      const childRel = relDir ? `${relDir}/${e.name}` : e.name;
+      if (e.name === "superpowers" && basename(relDir) === "docs") {
+        out.push(...mdFilesIn(root, `${childRel}/specs`, "specs"));
+        out.push(...mdFilesIn(root, `${childRel}/plans`, "plans"));
+        continue; // nothing deeper under superpowers is listed
+      }
+      if (depth < MAX_DEPTH && !isNestedCheckout(join(root, childRel))) walk(childRel, depth + 1);
+    }
+```
+
+The dot-directory rule subsumes the `.git`, `.next` and `.mojito` entries the set used to carry,
+which is why they come out of it. No spec or plan lives under a dot-directory.
+
+- [ ] **Step 4: Run the tests**
+
+Run: `npx vitest run tests/server/docFiles.test.ts && npx tsc --noEmit && npx vitest run`
+Expected: the two new cases pass, every pre-existing case in the file still passes (the
+`node_modules` case in particular), and the whole suite is green.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/server/docFiles.ts tests/server/docFiles.test.ts
+git commit -m "fix(docs): keep the document walk inside its own worktree"
 ```
 
 ---
