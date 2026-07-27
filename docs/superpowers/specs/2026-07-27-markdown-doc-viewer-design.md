@@ -132,8 +132,13 @@ a custom session.
 `page.tsx` already loads `TerminalView`, so the parser is fetched the first time a document
 opens rather than on first paint over Tailscale. Raw HTML in the markdown is not rendered
 (react-markdown's default), so there is no `dangerouslySetInnerHTML` and no sanitizer to
-maintain. `http(s)` links get `target="_blank"` + `rel="noopener noreferrer"`, matching what
-the terminal's WebLinksAddon does.
+maintain.
+
+Links are treated by scheme. `http(s)` gets `target="_blank"` + `rel="noopener noreferrer"`,
+matching what the terminal's WebLinksAddon does. `mailto:` stays a plain link. Anything else —
+a relative path, a bare `#anchor`, a missing href — renders inert: relative `.md` navigation is
+out of scope (below), and letting the browser follow such a link would leave the single-page app
+for a 404, tearing down the live terminal WebSocket behind the viewer.
 
 ### `src/lib/useDocs.ts`
 

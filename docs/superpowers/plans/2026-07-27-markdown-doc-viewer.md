@@ -1195,10 +1195,20 @@ export default function MarkdownDoc({ content }: { content: string }) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          // Same rule as the terminal's WebLinksAddon: links leave for a new tab.
-          a: ({ href, children }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
-          ),
+          // http(s) leaves for a new tab, same rule as the terminal's WebLinksAddon.
+          // mailto stays a plain link. Anything else — a relative path, a bare
+          // #anchor, a missing href — renders inert: relative .md navigation is out
+          // of scope here, and letting the browser follow it would leave the SPA for
+          // a 404, tearing down the live terminal behind the viewer.
+          a: ({ href, title, children }) => {
+            const scheme = (href ?? "").toLowerCase();
+            const external = scheme.startsWith("http://") || scheme.startsWith("https://");
+            if (external) {
+              return <a href={href} title={title} target="_blank" rel="noopener noreferrer">{children}</a>;
+            }
+            if (scheme.startsWith("mailto:")) return <a href={href} title={title}>{children}</a>;
+            return <a title={title}>{children}</a>;
+          },
           // A wide table must scroll inside its own box; the page never pans.
           table: ({ children }) => <div className="doc-table"><table>{children}</table></div>,
         }}
