@@ -1,5 +1,6 @@
 import type { SessionMeta } from "./types.js";
 import { resolveTicketCwd } from "./ticketCwd.js";
+import { getConfig, getRegistry } from "./app.js";
 
 export interface DocsTargetDeps {
   // Look up a live session by its tmux name — the registry, in production.
@@ -31,4 +32,11 @@ export function resolveDocsTarget(url: URL, deps: DocsTargetDeps): DocsTargetRes
     return { ok: true, root, label: ticket };
   }
   return { ok: false, error: "session or ticket required", code: 400 };
+}
+
+// The production wiring for resolveDocsTarget. Kept out of the resolver itself so
+// tests can pass their own lookup and project map without touching the registry
+// singleton or the real state directory.
+export function docsDeps(): DocsTargetDeps {
+  return { session: (id) => getRegistry().get(id), projectsPath: getConfig().projectsPath };
 }
