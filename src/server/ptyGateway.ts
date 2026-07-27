@@ -43,15 +43,23 @@ export function attachPty(ws: WebSocket, id: string, deps: Partial<AttachDeps> =
       }
       return;
     }
+    let msg: { resize?: { cols: number; rows: number } };
     try {
-      const msg = JSON.parse(data.toString("utf8"));
-      if (msg.resize) {
-        cols = msg.resize.cols;
-        rows = msg.resize.rows;
-        pty?.resize(cols, rows);
-      }
+      msg = JSON.parse(data.toString("utf8"));
     } catch {
-      /* ignore malformed control frame */
+      return; /* ignore malformed control frame */
+    }
+    if (!msg.resize) return;
+    cols = msg.resize.cols;
+    rows = msg.resize.rows;
+    try {
+      pty?.resize(cols, rows);
+    } catch (err) {
+      // node-pty rejects a non-positive size. Swallowing this used to leave the
+      // pty at its previous geometry while the browser had already resized
+      // itself — a silent mismatch that costs the TUI its bottom rows (input
+      // line included) with nothing to re-send the correct size.
+      console.error(`pty resize to ${cols}x${rows} failed:`, err);
     }
   });
 
