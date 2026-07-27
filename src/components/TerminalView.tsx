@@ -10,6 +10,7 @@ import { apiFetch } from "@/lib/client";
 import { computeTouchScroll, wheelSequences } from "@/lib/touchScroll";
 import { SESSION_GONE_CODE } from "@/lib/ptyClose";
 import { termRootStyle } from "@/lib/keyboardInset";
+import { terminalOptions } from "@/lib/terminalOptions";
 import { terminalTabTitle } from "@/lib/terminalTabTitle";
 import { readAsDataUrl } from "@/lib/readAsDataUrl";
 import { quoteArg } from "@/lib/quoteArg";
@@ -41,12 +42,7 @@ export default function TerminalView(
 
     const start = () => {
       if (torn) return;
-      const term = new Terminal({
-        fontSize: 13,
-        convertEol: true,
-        fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
-        theme: { background: "#08090a", foreground: "#c9d1d9", cursor: "#5ce08a" },
-      });
+      const term = new Terminal(terminalOptions());
       const fit = new FitAddon();
       term.loadAddon(fit);
       // Make http(s) URLs in terminal output clickable; open in a new tab.
