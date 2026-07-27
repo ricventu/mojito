@@ -21,8 +21,20 @@ export async function hasSession(name: string): Promise<boolean> {
   }
 }
 
+// tmux's status line is redundant in Mojito: the ticket, its status and the
+// session state are already in the app's own header. On a phone with the
+// keyboard open the visible band is only ~13 rows, and that one row is the
+// difference between claude's TUI having room for its input line or dropping it.
+// Session-scoped, so it never touches the user's own tmux sessions.
+const STATUS_OFF = ["set-option", "-t", "@NAME@", "status", "off"];
+const statusOffFor = (name: string) => STATUS_OFF.map((a) => (a === "@NAME@" ? name : a));
+
 export async function newSession(name: string, cwd: string, command: string): Promise<void> {
-  await pexec("tmux", ["new-session", "-d", "-s", name, "-c", cwd, command]);
+  await pexec("tmux", [
+    "new-session", "-d", "-s", name, "-c", cwd, command,
+    ";",
+    ...statusOffFor(name),
+  ]);
 }
 
 export async function startStackSession(name: string, cwd: string, command: string): Promise<void> {
@@ -32,7 +44,14 @@ export async function startStackSession(name: string, cwd: string, command: stri
     "new-session", "-d", "-s", name, "-c", cwd, command,
     ";",
     "set-option", "-w", "-t", name, "remain-on-exit", "on",
+    ";",
+    ...statusOffFor(name),
   ]);
+}
+
+export async function statusOption(name: string): Promise<string> {
+  const { stdout } = await pexec("tmux", ["show-options", "-t", name, "-v", "status"]);
+  return stdout.trim();
 }
 
 export async function panesDead(name: string): Promise<string> {

@@ -21,6 +21,21 @@ run("tmux control (requires tmux)", () => {
     expect(await tmux.hasSession(NAME)).toBe(false);
   });
 
+  // The browser terminal already shows the ticket and its state in Mojito's own
+  // header, so tmux's status line is redundant chrome — and on a phone with the
+  // keyboard up it costs the one row the TUI needs for its input line.
+  it("creates sessions with tmux's status line off", async () => {
+    const name = "mojito-test-status-off";
+    await tmux.killSession(name).catch(() => {});
+    await tmux.newSession(name, tmpdir(), "sleep 30");
+    expect(await tmux.statusOption(name)).toBe("off");
+    await tmux.killSession(name);
+
+    await startStackSession(name, process.cwd(), "sleep 30");
+    expect(await tmux.statusOption(name)).toBe("off");
+    await tmux.killSession(name);
+  });
+
   it("closeSession interrupts the process and lets the session auto-close (no force)", async () => {
     const CLOSE_NAME = "mojito-test-ric-1-close";
     await tmux.newSession(CLOSE_NAME, tmpdir(), "sleep 30");
