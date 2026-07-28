@@ -1,9 +1,20 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, realpathSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveDocsTarget } from "@/server/docTarget";
 import type { SessionMeta } from "@/server/types";
+
+// A real repository with a real linked worktree: resolveWorktree shells out to
+// `git worktree list --porcelain` and matches on the branch name, so a fake would
+// only prove that the fake was called.
+function git(cwd: string, args: string[]): void {
+  execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], {
+    cwd,
+    stdio: ["ignore", "ignore", "ignore"],
+  });
+}
 
 let dir: string;
 let repo: string;
@@ -41,6 +52,30 @@ describe("resolveDocsTarget", () => {
     sessions["mojito-custom-mojito-abc"] = { cwd: "/repo/mojito", ticket: "", title: "mojito" };
     expect(resolveDocsTarget(url("session=mojito-custom-mojito-abc"), deps()))
       .toEqual({ ok: true, root: "/repo/mojito", label: "mojito" });
+  });
+
+  it("prefers the ticket's worktree over a session cwd frozen at the repo root", () => {
+    // A Backlog session is launched before its worktree exists — /lime-design creates
+    // it mid-session — so meta.cwd stays the repo root while the spec the session
+    // writes lands in the worktree. The docs must follow the worktree, not the cwd.
+    git(repo, ["init", "-q", "-b", "main"]);
+    git(repo, ["commit", "-q", "--allow-empty", "-m", "root"]);
+    const worktree = join(dir, "wt-ric-162");
+    git(repo, ["worktree", "add", "-q", "-b", "ricventu/ric-162-submenus", worktree]);
+    sessions["mojito-RIC-162-backlog"] = { cwd: repo, ticket: "RIC-162", title: "Submenus" };
+
+    expect(resolveDocsTarget(url("session=mojito-RIC-162-backlog"), deps()))
+      .toEqual({ ok: true, root: realpathSync(worktree), label: "RIC-162" });
+  });
+
+  it("keeps a session cwd that is already a worktree when no branch matches the ticket", () => {
+    // The inverse guard: a To-Code session launched inside its worktree must not be
+    // downgraded to the repo root just because the branch was later renamed.
+    git(repo, ["init", "-q", "-b", "main"]);
+    git(repo, ["commit", "-q", "--allow-empty", "-m", "root"]);
+    sessions["mojito-RIC-9-to-code"] = { cwd: "/wt/renamed-branch", ticket: "RIC-9", title: "t" };
+    expect(resolveDocsTarget(url("session=mojito-RIC-9-to-code"), deps()))
+      .toEqual({ ok: true, root: "/wt/renamed-branch", label: "RIC-9" });
   });
 
   it("404s an unknown session", () => {
