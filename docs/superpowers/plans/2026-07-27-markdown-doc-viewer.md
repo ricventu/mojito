@@ -17,7 +17,11 @@
 - Server modules under `src/server/` import each other with an explicit `.js` extension (e.g. `from "./worktree.js"`); route files and client files use the `@/` alias without an extension.
 - vitest runs with `environment: "node"` and `include: ["tests/**/*.test.ts"]` — **`.tsx` test files are not picked up**, so no React component tests. Test pure logic and routes only.
 - Document size cap: `512 * 1024` bytes, exported as `DOC_MAX_BYTES`.
-- Directory walk skips `node_modules`, `.git`, `.next`, `.mojito`, and stops at depth 6.
+- Directory walk stops at depth 6 and never leaves the worktree it was given: it skips
+  `node_modules`, skips every directory whose name begins with `.` (which subsumes `.git`,
+  `.next`, `.mojito`, `.superpowers` and — crucially — `.claude/worktrees/`, where lime nests
+  sibling worktrees), and does not descend into a nested git worktree or repository, i.e. any
+  directory containing a `.git` entry. See Task 11.
 - Dark-only palette: use the existing CSS custom properties in `src/app/globals.css` (`--bg`, `--surface`, `--surface-hi`, `--border`, `--border-hi`, `--text`, `--text-dim`, `--accent`, `--mono`, `--r`, `--r-sm`). No new colour literals.
 - Out of scope: relative `.md` links navigating inside the viewer, local images, syntax highlighting, editing.
 - Full verification, run at the end of every task: `npx tsc --noEmit && npx vitest run`.
@@ -667,94 +671,127 @@ git commit -m "refactor(server): extract resolveTicketCwd for reuse by the docs 
 - Test: `tests/server/docTarget.test.ts`
 
 **Interfaces:**
-- Consumes: `getConfig` + `getRegistry` from `./app.js`, `resolveTicketCwd` from Task 4.
+- Consumes: `resolveTicketCwd` from Task 4, `SessionMeta` from `./types.js`.
 - Produces:
   ```ts
+  export interface DocsTargetDeps {
+    session: (id: string) => SessionMeta | undefined;  // the registry, in production
+    projectsPath: string;                              // lime-projects.json
+  }
   export type DocsTargetResult =
     | { ok: true; root: string; label: string }
     | { ok: false; error: string; code: 400 | 404 | 409 };
-  export function resolveDocsTarget(url: URL): DocsTargetResult;
+  export function resolveDocsTarget(url: URL, deps: DocsTargetDeps): DocsTargetResult;
   ```
+
+**Why injected deps rather than reaching for `getRegistry()`/`getConfig()`:** this module would
+otherwise import `./app.js`, whose singletons construct a real `Registry` over the real state
+directory the moment they are touched. Injection is the seam this codebase already uses for
+exactly that reason — `launch.ts` takes a `deps` object, `worktree.ts` and `reviewScale.ts` take
+a `run`. It also keeps the test free of module mocking: every existing `vi.mock` in the suite
+intercepts a module imported through the `@/` alias from a route, and there is no precedent for
+mocking one imported as a relative `./x.js`.
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/server/docTarget.test.ts`:
 
 ```ts
-import { describe, it, expect, beforeEach, vi } from "vitest";
-
-vi.mock("@/server/app", () => ({
-  getConfig: vi.fn(() => ({ projectsPath: "/projects.json" })),
-  getRegistry: vi.fn(() => ({ get: getSession })),
-}));
-vi.mock("@/server/ticketCwd", () => ({ resolveTicketCwd: vi.fn() }));
-
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { resolveDocsTarget } from "@/server/docTarget";
-import { resolveTicketCwd } from "@/server/ticketCwd";
 import type { SessionMeta } from "@/server/types";
 
+let dir: string;
+let repo: string;
+let projectsPath: string;
 let sessions: Record<string, Partial<SessionMeta>>;
-const getSession = (id: string) => sessions[id];
+
+// The registry lookup is a plain function here; the project map is a real file,
+// so the ticket path exercises resolveTicketCwd for real rather than a mock of it.
+const deps = () => ({
+  session: (id: string) => sessions[id] as SessionMeta | undefined,
+  projectsPath,
+});
 
 beforeEach(() => {
+  dir = mkdtempSync(join(tmpdir(), "mojito-dt-"));
+  repo = join(dir, "repo");
+  mkdirSync(repo);
+  projectsPath = join(dir, "lime-projects.json");
+  // Keyed by Linear team key — that is what resolveRepoFromMap indexes on.
+  writeFileSync(projectsPath, JSON.stringify({ RIC: repo }));
   sessions = {};
-  vi.mocked(resolveTicketCwd).mockReset();
 });
+afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 const url = (qs: string) => new URL(`http://localhost/api/docs?${qs}`);
 
 describe("resolveDocsTarget", () => {
   it("resolves a session to its cwd, labelled by ticket", () => {
     sessions["mojito-RIC-162-backlog"] = { cwd: "/wt/RIC-162", ticket: "RIC-162", title: "Submenus" };
-    expect(resolveDocsTarget(url("session=mojito-RIC-162-backlog")))
+    expect(resolveDocsTarget(url("session=mojito-RIC-162-backlog"), deps()))
       .toEqual({ ok: true, root: "/wt/RIC-162", label: "RIC-162" });
   });
 
   it("labels a ticketless session by its title", () => {
     sessions["mojito-custom-mojito-abc"] = { cwd: "/repo/mojito", ticket: "", title: "mojito" };
-    const res = resolveDocsTarget(url("session=mojito-custom-mojito-abc"));
-    expect(res).toEqual({ ok: true, root: "/repo/mojito", label: "mojito" });
+    expect(resolveDocsTarget(url("session=mojito-custom-mojito-abc"), deps()))
+      .toEqual({ ok: true, root: "/repo/mojito", label: "mojito" });
   });
 
   it("404s an unknown session", () => {
-    expect(resolveDocsTarget(url("session=gone"))).toEqual({
+    expect(resolveDocsTarget(url("session=gone"), deps())).toEqual({
       ok: false, error: "unknown session", code: 404,
     });
   });
 
   it("400s a session with no working directory", () => {
     sessions["no-cwd"] = { cwd: "", ticket: "RIC-1", title: "t" };
-    expect(resolveDocsTarget(url("session=no-cwd")).ok).toBe(false);
-    expect(resolveDocsTarget(url("session=no-cwd"))).toMatchObject({ code: 400 });
+    expect(resolveDocsTarget(url("session=no-cwd"), deps())).toEqual({
+      ok: false, error: "session has no working directory", code: 400,
+    });
   });
 
-  it("resolves a ticket through resolveTicketCwd with its project", () => {
-    vi.mocked(resolveTicketCwd).mockReturnValue("/wt/RIC-162");
-    expect(resolveDocsTarget(url("ticket=RIC-162&project=Mojito")))
-      .toEqual({ ok: true, root: "/wt/RIC-162", label: "RIC-162" });
-    expect(vi.mocked(resolveTicketCwd).mock.calls[0]).toEqual(["/projects.json", "RIC-162", "Mojito"]);
+  it("resolves a ticket through the project map to its repo root", () => {
+    expect(resolveDocsTarget(url("ticket=RIC-162"), deps()))
+      .toEqual({ ok: true, root: repo, label: "RIC-162" });
   });
 
-  it("passes a null project when the query omits it", () => {
-    vi.mocked(resolveTicketCwd).mockReturnValue("/repo");
-    resolveDocsTarget(url("ticket=RIC-162"));
-    expect(vi.mocked(resolveTicketCwd).mock.calls[0][2]).toBeNull();
+  it("passes the project through, so a nested project map can be honoured", () => {
+    const other = join(dir, "other");
+    mkdirSync(other);
+    writeFileSync(projectsPath, JSON.stringify({ RIC: { path: repo, projects: { Mojito: other } } }));
+    expect(resolveDocsTarget(url("ticket=RIC-162&project=Mojito"), deps()))
+      .toEqual({ ok: true, root: other, label: "RIC-162" });
   });
 
-  it("409s a ticket that resolves to no repo", () => {
-    vi.mocked(resolveTicketCwd).mockReturnValue(null);
-    expect(resolveDocsTarget(url("ticket=RIC-162"))).toEqual({
+  it("409s a ticket whose team key is not mapped", () => {
+    expect(resolveDocsTarget(url("ticket=ZZZ-1"), deps())).toEqual({
       ok: false, error: "no worktree for this ticket", code: 409,
     });
   });
 
+  it("prefers the session when both parameters are present", () => {
+    sessions["s"] = { cwd: "/wt/from-session", ticket: "RIC-9", title: "t" };
+    expect(resolveDocsTarget(url("session=s&ticket=RIC-162"), deps()))
+      .toEqual({ ok: true, root: "/wt/from-session", label: "RIC-9" });
+  });
+
   it("400s when neither session nor ticket is given", () => {
-    expect(resolveDocsTarget(url(""))).toEqual({
+    expect(resolveDocsTarget(url(""), deps())).toEqual({
       ok: false, error: "session or ticket required", code: 400,
     });
   });
 });
 ```
+
+Note: the ticket cases run `resolveWorktree` against a temp directory that is not a git
+repository. `resolveWorktree` catches that and falls back to the repo root, which is what those
+tests assert; git may print `fatal: not a git repository` to stderr, exactly as it already does
+in `tests/server/ticketCwd.test.ts`.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -766,8 +803,15 @@ Expected: FAIL — cannot resolve `@/server/docTarget`.
 Create `src/server/docTarget.ts`:
 
 ```ts
-import { getConfig, getRegistry } from "./app.js";
+import type { SessionMeta } from "./types.js";
 import { resolveTicketCwd } from "./ticketCwd.js";
+
+export interface DocsTargetDeps {
+  // Look up a live session by its tmux name — the registry, in production.
+  session: (id: string) => SessionMeta | undefined;
+  // Path to lime-projects.json, for a ticket with no live session.
+  projectsPath: string;
+}
 
 export type DocsTargetResult =
   | { ok: true; root: string; label: string }
@@ -775,18 +819,19 @@ export type DocsTargetResult =
 
 // Both docs routes accept the same two target shapes: a live session (its cwd is
 // already the worktree) or a ticket (resolved the way a launch would). One place
-// decides, so the two routes cannot drift on status codes.
-export function resolveDocsTarget(url: URL): DocsTargetResult {
+// decides, so the two routes cannot drift on status codes. A session wins when
+// both are present — it is the more specific answer.
+export function resolveDocsTarget(url: URL, deps: DocsTargetDeps): DocsTargetResult {
   const session = url.searchParams.get("session");
   if (session) {
-    const meta = getRegistry().get(session);
+    const meta = deps.session(session);
     if (!meta) return { ok: false, error: "unknown session", code: 404 };
     if (!meta.cwd) return { ok: false, error: "session has no working directory", code: 400 };
     return { ok: true, root: meta.cwd, label: meta.ticket || meta.title };
   }
   const ticket = url.searchParams.get("ticket");
   if (ticket) {
-    const root = resolveTicketCwd(getConfig().projectsPath, ticket, url.searchParams.get("project"));
+    const root = resolveTicketCwd(deps.projectsPath, ticket, url.searchParams.get("project"));
     if (!root) return { ok: false, error: "no worktree for this ticket", code: 409 };
     return { ok: true, root, label: ticket };
   }
@@ -816,7 +861,7 @@ git commit -m "feat(docs): resolve a docs target from a session or a ticket"
 - Test: `tests/server/docsRoute.test.ts`
 
 **Interfaces:**
-- Consumes: `resolveDocsTarget` (Task 5), `listDocs` / `resolveDocPath` / `readDoc` (Tasks 1–3), `tokenFromHeaders` from `@/server/auth`, `getConfig` from `@/server/app`.
+- Consumes: `resolveDocsTarget` + `docsDeps` (Task 5, the latter added by this task's Step 3), `listDocs` / `resolveDocPath` / `readDoc` (Tasks 1–3), `tokenFromHeaders` from `@/server/auth`, `getConfig` from `@/server/app`.
 - Produces: `GET /api/docs` → `{ root, label, files: DocEntry[] }`; `GET /api/docs/content` → `{ path, content }`.
 
 - [ ] **Step 1: Write the failing test**
@@ -826,7 +871,11 @@ Create `tests/server/docsRoute.test.ts`:
 ```ts
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-vi.mock("@/server/docTarget", () => ({ resolveDocsTarget: vi.fn() }));
+vi.mock("@/server/docTarget", () => ({
+  resolveDocsTarget: vi.fn(),
+  // The routes call this for the production wiring; the mocked resolver ignores it.
+  docsDeps: vi.fn(() => ({ session: () => undefined, projectsPath: "/projects.json" })),
+}));
 vi.mock("@/server/docFiles", () => ({
   listDocs: vi.fn(),
   resolveDocPath: vi.fn(),
@@ -947,11 +996,29 @@ import { listDocs } from "@/server/docFiles";
 export async function GET(req: Request) {
   const cfg = getConfig();
   if (!tokenFromHeaders(req.headers, cfg.token)) return new NextResponse("unauthorized", { status: 401 });
-  const target = resolveDocsTarget(new URL(req.url));
+  const target = resolveDocsTarget(new URL(req.url), docsDeps());
   if (!target.ok) return NextResponse.json({ error: target.error }, { status: target.code });
   return NextResponse.json({ root: target.root, label: target.label, files: listDocs(target.root) });
 }
 ```
+
+Both routes need the same deps object, so put it in `src/server/docTarget.ts` next to its
+consumer — it is the one place allowed to touch the app singletons, and it keeps the two routes
+from drifting:
+
+```ts
+// appended to src/server/docTarget.ts
+import { getConfig, getRegistry } from "./app.js";
+
+// The production wiring for resolveDocsTarget. Kept out of the resolver itself so
+// tests can pass their own lookup and project map without touching the registry
+// singleton or the real state directory.
+export function docsDeps(): DocsTargetDeps {
+  return { session: (id) => getRegistry().get(id), projectsPath: getConfig().projectsPath };
+}
+```
+
+Import it in both routes as `import { resolveDocsTarget, docsDeps } from "@/server/docTarget";`.
 
 Create `src/app/api/docs/content/route.ts`:
 
@@ -966,7 +1033,7 @@ export async function GET(req: Request) {
   const cfg = getConfig();
   if (!tokenFromHeaders(req.headers, cfg.token)) return new NextResponse("unauthorized", { status: 401 });
   const url = new URL(req.url);
-  const target = resolveDocsTarget(url);
+  const target = resolveDocsTarget(url, docsDeps());
   if (!target.ok) return NextResponse.json({ error: target.error }, { status: target.code });
   const rel = url.searchParams.get("path");
   if (!rel) return NextResponse.json({ error: "path required" }, { status: 400 });
@@ -1132,10 +1199,20 @@ export default function MarkdownDoc({ content }: { content: string }) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          // Same rule as the terminal's WebLinksAddon: links leave for a new tab.
-          a: ({ href, children }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
-          ),
+          // http(s) leaves for a new tab, same rule as the terminal's WebLinksAddon.
+          // mailto stays a plain link. Anything else — a relative path, a bare
+          // #anchor, a missing href — renders inert: relative .md navigation is out
+          // of scope here, and letting the browser follow it would leave the SPA for
+          // a 404, tearing down the live terminal behind the viewer.
+          a: ({ href, title, children }) => {
+            const scheme = (href ?? "").toLowerCase();
+            const external = scheme.startsWith("http://") || scheme.startsWith("https://");
+            if (external) {
+              return <a href={href} title={title} target="_blank" rel="noopener noreferrer">{children}</a>;
+            }
+            if (scheme.startsWith("mailto:")) return <a href={href} title={title}>{children}</a>;
+            return <a title={title}>{children}</a>;
+          },
           // A wide table must scroll inside its own box; the page never pans.
           table: ({ children }) => <div className="doc-table"><table>{children}</table></div>,
         }}
@@ -1625,6 +1702,97 @@ Run the dev server (`npm run dev`) and, against a real ticket that has a spec in
 ```bash
 git add src/components/TerminalView.tsx src/components/SessionList.tsx src/components/LaunchSheet.tsx src/components/TicketList.tsx src/app/page.tsx
 git commit -m "feat(ui): open the docs viewer from the terminal, sessions and tickets"
+```
+
+---
+
+### Task 11: Keep the walk inside its own worktree
+
+**Files:**
+- Modify: `src/server/docFiles.ts` (`SKIP_DIRS` and the `walk` body inside `scanSuperpowersDocs`)
+- Test: `tests/server/docFiles.test.ts` (append two cases to the `scanSuperpowersDocs` block)
+
+**Interfaces:** unchanged — no signature, export, or return shape moves.
+
+**Why:** measured against this repo, `scanSuperpowersDocs("/home/mojito/code/mojito")` returned
+175 entries, of which 115 were sibling worktrees' copies of the same specs, reached through
+`.claude/worktrees/<ticket>/docs/superpowers/` at depth 5. A ticket with no worktree of its own
+resolves to the repo root, so that is a list the user would really see: two thirds noise, each
+row a duplicate title from another ticket's branch.
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to the `describe("scanSuperpowersDocs", …)` block in `tests/server/docFiles.test.ts`:
+
+```ts
+  it("stays out of a sibling worktree nested under a dot-directory", () => {
+    write("docs/superpowers/specs/mine-design.md", "# mine");
+    write(".claude/worktrees/ric-1/docs/superpowers/specs/theirs-design.md", "# theirs");
+    expect(scanSuperpowersDocs(root).map((d) => d.path)).toEqual([
+      "docs/superpowers/specs/mine-design.md",
+    ]);
+  });
+
+  it("stays out of a nested checkout under a plainly-named directory", () => {
+    // A linked git worktree has a `.git` FILE; a clone has a `.git` directory.
+    write("worktrees/ric-1/.git", "gitdir: /elsewhere/.git/worktrees/ric-1\n");
+    write("worktrees/ric-1/docs/superpowers/specs/theirs-design.md", "# theirs");
+    expect(scanSuperpowersDocs(root)).toEqual([]);
+  });
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `npx vitest run tests/server/docFiles.test.ts`
+Expected: both new cases FAIL, each listing the foreign `theirs-design.md` alongside (or instead
+of) the local document. That failure is the bug.
+
+- [ ] **Step 3: Change the walk**
+
+In `src/server/docFiles.ts`, replace the skip set and add the nested-checkout guard:
+
+```ts
+const SKIP_DIRS = new Set(["node_modules"]);
+const MAX_DEPTH = 6;
+
+// A directory holding a `.git` entry is another checkout: a linked worktree (where
+// `.git` is a file) or a clone (where it is a directory). Its documents belong to
+// that tree, not to the one being listed.
+function isNestedCheckout(abs: string): boolean {
+  return existsSync(join(abs, ".git"));
+}
+```
+
+Add `existsSync` to the `node:fs` import. Then, in `walk`, skip dot-directories and refuse to
+descend into another checkout:
+
+```ts
+    for (const e of entries) {
+      if (!e.isDirectory() || SKIP_DIRS.has(e.name) || e.name.startsWith(".")) continue;
+      const childRel = relDir ? `${relDir}/${e.name}` : e.name;
+      if (e.name === "superpowers" && basename(relDir) === "docs") {
+        out.push(...mdFilesIn(root, `${childRel}/specs`, "specs"));
+        out.push(...mdFilesIn(root, `${childRel}/plans`, "plans"));
+        continue; // nothing deeper under superpowers is listed
+      }
+      if (depth < MAX_DEPTH && !isNestedCheckout(join(root, childRel))) walk(childRel, depth + 1);
+    }
+```
+
+The dot-directory rule subsumes the `.git`, `.next` and `.mojito` entries the set used to carry,
+which is why they come out of it. No spec or plan lives under a dot-directory.
+
+- [ ] **Step 4: Run the tests**
+
+Run: `npx vitest run tests/server/docFiles.test.ts && npx tsc --noEmit && npx vitest run`
+Expected: the two new cases pass, every pre-existing case in the file still passes (the
+`node_modules` case in particular), and the whole suite is green.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/server/docFiles.ts tests/server/docFiles.test.ts
+git commit -m "fix(docs): keep the document walk inside its own worktree"
 ```
 
 ---

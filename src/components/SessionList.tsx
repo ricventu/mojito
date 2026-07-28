@@ -12,8 +12,9 @@ import { groupByStatus } from "@/lib/groupByStatus";
 import StatusBadge from "./StatusBadge";
 
 export default function SessionList(
-  { token, sessions, onOpen, onChanged }:
-  { token: string; sessions: SessionMeta[]; onOpen: (s: SessionMeta) => void; onChanged: () => void },
+  { token, sessions, onOpen, onChanged, onOpenDocs }:
+  { token: string; sessions: SessionMeta[]; onOpen: (s: SessionMeta) => void; onChanged: () => void;
+    onOpenDocs: (s: SessionMeta) => void },
 ) {
   const [query, setQuery] = usePersistedState("mojito-sessions-q", "");
   const [projectRaw, setProjectRaw] = usePersistedState("mojito-sessions-project", "");
@@ -130,6 +131,7 @@ export default function SessionList(
                     </div>
                     <div className="row" style={{ marginTop: 12 }}>
                       <button className="btn ghost sm grow" onClick={() => onOpen(s)}>Open</button>
+                      <button className="btn ghost sm" onClick={() => onOpenDocs(s)}>Docs</button>
                       <button className={`btn sm${active ? " danger" : ""}`} onClick={() => dismiss(s)}>
                         {active ? "Kill" : "Dismiss"}
                       </button>

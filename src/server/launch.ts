@@ -3,10 +3,10 @@ import { join, basename } from "node:path";
 import { homedir } from "node:os";
 import { randomBytes } from "node:crypto";
 import type { Effort, SessionMeta } from "./types.js";
-import { tmuxName, parseIdentifier, validateTicket, statusSlug, customSessionName, rebaseSessionName, shellSessionName } from "./sessionKey.js";
+import { tmuxName, validateTicket, statusSlug, customSessionName, rebaseSessionName, shellSessionName } from "./sessionKey.js";
 import { buildHookSettings } from "./hookSettings.js";
-import { loadProjectMap, resolveRepoFromMap, resolvePathForProject } from "./limeProjects.js";
-import { resolveWorktree } from "./worktree.js";
+import { loadProjectMap, resolvePathForProject } from "./limeProjects.js";
+import { resolveTicketCwd } from "./ticketCwd.js";
 import { logfilePath } from "./sidecar.js";
 import type { Registry } from "./registry.js";
 import { writeLaunchContext, writeNewTicketContext } from "./launchContext.js";
@@ -42,12 +42,8 @@ export interface LaunchDeps {
 }
 
 function defaultResolveCwd(projectsPath: string) {
-  return (ticket: string, projectName: string | null): string | null => {
-    const { teamKey } = parseIdentifier(ticket);
-    const repo = resolveRepoFromMap(loadProjectMap(projectsPath), teamKey, projectName);
-    if (!repo) return null;
-    return resolveWorktree(repo, ticket) ?? repo;
-  };
+  return (ticket: string, projectName: string | null): string | null =>
+    resolveTicketCwd(projectsPath, ticket, projectName);
 }
 
 export function buildClaudeCommand(req: LaunchRequest, settingsPath: string, contextPath?: string): string {

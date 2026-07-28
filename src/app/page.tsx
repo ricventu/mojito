@@ -12,9 +12,11 @@ import SessionList from "@/components/SessionList";
 import StacksPanel from "@/components/StacksPanel";
 import AlertLayer from "@/components/AlertLayer";
 import SettingsSheet from "@/components/SettingsSheet";
+import DocsView from "@/components/DocsView";
 import { tabTitle } from "@/lib/tabTitle";
 import type { MojitoEvent } from "@/server/events";
 import type { SessionMeta } from "@/server/types";
+import type { DocsTarget } from "@/lib/useDocs";
 
 // xterm/xterm and its addons reference browser-only globals (e.g. `self`) at module
 // load time, which crashes Next.js's server-side prerender of this page. Loading
@@ -27,6 +29,7 @@ export default function Home() {
   const [open, setOpen] = useState<SessionMeta | null>(null);
   const [alerts, setAlerts] = useState<{ id: string; ticket: string; message: string }[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [docsFor, setDocsFor] = useState<{ target: DocsTarget; label: string } | null>(null);
   const { tickets, refresh: refreshTickets } = useTickets(token);
   const { sessions, refresh: refreshSessions } = useSessions(token);
 
@@ -49,6 +52,12 @@ export default function Home() {
   // dead session (tmux gone) emits no hook event to trigger a refresh on its own,
   // so without this its card would linger in the list after being deleted.
   if (open) return <TerminalView token={token} session={open} onBack={() => { setOpen(null); refreshSessions(); }} />;
+  // The overlay opened from a list replaces the page, since there is no terminal to keep alive here.
+  if (docsFor) {
+    return (
+      <DocsView token={token} target={docsFor.target} label={docsFor.label} onClose={() => setDocsFor(null)} />
+    );
+  }
 
   const needsInput = sessions.filter((s) => s.state === "needs-input").length;
 
@@ -57,10 +66,13 @@ export default function Home() {
       <AlertLayer alerts={alerts} onOpen={(id) => { const s = sessions.find((x) => x.id === id); if (s) setOpen(s); }} onClear={() => setAlerts([])} />
       {settingsOpen && <SettingsSheet token={token} onClose={() => setSettingsOpen(false)} />}
       {tab === "tickets"
-        ? <TicketList token={token} tickets={tickets} sessions={sessions} onLaunched={() => { refreshSessions(); refreshTickets(); }} onOpen={setOpen} />
+        ? <TicketList token={token} tickets={tickets} sessions={sessions}
+            onLaunched={() => { refreshSessions(); refreshTickets(); }} onOpen={setOpen}
+            onOpenDocs={(t) => setDocsFor({ target: { ticket: t.identifier, project: t.project }, label: t.identifier })} />
         : tab === "stacks"
         ? <StacksPanel token={token} onOpenLogs={setOpen} />
-        : <SessionList token={token} sessions={sessions} onOpen={setOpen} onChanged={refreshSessions} />}
+        : <SessionList token={token} sessions={sessions} onOpen={setOpen} onChanged={refreshSessions}
+            onOpenDocs={(s) => setDocsFor({ target: { session: s.id }, label: s.ticket || s.title })} />}
       <nav className="nav">
         <button className={`tab${tab === "tickets" ? " active" : ""}`} onClick={() => setTab("tickets")}>Tickets</button>
         <button className={`tab${tab === "sessions" ? " active" : ""}`} onClick={() => setTab("sessions")}>
