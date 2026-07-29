@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 import AccessoryBar from "./AccessoryBar";
 import DocsView from "./DocsView";
@@ -12,6 +11,7 @@ import { computeTouchScroll, wheelSequences } from "@/lib/touchScroll";
 import { SESSION_GONE_CODE } from "@/lib/ptyClose";
 import { termRootStyle, isKeyboardOpen } from "@/lib/keyboardInset";
 import { terminalOptions } from "@/lib/terminalOptions";
+import { urlLinkProvider } from "@/lib/terminalLinkProvider";
 import { isUsableGeometry } from "@/lib/terminalFit";
 import { keepSettling } from "@/lib/viewportSettle";
 import { terminalTabTitle } from "@/lib/terminalTabTitle";
@@ -56,9 +56,11 @@ export default function TerminalView(
       const term = new Terminal(terminalOptions());
       const fit = new FitAddon();
       term.loadAddon(fit);
-      // Make http(s) URLs in terminal output clickable; open in a new tab.
-      term.loadAddon(
-        new WebLinksAddon((event, uri) => {
+      // Make http(s) URLs in terminal output clickable; open in a new tab. Our
+      // own provider rather than WebLinksAddon, which linkifies only the first
+      // row of a URL wider than the terminal here — see terminalLinks.ts.
+      const links = term.registerLinkProvider(
+        urlLinkProvider(term, (event, uri) => {
           window.open(uri, "_blank", "noopener,noreferrer");
         }),
       );
@@ -208,6 +210,7 @@ export default function TerminalView(
         clearTimeout(retry);
         clearTimeout(settle);
         onData.dispose();
+        links.dispose();
         window.removeEventListener("resize", onResize);
         if (vv) {
           vv.removeEventListener("resize", applyViewport);
