@@ -19,7 +19,7 @@ export function urlLinkProvider(
       const buffer = term.buffer.active;
       const getRow = (index: number) => buffer.getLine(index)?.translateToString(false);
       const links: ILink[] = [];
-      for (const match of findTerminalLinks(bufferLineNumber - 1, getRow)) {
+      for (const match of findTerminalLinks(bufferLineNumber - 1, getRow, term.cols)) {
         const startLine = buffer.getLine(match.start.row);
         const endLine = buffer.getLine(match.end.row);
         if (!startLine || !endLine) continue;
