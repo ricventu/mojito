@@ -35,6 +35,19 @@
  * signature of a hard-wrapped block), or the one that does also sits within a
  * few cells of the right edge.
  *
+ * A block's margin is not always spaces. claude opens a bullet with `● ` in the
+ * margin and continues it with two spaces, so the row carrying the URL has no
+ * leading whitespace at all:
+ *
+ *      col 0   1234567890...                                    48
+ *              ● MR aperta: https://gitlab.com/factorybook/Gesti
+ *                onaleCooperativeMvp/-/merge_requests/6
+ *
+ * Read by leading whitespace those two rows sit in different blocks, and the
+ * link stopped at `Gesti` — a wrong URL again. So a row whose margin is filled
+ * by one unbroken token and a space (`● `, `- `, `1. `) is read at the indent of
+ * the row below it: a marker row opens the block it hangs over.
+ *
  * Two consequences worth knowing. A URL that genuinely ends at the wrap width
  * with unrelated non-blank text directly below gets that text glued on; nothing
  * in the buffer distinguishes it from a wrap. And a narrow wrapped block inside
@@ -107,10 +120,33 @@ function readRow(getRow: RowReader, index: number): Row | undefined {
   return { index, indent, body: trimmed.slice(indent) };
 }
 
+/** One unbroken token and the space after it: what fills a hanging indent. */
+const MARKER = /^\s*\S+\s+$/;
+
+/**
+ * Re-read a row as the opening row of a block indented to `indent` — the row
+ * whose margin is filled by a marker (`● `, `- `, `1. `) instead of by spaces,
+ * so its leading whitespace understates where its text starts.
+ */
+function hangingRow(getRow: RowReader, index: number, indent: number): Row | undefined {
+  const raw = getRow(index);
+  if (raw === undefined) return undefined;
+  const trimmed = raw.trimEnd();
+  if (trimmed.length <= indent || trimmed[indent] === " ") return undefined;
+  if (!MARKER.test(trimmed.slice(0, indent))) return undefined;
+  return { index, indent, body: trimmed.slice(indent) };
+}
+
 /** The adjacent rows sharing `row`'s indent: the block it belongs to. */
 function sameIndentRun(row: number, getRow: RowReader): Row[] | undefined {
-  const current = readRow(getRow, row);
-  if (!current) return undefined;
+  const plain = readRow(getRow, row);
+  if (!plain) return undefined;
+
+  // The row below shows where this block's text starts; if `row` is a marker
+  // row, that is further right than its own (empty) leading whitespace.
+  const next = readRow(getRow, row + 1);
+  const current =
+    (next && next.indent > plain.indent && hangingRow(getRow, row, next.indent)) || plain;
 
   const run = [current];
   let chars = current.body.length;
@@ -118,7 +154,13 @@ function sameIndentRun(row: number, getRow: RowReader): Row[] | undefined {
 
   for (let i = row - 1; i >= 0 && room(); i--) {
     const above = readRow(getRow, i);
-    if (!above || above.indent !== current.indent) break;
+    if (!above) break;
+    if (above.indent !== current.indent) {
+      // A marker row is the block's first row: take it, then stop.
+      const opener = hangingRow(getRow, i, current.indent);
+      if (opener) run.unshift(opener);
+      break;
+    }
     run.unshift(above);
     chars += above.body.length;
   }
