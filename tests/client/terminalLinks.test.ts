@@ -24,6 +24,25 @@ const AUTH_PANE = [
   "     browser.",
 ];
 
+/**
+ * The same pane later in the session, showing a bullet: claude puts `● ` in the
+ * margin of the first row and two spaces on the rows continuing it, so the row
+ * holding the URL has no leading whitespace at all. Verbatim from
+ * `tmux capture-pane -p` on the live session.
+ */
+const MR_URL = "https://gitlab.com/factorybook/GestionaleCooperativeMvp/-/merge_requests/6";
+const BULLET_PANE = [
+  "● --description prende una stringa, non un file.",
+  "",
+  "  Ran 1 shell command",
+  "",
+  "● MR aperta: https://gitlab.com/factorybook/Gesti",
+  "  onaleCooperativeMvp/-/merge_requests/6",
+  "",
+  "  Worktree conservato — è lì che si itera sui",
+  "  feedback della MR. Allineo Linear allo stato",
+];
+
 /** Rows as xterm hands them out: space-padded to the terminal width. */
 const reader = (rows: string[], cols: number) => (index: number) =>
   rows[index] === undefined ? undefined : rows[index].padEnd(cols, " ");
@@ -46,6 +65,26 @@ describe("findTerminalLinks", () => {
       const links = linksAt(AUTH_PANE, PHONE_COLS, row);
       expect(links.map((l) => l.text)).toEqual([AUTH_URL]);
       expect(links[0].start).toEqual({ row: 5, char: 2 });
+    }
+  });
+
+  it("joins a URL wrapped under a bullet, whose marker fills the first row's margin", () => {
+    const links = linksAt(BULLET_PANE, PHONE_COLS, 4);
+    expect(links).toHaveLength(1);
+    expect(links[0].text).toBe(MR_URL);
+    expect(links[0].start).toEqual({ row: 4, char: 13 });
+    expect(links[0].end).toEqual({ row: 5, char: 39 });
+  });
+
+  it("reports the bullet's URL from the row continuing it too", () => {
+    const links = linksAt(BULLET_PANE, PHONE_COLS, 5);
+    expect(links.map((l) => l.text)).toEqual([MR_URL]);
+    expect(links[0].start).toEqual({ row: 4, char: 13 });
+  });
+
+  it("leaves the prose around the bullet alone", () => {
+    for (const row of [0, 1, 2, 3, 6, 7, 8]) {
+      expect(linksAt(BULLET_PANE, PHONE_COLS, row)).toEqual([]);
     }
   });
 
