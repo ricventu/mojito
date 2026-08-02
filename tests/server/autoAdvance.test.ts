@@ -7,6 +7,12 @@ describe("stageAdvanced", () => {
     expect(stageAdvanced("To Code", "To Review")).toBe(true);
     expect(stageAdvanced("To Review", "To QA")).toBe(true);
   });
+  it("is true when lime skips a stage (To Code -> To QA when the tree was already reviewed)", () => {
+    // Stage 2 exits straight to To QA when the reviewed-tree marker matches, so the
+    // handoff skips stage 3. Two-stage jumps must stay forward moves — reading this as
+    // "not advanced" would leave the session hanging instead of closing it out.
+    expect(stageAdvanced("To Code", "To QA")).toBe(true);
+  });
   it("is false when the status is unchanged", () => {
     expect(stageAdvanced("To Code", "To Code")).toBe(false);
   });
@@ -33,6 +39,8 @@ describe("decideAutoAdvance", () => {
     expect(decideAutoAdvance("Done", true)).toEqual({ action: "stop" });
   });
   it("gates at human-decision states", () => {
+    // To QA gating is what makes lime's stage-3 skip free: stage 2 hands off straight to
+    // To QA and this returns "gate", so no follow-up session is ever launched.
     expect(decideAutoAdvance("To QA", true)).toEqual({ action: "gate", gate: "To QA" });
     expect(decideAutoAdvance("To Merge", true)).toEqual({ action: "gate", gate: "To Merge" });
   });

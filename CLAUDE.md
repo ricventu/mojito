@@ -45,6 +45,11 @@ degrades gracefully without Mojito (bare-terminal mode). So for a cross-cutting 
      `src/server/sessionKey.ts` (session names embed the status slug).
    These two must agree on the exact status names. A mismatch silently breaks
    auto-advance and session naming.
+   From lime 0.20.0, stage 2 may skip stage 3: `lime-implement` exits straight to `To QA`
+   when the reviewed-tree marker matches the current tree, and only falls back to
+   `To Review` when it does not. So `To Code → To QA` is a legal transition and
+   `stageAdvanced` must keep treating a multi-stage forward jump as an advance — a
+   "consecutive stages only" rule would silently break the skip.
 
 3. **Launch command per status** — Mojito invokes the stage skill directly so a session
    loads only the stage it runs: `slashForStatus` in `src/server/stageCommand.ts` maps
