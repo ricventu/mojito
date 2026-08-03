@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { NO_PROJECT, ticketStatuses, filterTickets, mineOnly } from "@/lib/ticketFilter";
+import { NO_PROJECT, ticketStatuses, filterTickets, mineOnly, showsMineMarker } from "@/lib/ticketFilter";
 import type { TicketSummary } from "@/server/types";
 
 function ticket(p: Partial<TicketSummary>): TicketSummary {
@@ -68,6 +68,21 @@ describe("mineOnly", () => {
     ];
     expect(ticketStatuses(mineOnly(mixed, true))).toEqual(["Todo"]);
     expect(ticketStatuses(mineOnly(mixed, false))).toEqual(["Todo", "To Code"]);
+  });
+});
+
+describe("showsMineMarker", () => {
+  const ours = ticket({ assignedToMe: true });
+  const theirs = ticket({ assignedToMe: false });
+
+  it("marks the viewer's tickets while the filter is off", () => {
+    expect(showsMineMarker(ours, false)).toBe(true);
+    expect(showsMineMarker(theirs, false)).toBe(false);
+  });
+
+  it("marks nothing while the filter is on, where every ticket is the viewer's", () => {
+    expect(showsMineMarker(ours, true)).toBe(false);
+    expect(showsMineMarker(theirs, true)).toBe(false);
   });
 });
 

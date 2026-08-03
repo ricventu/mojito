@@ -16,6 +16,16 @@ export function mineOnly(tickets: TicketSummary[], mine: boolean): TicketSummary
 }
 
 /**
+ * Whether a ticket's card should carry the "assigned to me" marker.
+ *
+ * Only while the filter is off: with it on every visible ticket is the viewer's, so a
+ * marker on all of them would carry no information.
+ */
+export function showsMineMarker(ticket: TicketSummary, mine: boolean): boolean {
+  return !mine && ticket.assignedToMe;
+}
+
+/**
  * Distinct lifecycle statuses present in the tickets, ordered by lifecycle rank
  * (unknown statuses last, alphabetical tie-break — same ordering as groupByStatus).
  */
