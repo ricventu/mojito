@@ -2,7 +2,7 @@
 export { NO_PROJECT } from "@/lib/ticketFilter";
 
 export default function FilterBar(
-  { query, onQuery, projects, active, onProject, statuses, activeStatus, onStatus, placeholder, action }:
+  { query, onQuery, projects, active, onProject, statuses, activeStatus, onStatus, mine, onMine, placeholder, action }:
   {
     query: string;
     onQuery: (q: string) => void;
@@ -12,10 +12,14 @@ export default function FilterBar(
     statuses?: string[];
     activeStatus?: string | null;
     onStatus?: (s: string | null) => void;
+    mine?: boolean;
+    onMine?: (v: boolean) => void;
     placeholder?: string;
     action?: React.ReactNode;
   },
 ) {
+  const hasStatuses = statuses != null && onStatus != null
+    && (statuses.length > 0 || (activeStatus ?? null) !== null);
   return (
     <div className="filter">
       <div className="filter-top">
@@ -37,18 +41,33 @@ export default function FilterBar(
           ))}
         </div>
       )}
-      {statuses && onStatus && (statuses.length > 0 || (activeStatus ?? null) !== null) && (
+      {(hasStatuses || onMine) && (
         <div className="filter-chips">
-          <button className={`chip toggle${(activeStatus ?? null) === null ? " on" : ""}`} onClick={() => onStatus(null)}>All</button>
-          {statuses.map((s) => (
+          {/* "Mine" leads the row: .filter-chips scrolls horizontally, so a trailing
+              chip would sit off-screen on a phone once the statuses fill the width. */}
+          {onMine && (
             <button
-              key={s}
-              className={`chip toggle${activeStatus === s ? " on" : ""}`}
-              onClick={() => onStatus(s)}
+              className={`chip toggle lead${mine ? " on" : ""}`}
+              aria-pressed={mine}
+              onClick={() => onMine(!mine)}
             >
-              {s}
+              Mine
             </button>
-          ))}
+          )}
+          {hasStatuses && (
+            <>
+              <button className={`chip toggle${(activeStatus ?? null) === null ? " on" : ""}`} onClick={() => onStatus!(null)}>All</button>
+              {statuses!.map((s) => (
+                <button
+                  key={s}
+                  className={`chip toggle${activeStatus === s ? " on" : ""}`}
+                  onClick={() => onStatus!(s)}
+                >
+                  {s}
+                </button>
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>

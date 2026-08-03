@@ -29,6 +29,10 @@ export default function LaunchSheet(
   const [auto, setAuto] = useState(true);
   const [bareMode, setBareMode] = useState<"claude" | "terminal">("claude");
   const [err, setErr] = useState<string | null>(null);
+  // Mirrors ticket.assignedToMe so the sheet can flip the label without waiting for the
+  // list to refetch — the ticket prop is a snapshot taken when the sheet opened.
+  const [mine, setMine] = useState(ticket.assignedToMe);
+  const [assigning, setAssigning] = useState(false);
   const existingId = tmuxName(ticket.identifier, ticket.statusName);
   const existing = sessions.find((s) => s.id === existingId);
   const existingActive = existing != null
@@ -65,6 +69,26 @@ export default function LaunchSheet(
     if (!res.ok) { setErr(await res.text()); return; }
     onLaunched();
     onClose();
+  };
+
+  // Take the ticket or hand it back. The sheet stays open — assigning a ticket and then
+  // starting its session is one flow.
+  const toggleAssignee = async () => {
+    const next = !mine;
+    setAssigning(true);
+    setMine(next);
+    const res = await apiFetch(token, `/api/tickets/${ticket.identifier}/assignee`, {
+      method: "POST",
+      body: JSON.stringify({ mine: next }),
+    });
+    setAssigning(false);
+    if (!res.ok) {
+      setMine(!next);
+      setErr(`could not ${next ? "assign" : "unassign"} ${ticket.identifier} (${res.status})`);
+      return;
+    }
+    setErr(null);
+    onLaunched();
   };
 
   const noActiveSession = activeSessionLevel(ticket.identifier, sessions) === null;
@@ -179,6 +203,9 @@ export default function LaunchSheet(
             {customBtn}
           </>
         )}
+        <button className="btn ghost block" style={{ marginTop: 12 }} disabled={assigning} onClick={toggleAssignee}>
+          {mine ? "Unassign" : "Assign to me"}
+        </button>
         <button className="btn ghost block" style={{ marginTop: 12 }} onClick={onOpenDocs}>Docs</button>
         {err && <p className="err-text">{err}</p>}
       </div>
