@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import LaunchSheet from "./LaunchSheet";
 import NewTicketSheet from "./NewTicketSheet";
 import FilterBar, { NO_PROJECT } from "./FilterBar";
-import { filterTickets, mineOnly, ticketStatuses } from "@/lib/ticketFilter";
+import { filterTickets, mineOnly, showsMineMarker, ticketStatuses } from "@/lib/ticketFilter";
 import { usePersistedState } from "@/lib/usePersistedState";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 import { activeSessionLevel, type ActiveLevel } from "@/lib/ticketSessionLevel";
@@ -85,6 +85,7 @@ export default function TicketList(
                 <button key={t.identifier} className="card tap" onClick={() => setPicked(t)}>
                   <div>
                     <span className="id">{t.identifier}</span>
+                    {showsMineMarker(t, mine) && <span className="chip mine">Mine</span>}
                     {levels.get(t.identifier) && (
                       <span
                         className={`s-dot ${levels.get(t.identifier)}`}
