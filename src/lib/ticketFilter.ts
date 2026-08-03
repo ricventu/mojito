@@ -5,6 +5,17 @@ import { statusRank } from "@/lib/status";
 export const NO_PROJECT = "No project";
 
 /**
+ * Tickets assigned to the viewer, or all of them when the filter is off.
+ *
+ * This is a scope applied before the other criteria, not a fourth criterion inside
+ * filterTickets: the project and status chips are derived from the scoped list, so
+ * turning the filter on never leaves a chip that would match nothing.
+ */
+export function mineOnly(tickets: TicketSummary[], mine: boolean): TicketSummary[] {
+  return mine ? tickets.filter((t) => t.assignedToMe) : tickets;
+}
+
+/**
  * Distinct lifecycle statuses present in the tickets, ordered by lifecycle rank
  * (unknown statuses last, alphabetical tie-break — same ordering as groupByStatus).
  */

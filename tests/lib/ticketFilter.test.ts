@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { NO_PROJECT, ticketStatuses, filterTickets } from "@/lib/ticketFilter";
+import { NO_PROJECT, ticketStatuses, filterTickets, mineOnly } from "@/lib/ticketFilter";
 import type { TicketSummary } from "@/server/types";
 
 function ticket(p: Partial<TicketSummary>): TicketSummary {
@@ -10,6 +10,7 @@ function ticket(p: Partial<TicketSummary>): TicketSummary {
     statusType: "unstarted",
     project: "Mojito",
     labels: [],
+    assignedToMe: true,
     ...p,
   };
 }
@@ -42,6 +43,31 @@ describe("ticketStatuses", () => {
       ticket({ statusName: "To Code" }),
     ];
     expect(ticketStatuses(tickets)).toEqual(["To Code", "Alpha", "Zeta"]);
+  });
+});
+
+describe("mineOnly", () => {
+  const tickets = [
+    ticket({ identifier: "RIC-1", assignedToMe: true }),
+    ticket({ identifier: "RIC-2", assignedToMe: false }),
+    ticket({ identifier: "RIC-3", assignedToMe: true }),
+  ];
+
+  it("keeps only the viewer's tickets when the filter is on", () => {
+    expect(mineOnly(tickets, true).map((t) => t.identifier)).toEqual(["RIC-1", "RIC-3"]);
+  });
+
+  it("returns every ticket when the filter is off", () => {
+    expect(mineOnly(tickets, false).map((t) => t.identifier)).toEqual(["RIC-1", "RIC-2", "RIC-3"]);
+  });
+
+  it("scopes the derived status chips, so no chip yields an empty list", () => {
+    const mixed = [
+      ticket({ statusName: "Todo", assignedToMe: true }),
+      ticket({ statusName: "To Code", assignedToMe: false }),
+    ];
+    expect(ticketStatuses(mineOnly(mixed, true))).toEqual(["Todo"]);
+    expect(ticketStatuses(mineOnly(mixed, false))).toEqual(["Todo", "To Code"]);
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { listOpenIssues, getIssueStatus, getIssueRef, setIssueStatus, postComment, uploadImage } from "@/server/linear";
+import { listOpenIssues, getIssueStatus, getIssueRef, setIssueStatus, setIssueAssignee, postComment, uploadImage } from "@/server/linear";
 
 function fakeFetch(payload: unknown) {
   return vi.fn(async () => ({ ok: true, json: async () => ({ data: payload }) })) as unknown as typeof fetch;
@@ -21,6 +21,7 @@ describe("linear client", () => {
             state: { name: "To Review", type: "started" },
             project: { name: "Lime" },
             labels: { nodes: [{ name: "bug" }] },
+            assignee: { isMe: true },
           },
         ],
       },
@@ -33,7 +34,31 @@ describe("linear client", () => {
       statusType: "started",
       project: "Lime",
       labels: ["bug"],
+      assignedToMe: true,
     });
+  });
+
+  it("marks unassigned issues and issues assigned to others as not mine", async () => {
+    const f = fakeFetch({
+      issues: {
+        nodes: [
+          { identifier: "RIC-1", state: { name: "Backlog" }, assignee: null },
+          { identifier: "RIC-2", state: { name: "Backlog" }, assignee: { isMe: false } },
+        ],
+      },
+    });
+    const items = await listOpenIssues("k", f);
+    expect(items.map((t) => t.assignedToMe)).toEqual([false, false]);
+  });
+
+  it("no longer restricts the query to the viewer's own issues", async () => {
+    const f = fakeFetch({ issues: { nodes: [] } });
+    await listOpenIssues("k", f);
+    const body = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string;
+    // The assignee survives only as a selected field, never as a filter clause.
+    expect(body).not.toContain("isMe: {");
+    expect(body).toContain("assignee { isMe }");
+    expect(body).toContain("nin");
   });
 
   it("returns a single issue status", async () => {
@@ -67,6 +92,32 @@ describe("linear mutations", () => {
       { team: { states: { nodes: [{ id: "s1", name: "To Code" }] } } },
     ]);
     await expect(setIssueStatus("k", "RIC-110", "To Merge", f)).rejects.toThrow(/To Merge/);
+  });
+
+  it("assigns an issue to the viewer", async () => {
+    const f = seqFetch([
+      { issues: { nodes: [{ id: "issue-uuid", state: { name: "Backlog" }, team: { id: "team-uuid" } }] } },
+      { viewer: { id: "viewer-uuid" } },
+      { issueUpdate: { success: true } },
+    ]);
+    await setIssueAssignee("k", "RIC-169", true, f);
+    const calls = (f as unknown as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls[1][1].body).toContain("viewer");
+    const update = JSON.parse(calls[2][1].body as string);
+    expect(update.query).toContain("issueUpdate");
+    expect(update.variables).toEqual({ id: "issue-uuid", assigneeId: "viewer-uuid" });
+  });
+
+  it("unassigns an issue without looking up the viewer", async () => {
+    const f = seqFetch([
+      { issues: { nodes: [{ id: "issue-uuid", state: { name: "Backlog" }, team: { id: "team-uuid" } }] } },
+      { issueUpdate: { success: true } },
+    ]);
+    await setIssueAssignee("k", "RIC-169", false, f);
+    const calls = (f as unknown as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls).toHaveLength(2);
+    const update = JSON.parse(calls[1][1].body as string);
+    expect(update.variables).toEqual({ id: "issue-uuid", assigneeId: null });
   });
 
   it("posts a comment on the resolved issue node", async () => {

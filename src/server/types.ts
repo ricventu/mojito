@@ -41,6 +41,7 @@ export interface TicketSummary {
   statusType: string;    // triage | backlog | unstarted | started | completed | canceled
   project: string | null;
   labels: string[];
+  assignedToMe: boolean;  // assigned to the Linear API key's owner (false when unassigned)
 }
 
 export interface AppConfig {

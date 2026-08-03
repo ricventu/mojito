@@ -9,6 +9,7 @@ interface IssueNode {
   state?: { name?: string; type?: string };
   project?: { name?: string } | null;
   labels?: { nodes?: { name: string }[] };
+  assignee?: { isMe?: boolean } | null;
 }
 
 async function query<T>(apiKey: string, body: object, fetchImpl: typeof fetch): Promise<T> {
@@ -31,6 +32,7 @@ function mapIssueNode(node: IssueNode): TicketSummary {
     statusType: node.state?.type ?? "",
     project: node.project?.name ?? null,
     labels: node.labels?.nodes?.map((l) => l.name) ?? [],
+    assignedToMe: node.assignee?.isMe ?? false,
   };
 }
 
@@ -38,12 +40,16 @@ export async function listOpenIssues(apiKey: string, fetchImpl: typeof fetch = f
   const data = await query<{ issues: { nodes: IssueNode[] } }>(
     apiKey,
     {
+      // Every open issue, not just the viewer's — the "Mine" restriction is a UI filter
+      // over `assignedToMe`, so unassigned tickets stay reachable from Mojito.
       query: `query {
         issues(filter: {
-          assignee: { isMe: { eq: true } },
           state: { type: { nin: ["completed", "canceled"] } }
         }, first: 100) {
-          nodes { identifier title state { name type } project { name } labels { nodes { name } } }
+          nodes {
+            identifier title state { name type } project { name }
+            labels { nodes { name } } assignee { isMe }
+          }
         }
       }`,
     },
@@ -122,6 +128,34 @@ export async function setIssueStatus(
         issueUpdate(id: $id, input: { stateId: $stateId }) { success }
       }`,
       variables: { id: ref.id, stateId: target.id },
+    },
+    fetchImpl,
+  );
+}
+
+/**
+ * Assign an issue to the API key's owner, or clear its assignee.
+ * The viewer lookup is skipped when unassigning — `null` needs no id.
+ */
+export async function setIssueAssignee(
+  apiKey: string,
+  identifier: string,
+  toMe: boolean,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  const ref = await getIssueRef(apiKey, identifier, fetchImpl);
+  let assigneeId: string | null = null;
+  if (toMe) {
+    const viewer = await query<{ viewer: { id: string } }>(apiKey, { query: `query { viewer { id } }` }, fetchImpl);
+    assigneeId = viewer.viewer.id;
+  }
+  await query<{ issueUpdate: { success: boolean } }>(
+    apiKey,
+    {
+      query: `mutation ($id: String!, $assigneeId: String) {
+        issueUpdate(id: $id, input: { assigneeId: $assigneeId }) { success }
+      }`,
+      variables: { id: ref.id, assigneeId },
     },
     fetchImpl,
   );

@@ -118,6 +118,9 @@ label { color: var(--text); }
 .filter-chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 2px; scrollbar-width: none; }
 .filter-chips::-webkit-scrollbar { display: none; }
 .filter-chips .chip { flex: none; white-space: nowrap; }
+/* The assignee toggle leads the status row but belongs to a different axis than the
+   status chips beside it — extra space keeps the two from reading as one group. */
+.filter-chips .chip.lead { margin-right: 14px; }
 
 /* ---- Chips (labels / meta) ---- */
 .chip {

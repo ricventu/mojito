@@ -3,7 +3,7 @@ import { orderTickets } from "@/lib/orderTickets";
 import type { TicketSummary } from "@/server/types";
 
 function t(identifier: string): TicketSummary {
-  return { identifier, title: "", statusName: "", statusType: "", project: null, labels: [] };
+  return { identifier, title: "", statusName: "", statusType: "", project: null, labels: [], assignedToMe: true };
 }
 
 describe("orderTickets", () => {
