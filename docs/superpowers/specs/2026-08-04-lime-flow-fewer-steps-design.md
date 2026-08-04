@@ -326,5 +326,5 @@ Mojito (`npx tsc --noEmit && npx vitest run`):
   express escalation criteria.
 - **Auto-labelling `Express` from `lime-new`'s mini-analysis.** Plausible and cheap, but it
   would put a triage decision in the one stage that cannot yet see the repo.
-- **Unifying `lime-merge`'s and `lime-rebase`'s duplicated rebase/review block**, which
-  `lime-merge:38` already flags for a future ticket.
+- **Unifying `lime-merge`'s and `lime-rebase`'s duplicated rebase/review block**, flagged at
+  `lime-merge:38` and now tracked as RIC-170.
