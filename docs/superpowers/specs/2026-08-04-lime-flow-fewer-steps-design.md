@@ -195,6 +195,14 @@ Body:
    `superpowers:brainstorming` then `superpowers:writing-plans` **in this session** — the
    context is already loaded — and exit at **To Code**. Mojito's auto-advance then launches
    `/lime-implement`, which finds the committed plan; a mis-triage costs one session boot.
+
+   **This step depends on RIC-139 landing first.** Escalation fires exactly when a design
+   decision is open, which is the case RIC-139 exists to fix: today a stage-1 brainstorm in
+   auto mode answers its own open questions, commits, and advances the status. Shipping this
+   escalation before that gate would add a path whose entire purpose is "a decision is open
+   here" and have it decide anyway — worse here than in the design stage, since the express
+   route has no plan document and no separate review stage. This step's stopping behaviour
+   is whatever RIC-139 defines; it must not restate it.
 4. **Test-driven implementation.** `superpowers:test-driven-development`: failing test, fix,
    passing test, then the full suite green. A purely visual or copy change is exempt from
    the new test but must still leave the suite green.
@@ -262,13 +270,19 @@ another:
   breaks rejection handling.
 - **Amended — launch command per status.** `slashForStatus` now also maps stage 1 + the
   `Express` label to `/lime-express`, which raises the hard floor for that mapping to
-  **lime ≥ 0.21.0** in the plugin cache.
+  **lime ≥ 0.22.0** in the plugin cache.
 
 ## Rollout order
 
-1. **lime** — parts 1, 3, 4. Bump `.claude-plugin/plugin.json` to `0.21.0`, update the
+0. **lime — RIC-139 first, on its own version.** Every part of this design makes the flow
+   more autonomous: the approve launches the merge, the reject launches implementation, the
+   express route skips the plan boundary. Each removed step is one fewer moment where a
+   human looks, so a stage 1 that answers its own open questions has to be fixed before, not
+   after. Shipped as `0.21.0` and confirmed in the cache before anything below starts —
+   separately, so that if the express work stalls, RIC-139 is already live.
+1. **lime** — parts 1, 3, 4. Bump `.claude-plugin/plugin.json` to `0.22.0`, update the
    dispatch table and matrix in `skills/lime-next/SKILL.md` and `README.md`, then
-   `/plugin` update and confirm `ls ~/.claude/plugins/cache/lime/lime/` shows 0.21.0. lime
+   `/plugin` update and confirm `ls ~/.claude/plugins/cache/lime/lime/` shows 0.22.0. lime
    runs from the cache, not from source.
 2. **Linear** — create the `Express` label once (workspace level, like the existing three).
 3. **Mojito** — part 2, then part 5, then the UI. Part 5 must not ship before step 1 is in
@@ -279,10 +293,10 @@ another:
 Parts 1, 2 and 3 are independent of each other and of the express work; part 5 depends on
 parts 1 and 4 being in the cache, and part 2's `reject` launch depends on part 3.
 
-This is too much for one implementation plan. It decomposes into three, in this order:
-**(a) lime** — parts 1, 3, 4 plus the version bump and cache rebuild; **(b) Mojito verdict**
-— part 2 and its tests; **(c) Mojito express** — part 5, the UI and the contract edits.
-Each is independently shippable and leaves the flow working.
+This is too much for one implementation plan. It decomposes into three, in this order, all
+of them behind RIC-139: **(a) lime** — parts 1, 3, 4 plus the version bump and cache
+rebuild; **(b) Mojito verdict** — part 2 and its tests; **(c) Mojito express** — part 5, the
+UI and the contract edits. Each is independently shippable and leaves the flow working.
 
 ## Testing
 
