@@ -18,9 +18,9 @@ function repoForTicket(projectsPath: string, ticket: string, projectName: string
 // The ticket's worktree, and only that — null when the ticket maps to no repo or
 // has no worktree yet. Distinct from resolveTicketCwd's repo-root fallback because
 // a caller that already holds a directory needs to know whether a worktree exists
-// before replacing what it has: a stage-1 session's cwd is the repo root (the
-// the worktree is created mid-session by the work session), so it should be upgraded to the
-// worktree, while a stage-2 session's cwd already IS a worktree and must never be
+// before replacing what it has: a fresh work session's cwd is the repo root (the
+// worktree is created mid-session by the work session), so it should be upgraded to the
+// worktree, while a relaunched session's cwd already IS a worktree and must never be
 // downgraded to the repo root just because a branch was renamed.
 export function resolveTicketWorktree(
   projectsPath: string,
