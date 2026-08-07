@@ -49,7 +49,7 @@ export function mapHook(event: HookEventName, ready: boolean, currentState: Sess
 }
 
 /**
- * State mapping for a custom (interactive, no-lifecycle) session. Unlike a lime session,
+ * State mapping for a custom (interactive, no-lifecycle) session. Unlike a ticket session,
  * a custom session has no stage handoff: it rests between turns waiting for the user. That
  * resting state — a finished turn (Stop) or an idle Notification — is the calm "idle" state,
  * NOT the amber needs-input alert. needs-input is reserved for a genuine block: a permission

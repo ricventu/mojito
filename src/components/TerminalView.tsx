@@ -174,9 +174,9 @@ export default function TerminalView(
         };
         ws.onclose = (ev) => {
           if (closed) return;
-          // The tmux session is gone for good (retired on auto-advance, killed, or
-          // crashed). Reconnecting would just respawn a doomed `tmux attach` that
-          // prints "can't find session" and exits — an endless loop. Stop here.
+          // The tmux session is gone for good (retired when a verdict launched its
+          // successor, killed, or crashed). Reconnecting would just respawn a doomed
+          // `tmux attach` that prints "can't find session" and exits — an endless loop. Stop here.
           if (ev.code === SESSION_GONE_CODE) {
             term.write("\r\n\x1b[90m— session ended —\x1b[0m\r\n");
             return;

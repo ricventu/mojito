@@ -74,8 +74,9 @@ export function attachPty(ws: WebSocket, id: string, deps: Partial<AttachDeps> =
   // Never attach to a session that no longer exists. `tmux attach-session` would
   // otherwise spawn fine, print "can't find session: <id>" into the stream, and
   // exit — and the client, reconnecting every 1.5s, would repeat that error
-  // forever (seen after a ticket auto-advances and the old status's session is
-  // retired). Report it once with a distinct close code so the client stops.
+  // forever (seen after a verdict launches the ticket's successor session and the
+  // old status's session is retired). Report it once with a distinct close code so
+  // the client stops.
   d.hasSession(id)
     .then((alive) => {
       if (!alive) {

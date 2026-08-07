@@ -48,7 +48,7 @@ function isUnder(root: string, cwd: string): boolean {
 }
 
 // Panes launched by Mojito itself (the `stack-<slug>` launcher and `mojito-*`
-// lime sessions) run inside project trees too, so exclude them when looking for
+// ticket sessions) run inside project trees too, so exclude them when looking for
 // the stack's own detached child session.
 function isMojitoOwnSession(name: string): boolean {
   return name.startsWith("stack-") || name.startsWith("mojito-");

@@ -14,7 +14,7 @@ export type HookEventName =
 
 export interface SessionMeta {
   kind: "ticket" | "custom" | "shell"; // "ticket" = full work-phase lifecycle session; "custom" = standalone claude; "shell" = plain login-shell terminal ($SHELL, or bash)
-  id: string;            // tmux session name, e.g. "mojito-RIC-46-to-review"
+  id: string;            // tmux session name, e.g. "mojito-RIC-46-work"
   ticket: string;        // "RIC-46" (empty for custom sessions)
   launchStatus: string;  // Linear status name at launch (empty for custom sessions)
   model: string;         // "opus" | "sonnet" | "fable" | full id
@@ -23,10 +23,10 @@ export interface SessionMeta {
   cwd: string;
   createdAt: string;     // ISO
   message?: string;      // last alert message
-  projectName?: string | null; // Linear project name resolved at launch, for auto/gate advance
+  projectName?: string | null; // Linear project name resolved at launch, used to resolve the repo and for verdict actions
   // Added after the fields above: sidecars persisted before this change lack them,
   // so readSidecar can yield `undefined` at runtime despite the types — callers must guard.
-  title: string;         // Linear ticket title at launch, for the skill's launch context
+  title: string;         // Linear ticket title at launch, goes into the session context file
   labels: string[];      // Linear label names at launch, for bug/feature classification
 }
 

@@ -55,7 +55,7 @@ describe("resolveDocsTarget", () => {
   });
 
   it("prefers the ticket's worktree over a session cwd frozen at the repo root", () => {
-    // A Backlog session is launched before its worktree exists — /lime-design creates
+    // A Backlog session is launched before its worktree exists — the work session creates
     // it mid-session — so meta.cwd stays the repo root while the spec the session
     // writes lands in the worktree. The docs must follow the worktree, not the cwd.
     git(repo, ["init", "-q", "-b", "main"]);

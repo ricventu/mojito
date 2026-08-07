@@ -30,9 +30,9 @@ export async function handleHook(
 
   if (meta.kind === "custom" || meta.kind === "shell") {
     // Shell sessions fire no hooks, so this branch is unreachable for them today; guarding here
-    // future-proofs against any stray/manual hook pushing a plain terminal into the lime path.
+    // future-proofs against any stray/manual hook pushing a plain terminal into the ticket session path.
     // Custom sessions have no ticket and no lifecycle: neither kind calls Linear or
-    // auto-advances, and SessionEnd is a clean close (done), not a failure. A custom
+    // moves to a new stage, and SessionEnd is a clean close (done), not a failure. A custom
     // session is interactive, so it rests at "idle" between turns (mapCustomHook).
     const outcome = meta.kind === "custom"
       ? mapCustomHook(event, meta.state)

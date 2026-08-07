@@ -376,7 +376,7 @@ describe("handleHook — custom sessions", () => {
   });
 });
 
-it("does not overwrite a lime session's title", async () => {
+it("does not overwrite a ticket session's title", async () => {
   const { registry } = seed({ title: "Linear title" });
   const bus = new EventBus();
   await handleHook("mojito-RIC-46-in-progress", "SessionStart",
@@ -385,7 +385,7 @@ it("does not overwrite a lime session's title", async () => {
   expect(registry.get("mojito-RIC-46-in-progress")?.title).toBe("Linear title");
 });
 
-it("never reads the transcript title for a lime session", async () => {
+it("never reads the transcript title for a ticket session", async () => {
   const { registry } = seed({ title: "Linear title" });
   const bus = new EventBus();
   const readTranscriptTitle = vi.fn(() => "auto title");

@@ -39,7 +39,7 @@ describe("mapHook", () => {
     expect(o.alert?.message).toBe("ready for QA");
   });
 
-  it("stop with unchanged status means claude is waiting", () => {
+  it("stop when not ready for QA means claude is waiting", () => {
     const o = mapHook("Stop", false, "running");
     expect(o.state).toBe("needs-input");
     expect(o.alert?.kind).toBe("needs-input");

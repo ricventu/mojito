@@ -144,7 +144,7 @@ export async function launchCustomSession(
   let cwd: string;
   let slug: string;
   if (req.ticket) {
-    // Same resolver the lime path uses: worktree if one exists for the ticket, else repo root.
+    // Same resolver the ticket session uses: worktree if one exists for the ticket, else repo root.
     const resolveCwd = deps.resolveCwd ?? defaultResolveCwd(deps.projectsPath);
     const resolved = resolveCwd(req.ticket, req.projectName);
     if (!resolved) return { ok: false, reason: "no-repo" };
