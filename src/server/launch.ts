@@ -9,7 +9,7 @@ import { loadProjectMap, resolvePathForProject } from "./limeProjects.js";
 import { resolveTicketCwd } from "./ticketCwd.js";
 import { logfilePath } from "./sidecar.js";
 import type { Registry } from "./registry.js";
-import { writeLaunchContext, writeNewTicketContext } from "./launchContext.js";
+import { writeLaunchContext } from "./launchContext.js";
 import { branchChangedLines, scaleReviewProfile } from "./reviewScale.js";
 import { defaultModelForStatus, defaultEffortForStatus } from "./stageDefaults.js";
 import { readAutoScale } from "./scaleSettings.js";
@@ -218,79 +218,6 @@ export async function launchCustomSession(
     projectName: req.projectName,
     title,
     labels: req.ticket ? (req.labels ?? []) : [],
-  };
-  deps.registry.upsert(meta);
-  return { ok: true, meta };
-}
-
-export interface NewTicketLaunchRequest {
-  brief: string;
-  projectName: string | null;
-  model: string;
-  effort: Effort;
-  images?: string[];
-}
-
-export function buildNewTicketClaudeCommand(
-  req: NewTicketLaunchRequest,
-  settingsPath: string,
-  contextPath: string,
-): string {
-  const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
-  return (
-    `LIME_NEW_CONTEXT=${q(contextPath)} ` +
-    `claude --model ${q(req.model)} --effort ${q(req.effort)} --settings ${q(settingsPath)} ${q("/lime-new")}`
-  );
-}
-
-export async function launchNewTicketSession(
-  req: NewTicketLaunchRequest,
-  deps: LaunchDeps & { genId?: () => string; homeDir?: () => string },
-): Promise<{ ok: true; meta: SessionMeta } | { ok: false; reason: "no-repo" }> {
-  const homeDir = deps.homeDir ?? (() => homedir());
-  const genId = deps.genId ?? (() => randomBytes(3).toString("hex"));
-
-  let cwd: string;
-  if (req.projectName) {
-    const path = resolvePathForProject(loadProjectMap(deps.projectsPath), req.projectName);
-    if (!path) return { ok: false, reason: "no-repo" };
-    cwd = path;
-  } else {
-    cwd = homeDir();
-  }
-
-  const slug = req.projectName ? statusSlug(req.projectName) : "new-ticket";
-  const id = customSessionName(slug, genId());
-
-  const settingsDir = join(deps.stateDir, "settings");
-  mkdirSync(settingsDir, { recursive: true, mode: 0o700 });
-  const settingsPath = join(settingsDir, `${id}.json`);
-  writeFileSync(settingsPath, JSON.stringify(buildHookSettings(id, deps.port, deps.token), null, 2), { mode: 0o600 });
-  chmodSync(settingsPath, 0o600); // mode on writeFileSync is ignored if the file pre-existed
-
-  const contextPath = writeNewTicketContext(deps.stateDir, id, {
-    brief: req.brief,
-    project: req.projectName,
-    images: req.images ?? [],
-  });
-
-  const command = buildNewTicketClaudeCommand(req, settingsPath, contextPath);
-  await deps.newSession(id, cwd, command);
-  await deps.pipePane(id, logfilePath(deps.stateDir, id));
-
-  const meta: SessionMeta = {
-    kind: "custom",
-    id,
-    ticket: "",
-    launchStatus: "",
-    model: req.model,
-    effort: req.effort,
-    state: "starting",
-    cwd,
-    createdAt: (deps.nowIso ?? (() => new Date().toISOString()))(),
-    projectName: req.projectName,
-    title: `New ticket · ${req.projectName ?? "home"}`,
-    labels: [],
   };
   deps.registry.upsert(meta);
   return { ok: true, meta };

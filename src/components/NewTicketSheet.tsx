@@ -3,10 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/client";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES, MAX_IMAGES } from "@/lib/imageConstants";
 import { readAsDataUrl } from "@/lib/readAsDataUrl";
-import type { SessionMeta } from "@/server/types";
 
-const MODELS = ["opus", "sonnet", "fable"];
-const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 const GENERAL = "__general__";
 
 interface PendingImage { id: string; name: string; type: string; dataUrl: string; }
@@ -20,13 +17,12 @@ function newImageId(): string {
 
 export default function NewTicketSheet(
   { token, onClose, onCreated }:
-  { token: string; onClose: () => void; onCreated: (meta: SessionMeta) => void },
+  { token: string; onClose: () => void; onCreated: () => void },
 ) {
   const [projects, setProjects] = useState<string[]>([]);
   const [project, setProject] = useState(GENERAL);
+  const [title, setTitle] = useState("");
   const [brief, setBrief] = useState("");
-  const [model, setModel] = useState("opus");
-  const [effort, setEffort] = useState("high");
   const [images, setImages] = useState<PendingImage[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,17 +85,16 @@ export default function NewTicketSheet(
     setErr(null);
     setIsSubmitting(true);
     try {
-      const res = await apiFetch(token, "/api/sessions", {
+      const res = await apiFetch(token, "/api/tickets", {
         method: "POST",
         body: JSON.stringify({
-          kind: "new-ticket", brief: brief.trim(),
-          projectName: project === GENERAL ? null : project, model, effort,
+          title: title.trim(), brief: brief.trim(),
+          projectName: project === GENERAL ? null : project,
           images: images.map(({ name, type, dataUrl }) => ({ name, type, dataUrl })),
         }),
       });
       if (!res.ok) { setErr(await res.text()); return; }
-      const meta: SessionMeta = await res.json();
-      onCreated(meta);
+      onCreated();
       onClose();
     } finally {
       setIsSubmitting(false);
@@ -115,9 +110,12 @@ export default function NewTicketSheet(
             <option value={GENERAL}>General (home)</option>
             {projects.map((p) => <option key={p} value={p}>{p}</option>)}
           </select></label>
+        <label className="field"><span className="lbl">Title</span>
+          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ticket title" />
+        </label>
         <label className="field"><span className="lbl">Description</span>
           <textarea rows={5} value={brief} onChange={(e) => setBrief(e.target.value)} onPaste={onPaste}
-            placeholder="Describe the ticket — Claude will turn it into a title + description. Paste or drop images." />
+            placeholder="Describe the ticket — this becomes the issue description. Paste or drop images." />
         </label>
         <div className="img-row">
           <button type="button" className="btn sm" onClick={() => fileInput.current?.click()}>Add image</button>
@@ -135,13 +133,7 @@ export default function NewTicketSheet(
             ))}
           </div>
         )}
-        <div className="two">
-          <label className="field"><span className="lbl">Model</span>
-            <select value={model} onChange={(e) => setModel(e.target.value)}>{MODELS.map((m) => <option key={m}>{m}</option>)}</select></label>
-          <label className="field"><span className="lbl">Effort</span>
-            <select value={effort} onChange={(e) => setEffort(e.target.value)}>{EFFORTS.map((x) => <option key={x}>{x}</option>)}</select></label>
-        </div>
-        <button className="btn primary block" disabled={!brief.trim() || isSubmitting} onClick={create}>Create ticket</button>
+        <button className="btn primary block" disabled={!title.trim() || isSubmitting} onClick={create}>Create ticket</button>
         {err && <p className="err-text">{err}</p>}
       </div>
     </div>

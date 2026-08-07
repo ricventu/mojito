@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveRepoFromMap, listMappedProjects, resolvePathForProject } from "@/server/limeProjects";
+import { resolveRepoFromMap, listMappedProjects, resolvePathForProject, teamKeyForProject } from "@/server/limeProjects";
 
 describe("resolveRepoFromMap", () => {
   const map = {
@@ -46,5 +46,25 @@ describe("resolvePathForProject", () => {
   });
   it("returns null for an unmapped name", () => {
     expect(resolvePathForProject(map, "Nope")).toBeNull();
+  });
+});
+
+describe("teamKeyForProject", () => {
+  const map = {
+    ENG: "/code/backend",
+    WEB: { path: "/code/web", projects: { "Design System": "/code/ds", Marketing: "/code/mkt" } },
+  };
+  it("returns the team key whose projects map contains the name", () => {
+    expect(teamKeyForProject(map, "Design System")).toBe("WEB");
+  });
+  it("falls back to the map's first key when the name is not found", () => {
+    expect(teamKeyForProject(map, "Nope")).toBe("ENG");
+  });
+  it("falls back to the map's first key when projectName is null", () => {
+    expect(teamKeyForProject(map, null)).toBe("ENG");
+  });
+  it("returns null for an empty map", () => {
+    expect(teamKeyForProject({}, null)).toBeNull();
+    expect(teamKeyForProject({}, "Anything")).toBeNull();
   });
 });

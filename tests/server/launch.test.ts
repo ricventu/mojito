@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   launchSession, buildClaudeCommand, launchCustomSession, buildCustomClaudeCommand,
-  launchNewTicketSession, buildNewTicketClaudeCommand,
   launchRebaseSession, buildRebaseClaudeCommand, launchConflictSession,
   buildShellCommand, launchShellSession,
   buildResolvePrompt, launchStackResolveSession,
@@ -239,21 +238,6 @@ describe("launchCustomSession", () => {
   });
 });
 
-describe("buildNewTicketClaudeCommand", () => {
-  it("prefixes LIME_NEW_CONTEXT and runs /lime-new", () => {
-    const cmd = buildNewTicketClaudeCommand(
-      { projectName: null, model: "opus", effort: "high", brief: "x" },
-      "/s/x.json",
-      "/state/context/mojito-custom-general-abc123.json",
-    );
-    expect(cmd).toMatch(/^LIME_NEW_CONTEXT='\/state\/context\/mojito-custom-general-abc123.json' claude /);
-    expect(cmd).toContain("--model 'opus' --effort 'high'");
-    expect(cmd).toContain("--settings '/s/x.json'");
-    expect(cmd).toContain("'/lime-new'");
-    expect(cmd).not.toContain("/lime-next");
-  });
-});
-
 const baseRebaseReq = {
   ticket: "RIC-120", projectName: "Mojito", title: "action per fare rebase",
   labels: [] as string[], model: "opus", effort: "xhigh" as const,
@@ -267,67 +251,6 @@ describe("buildRebaseClaudeCommand", () => {
     expect(cmd).toContain("--settings '/s/x.json'");
     expect(cmd).toContain("'/lime-rebase RIC-120'");
     expect(cmd).not.toContain("/lime-next");
-  });
-});
-
-describe("launchNewTicketSession", () => {
-  it("General opens in the home directory with a New ticket · home title", async () => {
-    const d = customDeps();
-    const res = await launchNewTicketSession(
-      { brief: "Aggiungi export CSV", projectName: null, model: "opus", effort: "high" }, d,
-    );
-    expect(res.ok).toBe(true);
-    const meta = (res as { ok: true; meta: SessionMeta }).meta;
-    expect(meta).toMatchObject({
-      kind: "custom", id: "mojito-custom-new-ticket-abc123", ticket: "", launchStatus: "",
-      cwd: "/home/me", projectName: null, title: "New ticket · home",
-    });
-    expect(d.newSession).toHaveBeenCalledWith(
-      "mojito-custom-new-ticket-abc123", "/home/me",
-      expect.stringContaining("'/lime-new'"),
-    );
-  });
-
-  it("a mapped project opens in its folder with the project in the title", async () => {
-    const projectsPath = join(dir, "projects.json");
-    writeFileSync(projectsPath, JSON.stringify({ RIC: { projects: { Mojito: "/code/Lime/mojito" } } }));
-    const d = customDeps({ projectsPath });
-    const res = await launchNewTicketSession(
-      { brief: "x", projectName: "Mojito", model: "sonnet", effort: "low" }, d,
-    );
-    expect(res.ok).toBe(true);
-    const meta = (res as { ok: true; meta: SessionMeta }).meta;
-    expect(meta).toMatchObject({
-      kind: "custom", id: "mojito-custom-mojito-abc123", cwd: "/code/Lime/mojito",
-      projectName: "Mojito", title: "New ticket · Mojito",
-    });
-  });
-
-  it("writes the LIME_NEW_CONTEXT file with the brief and project", async () => {
-    const projectsPath = join(dir, "projects.json");
-    writeFileSync(projectsPath, JSON.stringify({ RIC: { projects: { Mojito: "/code/Lime/mojito" } } }));
-    const d = customDeps({ projectsPath });
-    await launchNewTicketSession({ brief: "Aggiungi export CSV", projectName: "Mojito", model: "opus", effort: "high" }, d);
-    const p = join(dir, "context", "mojito-custom-mojito-abc123.json");
-    expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({ brief: "Aggiungi export CSV", project: "Mojito", images: [] });
-  });
-
-  it("writes provided image URLs into the context", async () => {
-    const projectsPath = join(dir, "projects.json");
-    writeFileSync(projectsPath, JSON.stringify({ RIC: { projects: { Mojito: "/code/Lime/mojito" } } }));
-    const d = customDeps({ projectsPath });
-    await launchNewTicketSession(
-      { brief: "x", projectName: "Mojito", model: "opus", effort: "high", images: ["https://uploads.linear.app/a.png"] },
-      d,
-    );
-    const p = join(dir, "context", "mojito-custom-mojito-abc123.json");
-    expect(JSON.parse(readFileSync(p, "utf8")).images).toEqual(["https://uploads.linear.app/a.png"]);
-  });
-
-  it("refuses an unmapped project", async () => {
-    const d = customDeps();
-    const res = await launchNewTicketSession({ brief: "x", projectName: "Ghost", model: "opus", effort: "high" }, d);
-    expect(res).toMatchObject({ ok: false, reason: "no-repo" });
   });
 });
 

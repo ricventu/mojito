@@ -113,7 +113,7 @@ export default function TicketList(
       {newOpen && (
         <NewTicketSheet token={token}
           onClose={() => setNewOpen(false)}
-          onCreated={(meta) => { onLaunched(); onOpen(meta); }} />
+          onCreated={onLaunched} />
       )}
     </div>
   );

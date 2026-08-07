@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { getConfig, getRegistry } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
-import { launchSession, launchCustomSession, launchNewTicketSession, launchRebaseSession, launchShellSession } from "@/server/launch";
+import { launchSession, launchCustomSession, launchRebaseSession, launchShellSession } from "@/server/launch";
 import { validateTicket } from "@/server/sessionKey";
-import { validateImages } from "@/server/imageUpload";
-import { uploadImage, getIssueDescription, setIssueStatus } from "@/server/linear";
+import { getIssueDescription, setIssueStatus } from "@/server/linear";
 import { hasSession, newSession, pipePane } from "@/server/tmux";
 
 export async function GET(req: Request) {
@@ -25,26 +24,6 @@ export async function POST(req: Request) {
           ? { ticket: body.ticket, status: body.status ?? "", title: body.title ?? "",
               labels: Array.isArray(body.labels) ? body.labels : [] }
           : {}) },
-      { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
-        projectsPath: cfg.projectsPath, hasSession, newSession, pipePane },
-    );
-    if (!res.ok) return NextResponse.json({ error: res.reason }, { status: 422 });
-    return NextResponse.json(res.meta, { status: 201 });
-  }
-  if (body.kind === "new-ticket") {
-    const brief = typeof body.brief === "string" ? body.brief.trim() : "";
-    if (!brief) return NextResponse.json({ error: "empty brief" }, { status: 400 });
-    const parsed = validateImages(body.images);
-    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
-    let imageUrls: string[];
-    try {
-      imageUrls = await Promise.all(parsed.files.map((f) => uploadImage(cfg.linearApiKey, f)));
-    } catch {
-      return NextResponse.json({ error: "image upload failed" }, { status: 502 });
-    }
-    const res = await launchNewTicketSession(
-      { brief, projectName: body.projectName ?? null, model: body.model ?? "opus", effort: body.effort ?? "high",
-        images: imageUrls },
       { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
         projectsPath: cfg.projectsPath, hasSession, newSession, pipePane },
     );

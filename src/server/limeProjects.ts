@@ -39,3 +39,17 @@ export function listMappedProjects(map: ProjectMap): { name: string; path: strin
 export function resolvePathForProject(map: ProjectMap, name: string): string | null {
   return listMappedProjects(map).find((p) => p.name === name)?.path ?? null;
 }
+
+/**
+ * Resolve the team key that owns a project name, for issue creation. Falls back to the
+ * map's first key when the name is unmapped (or null, e.g. "General"); null for an
+ * empty map, since there is no team to fall back to.
+ */
+export function teamKeyForProject(map: ProjectMap, projectName: string | null): string | null {
+  if (projectName) {
+    for (const [key, entry] of Object.entries(map)) {
+      if (typeof entry !== "string" && entry.projects && Object.prototype.hasOwnProperty.call(entry.projects, projectName)) return key;
+    }
+  }
+  return Object.keys(map)[0] ?? null;
+}
