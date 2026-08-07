@@ -32,7 +32,7 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "mojito-dt-"));
   repo = join(dir, "repo");
   mkdirSync(repo);
-  projectsPath = join(dir, "lime-projects.json");
+  projectsPath = join(dir, "projects.json");
   // Keyed by Linear team key — that is what resolveRepoFromMap indexes on.
   writeFileSync(projectsPath, JSON.stringify({ RIC: repo }));
   sessions = {};

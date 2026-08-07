@@ -8,7 +8,7 @@ let dir: string;
 let projectsPath: string;
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "mojito-tcwd-"));
-  projectsPath = join(dir, "lime-projects.json");
+  projectsPath = join(dir, "projects.json");
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 

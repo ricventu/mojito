@@ -3,7 +3,7 @@ import { getConfig } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
 import { listOpenIssues, createIssue, uploadImage } from "@/server/linear";
 import { validateImages } from "@/server/imageUpload";
-import { loadProjectMap, teamKeyForProject } from "@/server/limeProjects";
+import { loadProjectMap, teamKeyForProject } from "@/server/projects";
 
 export async function GET(req: Request) {
   const cfg = getConfig();

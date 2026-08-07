@@ -1,5 +1,5 @@
 import { parseIdentifier } from "./sessionKey.js";
-import { loadProjectMap, resolveRepoFromMap } from "./limeProjects.js";
+import { loadProjectMap, resolveRepoFromMap } from "./projects.js";
 import { resolveWorktree } from "./worktree.js";
 
 // The repo a ticket's project maps to, or null.

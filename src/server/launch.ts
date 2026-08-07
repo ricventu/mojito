@@ -5,7 +5,7 @@ import { randomBytes } from "node:crypto";
 import type { Effort, SessionMeta } from "./types.js";
 import { tmuxName, validateTicket, statusSlug, customSessionName, conflictSessionName, shellSessionName } from "./sessionKey.js";
 import { buildHookSettings } from "./hookSettings.js";
-import { loadProjectMap, resolvePathForProject } from "./limeProjects.js";
+import { loadProjectMap, resolvePathForProject } from "./projects.js";
 import { resolveTicketCwd } from "./ticketCwd.js";
 import { logfilePath } from "./sidecar.js";
 import type { Registry } from "./registry.js";

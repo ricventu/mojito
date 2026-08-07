@@ -2,7 +2,7 @@ import { statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { listMappedProjects, loadProjectMap, type ProjectMap } from "./limeProjects.js";
+import { listMappedProjects, loadProjectMap, type ProjectMap } from "./projects.js";
 import { statusSlug, stackSessionName } from "./sessionKey.js";
 import { listAllPanes as tmuxListAllPanes, startStackSession, stopStackSession, type PaneInfo } from "./tmux.js";
 import { ffPull, FfPullError, type FfPullResult, type GitRun } from "./ffPull.js";

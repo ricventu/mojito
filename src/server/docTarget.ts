@@ -5,7 +5,7 @@ import { getConfig, getRegistry } from "./app.js";
 export interface DocsTargetDeps {
   // Look up a live session by its tmux name — the registry, in production.
   session: (id: string) => SessionMeta | undefined;
-  // Path to lime-projects.json, for a ticket with no live session.
+  // Path to the projects map, for a ticket with no live session.
   projectsPath: string;
 }
 
@@ -23,8 +23,8 @@ export function resolveDocsTarget(url: URL, deps: DocsTargetDeps): DocsTargetRes
     const meta = deps.session(session);
     if (!meta) return { ok: false, error: "unknown session", code: 404 };
     // A session's cwd is frozen at launch, and a stage-1 session is launched before
-    // its worktree exists — /lime-design creates it mid-session — so cwd stays the
-    // repo root while the spec the session writes lands in the worktree. Re-resolve
+    // its worktree exists — the work session creates it mid-session — so cwd stays
+    // the repo root while the spec the session writes lands in the worktree. Re-resolve
     // the worktree per request and prefer it; falling back to cwd (rather than to
     // the repo root) keeps a session that is already inside a worktree where it is.
     const worktree = meta.ticket

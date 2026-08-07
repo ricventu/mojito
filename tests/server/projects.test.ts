@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveRepoFromMap, listMappedProjects, resolvePathForProject, teamKeyForProject } from "@/server/limeProjects";
+import { resolveRepoFromMap, listMappedProjects, resolvePathForProject, teamKeyForProject } from "@/server/projects";
 
 describe("resolveRepoFromMap", () => {
   const map = {

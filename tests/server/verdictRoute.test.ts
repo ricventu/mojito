@@ -31,7 +31,7 @@ vi.mock("@/server/supersede", () => ({ supersedeSession: h.supersedeSession }));
 vi.mock("@/server/ticketCwd", () => ({
   resolveTicketWorktree: h.resolveTicketWorktree, resolveTicketCwd: h.resolveTicketCwd,
 }));
-vi.mock("@/server/limeProjects", () => ({
+vi.mock("@/server/projects", () => ({
   loadProjectMap: () => ({}), resolvePathForProject: h.resolvePathForProject,
 }));
 vi.mock("@/server/tmux", () => ({

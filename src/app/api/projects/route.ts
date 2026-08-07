@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getConfig } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
-import { loadProjectMap, listMappedProjects } from "@/server/limeProjects";
+import { loadProjectMap, listMappedProjects } from "@/server/projects";
 
 export async function GET(req: Request) {
   const cfg = getConfig();

@@ -3,7 +3,7 @@ import { getConfig, getRegistry } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
 import { getIssueStatus, setIssueStatus, getIssueDescription } from "@/server/linear";
 import { launchSession, launchConflictSession } from "@/server/launch";
-import { loadProjectMap, resolvePathForProject } from "@/server/limeProjects";
+import { loadProjectMap, resolvePathForProject } from "@/server/projects";
 import { mergeTicketBranch, repoRootFromWorktree } from "@/server/merge";
 import { resolveQaVerdict } from "@/server/qaVerdict";
 import { resolveTicketVerdict } from "@/server/ticketVerdict";
