@@ -36,8 +36,8 @@ export default function LaunchSheet(
   const existingActive = existing != null
     && (existing.state === "running" || existing.state === "needs-input" || existing.state === "starting");
 
-  // The To QA verdict is resolved server-side: approve rebases + merges (or opens an MR)
-  // with no session at all, and only reject (or a rebase conflict) spawns one. projectName
+  // The To QA verdict is resolved server-side: approve merges (or opens an MR) with
+  // no session at all, and only reject (or a merge conflict) spawns one. projectName
   // and title are sent because the server needs them to locate the worktree and to seed
   // whatever session the verdict ends up launching.
   const submitVerdict = async (arg: "approve-local" | "approve-mr" | "reject", reason?: string) => {

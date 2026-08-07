@@ -22,7 +22,10 @@ export function readSidecar(stateDir: string, id: string): SessionMeta | null {
   try {
     const meta = JSON.parse(readFileSync(join(sessionsDir(stateDir), `${id}.json`), "utf8"));
     // Sidecars written before `kind` existed, or by the lime era, are ticket sessions.
-    const kind = meta.kind === "lime" || meta.kind === undefined ? "ticket" : meta.kind;
+    // "rebase" (removed: the launcher it named is dead code) reads back as "custom" — a
+    // rebase session had a real ticket but no lifecycle, same as a custom session.
+    const kind = meta.kind === "lime" || meta.kind === undefined ? "ticket"
+      : meta.kind === "rebase" ? "custom" : meta.kind;
     return { ...meta, kind } as SessionMeta;
   } catch {
     return null;

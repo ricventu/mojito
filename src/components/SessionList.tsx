@@ -114,7 +114,6 @@ export default function SessionList(
                             {s.model} · {s.effort}{s.scaledFrom ? " ⤵" : ""}
                           </span>
                         )}
-                        {s.kind === "rebase" && <span className="chip">rebase</span>}
                         {s.kind === "shell" && <span className="chip">terminal</span>}
                       </div>
                     </div>

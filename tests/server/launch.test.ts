@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   launchSession, buildClaudeCommand, launchCustomSession, buildCustomClaudeCommand,
-  launchRebaseSession, buildRebaseClaudeCommand, launchConflictSession,
+  launchConflictSession,
   buildShellCommand, launchShellSession,
   buildResolvePrompt, launchStackResolveSession,
 } from "@/server/launch";
@@ -238,62 +238,8 @@ describe("launchCustomSession", () => {
   });
 });
 
-const baseRebaseReq = {
-  ticket: "RIC-120", projectName: "Mojito", title: "action per fare rebase",
-  labels: [] as string[], model: "opus", effort: "xhigh" as const,
-};
-
-describe("buildRebaseClaudeCommand", () => {
-  it("runs /lime-rebase for the ticket with a launch context prefix", () => {
-    const cmd = buildRebaseClaudeCommand(baseRebaseReq, "/s/x.json", "/c/x.json");
-    expect(cmd).toMatch(/^LIME_SESSION_CONTEXT='\/c\/x.json' claude /);
-    expect(cmd).toContain("--model 'opus' --effort 'xhigh'");
-    expect(cmd).toContain("--settings '/s/x.json'");
-    expect(cmd).toContain("'/lime-rebase RIC-120'");
-    expect(cmd).not.toContain("/lime-next");
-  });
-});
-
-describe("launchRebaseSession", () => {
-  it("launches a rebase-kind session at To QA", async () => {
-    const d = deps();
-    const res = await launchRebaseSession(baseRebaseReq, d);
-    expect(res.ok).toBe(true);
-    const meta = (res as { ok: true; meta: SessionMeta }).meta;
-    expect(meta).toMatchObject({
-      kind: "rebase", id: "mojito-RIC-120-rebase", ticket: "RIC-120",
-      launchStatus: "To QA", state: "starting", cwd: "/code/lime",
-    });
-    expect(d.newSession).toHaveBeenCalledWith(
-      "mojito-RIC-120-rebase", "/code/lime", expect.stringContaining("'/lime-rebase RIC-120'"));
-  });
-
-  it("writes a launch context with statusName To QA", async () => {
-    const { readFileSync } = await import("node:fs");
-    const d = deps();
-    await launchRebaseSession(baseRebaseReq, d);
-    const p = join(dir, "context", "mojito-RIC-120-rebase.json");
-    expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({
-      identifier: "RIC-120", statusName: "To QA",
-      title: "action per fare rebase", project: "Mojito", labels: [], description: "",
-    });
-  });
-
-  it("refuses a duplicate", async () => {
-    const d = deps({ hasSession: vi.fn(async () => true) });
-    const res = await launchRebaseSession(baseRebaseReq, d);
-    expect(res).toMatchObject({ ok: false, reason: "duplicate", id: "mojito-RIC-120-rebase" });
-  });
-
-  it("refuses when no repo resolves", async () => {
-    const d = deps({ resolveCwd: () => null });
-    const res = await launchRebaseSession(baseRebaseReq, d);
-    expect(res).toMatchObject({ ok: false, reason: "no-repo" });
-  });
-});
-
 const baseConflictReq = {
-  ticket: "RIC-120", projectName: "Mojito", title: "action per fare rebase",
+  ticket: "RIC-120", projectName: "Mojito", title: "some ticket title",
   description: "Let the user do the thing.", model: "opus", effort: "xhigh" as const,
 };
 
@@ -311,7 +257,7 @@ describe("launchConflictSession", () => {
     expect(meta.id.endsWith("-conflict")).toBe(true);
     // The conflict prompt, not the work prompt, and no lime slash command.
     expect(command.startsWith("claude --model")).toBe(true);
-    expect(command).toContain("could not be rebased onto");
+    expect(command).toContain("QA-approved branch");
     expect(command).toContain(join(dir, "context", "mojito-RIC-120-conflict.json"));
     expect(command).toContain(join(dir, "results", "mojito-RIC-120-conflict.json"));
     expect(command).not.toContain("/lime-");
@@ -322,7 +268,7 @@ describe("launchConflictSession", () => {
     await launchConflictSession(baseConflictReq, d);
     const p = join(dir, "context", "mojito-RIC-120-conflict.json");
     expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({
-      identifier: "RIC-120", statusName: "To QA", title: "action per fare rebase",
+      identifier: "RIC-120", statusName: "To QA", title: "some ticket title",
       project: "Mojito", labels: [], description: "Let the user do the thing.",
     });
   });

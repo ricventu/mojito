@@ -36,7 +36,7 @@ describe("resolveQaVerdict approve", () => {
     expect(res).toEqual({ done: "mr-created", url: "https://git.example/mr/7" });
   });
 
-  it("a rebase conflict launches the conflict-fix session and writes NO status", async () => {
+  it("a merge conflict launches the conflict-fix session and writes NO status", async () => {
     const d = deps({ status: "conflict", detail: "CONFLICT (content): src/a.ts" });
     const res = await resolveQaVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
     expect(d.launchConflictFix).toHaveBeenCalledWith("CONFLICT (content): src/a.ts");

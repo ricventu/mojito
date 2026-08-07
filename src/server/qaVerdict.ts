@@ -20,8 +20,9 @@ export type QaVerdictResult =
 
 /**
  * Resolve a To QA verdict. Approve runs the server-side merge (zero tokens on the
- * clean path) and only launches a session on rebase conflict; reject sends the reason
- * to the next work session through its context file — nothing is posted to Linear.
+ * clean path) and only launches a session when that merge hits a conflict; reject
+ * sends the reason to the next work session through its context file — nothing is
+ * posted to Linear.
  */
 export async function resolveQaVerdict(
   input: { ticket: string; arg: QaArg; reason?: string },

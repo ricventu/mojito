@@ -68,7 +68,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             const status = "In Progress";
             const sid = tmuxName(id, status);
             if (registry.get(sid)) await supersedeSession(sid, { closeSession, registry });
-            // A ticket that hit a rebase conflict and is then rejected would otherwise keep a
+            // A ticket that hit a merge conflict and is then rejected would otherwise keep a
             // live conflict session running in the very worktree the rework session takes over.
             const cid = conflictSessionName(id);
             if (registry.get(cid)) await supersedeSession(cid, { closeSession, registry });

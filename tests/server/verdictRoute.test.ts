@@ -164,7 +164,7 @@ describe("/api/tickets/[id]/verdict", () => {
     expect(h.mergeTicketBranch).not.toHaveBeenCalled();
   });
 
-  it("a rebase conflict launches the conflict session and leaves the status alone", async () => {
+  it("a merge conflict launches the conflict session and leaves the status alone", async () => {
     h.mergeTicketBranch.mockImplementation(async () => ({ status: "conflict", detail: "CONFLICT in a.ts" }));
     const res = await POST(req(approve), params());
     expect(res.status).toBe(200);

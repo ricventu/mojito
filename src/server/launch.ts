@@ -3,7 +3,7 @@ import { join, basename } from "node:path";
 import { homedir } from "node:os";
 import { randomBytes } from "node:crypto";
 import type { Effort, SessionMeta } from "./types.js";
-import { tmuxName, validateTicket, statusSlug, customSessionName, rebaseSessionName, conflictSessionName, shellSessionName } from "./sessionKey.js";
+import { tmuxName, validateTicket, statusSlug, customSessionName, conflictSessionName, shellSessionName } from "./sessionKey.js";
 import { buildHookSettings } from "./hookSettings.js";
 import { loadProjectMap, resolvePathForProject } from "./limeProjects.js";
 import { resolveTicketCwd } from "./ticketCwd.js";
@@ -223,85 +223,6 @@ export async function launchCustomSession(
   return { ok: true, meta };
 }
 
-export interface RebaseLaunchRequest {
-  ticket: string;
-  projectName: string | null;
-  title: string;
-  labels: string[];
-  model: string;
-  effort: Effort;
-}
-
-export function buildRebaseClaudeCommand(
-  req: RebaseLaunchRequest,
-  settingsPath: string,
-  contextPath: string,
-): string {
-  const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
-  return (
-    `LIME_SESSION_CONTEXT=${q(contextPath)} ` +
-    `claude --model ${q(req.model)} --effort ${q(req.effort)} ` +
-    `--settings ${q(settingsPath)} ${q(`/lime-rebase ${req.ticket}`)}`
-  );
-}
-
-/**
- * Launch a one-off session that rebases the ticket's worktree branch onto the default
- * branch (the To-Merge "first part", no merge). Distinct session name so it never collides
- * with the To-QA gate session; this is not a lifecycle handoff.
- */
-export async function launchRebaseSession(
-  req: RebaseLaunchRequest,
-  deps: LaunchDeps,
-): Promise<{ ok: true; meta: SessionMeta } | { ok: false; reason: "duplicate" | "no-repo"; id?: string }> {
-  validateTicket(req.ticket);
-  const id = rebaseSessionName(req.ticket);
-
-  if (await deps.hasSession(id)) return { ok: false, reason: "duplicate", id };
-
-  const resolveCwd = deps.resolveCwd ?? defaultResolveCwd(deps.projectsPath);
-  const cwd = resolveCwd(req.ticket, req.projectName);
-  if (!cwd) return { ok: false, reason: "no-repo" };
-
-  const settingsDir = join(deps.stateDir, "settings");
-  mkdirSync(settingsDir, { recursive: true, mode: 0o700 });
-  const settingsPath = join(settingsDir, `${id}.json`);
-  writeFileSync(settingsPath, JSON.stringify(buildHookSettings(id, deps.port, deps.token), null, 2), {
-    mode: 0o600,
-  });
-  chmodSync(settingsPath, 0o600); // mode on writeFileSync is ignored if the file pre-existed
-
-  const contextPath = writeLaunchContext(deps.stateDir, id, {
-    identifier: req.ticket,
-    statusName: "To QA",
-    title: req.title,
-    project: req.projectName,
-    labels: req.labels,
-    description: "", // /lime-rebase reads Linear itself; no Mojito-fetched description to pass
-  });
-
-  const command = buildRebaseClaudeCommand(req, settingsPath, contextPath);
-  await deps.newSession(id, cwd, command);
-  await deps.pipePane(id, logfilePath(deps.stateDir, id));
-
-  const meta: SessionMeta = {
-    kind: "rebase",
-    id,
-    ticket: req.ticket,
-    launchStatus: "To QA",
-    model: req.model,
-    effort: req.effort,
-    state: "starting",
-    cwd,
-    createdAt: (deps.nowIso ?? (() => new Date().toISOString()))(),
-    projectName: req.projectName,
-    title: req.title,
-    labels: req.labels,
-  };
-  deps.registry.upsert(meta);
-  return { ok: true, meta };
-}
-
 export interface ConflictLaunchRequest {
   ticket: string;
   projectName: string | null;
@@ -313,9 +234,10 @@ export interface ConflictLaunchRequest {
 
 /**
  * Launch the conflict-resolution session for a QA-approved branch whose server-side
- * rebase hit conflicts (see mergeTicketBranch). The ticket stays at To QA — the session
- * rebases and resolves by hand, then reports through the standard result file — so the
- * launch context carries statusName "To QA" and its own `-conflict` session id.
+ * merge hit conflicts while updating the branch onto the default branch (see
+ * mergeTicketBranch). The ticket stays at To QA — the session resolves the conflicts by
+ * hand, then reports through the standard result file — so the launch context carries
+ * statusName "To QA" and its own `-conflict` session id.
  */
 export async function launchConflictSession(
   req: ConflictLaunchRequest,
@@ -454,9 +376,10 @@ export function buildResolvePrompt(project: string, repo: string, branch: string
     `upstream on origin have diverged. Bring the branch up to date with origin without losing local`,
     `work and without force-pushing.`,
     ``,
-    `Steps: fetch origin; inspect the divergence (git status, git log --oneline --graph); rebase or`,
-    `merge as appropriate and resolve any conflicts; verify the working tree is clean and the branch`,
-    `is current. Do not force-push. Do not discard local commits.`,
+    `Steps: fetch origin; inspect the divergence (git status, git log --oneline --graph); reconcile`,
+    `as appropriate (fast-forward, merge, or replaying local commits onto origin) and resolve any`,
+    `conflicts; verify the working tree is clean and the branch is current. Do not force-push. Do`,
+    `not discard local commits.`,
   ].join("\n");
 }
 
@@ -467,7 +390,7 @@ export async function launchStackResolveSession(
   const repo = resolvePathForProject(loadProjectMap(deps.projectsPath), req.projectName);
   if (!repo) return { ok: false, reason: "no-repo" };
   // Analytical-resolve profile (formerly the To Merge stage default, now gone from
-  // BUILTIN_STAGE_DEFAULTS): a diverged-branch rebase/merge needs the top model at top
+  // BUILTIN_STAGE_DEFAULTS): reconciling a diverged branch needs the top model at top
   // effort, so this is inlined rather than resolved through a status that no longer exists.
   const model = "opus";
   const effort: Effort = "xhigh";

@@ -376,62 +376,6 @@ describe("handleHook — custom sessions", () => {
   });
 });
 
-function seedRebase(over: Partial<SessionMeta> = {}): Registry {
-  const registry = new Registry(dir);
-  registry.upsert({ kind: "rebase", id: "mojito-rebase-RIC-46", ticket: "RIC-46", launchStatus: "To QA",
-    model: "opus", effort: "high", state: "running", cwd: "/x",
-    createdAt: "2026-07-11T00:00:00.000Z", title: "Rebase RIC-46", labels: [], ...over });
-  return registry;
-}
-
-describe("handleHook — rebase sessions", () => {
-  it("SessionEnd on a rebase session is done, not failed, and never reads the result file", async () => {
-    // A rebase session stays at To QA (or escalates backward to To Code) by design; a clean
-    // rebase must land on "done" without ever consulting the result file or Linear.
-    const registry = seedRebase();
-    const bus = new EventBus();
-    const readResult = vi.fn(noResult);
-    await handleHook("mojito-rebase-RIC-46", "SessionEnd",
-      { registry, bus, readResult, moveToQa: noopMoveToQa, clearResult: noopClearResult });
-    expect(registry.get("mojito-rebase-RIC-46")?.state).toBe("done");
-    expect(readResult).not.toHaveBeenCalled();
-  });
-
-  it("Stop on a rebase session with a genuine prompt still maps to needs-input", async () => {
-    const registry = seedRebase();
-    const bus = new EventBus();
-    const readResult = vi.fn(noResult);
-    await handleHook("mojito-rebase-RIC-46", "Stop",
-      { registry, bus, readResult, moveToQa: noopMoveToQa, clearResult: noopClearResult });
-    expect(registry.get("mojito-rebase-RIC-46")?.state).toBe("needs-input");
-    expect(readResult).not.toHaveBeenCalled();
-  });
-
-  it("never calls moveToQa for a rebase session", async () => {
-    const registry = seedRebase();
-    const bus = new EventBus();
-    const moveToQa = vi.fn(noopMoveToQa);
-    const readResult = vi.fn(noResult);
-    await handleHook("mojito-rebase-RIC-46", "SessionEnd",
-      { registry, bus, readResult, moveToQa, clearResult: noopClearResult });
-    expect(moveToQa).not.toHaveBeenCalled();
-    expect(readResult).not.toHaveBeenCalled();
-    expect(registry.get("mojito-rebase-RIC-46")?.state).toBe("done");
-  });
-
-  it("a rebase alert carries the real ticket, not an empty string", async () => {
-    const registry = seedRebase();
-    const bus = new EventBus();
-    const events: unknown[] = [];
-    bus.subscribe((e) => events.push(e));
-    await handleHook("mojito-rebase-RIC-46", "PermissionRequest",
-      { registry, bus, readResult: noResult, moveToQa: noopMoveToQa, clearResult: noopClearResult });
-    expect(events).toContainEqual(
-      expect.objectContaining({ type: "session.alert", ticket: "RIC-46" }),
-    );
-  });
-});
-
 it("does not overwrite a lime session's title", async () => {
   const { registry } = seed({ title: "Linear title" });
   const bus = new EventBus();

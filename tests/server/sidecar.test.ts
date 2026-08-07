@@ -62,6 +62,20 @@ describe("sidecar", () => {
     expect(readSidecar(dir, "mojito-RIC-1-todo")?.kind).toBe("ticket");
   });
 
+  it("maps a persisted rebase kind to custom when reading a legacy sidecar", () => {
+    // "rebase" (the one-off To-QA rebase launcher) was removed as dead code once no UI
+    // path could launch one; a rebase session had a real ticket but no lifecycle, same
+    // as a custom session, so a sidecar written under the old kind reads back as custom.
+    const sdir = join(dir, "sessions");
+    mkdirSync(sdir, { recursive: true });
+    writeFileSync(join(sdir, "mojito-RIC-120-rebase.json"), JSON.stringify({
+      kind: "rebase", id: "mojito-RIC-120-rebase", ticket: "RIC-120", launchStatus: "To QA",
+      model: "opus", effort: "xhigh", state: "done", cwd: "/x",
+      createdAt: "2026-07-11T00:00:00.000Z", title: "t", labels: [],
+    }));
+    expect(readSidecar(dir, "mojito-RIC-120-rebase")?.kind).toBe("custom");
+  });
+
   it("preserves an explicit kind", () => {
     const sdir = join(dir, "sessions");
     mkdirSync(sdir, { recursive: true });

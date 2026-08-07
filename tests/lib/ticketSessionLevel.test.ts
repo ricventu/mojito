@@ -43,12 +43,13 @@ describe("activeSessionLevel", () => {
   });
 });
 
-describe("rebase button gate", () => {
-  // The To-QA rebase button shows only when the ticket has no active session.
-  it("is eligible (null) when only a finished rebase session exists", () => {
+describe("gate for a ticket-scoped action that requires no active session", () => {
+  // A ticket-scoped action (e.g. a one-off worktree sync) should be eligible only when
+  // the ticket has no active session.
+  it("is eligible (null) when only a finished session exists", () => {
     expect(activeSessionLevel("RIC-120", [s("RIC-120", "done")])).toBeNull();
   });
-  it("is not eligible while a rebase session is starting/running", () => {
+  it("is not eligible while a session is starting/running", () => {
     expect(activeSessionLevel("RIC-120", [s("RIC-120", "starting")])).toBe("run");
   });
 });
