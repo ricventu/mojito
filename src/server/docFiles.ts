@@ -1,7 +1,6 @@
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, isAbsolute, join, resolve, sep } from "node:path";
 import { execFileSync } from "node:child_process";
-import { detectDefaultBranch } from "./reviewScale.js";
 
 // Read-only markdown discovery for a worktree. Nothing in this module writes.
 
@@ -122,6 +121,25 @@ export function scanSuperpowersDocs(root: string): DocEntry[] {
 }
 
 export type Run = (cmd: string, args: string[]) => string;
+
+// Sync, null-returning default-branch detection (no throw): callers that are best-effort
+// by design (branchMdPaths below) fall back to an empty result rather than propagating a
+// git error. Do not confuse this with merge.ts's async, throwing variant, which has a
+// different contract for a caller that must fail loudly instead.
+export function detectDefaultBranch(run: Run): string | null {
+  try {
+    const ref = run("git", ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]).trim();
+    const name = ref.split("/").slice(1).join("/");
+    if (name) return name;
+  } catch { /* no origin/HEAD — try local names */ }
+  for (const name of ["main", "master"]) {
+    try {
+      run("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${name}`]);
+      return name;
+    } catch { /* not this one */ }
+  }
+  return null;
+}
 
 // Markdown the branch created or modified vs the default branch's merge base.
 // Best-effort by design: no git, no default branch, no commits yet, or any git

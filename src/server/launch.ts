@@ -10,9 +10,6 @@ import { resolveTicketCwd } from "./ticketCwd.js";
 import { logfilePath } from "./sidecar.js";
 import type { Registry } from "./registry.js";
 import { writeLaunchContext } from "./launchContext.js";
-import { branchChangedLines, scaleReviewProfile } from "./reviewScale.js";
-import { defaultModelForStatus, defaultEffortForStatus } from "./stageDefaults.js";
-import { readAutoScale } from "./scaleSettings.js";
 import { buildWorkPrompt, buildConflictPrompt } from "./prompts.js";
 import { resultPath, clearSessionResult } from "./sessionResult.js";
 
@@ -38,7 +35,6 @@ export interface LaunchDeps {
   newSession: (name: string, cwd: string, command: string) => Promise<void>;
   pipePane: (name: string, logfile: string) => Promise<void>;
   resolveCwd?: (ticket: string, projectName: string | null) => string | null;
-  changedLines?: (cwd: string) => number | null;
   nowIso?: () => string;
 }
 
@@ -69,31 +65,6 @@ export async function launchSession(
   const resolveCwd = deps.resolveCwd ?? defaultResolveCwd(deps.projectsPath);
   const cwd = resolveCwd(req.ticket, req.projectName);
   if (!cwd) return { ok: false, reason: "no-repo" };
-
-  // Review sessions read a diff whose size is knowable before the spawn: when the
-  // request is exactly the stage default (auto-advance always is; a manual launch the
-  // user didn't retune), downgrade model/effort for small branches. An explicit user
-  // choice is never overridden, and an unmeasurable diff keeps the default profile.
-  let scaledFrom: SessionMeta["scaledFrom"];
-  if (
-    readAutoScale() &&
-    (req.status === "To Review" || req.status === "To Merge") &&
-    req.model === defaultModelForStatus(req.status) &&
-    req.effort === defaultEffortForStatus(req.status)
-  ) {
-    const lines = (deps.changedLines ?? branchChangedLines)(cwd);
-    if (lines !== null) {
-      // To Merge's inline review gates the merge with no re-QA behind the clean path:
-      // scale its effort only, never its model. To Review has human QA behind it.
-      const scaled = scaleReviewProfile(req.model, req.effort, lines, {
-        effortOnly: req.status === "To Merge",
-      });
-      if (scaled.scaled) {
-        scaledFrom = { model: req.model, effort: req.effort };
-        req = { ...req, model: scaled.model, effort: scaled.effort };
-      }
-    }
-  }
 
   const settingsDir = join(deps.stateDir, "settings");
   mkdirSync(settingsDir, { recursive: true, mode: 0o700 });
@@ -134,7 +105,6 @@ export async function launchSession(
     projectName: req.projectName,
     title: req.title,
     labels: req.labels,
-    ...(scaledFrom ? { scaledFrom } : {}),
   };
   deps.registry.upsert(meta);
   return { ok: true, meta };

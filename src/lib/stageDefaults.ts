@@ -26,7 +26,7 @@ export const FALLBACK: StageDefault = { model: "opus", effort: "high" };
 
 // UI rows: one row for the work states (Backlog/Todo/In Progress all share the same
 // design-through-review session profile), writing all three keys.
-export const STAGE_DEFAULT_ROWS: { label: string; statuses: string[]; hint?: string }[] = [
+export const STAGE_DEFAULT_ROWS: { label: string; statuses: string[] }[] = [
   { label: "Work (Backlog/Todo/In Progress)", statuses: ["Backlog", "Todo", "In Progress"] },
 ];
 

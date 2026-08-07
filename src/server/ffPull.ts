@@ -19,7 +19,7 @@ export class FfPullError extends Error {
 }
 
 // LC_ALL=C pins git's output to English so the diverged markers below match a
-// localized environment too (mirrors reviewScale.ts). 60s covers a slow fetch.
+// localized environment too. 60s covers a slow fetch.
 // maxBuffer prevents ENOBUFS from misreporting a successful pull (ref already moved)
 // as a failed pull when advancing many commits.
 const defaultRun: GitRun = (args, cwd) =>

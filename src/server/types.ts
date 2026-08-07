@@ -28,9 +28,6 @@ export interface SessionMeta {
   // so readSidecar can yield `undefined` at runtime despite the types — callers must guard.
   title: string;         // Linear ticket title at launch, for the skill's launch context
   labels: string[];      // Linear label names at launch, for bug/feature classification
-  // Pre-scaling profile when diff-scaling downgraded a review launch (absent otherwise),
-  // so the UI can tell an automatic downgrade from a user's explicit choice.
-  scaledFrom?: { model: string; effort: Effort };
 }
 
 export interface TicketSummary {

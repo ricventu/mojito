@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, symlinkSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, basename } from "node:path";
-import { resolveDocPath, readDoc, DOC_MAX_BYTES, docEntry, scanSuperpowersDocs, branchMdPaths, listDocs } from "@/server/docFiles";
+import {
+  resolveDocPath, readDoc, DOC_MAX_BYTES, docEntry, scanSuperpowersDocs, branchMdPaths, listDocs,
+  detectDefaultBranch,
+} from "@/server/docFiles";
 
 let root: string;
 let outside: string;
@@ -175,6 +178,43 @@ describe("docEntry", () => {
 
   it("is null for a path that does not exist", () => {
     expect(docEntry(root, "docs/gone.md", "branch")).toBeNull();
+  });
+});
+
+describe("detectDefaultBranch", () => {
+  it("prefers origin/HEAD", () => {
+    const run = (_c: string, args: string[]) => {
+      if (args.includes("symbolic-ref")) return "origin/main\n";
+      throw new Error("unexpected");
+    };
+    expect(detectDefaultBranch(run)).toBe("main");
+  });
+  it("falls back to a local main", () => {
+    const run = (_c: string, args: string[]) => {
+      if (args.includes("symbolic-ref")) throw new Error("no origin/HEAD");
+      if (args.includes("refs/heads/main")) return "abc123\n";
+      throw new Error("unexpected");
+    };
+    expect(detectDefaultBranch(run)).toBe("main");
+  });
+  it("falls back to a local master", () => {
+    const run = (_c: string, args: string[]) => {
+      if (args.includes("symbolic-ref")) throw new Error("no origin/HEAD");
+      if (args.includes("refs/heads/main")) throw new Error("no main");
+      if (args.includes("refs/heads/master")) return "abc123\n";
+      throw new Error("unexpected");
+    };
+    expect(detectDefaultBranch(run)).toBe("master");
+  });
+  it("returns null when nothing resolves", () => {
+    expect(detectDefaultBranch(() => { throw new Error("git failed"); })).toBeNull();
+  });
+  it("preserves slashes in a slash-named default branch", () => {
+    const run = (_c: string, args: string[]) => {
+      if (args.includes("symbolic-ref")) return "origin/release/1.x\n";
+      throw new Error("unexpected");
+    };
+    expect(detectDefaultBranch(run)).toBe("release/1.x");
   });
 });
 
