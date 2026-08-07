@@ -147,7 +147,8 @@ export interface CustomLaunchRequest {
   model: string;
   effort: Effort;
   // Ticket-scoped custom session (RIC-128). When `ticket` is set, cwd resolves through the
-  // ticket→worktree chain and a launch-context file is written. Absent = project-scoped (RIC-115).
+  // ticket→worktree chain (no launch-context file — a bare interactive session has a human
+  // driving it and needs no machine contract). Absent = project-scoped (RIC-115).
   ticket?: string;
   status?: string;
   title?: string;

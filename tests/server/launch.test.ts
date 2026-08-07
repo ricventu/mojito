@@ -123,15 +123,24 @@ describe("launchSession", () => {
     expect(JSON.parse(readFileSync(p, "utf8"))).toMatchObject({ rejectReason: "missed the edge case" });
   });
 
-  it("clears a stale result file before spawning (ids repeat per ticket+status)", async () => {
-    const d = deps();
+  it("clears a stale result file before spawning, not merely by the time launchSession returns " +
+    "(ids repeat per ticket+status: the new session's Stop hook must never see the old result)", async () => {
     const resultsDir = join(dir, "results");
     const { mkdirSync, writeFileSync: write, existsSync } = await import("node:fs");
     mkdirSync(resultsDir, { recursive: true });
     const stale = join(resultsDir, "mojito-RIC-46-planned.json");
     write(stale, JSON.stringify({ outcome: "ready-for-qa" }));
+    let staleGoneBeforeSpawn: boolean | undefined;
+    const d = deps({
+      newSession: vi.fn(async () => {
+        // Checked from inside the spawn call, before the session process could possibly
+        // start — proves clearSessionResult ran before newSession, not just before launchSession
+        // returns (which would also pass if the clear happened concurrently/after the spawn).
+        staleGoneBeforeSpawn = !existsSync(stale);
+      }),
+    });
     await launchSession(baseReq, d);
-    expect(existsSync(stale)).toBe(false);
+    expect(staleGoneBeforeSpawn).toBe(true);
   });
 
   it("records title and labels on the session meta", async () => {
