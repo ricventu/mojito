@@ -9,6 +9,11 @@ export interface HookDeps {
   bus: EventBus;
   readResult: (id: string) => SessionResult | null;
   moveToQa: (ticket: string) => Promise<void>;
+  // Clears the result file so a later Stop/SessionEnd on this same session (e.g. after the
+  // user revives it with a prompt) never re-reads a stale "ready-for-qa" and re-fires
+  // moveToQa. Called only on a SUCCESSFUL moveToQa — a failed write leaves the file in place
+  // so the next Stop/SessionEnd can retry it.
+  clearResult: (id: string) => void;
   // Reads Claude Code's auto-generated session title from a transcript file (see
   // sessionTitle.ts). Optional so tests that don't exercise titling can omit it.
   readTranscriptTitle?: (transcriptPath: string) => string | null;
@@ -63,6 +68,7 @@ export async function handleHook(
     if (result?.outcome === "ready-for-qa") {
       try {
         await deps.moveToQa(meta.ticket);
+        deps.clearResult(id); // success only: a stale file must never re-fire moveToQa on a later Stop
         ready = true;
       } catch {
         ready = false; // Linear write failed: Stop => needs-input so the user can retry

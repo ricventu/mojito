@@ -4,7 +4,7 @@ import { tokenFromHeaders } from "@/server/auth";
 import { setIssueStatus } from "@/server/linear";
 import { handleHook } from "@/server/hookHandler";
 import { readTranscriptTitle } from "@/server/sessionTitle";
-import { readSessionResult } from "@/server/sessionResult";
+import { readSessionResult, clearSessionResult } from "@/server/sessionResult";
 import type { HookEventName } from "@/server/types";
 
 const VALID: HookEventName[] = ["SessionStart", "UserPromptSubmit", "PermissionRequest", "Notification", "PreToolUse", "PostToolUse", "Stop", "SessionEnd"];
@@ -31,6 +31,7 @@ export async function POST(req: Request) {
     bus: getBus(),
     readResult: (sessionId) => readSessionResult(cfg.stateDir, sessionId),
     moveToQa: (ticket) => setIssueStatus(cfg.linearApiKey, ticket, "To QA"),
+    clearResult: (sessionId) => clearSessionResult(cfg.stateDir, sessionId),
     readTranscriptTitle,
   }, payload);
   return new NextResponse(null, { status: 204 });
