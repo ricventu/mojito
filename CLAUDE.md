@@ -1,87 +1,35 @@
 # Mojito
 
-Mojito is a Next.js + TypeScript app (GUI + local server) that launches and monitors
-`lime` ticket-lifecycle sessions. It spawns `claude … '<stage-skill> <TICKET>'` processes
-(e.g. `/lime-implement RIC-46`; `/lime-next` is the fallback for unknown statuses) in
-detached tmux sessions, tracks their state, and lets the user advance a Linear ticket
-through its lifecycle from a web UI.
+Mojito is a Next.js + TypeScript app (GUI + local server) that manages Linear tickets
+per project and runs them through a collapsed lifecycle:
+`Backlog/Todo → In Progress → To QA → Done`.
 
-## Relationship to `lime` (separate repo — read this before cross-repo work)
+Mojito owns the whole lifecycle — there is no external plugin:
 
-`lime` is a **separate** Claude Code plugin, not part of this repo. Its repo is
-[github.com/ricventu/lime](https://github.com/ricventu/lime) (skill
-`skills/lime-next/SKILL.md`); locally it's cloned at `/Users/ricventu/code/Lime/lime`,
-which is the path the instructions below use for cross-repo edits. The two are kept in
-separate repos on purpose: `lime` has standalone value (`/lime-next` runs in a bare
-terminal without Mojito), so it ships as its own installable plugin.
-
-The dependency is **one-directional: Mojito depends on lime, never the reverse.** lime
-degrades gracefully without Mojito (bare-terminal mode). So for a cross-cutting change,
-**change lime first, then adapt Mojito to it.**
-
-### The shared contract (what must stay in sync)
-
-1. **Launch context** — Mojito writes a `LIME_SESSION_CONTEXT` file
-   (`src/server/launchContext.ts`, called from `src/server/launch.ts`) holding
-   `{ identifier, statusName, title, project, labels }`. lime reads it to skip `get_issue`
-   on stages 2–5. If you change these fields, update lime's context-consumption step in
-   `skills/lime-next/SKILL.md` to match.
-
-1b. **New-ticket context** — for the "New ticket" UI flow, Mojito writes a
-   `LIME_NEW_CONTEXT` file (`writeNewTicketContext` in `src/server/launchContext.ts`,
-   called from `launchNewTicketSession` in `src/server/launch.ts`) holding
-   `{ brief, project, images }`. `images` is a list of Linear asset URLs that the spawned
-   session appends to the created issue's description. The spawned `claude … /lime-new`
-   session reads it to analyze the brief and associate the project. If you change these
-   fields, update lime's `skills/lime-new/SKILL.md` context-read step to match.
-
-2. **Status / stage model** — the ticket lifecycle is:
-   `Backlog/Todo → To Code → To Review → To QA → To Merge → Done`.
-   - lime side: the dispatch table in `skills/lime-next/SKILL.md` (thin dispatcher) plus
-     the per-stage skills `lime-design` / `lime-implement` / `lime-review` / `lime-qa` /
-     `lime-merge` (and the matrix in lime's `README.md`).
-   - Mojito side: `STAGE_OF` in `src/server/autoAdvance.ts` (maps each status to its
-     stage; `stageAdvanced` decides auto-advance), and `tmuxName()` in
-     `src/server/sessionKey.ts` (session names embed the status slug).
-   These two must agree on the exact status names. A mismatch silently breaks
-   auto-advance and session naming.
-   From lime 0.20.0, stage 2 may skip stage 3: `lime-implement` exits straight to `To QA`
-   when the reviewed-tree marker matches the current tree, and only falls back to
-   `To Review` when it does not. So `To Code → To QA` is a legal transition and
-   `stageAdvanced` must keep treating a multi-stage forward jump as an advance — a
-   "consecutive stages only" rule would silently break the skip.
-
-3. **Launch command per status** — Mojito invokes the stage skill directly so a session
-   loads only the stage it runs: `slashForStatus` in `src/server/stageCommand.ts` maps
-   Backlog/Todo → `/lime-design`, To Code → `/lime-implement`, To Review →
-   `/lime-review`, To QA → `/lime-qa`, To Merge → `/lime-merge`, anything else →
-   `/lime-next` (dispatcher fallback). If lime renames or re-splits its stage skills,
-   update this map in the same change. **Hard floor: lime ≥ 0.19.0 must be in the plugin
-   cache before this map goes live** — against an older cache the stage commands are
-   unknown slash commands and the session stalls; only the `/lime-next` fallback
-   survives. Verify with `ls ~/.claude/plugins/cache/lime/lime/`.
-
-### Working on a task that spans both repos
-
-When a Mojito task implies a lime change (e.g. changing the status model):
-
-1. Make the lime change in `/Users/ricventu/code/Lime/lime` on its own branch:
-   edit `skills/lime-next/SKILL.md` + `README.md`, keep them internally consistent, and
-   bump the version in `.claude-plugin/plugin.json`.
-2. **Rebuild the plugin cache.** lime runs from
-   `~/.claude/plugins/cache/lime/lime/<version>/`, NOT from source. Editing source has no
-   runtime effect until the plugin is updated in Claude Code (via `/plugin`) so the new
-   version lands in the cache. Confirm `ls ~/.claude/plugins/cache/lime/lime/` shows the
-   new version.
-3. Adapt Mojito to the new lime version (e.g. update `STAGE_OF`), with tests.
-4. If the change touches Linear workflow states, create/rename them in Linear and migrate
-   existing tickets — Mojito and lime both read the live Linear status.
-
-### Repo resolution
-
-lime resolves a ticket's repo from `~/.claude/lime-projects.json` (project name → repo
-path). Mojito is registered there as `Mojito → /Users/ricventu/code/Lime/mojito`, lime as
-`Lime → /Users/ricventu/code/Lime/lime`.
+- **Prompts**: `src/server/prompts.ts` builds the full session prompt (work phase,
+  conflict resolution) from templates in `src/server/prompts/`. Sessions are spawned as
+  detached tmux sessions running `claude … '<prompt>'`.
+- **Linear**: `src/server/linear.ts` is a direct GraphQL client. Mojito writes issue
+  creation, status transitions, and assignee — never comments. **Spawned sessions never
+  touch Linear** (no MCP, no API); their prompt forbids it.
+- **Session context**: the launcher writes `<stateDir>/context/<id>.json`
+  (`{identifier, statusName, title, project, labels, description, rejectReason?}`);
+  the prompt embeds the path.
+- **Outcome channel**: the session's last action is writing
+  `<stateDir>/results/<id>.json` (`{outcome: "ready-for-qa" | "blocked", notes}`).
+  The Stop hook reads it (`src/server/hookHandler.ts`) and Mojito moves the status.
+- **QA gate**: approve runs the server-side rebase+merge (`src/server/merge.ts`,
+  zero tokens on the clean path; a Claude session only on conflict); reject launches
+  the rework session with the reason in its context file.
+- **Status model**: `src/server/statusModel.ts` is authoritative; `src/lib/status.ts`
+  mirrors it for presentation and a sync-guard test ties them together. Work-phase
+  sessions share a single tmux id `mojito-<ticket>-work` across Backlog/Todo/In
+  Progress (see `tmuxName` in `src/server/sessionKey.ts`); the conflict session is
+  `mojito-<ticket>-conflict`.
+- **Projects map**: `~/.config/mojito/projects.json` (Linear team key → project name →
+  repo path), resolved with a fallback chain (`resolveProjectsPath` in
+  `src/server/config.ts`): env `MOJITO_PROJECTS` → legacy env `LIME_PROJECTS` →
+  `~/.config/mojito/projects.json` → legacy `~/.claude/lime-projects.json`.
 
 ## Tests
 
