@@ -7,6 +7,7 @@ const h = vi.hoisted(() => ({
   setIssueStatus: vi.fn(async () => {}),
   getIssueDescription: vi.fn(async () => "the ticket description"),
   mergeTicketBranch: vi.fn(async () => ({ status: "merged", commit: "abc1234" }) as MergeOutcome),
+  repoRootFromWorktree: vi.fn(async () => "/code/mojito" as string | null),
   launchSession: vi.fn(async () => ({ ok: true, meta: {} }) as { ok: boolean; reason?: string }),
   launchConflictSession: vi.fn(async () => ({ ok: true, meta: {} }) as { ok: boolean; reason?: string }),
   supersedeSession: vi.fn(async () => {}),
@@ -20,7 +21,9 @@ vi.mock("@/server/linear", () => ({
   getIssueStatus: h.getIssueStatus, setIssueStatus: h.setIssueStatus,
   getIssueDescription: h.getIssueDescription,
 }));
-vi.mock("@/server/merge", () => ({ mergeTicketBranch: h.mergeTicketBranch }));
+vi.mock("@/server/merge", () => ({
+  mergeTicketBranch: h.mergeTicketBranch, repoRootFromWorktree: h.repoRootFromWorktree,
+}));
 vi.mock("@/server/launch", () => ({
   launchSession: h.launchSession, launchConflictSession: h.launchConflictSession,
 }));
@@ -64,6 +67,7 @@ beforeEach(() => {
   h.resolveTicketWorktree.mockImplementation(() => "/code/mojito/.worktrees/ric-110");
   h.resolveTicketCwd.mockImplementation(() => "/code/mojito");
   h.resolvePathForProject.mockImplementation(() => "/code/mojito");
+  h.repoRootFromWorktree.mockImplementation(async () => "/code/mojito");
   h.registryGet.mockImplementation(() => undefined);
 });
 
@@ -117,11 +121,46 @@ describe("/api/tickets/[id]/verdict", () => {
     expect(await res.json()).toEqual({ error: expect.stringContaining("no worktree for ticket") });
     expect(h.mergeTicketBranch).not.toHaveBeenCalled();
     expect(h.setIssueStatus).not.toHaveBeenCalled();
+    expect(h.repoRootFromWorktree).not.toHaveBeenCalled(); // nothing to ask git about
   });
 
-  it("400 without merging when the worktree is the repo root itself", async () => {
+  it("resolves the main checkout from git when the project is unmapped, and merges", async () => {
+    h.resolvePathForProject.mockImplementation(() => null);
+    h.repoRootFromWorktree.mockImplementation(async () => "/code/mojito");
+    const res = await POST(req(approve), params());
+    expect(res.status).toBe(200);
+    expect(h.repoRootFromWorktree).toHaveBeenCalledWith("/code/mojito/.worktrees/ric-110");
+    expect(h.mergeTicketBranch).toHaveBeenCalledWith({
+      worktree: "/code/mojito/.worktrees/ric-110", repoRoot: "/code/mojito", mode: "local",
+    });
+  });
+
+  it("resolves the main checkout from git when no projectName is sent at all", async () => {
+    const res = await POST(req({ arg: "approve-local", title: "Some ticket" }), params());
+    expect(res.status).toBe(200);
+    expect(h.resolvePathForProject).not.toHaveBeenCalled();
+    expect(h.repoRootFromWorktree).toHaveBeenCalledWith("/code/mojito/.worktrees/ric-110");
+    expect(h.mergeTicketBranch).toHaveBeenCalledWith(expect.objectContaining({ repoRoot: "/code/mojito" }));
+  });
+
+  it("reports the main-checkout failure distinctly when git cannot resolve one either", async () => {
+    h.resolvePathForProject.mockImplementation(() => null);
+    h.repoRootFromWorktree.mockImplementation(async () => null);
+    const res = await POST(req(approve), params());
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: expect.stringContaining("cannot resolve the main checkout for the ticket worktree"),
+    });
+    expect(h.mergeTicketBranch).not.toHaveBeenCalled();
+  });
+
+  it("refuses when the worktree IS the main checkout (no ticket branch to merge)", async () => {
     h.resolveTicketWorktree.mockImplementation(() => "/code/mojito");
-    expect((await POST(req(approve), params())).status).toBe(400);
+    const res = await POST(req(approve), params());
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: expect.stringContaining("cannot resolve the main checkout for the ticket worktree"),
+    });
     expect(h.mergeTicketBranch).not.toHaveBeenCalled();
   });
 
@@ -160,10 +199,32 @@ describe("/api/tickets/[id]/verdict", () => {
     expect(h.mergeTicketBranch).not.toHaveBeenCalled();
   });
 
+  it("reject launches the rework session BEFORE moving the board, so a failed launch keeps To QA", async () => {
+    const order: string[] = [];
+    h.launchSession.mockImplementation(async () => { order.push("launch"); return { ok: true, meta: {} }; });
+    h.setIssueStatus.mockImplementation(async () => { order.push("status"); });
+    await POST(req({ arg: "reject", reason: "broken", projectName: "Mojito", title: "T" }), params());
+    expect(order).toEqual(["launch", "status"]);
+  });
+
+  it("a failed rework launch leaves the board untouched", async () => {
+    h.launchSession.mockImplementation(async () => ({ ok: false, reason: "duplicate" }));
+    const res = await POST(req({ arg: "reject", reason: "broken", projectName: "Mojito", title: "T" }), params());
+    expect(res.status).toBe(422);
+    expect(h.setIssueStatus).not.toHaveBeenCalled();
+  });
+
+  it("reject also retires a stale conflict session for the ticket", async () => {
+    h.registryGet.mockImplementation((id: string) => ({ id }));
+    await POST(req({ arg: "reject", reason: "broken", projectName: "Mojito", title: "T" }), params());
+    expect(h.supersedeSession).toHaveBeenCalledWith("mojito-RIC-110-work", expect.anything());
+    expect(h.supersedeSession).toHaveBeenCalledWith("mojito-RIC-110-conflict", expect.anything());
+  });
+
   it("reject never supersedes the rework session it just launched", async () => {
     // A stale -work session exists: launchRework retires it before relaunching, and the
     // post-verdict cleanup must not then kill the fresh session sharing that id.
-    h.registryGet.mockImplementation(() => ({ id: "mojito-RIC-110-work" }));
+    h.registryGet.mockImplementation((id: string) => (id.endsWith("-work") ? { id } : undefined));
     await POST(req({ arg: "reject", reason: "broken", projectName: "Mojito", title: "T" }), params());
     expect(h.supersedeSession).toHaveBeenCalledTimes(1);
     expect(h.supersedeSession).toHaveBeenCalledWith("mojito-RIC-110-work", expect.anything());
@@ -191,9 +252,4 @@ describe("/api/tickets/[id]/verdict", () => {
     );
   });
 
-  it("422 when the rework session cannot be launched", async () => {
-    h.launchSession.mockImplementation(async () => ({ ok: false, reason: "duplicate" }));
-    const res = await POST(req({ arg: "reject", reason: "broken", projectName: "Mojito", title: "T" }), params());
-    expect(res.status).toBe(422);
-  });
 });

@@ -61,16 +61,26 @@ describe("resolveQaVerdict approve", () => {
 });
 
 describe("resolveQaVerdict reject", () => {
-  it("moves the ticket to In Progress then launches rework with the trimmed reason", async () => {
+  it("launches rework with the trimmed reason, THEN moves the ticket to In Progress", async () => {
     const d = deps();
     const order: string[] = [];
     d.setIssueStatus.mockImplementation(async () => { order.push("status"); });
     d.launchRework.mockImplementation(async () => { order.push("rework"); });
     const res = await resolveQaVerdict({ ticket: "RIC-110", arg: "reject", reason: "  layout broken  " }, d);
-    expect(d.setIssueStatus).toHaveBeenCalledWith("RIC-110", "In Progress");
     expect(d.launchRework).toHaveBeenCalledWith("layout broken");
-    expect(order).toEqual(["status", "rework"]);
+    expect(d.setIssueStatus).toHaveBeenCalledWith("RIC-110", "In Progress");
+    // The reason lives only in the launched session's context file, so the status must move
+    // only once that session exists.
+    expect(order).toEqual(["rework", "status"]);
     expect(res).toEqual({ done: "rework-session" });
+  });
+
+  it("a failed rework launch leaves the ticket at To QA so the reject can be retried", async () => {
+    const d = deps();
+    d.launchRework.mockImplementation(async () => { throw new Error("duplicate session"); });
+    await expect(resolveQaVerdict({ ticket: "RIC-110", arg: "reject", reason: "layout broken" }, d))
+      .rejects.toThrow(/duplicate session/);
+    expect(d.setIssueStatus).not.toHaveBeenCalled();
   });
 
   it("never merges on reject", async () => {

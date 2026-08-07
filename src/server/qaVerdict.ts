@@ -31,8 +31,14 @@ export async function resolveQaVerdict(
   if (arg === "reject") {
     const trimmed = (reason ?? "").trim();
     if (!trimmed) throw new QaVerdictError("rejection reason required");
-    await deps.setIssueStatus(ticket, "In Progress");
+    // Launch first, status second. The reason exists only in the launched session's context
+    // file, so a failed launch must leave the ticket at To QA: the reject is then simply
+    // retried with the reason intact, instead of stranding the ticket at In Progress where
+    // the To-QA guard would 409 every retry and the typed reason would be lost. The inverse
+    // failure is benign — a status write that fails after a successful launch only lags the
+    // board until the session's own move to To QA.
     await deps.launchRework(trimmed);
+    await deps.setIssueStatus(ticket, "In Progress");
     return { done: "rework-session" };
   }
   const outcome = await deps.merge(arg === "approve-local" ? "local" : "mr");

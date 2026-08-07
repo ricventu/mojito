@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { basename, dirname, isAbsolute } from "node:path";
 import { promisify } from "node:util";
 
 const pexec = promisify(execFile);
@@ -58,6 +59,28 @@ export async function detectDefaultBranch(repo: string, run: GitRun = defaultRun
     }
   }
   throw new Error("cannot determine default branch");
+}
+
+/**
+ * The main checkout behind a linked worktree, asked of git rather than of the project map:
+ * `--git-common-dir` is the shared `.git` directory (the linked worktree's own gitdir points
+ * at `<root>/.git/worktrees/<name>`, but the *common* dir is always `<root>/.git`), so its
+ * parent is the root checkout. Used when the ticket's project isn't mapped to a path — the
+ * project map is a convenience, not the only source of truth.
+ *
+ * null when the path isn't a git worktree, when git fails, or when the answer isn't an
+ * absolute `.git` directory (a bare repo answers with the repo dir itself, which has no
+ * checkout to fast-forward).
+ */
+export async function repoRootFromWorktree(worktree: string, run: GitRun = defaultRun): Promise<string | null> {
+  try {
+    const { stdout } = await run(["rev-parse", "--path-format=absolute", "--git-common-dir"], worktree);
+    const gitDir = stdout.trim();
+    if (!gitDir || !isAbsolute(gitDir) || basename(gitDir) !== ".git") return null;
+    return dirname(gitDir);
+  } catch {
+    return null;
+  }
 }
 
 /**

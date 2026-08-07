@@ -1,10 +1,10 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { mergeTicketBranch, type GitRun, type CliRun } from "@/server/merge";
+import { mergeTicketBranch, repoRootFromWorktree, type GitRun, type CliRun } from "@/server/merge";
 
 const pexec = promisify(execFile);
 
@@ -108,6 +108,50 @@ function pushFromAnotherClone(bare: string, root: string, fileName: string, cont
   git(other, ["commit", "--no-gpg-sign", "-m", `advance: ${fileName}`]);
   git(other, ["push", "origin", "main"]);
 }
+
+run("repoRootFromWorktree (real git fixtures)", () => {
+  const roots: string[] = [];
+
+  afterEach(() => {
+    while (roots.length) {
+      const root = roots.pop();
+      if (root) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("resolves a linked worktree back to the main checkout", async () => {
+    const { repoRoot, worktree } = makeFixture(roots);
+    // realpath both sides: macOS /var -> /private/var means the fixture path and git's
+    // absolute answer can differ by symlink while naming the same directory.
+    expect(await repoRootFromWorktree(worktree, sandboxedRun)).toBe(realpathSync(repoRoot));
+  });
+
+  it("resolves the main checkout to itself", async () => {
+    const { repoRoot } = makeFixture(roots);
+    expect(await repoRootFromWorktree(repoRoot, sandboxedRun)).toBe(realpathSync(repoRoot));
+  });
+
+  it("returns null for a directory that is not a git worktree", async () => {
+    const root = mkdtempSync(join(tmpdir(), "mojito-nogit-"));
+    roots.push(root);
+    expect(await repoRootFromWorktree(root, sandboxedRun)).toBeNull();
+  });
+
+  it("returns null when git cannot be run at all", async () => {
+    const failing: GitRun = async () => { throw new Error("git missing"); };
+    expect(await repoRootFromWorktree("/anywhere", failing)).toBeNull();
+  });
+
+  it("returns null for a bare repo (no checkout to fast-forward)", async () => {
+    const failing: GitRun = async () => ({ stdout: "/srv/repos/thing.git\n", stderr: "" });
+    expect(await repoRootFromWorktree("/srv/repos/thing.git", failing)).toBeNull();
+  });
+
+  it("returns null for a relative answer (never joins a path against the wrong cwd)", async () => {
+    const relative: GitRun = async () => ({ stdout: ".git\n", stderr: "" });
+    expect(await repoRootFromWorktree("/code/repo", relative)).toBeNull();
+  });
+});
 
 run("mergeTicketBranch (real git fixtures)", () => {
   const roots: string[] = [];
