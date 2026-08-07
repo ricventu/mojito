@@ -19,6 +19,7 @@ const baseReq = {
   ticket: "RIC-46", status: "Planned", model: "opus", effort: "high" as const,
   autoAdvance: false, projectName: "Lime",
   title: "Auto-advance toggle", labels: ["Feature"],
+  description: "Let the user toggle auto-advance from the terminal view.",
 };
 
 function deps(over: Record<string, unknown> = {}) {
@@ -33,42 +34,41 @@ function deps(over: Record<string, unknown> = {}) {
   };
 }
 
-describe("launchSession", () => {
-  it("builds a claude command with model, effort, settings, and the slash command", () => {
-    const cmd = buildClaudeCommand(baseReq, "/state/settings/x.json");
-    expect(cmd).toContain("claude --model 'opus' --effort 'high'");
-    expect(cmd).toContain("--settings '/state/settings/x.json'");
-    expect(cmd).toContain("'/lime-next RIC-46'");
-  });
-
-  it("invokes the stage skill matching the launch status", () => {
-    expect(buildClaudeCommand({ ...baseReq, status: "Backlog" }, "/s/x.json")).toContain("'/lime-design RIC-46'");
-    expect(buildClaudeCommand({ ...baseReq, status: "To Code" }, "/s/x.json")).toContain("'/lime-implement RIC-46'");
-    expect(buildClaudeCommand({ ...baseReq, status: "To Review" }, "/s/x.json")).toContain("'/lime-review RIC-46'");
-    // The route whitelists trailingArg to local|mr, so a To QA launch is always bare —
-    // QA verdicts are resolved server-side without a session.
-    expect(buildClaudeCommand({ ...baseReq, status: "To QA" }, "/s/x.json")).toContain("'/lime-qa RIC-46'");
-    expect(buildClaudeCommand({ ...baseReq, status: "To Merge", trailingArg: "local" }, "/s/x.json"))
-      .toContain("'/lime-merge RIC-46 local'");
-  });
-
-  it("appends a trailing gate arg inside the quoted slash command", () => {
-    const cmd = buildClaudeCommand({ ...baseReq, trailingArg: "approve" }, "/s/x.json");
-    expect(cmd).toContain("'/lime-next RIC-46 approve'");
-  });
-
-  it("appends the To Merge mode as the trailing gate arg", () => {
-    expect(buildClaudeCommand({ ...baseReq, trailingArg: "local" }, "/s/x.json"))
-      .toContain("'/lime-next RIC-46 local'");
-    expect(buildClaudeCommand({ ...baseReq, trailingArg: "mr" }, "/s/x.json"))
-      .toContain("'/lime-next RIC-46 mr'");
+describe("buildClaudeCommand", () => {
+  it("builds a plain claude command with model, effort, settings, and the quoted prompt", () => {
+    const cmd = buildClaudeCommand(baseReq, "/state/settings/x.json", "work on RIC-46");
+    expect(cmd).toBe("claude --model 'opus' --effort 'high' --settings '/state/settings/x.json' 'work on RIC-46'");
   });
 
   it("neutralizes shell metacharacters in model/effort", () => {
-    const cmd = buildClaudeCommand({ ...baseReq, model: "opus; touch pwned" }, "/s/x.json");
+    const cmd = buildClaudeCommand({ ...baseReq, model: "opus; touch pwned" }, "/s/x.json", "prompt");
     // the injection payload is contained inside a single-quoted token, not a live command
     expect(cmd).toContain("--model 'opus; touch pwned'");
     expect(cmd).not.toContain("; touch pwned "); // never appears unquoted/executable
+  });
+
+  it("escapes single quotes in the prompt", () => {
+    const cmd = buildClaudeCommand(baseReq, "/s/x.json", "it's fine");
+    expect(cmd).toContain("'it'\\''s fine'");
+  });
+
+  it("rejects a prompt starting with '-' (argv flag smuggling guard)", () => {
+    expect(() => buildClaudeCommand(baseReq, "/s/x.json", "-h")).toThrow();
+  });
+});
+
+describe("launchSession", () => {
+  it("builds a command that starts with claude --model, carries --settings, and embeds the " +
+    "ticket id plus the context/result paths inside the quoted prompt — no lime slash command", async () => {
+    let command = "";
+    const d = deps({ newSession: vi.fn(async (_n: string, _c: string, cmd: string) => { command = cmd; }) });
+    await launchSession(baseReq, d);
+    expect(command.startsWith("claude --model")).toBe(true);
+    expect(command).toContain("--settings");
+    expect(command).toContain("RIC-46");
+    expect(command).toContain(join(dir, "context", "mojito-RIC-46-planned.json"));
+    expect(command).toContain(join(dir, "results", "mojito-RIC-46-planned.json"));
+    expect(command).not.toContain("/lime-"); // no lime slash command, and no env-var prefix (it starts with "claude")
   });
 
   it("refuses a duplicate", async () => {
@@ -102,18 +102,7 @@ describe("launchSession", () => {
     expect(mode).toBe(0o600);
   });
 
-  it("prefixes LIME_SESSION_CONTEXT when a context path is given", () => {
-    const cmd = buildClaudeCommand(baseReq, "/state/settings/x.json", "/state/context/x.json");
-    expect(cmd).toMatch(/^LIME_SESSION_CONTEXT='\/state\/context\/x.json' claude /);
-  });
-
-  it("omits LIME_SESSION_CONTEXT when no context path is given", () => {
-    const cmd = buildClaudeCommand(baseReq, "/state/settings/x.json");
-    expect(cmd).not.toContain("LIME_SESSION_CONTEXT");
-    expect(cmd.startsWith("claude ")).toBe(true);
-  });
-
-  it("writes the launch context file with owner-only permissions", async () => {
+  it("writes the launch context file with owner-only permissions, including the description", async () => {
     const { readFileSync } = await import("node:fs");
     const d = deps();
     await launchSession(baseReq, d);
@@ -122,7 +111,27 @@ describe("launchSession", () => {
     expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({
       identifier: "RIC-46", statusName: "Planned",
       title: "Auto-advance toggle", project: "Lime", labels: ["Feature"],
+      description: "Let the user toggle auto-advance from the terminal view.",
     });
+  });
+
+  it("passes rejectReason through to the context file when present (QA rework)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const d = deps();
+    await launchSession({ ...baseReq, rejectReason: "missed the edge case" }, d);
+    const p = join(dir, "context", "mojito-RIC-46-planned.json");
+    expect(JSON.parse(readFileSync(p, "utf8"))).toMatchObject({ rejectReason: "missed the edge case" });
+  });
+
+  it("clears a stale result file before spawning (ids repeat per ticket+status)", async () => {
+    const d = deps();
+    const resultsDir = join(dir, "results");
+    const { mkdirSync, writeFileSync: write, existsSync } = await import("node:fs");
+    mkdirSync(resultsDir, { recursive: true });
+    const stale = join(resultsDir, "mojito-RIC-46-planned.json");
+    write(stale, JSON.stringify({ outcome: "ready-for-qa" }));
+    await launchSession(baseReq, d);
+    expect(existsSync(stale)).toBe(false);
   });
 
   it("records title and labels on the session meta", async () => {
@@ -151,23 +160,10 @@ function customDeps(over: Record<string, unknown> = {}) {
 }
 
 describe("buildCustomClaudeCommand", () => {
-  it("builds a bare claude command with no slash command", () => {
+  it("builds a bare claude command with no slash command and no context-file prefix", () => {
+    // Exact match: nothing precedes "claude" (no env-var prefix) and no slash command follows.
     const cmd = buildCustomClaudeCommand({ projectName: null, model: "opus", effort: "high" }, "/s/x.json");
     expect(cmd).toBe("claude --model 'opus' --effort 'high' --settings '/s/x.json'");
-    expect(cmd).not.toContain("/lime-next");
-  });
-
-  it("prefixes LIME_SESSION_CONTEXT when a context path is given", () => {
-    const cmd = buildCustomClaudeCommand({ projectName: null, model: "opus", effort: "high" },
-      "/s/x.json", "/state/context/mojito-custom-ric-128-abc123.json");
-    expect(cmd).toMatch(/^LIME_SESSION_CONTEXT='\/state\/context\/mojito-custom-ric-128-abc123.json' claude /);
-    expect(cmd).not.toContain("/lime-next");
-  });
-
-  it("omits LIME_SESSION_CONTEXT when no context path is given", () => {
-    const cmd = buildCustomClaudeCommand({ projectName: null, model: "opus", effort: "high" }, "/s/x.json");
-    expect(cmd).not.toContain("LIME_SESSION_CONTEXT");
-    expect(cmd.startsWith("claude ")).toBe(true);
   });
 
   describe("prompt", () => {
@@ -347,7 +343,7 @@ describe("launchRebaseSession", () => {
     const p = join(dir, "context", "mojito-RIC-120-rebase.json");
     expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({
       identifier: "RIC-120", statusName: "To QA",
-      title: "action per fare rebase", project: "Mojito", labels: [],
+      title: "action per fare rebase", project: "Mojito", labels: [], description: "",
     });
   });
 
@@ -378,20 +374,14 @@ describe("launchCustomSession from a ticket (RIC-128)", () => {
       title: "Custom session from a ticket", labels: ["Feature"], autoAdvance: false });
   });
 
-  it("writes a launch-context file and prefixes LIME_SESSION_CONTEXT (no /lime-next)", async () => {
-    const { readFileSync } = await import("node:fs");
+  it("writes NO launch-context file (a bare interactive session, human-driven)", async () => {
     const d = customDeps({ resolveCwd: () => "/wt/ric-128" });
     await launchCustomSession(ticketReq, d);
-    const p = join(dir, "context", "mojito-custom-ric-128-abc123.json");
-    expect(statSync(p).mode & 0o777).toBe(0o600);
-    expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({
-      identifier: "RIC-128", statusName: "Todo",
-      title: "Custom session from a ticket", project: "Mojito", labels: ["Feature"],
-    });
+    expect(existsSync(join(dir, "context", "mojito-custom-ric-128-abc123.json"))).toBe(false);
+    // Exact match: nothing precedes "claude" (no env-var prefix) and no slash command follows.
     expect(d.newSession).toHaveBeenCalledWith("mojito-custom-ric-128-abc123", "/wt/ric-128",
-      expect.stringMatching(/^LIME_SESSION_CONTEXT='[^']+' claude /));
-    expect(d.newSession).toHaveBeenCalledWith("mojito-custom-ric-128-abc123", "/wt/ric-128",
-      expect.not.stringContaining("/lime-next"));
+      "claude --model 'opus' --effort 'high' --settings " +
+      `'${join(dir, "settings", "mojito-custom-ric-128-abc123.json")}'`);
   });
 
   it("falls back to the repo root when no worktree exists", async () => {

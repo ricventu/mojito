@@ -93,16 +93,15 @@ export default function LaunchSheet(
 
   const noActiveSession = activeSessionLevel(ticket.identifier, sessions) === null;
 
-  // Launch a claude session. trailingArg carries the To Merge mode (local|mr) when present.
-  const start = async (trailingArg?: "local" | "mr") => {
+  // Launch a claude session.
+  const start = async () => {
     // A finished session for this ticket+status keeps the same tmux name, so clear it first
     // (kill + deregister) before relaunching, else the server rejects the launch as a duplicate.
     if (existing) await apiFetch(token, `/api/sessions/${existing.id}`, { method: "DELETE" });
     const res = await apiFetch(token, "/api/sessions", {
       method: "POST",
       body: JSON.stringify({ ticket: ticket.identifier, status: ticket.statusName, model, effort,
-        autoAdvance: auto, projectName: ticket.project, title: ticket.title, labels: ticket.labels,
-        ...(trailingArg ? { trailingArg } : {}) }),
+        autoAdvance: auto, projectName: ticket.project, title: ticket.title, labels: ticket.labels }),
     });
     if (res.status === 409) { setErr("A session for this ticket+status already exists."); return; }
     if (!res.ok) { setErr(await res.text()); return; }
@@ -137,7 +136,6 @@ export default function LaunchSheet(
   };
 
   const isToQa = ticket.statusName === "To QA";
-  const isToMerge = ticket.statusName === "To Merge";
 
   const selectors = (
     <div className="two">
@@ -192,14 +190,7 @@ export default function LaunchSheet(
             <label className="toggle" style={{ marginBottom: 12 }}>
               <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> Auto-advance
             </label>
-            {isToMerge ? (
-              <div className="btns">
-                <button className="btn primary" onClick={() => start("local")}>Start · local</button>
-                <button className="btn primary" onClick={() => start("mr")}>Start · mr</button>
-              </div>
-            ) : (
-              <button className="btn primary block" onClick={() => start()}>{existing ? "Start new session" : "Start session"}</button>
-            )}
+            <button className="btn primary block" onClick={() => start()}>{existing ? "Start new session" : "Start session"}</button>
             {customBtn}
           </>
         )}

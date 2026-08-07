@@ -13,7 +13,8 @@ import { writeLaunchContext, writeNewTicketContext } from "./launchContext.js";
 import { branchChangedLines, scaleReviewProfile } from "./reviewScale.js";
 import { defaultModelForStatus, defaultEffortForStatus } from "./stageDefaults.js";
 import { readAutoScale } from "./scaleSettings.js";
-import { slashForStatus } from "./stageCommand.js";
+import { buildWorkPrompt } from "./prompts.js";
+import { resultPath, clearSessionResult } from "./sessionResult.js";
 
 export interface LaunchRequest {
   ticket: string;
@@ -24,7 +25,8 @@ export interface LaunchRequest {
   projectName: string | null;
   title: string;
   labels: string[];
-  trailingArg?: string;
+  description: string;
+  rejectReason?: string;
 }
 
 export interface LaunchDeps {
@@ -46,15 +48,14 @@ function defaultResolveCwd(projectsPath: string) {
     resolveTicketCwd(projectsPath, ticket, projectName);
 }
 
-export function buildClaudeCommand(req: LaunchRequest, settingsPath: string, contextPath?: string): string {
+export function buildClaudeCommand(
+  req: { model: string; effort: Effort },
+  settingsPath: string,
+  prompt: string,
+): string {
   const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
-  const envPrefix = contextPath ? `LIME_SESSION_CONTEXT=${q(contextPath)} ` : "";
-  // The status is known at launch, so invoke the matching stage skill directly — the
-  // session loads only that stage's prose instead of the whole lifecycle dispatcher.
-  return (
-    `${envPrefix}claude --model ${q(req.model)} --effort ${q(req.effort)} ` +
-    `--settings ${q(settingsPath)} ${q(`${slashForStatus(req.status)} ${req.ticket}${req.trailingArg ? ` ${req.trailingArg}` : ""}`)}`
-  );
+  if (prompt.startsWith("-")) throw new Error("prompt must not start with '-'");
+  return `claude --model ${q(req.model)} --effort ${q(req.effort)} --settings ${q(settingsPath)} ${q(prompt)}`;
 }
 
 export async function launchSession(
@@ -109,9 +110,15 @@ export async function launchSession(
     title: req.title,
     project: req.projectName,
     labels: req.labels,
+    description: req.description,
+    ...(req.rejectReason ? { rejectReason: req.rejectReason } : {}),
   });
-
-  const command = buildClaudeCommand(req, settingsPath, contextPath);
+  clearSessionResult(deps.stateDir, id); // ids repeat per ticket+status: a stale result must not satisfy the new session's Stop hook
+  const command = buildClaudeCommand(req, settingsPath, buildWorkPrompt({
+    ticket: req.ticket,
+    contextPath,
+    resultPath: resultPath(deps.stateDir, id),
+  }));
   await deps.newSession(id, cwd, command);
   await deps.pipePane(id, logfilePath(deps.stateDir, id));
 
@@ -148,10 +155,9 @@ export interface CustomLaunchRequest {
   prompt?: string;
 }
 
-export function buildCustomClaudeCommand(req: CustomLaunchRequest, settingsPath: string, contextPath?: string): string {
+export function buildCustomClaudeCommand(req: CustomLaunchRequest, settingsPath: string): string {
   const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
-  const envPrefix = contextPath ? `LIME_SESSION_CONTEXT=${q(contextPath)} ` : "";
-  const base = `${envPrefix}claude --model ${q(req.model)} --effort ${q(req.effort)} --settings ${q(settingsPath)}`;
+  const base = `claude --model ${q(req.model)} --effort ${q(req.effort)} --settings ${q(settingsPath)}`;
   if (req.prompt && req.prompt.startsWith("-")) {
     throw new Error("prompt must not start with '-'");
   }
@@ -193,19 +199,9 @@ export async function launchCustomSession(
   writeFileSync(settingsPath, JSON.stringify(buildHookSettings(id, deps.port, deps.token), null, 2), { mode: 0o600 });
   chmodSync(settingsPath, 0o600); // mode on writeFileSync is ignored if the file pre-existed
 
-  // Ticket-scoped custom sessions get a launch-context file so a later /lime-next can read it;
-  // project-scoped custom sessions run fully bare (no context file).
-  const contextPath = req.ticket
-    ? writeLaunchContext(deps.stateDir, id, {
-        identifier: req.ticket,
-        statusName: req.status ?? "",
-        title: req.title ?? "",
-        project: req.projectName,
-        labels: req.labels ?? [],
-      })
-    : undefined;
-
-  const command = buildCustomClaudeCommand(req, settingsPath, contextPath);
+  // A custom session — ticket-scoped or project-scoped — is a bare interactive session
+  // with a human driving it; it needs no machine-readable context file.
+  const command = buildCustomClaudeCommand(req, settingsPath);
   await deps.newSession(id, cwd, command);
   await deps.pipePane(id, logfilePath(deps.stateDir, id));
 
@@ -357,6 +353,7 @@ export async function launchRebaseSession(
     title: req.title,
     project: req.projectName,
     labels: req.labels,
+    description: "", // /lime-rebase reads Linear itself; no Mojito-fetched description to pass
   });
 
   const command = buildRebaseClaudeCommand(req, settingsPath, contextPath);

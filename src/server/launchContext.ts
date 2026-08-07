@@ -7,12 +7,15 @@ export interface LaunchContext {
   title: string;
   project: string | null;
   labels: string[];
+  description: string;
+  rejectReason?: string;
 }
 
 /**
- * Write the per-session launch context the lime-next skill reads to dispatch a
- * stage without calling the Linear `get_issue` MCP. Returns the file path so the
- * caller can pass it to the session via LIME_SESSION_CONTEXT.
+ * Write the per-session launch context the spawned session itself reads (the file's
+ * path is embedded directly in the Mojito-built work prompt — no env var involved) so
+ * it can skip a Linear `get_issue`/description fetch and, on QA rework, see why the
+ * ticket bounced back. Returns the file path so the caller can embed it in the prompt.
  */
 export function writeLaunchContext(stateDir: string, id: string, ctx: LaunchContext): string {
   const dir = join(stateDir, "context");

@@ -22,6 +22,9 @@ export function buildAutoAdvanceRequest(prev: SessionMeta, newStatus: string): L
     projectName: prev.projectName ?? null,
     title: prev.title ?? "",
     labels: prev.labels ?? [],
+    // Auto-advance runs headless (no Linear fetch on this path); this whole module is
+    // removed in a later task once auto-advance itself is dropped.
+    description: "",
   };
 }
 

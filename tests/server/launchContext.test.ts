@@ -13,6 +13,7 @@ const ctx: LaunchContext = {
   title: "Toggle auto-advance from the terminal view",
   project: "Mojito",
   labels: ["Bug"],
+  description: "Add a toggle to enable/disable auto-advance from the terminal view.",
 };
 
 describe("writeLaunchContext", () => {
@@ -25,6 +26,11 @@ describe("writeLaunchContext", () => {
   it("writes with owner-only permissions", () => {
     const p = writeLaunchContext(dir, "mojito-RIC-46-to-review", ctx);
     expect(statSync(p).mode & 0o777).toBe(0o600);
+  });
+
+  it("includes rejectReason when given (QA rework)", () => {
+    const p = writeLaunchContext(dir, "mojito-RIC-46-to-code", { ...ctx, rejectReason: "missed the edge case" });
+    expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({ ...ctx, rejectReason: "missed the edge case" });
   });
 });
 

@@ -4,7 +4,7 @@ import { tokenFromHeaders } from "@/server/auth";
 import { launchSession, launchCustomSession, launchNewTicketSession, launchRebaseSession, launchShellSession } from "@/server/launch";
 import { validateTicket } from "@/server/sessionKey";
 import { validateImages } from "@/server/imageUpload";
-import { uploadImage } from "@/server/linear";
+import { uploadImage, getIssueDescription } from "@/server/linear";
 import { hasSession, newSession, pipePane } from "@/server/tmux";
 
 export async function GET(req: Request) {
@@ -18,11 +18,6 @@ export async function POST(req: Request) {
   if (!tokenFromHeaders(req.headers, cfg.token)) return new NextResponse("unauthorized", { status: 401 });
   let body;
   try { body = await req.json(); } catch { return new NextResponse("bad json", { status: 400 }); }
-  // Only the To Merge gate passes a trailing arg (the Stage-5 mode); whitelist it so the
-  // launch command can never carry an arbitrary token.
-  if (body.trailingArg !== undefined && body.trailingArg !== "local" && body.trailingArg !== "mr") {
-    return NextResponse.json({ error: "invalid trailingArg" }, { status: 400 });
-  }
   if (body.kind === "custom") {
     const res = await launchCustomSession(
       { projectName: body.projectName ?? null, model: body.model ?? "opus", effort: body.effort ?? "high",
@@ -84,11 +79,13 @@ export async function POST(req: Request) {
     if (!res.ok) return NextResponse.json({ error: res.reason }, { status: 422 });
     return NextResponse.json(res.meta, { status: 201 });
   }
+  let description = "";
+  try { description = await getIssueDescription(cfg.linearApiKey, body.ticket); } catch { /* launch anyway with empty description */ }
   const res = await launchSession(
     { ticket: body.ticket, status: body.status, model: body.model ?? "opus", effort: body.effort ?? "high",
       autoAdvance: !!body.autoAdvance, projectName: body.projectName ?? null,
       title: body.title ?? "", labels: Array.isArray(body.labels) ? body.labels : [],
-      trailingArg: body.trailingArg },
+      description },
     { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token, projectsPath: cfg.projectsPath,
       hasSession, newSession, pipePane },
   );
