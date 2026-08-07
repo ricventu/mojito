@@ -1,3 +1,5 @@
+import { WORK_STATES } from "./statusModel.js";
+
 const TICKET_RE = /^([A-Z][A-Z0-9]*)-(\d+)$/;
 
 export function validateTicket(ticket: string): void {
@@ -19,7 +21,11 @@ export function statusSlug(status: string): string {
 
 export function tmuxName(ticket: string, status: string): string {
   validateTicket(ticket);
-  return `mojito-${ticket}-${statusSlug(status)}`;
+  // The work states (Backlog/Todo/In Progress) share one session id: a launch-time board
+  // move (Backlog/Todo -> In Progress) must not change the session's tmux name mid-flight,
+  // or the duplicate guard and "open running session" lookup both miss the live session.
+  const slug = WORK_STATES.includes(status) ? "work" : statusSlug(status);
+  return `mojito-${ticket}-${slug}`;
 }
 
 export function customSessionName(slug: string, unique: string): string {

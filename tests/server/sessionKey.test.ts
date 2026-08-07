@@ -9,8 +9,22 @@ describe("sessionKey", () => {
   });
 
   it("builds a tmux-safe session name", () => {
-    expect(tmuxName("RIC-46", "In Progress")).toBe("mojito-RIC-46-in-progress");
-    expect(tmuxName("RIC-46", "In Progress")).not.toMatch(/[.:\s]/);
+    expect(tmuxName("RIC-46", "To QA")).toBe("mojito-RIC-46-to-qa");
+    expect(tmuxName("RIC-46", "To QA")).not.toMatch(/[.:\s]/);
+  });
+
+  it("collapses every work state (Backlog/Todo/In Progress) to the same session id", () => {
+    // A launch-time board move (Backlog/Todo -> In Progress) must not change the tmux
+    // name mid-flight, or the duplicate guard and the "open running session" lookup
+    // both miss the live session (see LaunchSheet's existingId / launchSession's id).
+    expect(tmuxName("RIC-46", "Backlog")).toBe("mojito-RIC-46-work");
+    expect(tmuxName("RIC-46", "Todo")).toBe("mojito-RIC-46-work");
+    expect(tmuxName("RIC-46", "In Progress")).toBe("mojito-RIC-46-work");
+  });
+
+  it("keeps To QA on its own distinct session id", () => {
+    expect(tmuxName("RIC-46", "To QA")).toBe("mojito-RIC-46-to-qa");
+    expect(tmuxName("RIC-46", "To QA")).not.toBe(tmuxName("RIC-46", "In Progress"));
   });
 
   it("parses an identifier", () => {

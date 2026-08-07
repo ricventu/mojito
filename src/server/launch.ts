@@ -468,8 +468,11 @@ export async function launchStackResolveSession(
 ): Promise<{ ok: true; meta: SessionMeta } | { ok: false; reason: "no-repo" }> {
   const repo = resolvePathForProject(loadProjectMap(deps.projectsPath), req.projectName);
   if (!repo) return { ok: false, reason: "no-repo" };
-  const model = defaultModelForStatus("To Merge");
-  const effort = defaultEffortForStatus("To Merge");
+  // Analytical-resolve profile (formerly the To Merge stage default, now gone from
+  // BUILTIN_STAGE_DEFAULTS): a diverged-branch rebase/merge needs the top model at top
+  // effort, so this is inlined rather than resolved through a status that no longer exists.
+  const model = "opus";
+  const effort: Effort = "xhigh";
   const prompt = buildResolvePrompt(req.projectName, repo, req.branch);
   return launchCustomSession({ projectName: req.projectName, model, effort, prompt }, deps);
 }

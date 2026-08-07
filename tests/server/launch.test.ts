@@ -528,6 +528,10 @@ describe("launchStackResolveSession", () => {
     if (res.ok) {
       expect(res.meta.kind).toBe("custom");
       expect(res.meta.projectName).toBe("Factorybook");
+      // Analytical-resolve profile is inlined (opus/xhigh), not resolved via a status
+      // that no longer exists in BUILTIN_STAGE_DEFAULTS (formerly "To Merge").
+      expect(res.meta.model).toBe("opus");
+      expect(res.meta.effort).toBe("xhigh");
     }
     // Command carries the seeded prompt as the final quoted arg, and no client string.
     expect(command).toMatch(/claude --model .* --effort .* --settings .* '.*force-push.*'/s);
