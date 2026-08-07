@@ -3,7 +3,7 @@ import { join, basename } from "node:path";
 import { homedir } from "node:os";
 import { randomBytes } from "node:crypto";
 import type { Effort, SessionMeta } from "./types.js";
-import { tmuxName, validateTicket, statusSlug, customSessionName, rebaseSessionName, shellSessionName } from "./sessionKey.js";
+import { tmuxName, validateTicket, statusSlug, customSessionName, rebaseSessionName, conflictSessionName, shellSessionName } from "./sessionKey.js";
 import { buildHookSettings } from "./hookSettings.js";
 import { loadProjectMap, resolvePathForProject } from "./limeProjects.js";
 import { resolveTicketCwd } from "./ticketCwd.js";
@@ -13,7 +13,7 @@ import { writeLaunchContext, writeNewTicketContext } from "./launchContext.js";
 import { branchChangedLines, scaleReviewProfile } from "./reviewScale.js";
 import { defaultModelForStatus, defaultEffortForStatus } from "./stageDefaults.js";
 import { readAutoScale } from "./scaleSettings.js";
-import { buildWorkPrompt } from "./prompts.js";
+import { buildWorkPrompt, buildConflictPrompt } from "./prompts.js";
 import { resultPath, clearSessionResult } from "./sessionResult.js";
 
 export interface LaunchRequest {
@@ -370,6 +370,77 @@ export async function launchRebaseSession(
     projectName: req.projectName,
     title: req.title,
     labels: req.labels,
+  };
+  deps.registry.upsert(meta);
+  return { ok: true, meta };
+}
+
+export interface ConflictLaunchRequest {
+  ticket: string;
+  projectName: string | null;
+  title: string;
+  description: string;
+  model: string;
+  effort: Effort;
+}
+
+/**
+ * Launch the conflict-resolution session for a QA-approved branch whose server-side
+ * rebase hit conflicts (see mergeTicketBranch). The ticket stays at To QA — the session
+ * rebases and resolves by hand, then reports through the standard result file — so the
+ * launch context carries statusName "To QA" and its own `-conflict` session id.
+ */
+export async function launchConflictSession(
+  req: ConflictLaunchRequest,
+  deps: LaunchDeps,
+): Promise<{ ok: true; meta: SessionMeta } | { ok: false; reason: "duplicate" | "no-repo"; id?: string }> {
+  validateTicket(req.ticket);
+  const id = conflictSessionName(req.ticket);
+
+  if (await deps.hasSession(id)) return { ok: false, reason: "duplicate", id };
+
+  const resolveCwd = deps.resolveCwd ?? defaultResolveCwd(deps.projectsPath);
+  const cwd = resolveCwd(req.ticket, req.projectName);
+  if (!cwd) return { ok: false, reason: "no-repo" };
+
+  const settingsDir = join(deps.stateDir, "settings");
+  mkdirSync(settingsDir, { recursive: true, mode: 0o700 });
+  const settingsPath = join(settingsDir, `${id}.json`);
+  writeFileSync(settingsPath, JSON.stringify(buildHookSettings(id, deps.port, deps.token), null, 2), {
+    mode: 0o600,
+  });
+  chmodSync(settingsPath, 0o600); // mode on writeFileSync is ignored if the file pre-existed
+
+  const contextPath = writeLaunchContext(deps.stateDir, id, {
+    identifier: req.ticket,
+    statusName: "To QA",
+    title: req.title,
+    project: req.projectName,
+    labels: [],
+    description: req.description,
+  });
+  clearSessionResult(deps.stateDir, id); // the id repeats per ticket: a stale result must not satisfy this session's Stop hook
+  const command = buildClaudeCommand(req, settingsPath, buildConflictPrompt({
+    ticket: req.ticket,
+    contextPath,
+    resultPath: resultPath(deps.stateDir, id),
+  }));
+  await deps.newSession(id, cwd, command);
+  await deps.pipePane(id, logfilePath(deps.stateDir, id));
+
+  const meta: SessionMeta = {
+    kind: "ticket",
+    id,
+    ticket: req.ticket,
+    launchStatus: "To QA",
+    model: req.model,
+    effort: req.effort,
+    state: "starting",
+    cwd,
+    createdAt: (deps.nowIso ?? (() => new Date().toISOString()))(),
+    projectName: req.projectName,
+    title: req.title,
+    labels: [],
   };
   deps.registry.upsert(meta);
   return { ok: true, meta };

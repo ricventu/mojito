@@ -5,7 +5,7 @@ import { join } from "node:path";
 import {
   launchSession, buildClaudeCommand, launchCustomSession, buildCustomClaudeCommand,
   launchNewTicketSession, buildNewTicketClaudeCommand,
-  launchRebaseSession, buildRebaseClaudeCommand,
+  launchRebaseSession, buildRebaseClaudeCommand, launchConflictSession,
   buildShellCommand, launchShellSession,
   buildResolvePrompt, launchStackResolveSession,
 } from "@/server/launch";
@@ -365,6 +365,65 @@ describe("launchRebaseSession", () => {
   it("refuses when no repo resolves", async () => {
     const d = deps({ resolveCwd: () => null });
     const res = await launchRebaseSession(baseRebaseReq, d);
+    expect(res).toMatchObject({ ok: false, reason: "no-repo" });
+  });
+});
+
+const baseConflictReq = {
+  ticket: "RIC-120", projectName: "Mojito", title: "action per fare rebase",
+  description: "Let the user do the thing.", model: "opus", effort: "xhigh" as const,
+};
+
+describe("launchConflictSession", () => {
+  it("launches a ticket-kind session at To QA under the -conflict id, seeded with the conflict prompt", async () => {
+    let command = "";
+    const d = deps({ newSession: vi.fn(async (_n: string, _c: string, cmd: string) => { command = cmd; }) });
+    const res = await launchConflictSession(baseConflictReq, d);
+    expect(res.ok).toBe(true);
+    const meta = (res as { ok: true; meta: SessionMeta }).meta;
+    expect(meta).toMatchObject({
+      kind: "ticket", id: "mojito-RIC-120-conflict", ticket: "RIC-120",
+      launchStatus: "To QA", state: "starting", cwd: "/code/lime",
+    });
+    expect(meta.id.endsWith("-conflict")).toBe(true);
+    // The conflict prompt, not the work prompt, and no lime slash command.
+    expect(command.startsWith("claude --model")).toBe(true);
+    expect(command).toContain("could not be rebased onto");
+    expect(command).toContain(join(dir, "context", "mojito-RIC-120-conflict.json"));
+    expect(command).toContain(join(dir, "results", "mojito-RIC-120-conflict.json"));
+    expect(command).not.toContain("/lime-");
+  });
+
+  it("writes a launch context at To QA carrying the description and no labels", async () => {
+    const d = deps();
+    await launchConflictSession(baseConflictReq, d);
+    const p = join(dir, "context", "mojito-RIC-120-conflict.json");
+    expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({
+      identifier: "RIC-120", statusName: "To QA", title: "action per fare rebase",
+      project: "Mojito", labels: [], description: "Let the user do the thing.",
+    });
+  });
+
+  it("clears a stale result file before spawning", async () => {
+    const { mkdirSync, writeFileSync: write } = await import("node:fs");
+    mkdirSync(join(dir, "results"), { recursive: true });
+    const stale = join(dir, "results", "mojito-RIC-120-conflict.json");
+    write(stale, JSON.stringify({ outcome: "ready-for-qa" }));
+    let goneBeforeSpawn: boolean | undefined;
+    const d = deps({ newSession: vi.fn(async () => { goneBeforeSpawn = !existsSync(stale); }) });
+    await launchConflictSession(baseConflictReq, d);
+    expect(goneBeforeSpawn).toBe(true);
+  });
+
+  it("refuses a duplicate", async () => {
+    const d = deps({ hasSession: vi.fn(async () => true) });
+    const res = await launchConflictSession(baseConflictReq, d);
+    expect(res).toMatchObject({ ok: false, reason: "duplicate", id: "mojito-RIC-120-conflict" });
+  });
+
+  it("refuses when no repo resolves", async () => {
+    const d = deps({ resolveCwd: () => null });
+    const res = await launchConflictSession(baseConflictReq, d);
     expect(res).toMatchObject({ ok: false, reason: "no-repo" });
   });
 });

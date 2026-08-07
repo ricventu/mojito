@@ -44,3 +44,11 @@ export function rebaseSessionName(ticket: string): string {
   validateTicket(ticket);
   return `mojito-${ticket}-rebase`;
 }
+
+// The conflict-resolution session Mojito launches when the QA-approve merge hits rebase
+// conflicts. Its own id so it never collides with the ticket's work session (which may
+// still be registered) nor with the To QA gate id.
+export function conflictSessionName(ticket: string): string {
+  validateTicket(ticket);
+  return `mojito-${ticket}-conflict`;
+}

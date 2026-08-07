@@ -1,15 +1,19 @@
 "use client";
 import { useState } from "react";
 
+// Approve is two buttons, not one: the merge is done server-side and the user chooses how
+// it lands — a local fast-forward onto the default branch, or a pushed branch + MR/PR.
 export default function QaVerdictButtons(
-  { onApprove, onReject }: { onApprove: () => void; onReject: (reason: string) => void },
+  { onApprove, onReject }:
+  { onApprove: (arg: "approve-local" | "approve-mr") => void; onReject: (reason: string) => void },
 ) {
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
 
   return (
     <div className="btns">
-      <button className="btn primary" onClick={onApprove}>approve</button>
+      <button className="btn primary" onClick={() => onApprove("approve-local")}>Approve · merge</button>
+      <button className="btn primary" onClick={() => onApprove("approve-mr")}>Approve · MR</button>
       {rejecting ? (
         <>
           <textarea

@@ -3,8 +3,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client";
 import { resolveEffort, resolveModel, MODELS, EFFORTS } from "@/lib/stageDefaults";
 import { useStageDefaults } from "@/lib/useStageDefaults";
-import { tmuxName, rebaseSessionName } from "@/server/sessionKey";
-import { activeSessionLevel } from "@/lib/ticketSessionLevel";
+import { tmuxName } from "@/server/sessionKey";
 import StateBadge from "./StateBadge";
 import QaVerdictButtons from "./QaVerdictButtons";
 import type { SessionMeta, TicketSummary } from "@/server/types";
@@ -37,37 +36,20 @@ export default function LaunchSheet(
   const existingActive = existing != null
     && (existing.state === "running" || existing.state === "needs-input" || existing.state === "starting");
 
-  // To QA is resolved as a pure Linear mutation — no session is ever launched.
-  const submitVerdict = async (arg: "approve" | "reject", reason?: string) => {
+  // The To QA verdict is resolved server-side: approve rebases + merges (or opens an MR)
+  // with no session at all, and only reject (or a rebase conflict) spawns one. projectName
+  // and title are sent because the server needs them to locate the worktree and to seed
+  // whatever session the verdict ends up launching.
+  const submitVerdict = async (arg: "approve-local" | "approve-mr" | "reject", reason?: string) => {
     const res = await apiFetch(token, `/api/tickets/${ticket.identifier}/verdict`, {
       method: "POST",
-      body: JSON.stringify(reason === undefined ? { arg } : { arg, reason }),
+      body: JSON.stringify({ arg, ...(reason === undefined ? {} : { reason }),
+        projectName: ticket.project, title: ticket.title }),
     });
     if (res.ok) { onLaunched(); onClose(); return; }
     let message = `verdict failed (${res.status})`;
     try { const b = await res.json(); if (b?.error) message = b.error; } catch { /* non-JSON */ }
     setErr(message);
-  };
-
-  // Launch a one-off session that rebases the ticket's worktree branch (To-QA action).
-  const startRebase = async () => {
-    const rebaseId = rebaseSessionName(ticket.identifier);
-    // A finished rebase session keeps the same tmux name — clear it before relaunching,
-    // else the server rejects the launch as a duplicate.
-    if (sessions.some((s) => s.id === rebaseId)) {
-      await apiFetch(token, `/api/sessions/${rebaseId}`, { method: "DELETE" });
-    }
-    const res = await apiFetch(token, "/api/sessions", {
-      method: "POST",
-      // effort is fixed at "xhigh" (not the To-QA state default, which is "low") — a rebase
-      // is an analytical task regardless of the ticket's stage-default effort.
-      body: JSON.stringify({ kind: "rebase", ticket: ticket.identifier, model, effort: "xhigh",
-        projectName: ticket.project, title: ticket.title, labels: ticket.labels }),
-    });
-    if (res.status === 409) { setErr("A rebase session for this ticket already exists."); return; }
-    if (!res.ok) { setErr(await res.text()); return; }
-    onLaunched();
-    onClose();
   };
 
   // Take the ticket or hand it back. The sheet stays open — assigning a ticket and then
@@ -89,8 +71,6 @@ export default function LaunchSheet(
     setErr(null);
     onLaunched();
   };
-
-  const noActiveSession = activeSessionLevel(ticket.identifier, sessions) === null;
 
   // Launch a claude session.
   const start = async () => {
@@ -163,12 +143,7 @@ export default function LaunchSheet(
         {ticket.title && <p className="sheet-title">{ticket.title}</p>}
         {isToQa ? (
           <>
-            <QaVerdictButtons onApprove={() => submitVerdict("approve")} onReject={(reason) => submitVerdict("reject", reason)} />
-            {noActiveSession && (
-              <button className="btn ghost block" style={{ marginTop: 12 }} onClick={startRebase}>
-                Rebase onto default branch
-              </button>
-            )}
+            <QaVerdictButtons onApprove={(a) => submitVerdict(a)} onReject={(reason) => submitVerdict("reject", reason)} />
             {selectors}
             {customBtn}
           </>

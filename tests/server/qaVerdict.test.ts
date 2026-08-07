@@ -1,34 +1,101 @@
 import { describe, it, expect, vi } from "vitest";
-import { resolveQaVerdict, QaVerdictError } from "@/server/qaVerdict";
+import { resolveQaVerdict, QaVerdictError, QA_ARGS } from "@/server/qaVerdict";
+import type { MergeOutcome } from "@/server/merge";
 
-function deps() {
-  return { setIssueStatus: vi.fn(async () => {}), postComment: vi.fn(async () => {}) };
+function deps(outcome: MergeOutcome = { status: "merged", commit: "abc1234" }) {
+  return {
+    merge: vi.fn(async () => outcome),
+    setIssueStatus: vi.fn(async () => {}),
+    launchRework: vi.fn(async () => {}),
+    launchConflictFix: vi.fn(async () => {}),
+  };
 }
 
-describe("resolveQaVerdict", () => {
-  it("approve moves the ticket to To Merge and posts no comment", async () => {
-    const d = deps();
-    await resolveQaVerdict({ ticket: "RIC-110", arg: "approve" }, d);
-    expect(d.setIssueStatus).toHaveBeenCalledWith("RIC-110", "To Merge");
-    expect(d.postComment).not.toHaveBeenCalled();
+describe("QA_ARGS", () => {
+  it("is the exact accepted verdict set", () => {
+    expect([...QA_ARGS]).toEqual(["approve-local", "approve-mr", "reject"]);
+  });
+});
+
+describe("resolveQaVerdict approve", () => {
+  it("approve-local merges locally and moves the ticket to Done", async () => {
+    const d = deps({ status: "merged", commit: "abc1234" });
+    const res = await resolveQaVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
+    expect(d.merge).toHaveBeenCalledWith("local");
+    expect(d.setIssueStatus).toHaveBeenCalledWith("RIC-110", "Done");
+    expect(res).toEqual({ done: "merged", commit: "abc1234" });
+    expect(d.launchRework).not.toHaveBeenCalled();
+    expect(d.launchConflictFix).not.toHaveBeenCalled();
   });
 
-  it("reject posts the reason comment then moves to To Code, in that order", async () => {
+  it("approve-mr opens an MR and moves the ticket to Done", async () => {
+    const d = deps({ status: "mr-created", url: "https://git.example/mr/7" });
+    const res = await resolveQaVerdict({ ticket: "RIC-110", arg: "approve-mr" }, d);
+    expect(d.merge).toHaveBeenCalledWith("mr");
+    expect(d.setIssueStatus).toHaveBeenCalledWith("RIC-110", "Done");
+    expect(res).toEqual({ done: "mr-created", url: "https://git.example/mr/7" });
+  });
+
+  it("a rebase conflict launches the conflict-fix session and writes NO status", async () => {
+    const d = deps({ status: "conflict", detail: "CONFLICT (content): src/a.ts" });
+    const res = await resolveQaVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
+    expect(d.launchConflictFix).toHaveBeenCalledWith("CONFLICT (content): src/a.ts");
+    expect(d.setIssueStatus).not.toHaveBeenCalled();
+    expect(res).toEqual({ done: "conflict-session" });
+  });
+
+  it("a merge error throws QaVerdictError and writes no status, launches nothing", async () => {
+    const d = deps({ status: "error", detail: "worktree has uncommitted changes" });
+    await expect(resolveQaVerdict({ ticket: "RIC-110", arg: "approve-local" }, d))
+      .rejects.toBeInstanceOf(QaVerdictError);
+    expect(d.setIssueStatus).not.toHaveBeenCalled();
+    expect(d.launchConflictFix).not.toHaveBeenCalled();
+    expect(d.launchRework).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the merge failure detail in the error message", async () => {
+    const d = deps({ status: "error", detail: "repo root is on other, not main" });
+    await expect(resolveQaVerdict({ ticket: "RIC-110", arg: "approve-local" }, d))
+      .rejects.toThrow(/repo root is on other, not main/);
+  });
+});
+
+describe("resolveQaVerdict reject", () => {
+  it("moves the ticket to In Progress then launches rework with the trimmed reason", async () => {
     const d = deps();
     const order: string[] = [];
-    d.postComment.mockImplementation(async () => { order.push("comment"); });
     d.setIssueStatus.mockImplementation(async () => { order.push("status"); });
-    await resolveQaVerdict({ ticket: "RIC-110", arg: "reject", reason: "layout broken" }, d);
-    expect(d.postComment).toHaveBeenCalledWith("RIC-110", "QA rejected — layout broken");
-    expect(d.setIssueStatus).toHaveBeenCalledWith("RIC-110", "To Code");
-    expect(order).toEqual(["comment", "status"]);
+    d.launchRework.mockImplementation(async () => { order.push("rework"); });
+    const res = await resolveQaVerdict({ ticket: "RIC-110", arg: "reject", reason: "  layout broken  " }, d);
+    expect(d.setIssueStatus).toHaveBeenCalledWith("RIC-110", "In Progress");
+    expect(d.launchRework).toHaveBeenCalledWith("layout broken");
+    expect(order).toEqual(["status", "rework"]);
+    expect(res).toEqual({ done: "rework-session" });
   });
 
-  it("reject with a blank reason throws and touches nothing", async () => {
+  it("never merges on reject", async () => {
+    const d = deps();
+    await resolveQaVerdict({ ticket: "RIC-110", arg: "reject", reason: "nope" }, d);
+    expect(d.merge).not.toHaveBeenCalled();
+  });
+
+  it("a blank reason throws and touches nothing", async () => {
     const d = deps();
     await expect(resolveQaVerdict({ ticket: "RIC-110", arg: "reject", reason: "   " }, d))
       .rejects.toBeInstanceOf(QaVerdictError);
-    expect(d.postComment).not.toHaveBeenCalled();
     expect(d.setIssueStatus).not.toHaveBeenCalled();
+    expect(d.launchRework).not.toHaveBeenCalled();
+  });
+
+  it("a missing reason throws", async () => {
+    const d = deps();
+    await expect(resolveQaVerdict({ ticket: "RIC-110", arg: "reject" }, d))
+      .rejects.toBeInstanceOf(QaVerdictError);
+  });
+
+  it("exposes no comment dependency at all (the reason travels in the context file)", async () => {
+    const d = deps();
+    await resolveQaVerdict({ ticket: "RIC-110", arg: "reject", reason: "broken" }, d);
+    expect(Object.keys(d)).toEqual(["merge", "setIssueStatus", "launchRework", "launchConflictFix"]);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { statusSlug, tmuxName, parseIdentifier, validateTicket, customSessionName, rebaseSessionName, shellSessionName, stackSessionName } from "@/server/sessionKey";
+import { statusSlug, tmuxName, parseIdentifier, validateTicket, customSessionName, rebaseSessionName, conflictSessionName, shellSessionName, stackSessionName } from "@/server/sessionKey";
 
 describe("sessionKey", () => {
   it("slugs a status", () => {
@@ -58,6 +58,19 @@ describe("rebaseSessionName", () => {
   });
   it("rejects a malformed ticket", () => {
     expect(() => rebaseSessionName("nonsense")).toThrow();
+  });
+});
+
+describe("conflictSessionName", () => {
+  it("builds the conflict-fix session name for a ticket", () => {
+    expect(conflictSessionName("RIC-120")).toBe("mojito-RIC-120-conflict");
+  });
+  it("collides with neither the work session nor the To QA gate session", () => {
+    expect(conflictSessionName("RIC-120")).not.toBe(tmuxName("RIC-120", "In Progress"));
+    expect(conflictSessionName("RIC-120")).not.toBe(tmuxName("RIC-120", "To QA"));
+  });
+  it("rejects a malformed ticket", () => {
+    expect(() => conflictSessionName("nonsense")).toThrow();
   });
 });
 

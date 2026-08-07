@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { getConfig, getRegistry } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
-import { getIssueStatus, setIssueStatus, postComment } from "@/server/linear";
+import { getIssueStatus, setIssueStatus, getIssueDescription } from "@/server/linear";
+import { launchSession, launchConflictSession } from "@/server/launch";
+import { loadProjectMap, resolvePathForProject } from "@/server/limeProjects";
+import { mergeTicketBranch } from "@/server/merge";
 import { resolveQaVerdict } from "@/server/qaVerdict";
 import { resolveTicketVerdict } from "@/server/ticketVerdict";
-import { tmuxName, validateTicket } from "@/server/sessionKey";
+import { tmuxName, conflictSessionName, validateTicket } from "@/server/sessionKey";
+import { defaultModelForStatus, defaultEffortForStatus } from "@/server/stageDefaults";
 import { supersedeSession } from "@/server/supersede";
-import { closeSession } from "@/server/tmux";
+import { resolveTicketCwd, resolveTicketWorktree } from "@/server/ticketCwd";
+import { closeSession, hasSession, newSession, pipePane } from "@/server/tmux";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const cfg = getConfig();
@@ -15,7 +20,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try { validateTicket(id); } catch { return new NextResponse("invalid ticket", { status: 400 }); }
   let body;
   try { body = await req.json(); } catch { return new NextResponse("bad json", { status: 400 }); }
-  const { arg, reason } = body;
+  const arg: string = typeof body.arg === "string" ? body.arg : "";
+  const reason: string | undefined = typeof body.reason === "string" ? body.reason : undefined;
+  const projectName: string | null = typeof body.projectName === "string" ? body.projectName : null;
+  const title: string = typeof body.title === "string" ? body.title : "";
+
+  const registry = getRegistry();
+  const tmuxDeps = { registry, stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
+    projectsPath: cfg.projectsPath, hasSession, newSession, pipePane };
+
+  // The merge needs both sides of the ticket: the worktree holding the branch, and the
+  // project's main checkout that receives a local fast-forward. A ticket without its own
+  // worktree (resolveTicketCwd falls back to the repo root) has no branch to merge.
+  // Resolved lazily — a reject never merges, so it must not pay for the git lookups.
+  const resolveDirs = () => ({
+    worktree: resolveTicketWorktree(cfg.projectsPath, id, projectName),
+    repoRoot: (projectName ? resolvePathForProject(loadProjectMap(cfg.projectsPath), projectName) : null)
+      ?? resolveTicketCwd(cfg.projectsPath, id, projectName),
+  });
+
+  // A reject relaunches the ticket's work session under the same id, so the
+  // stale-session cleanup below must not retire the session this request just started.
+  let workSessionRelaunched = false;
+
+  const describe = async () => {
+    try { return await getIssueDescription(cfg.linearApiKey, id); } catch { return ""; }
+  };
 
   const result = await resolveTicketVerdict(
     { ticket: id, arg, reason },
@@ -23,17 +53,47 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       getIssueStatus: (t) => getIssueStatus(cfg.linearApiKey, t),
       resolveVerdict: (i) =>
         resolveQaVerdict(i, {
+          merge: async (mode) => {
+            const { worktree, repoRoot } = resolveDirs();
+            if (!worktree || !repoRoot || worktree === repoRoot) {
+              return { status: "error", detail: "no worktree for ticket" } as const;
+            }
+            return mergeTicketBranch({ worktree, repoRoot, mode });
+          },
           setIssueStatus: (t, s) => setIssueStatus(cfg.linearApiKey, t, s),
-          postComment: (t, b) => postComment(cfg.linearApiKey, t, b),
+          launchRework: async (rejectReason) => {
+            const status = "In Progress";
+            const sid = tmuxName(id, status);
+            if (registry.get(sid)) await supersedeSession(sid, { closeSession, registry });
+            const res = await launchSession(
+              { ticket: id, status, model: defaultModelForStatus(status),
+                effort: defaultEffortForStatus(status), projectName, title, labels: [],
+                description: await describe(), rejectReason },
+              tmuxDeps,
+            );
+            if (!res.ok) throw new Error(`rework session not launched: ${res.reason}`);
+            workSessionRelaunched = true;
+          },
+          launchConflictFix: async () => {
+            const sid = conflictSessionName(id);
+            if (registry.get(sid)) await supersedeSession(sid, { closeSession, registry });
+            const status = "In Progress";
+            const res = await launchConflictSession(
+              { ticket: id, projectName, title, description: await describe(),
+                model: defaultModelForStatus(status), effort: defaultEffortForStatus(status) },
+              tmuxDeps,
+            );
+            if (!res.ok) throw new Error(`conflict session not launched: ${res.reason}`);
+          },
         }),
       supersedeStaleSession: async (t) => {
-        const registry = getRegistry();
-        const sid = tmuxName(t, "To QA");
+        if (workSessionRelaunched) return;
+        const sid = tmuxName(t, "In Progress");
         if (registry.get(sid)) await supersedeSession(sid, { closeSession, registry });
       },
     },
   );
 
-  if (result.ok) return NextResponse.json({ ok: true, arg: result.arg }, { status: 200 });
+  if (result.ok) return NextResponse.json({ ok: true, result: result.result }, { status: 200 });
   return NextResponse.json({ error: result.error }, { status: result.code });
 }

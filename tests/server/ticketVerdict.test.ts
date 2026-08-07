@@ -5,31 +5,37 @@ import { QaVerdictError } from "@/server/qaVerdict";
 function deps(over: Record<string, unknown> = {}) {
   return {
     getIssueStatus: vi.fn(async () => "To QA"),
-    resolveVerdict: vi.fn(async () => {}),
+    resolveVerdict: vi.fn(async () => ({ done: "merged", commit: "abc1234" }) as const),
     supersedeStaleSession: vi.fn(async () => {}),
     ...over,
   };
 }
 
 describe("resolveTicketVerdict", () => {
-  it("approve at To QA resolves the verdict then supersedes the stale session", async () => {
+  it("approve-local at To QA resolves the verdict, returns its result, then supersedes the stale session", async () => {
     const d = deps();
-    const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve" }, d);
-    expect(res).toEqual({ ok: true, arg: "approve" });
-    expect(d.resolveVerdict).toHaveBeenCalledWith({ ticket: "RIC-110", arg: "approve", reason: undefined });
+    const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
+    expect(res).toEqual({ ok: true, result: { done: "merged", commit: "abc1234" } });
+    expect(d.resolveVerdict).toHaveBeenCalledWith({ ticket: "RIC-110", arg: "approve-local", reason: undefined });
     expect(d.supersedeStaleSession).toHaveBeenCalledWith("RIC-110");
   });
 
-  it("reject passes the reason through", async () => {
-    const d = deps();
+  it("accepts approve-mr and passes the MR result through", async () => {
+    const d = deps({ resolveVerdict: vi.fn(async () => ({ done: "mr-created", url: "https://x/mr/1" }) as const) });
+    const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve-mr" }, d);
+    expect(res).toEqual({ ok: true, result: { done: "mr-created", url: "https://x/mr/1" } });
+  });
+
+  it("reject passes the reason through and returns the rework result", async () => {
+    const d = deps({ resolveVerdict: vi.fn(async () => ({ done: "rework-session" }) as const) });
     const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "reject", reason: "broken" }, d);
-    expect(res).toEqual({ ok: true, arg: "reject" });
+    expect(res).toEqual({ ok: true, result: { done: "rework-session" } });
     expect(d.resolveVerdict).toHaveBeenCalledWith({ ticket: "RIC-110", arg: "reject", reason: "broken" });
   });
 
   it("returns 409 and touches nothing when the ticket is not at To QA", async () => {
-    const d = deps({ getIssueStatus: vi.fn(async () => "To Code") });
-    const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve" }, d);
+    const d = deps({ getIssueStatus: vi.fn(async () => "In Progress") });
+    const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
     expect(res).toEqual({ ok: false, code: 409, error: "ticket is not at To QA" });
     expect(d.resolveVerdict).not.toHaveBeenCalled();
     expect(d.supersedeStaleSession).not.toHaveBeenCalled();
@@ -42,6 +48,12 @@ describe("resolveTicketVerdict", () => {
     expect(d.getIssueStatus).not.toHaveBeenCalled();
   });
 
+  it("rejects the retired bare 'approve' arg", async () => {
+    const d = deps();
+    const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve" }, d);
+    expect(res).toEqual({ ok: false, code: 400, error: "invalid arg" });
+  });
+
   it("maps QaVerdictError to 400 and skips supersede", async () => {
     const d = deps({ resolveVerdict: vi.fn(async () => { throw new QaVerdictError("rejection reason required"); }) });
     const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "reject", reason: "" }, d);
@@ -51,7 +63,7 @@ describe("resolveTicketVerdict", () => {
 
   it("maps a generic error to 422 and skips supersede", async () => {
     const d = deps({ resolveVerdict: vi.fn(async () => { throw new Error("Linear down"); }) });
-    const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve" }, d);
+    const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
     expect(res).toEqual({ ok: false, code: 422, error: "Linear down" });
     expect(d.supersedeStaleSession).not.toHaveBeenCalled();
   });
