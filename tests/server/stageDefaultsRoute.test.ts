@@ -35,26 +35,26 @@ describe("GET /api/config/stage-defaults", () => {
     const res = await GET(req("GET"));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body["To QA"]).toEqual({ model: "sonnet", effort: "low" });
-    expect(body["To Review"]).toEqual({ model: "opus", effort: "xhigh" });
+    expect(body["In Progress"]).toEqual({ model: "opus", effort: "xhigh" });
+    expect(body["Todo"]).toEqual({ model: "opus", effort: "xhigh" });
   });
 });
 
 describe("PUT /api/config/stage-defaults", () => {
   it("401 without a token", async () => {
-    expect((await PUT(req("PUT", { "To QA": { model: "opus", effort: "medium" } }, false))).status).toBe(401);
+    expect((await PUT(req("PUT", { "In Progress": { model: "opus", effort: "medium" } }, false))).status).toBe(401);
   });
   it("persists a valid override and returns the new effective table", async () => {
-    const res = await PUT(req("PUT", { "To QA": { model: "opus", effort: "medium" } }));
+    const res = await PUT(req("PUT", { "In Progress": { model: "opus", effort: "medium" } }));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body["To QA"]).toEqual({ model: "opus", effort: "medium" });
+    expect(body["In Progress"]).toEqual({ model: "opus", effort: "medium" });
     // A fresh GET reflects it too.
     const after = await (await GET(req("GET"))).json();
-    expect(after["To QA"]).toEqual({ model: "opus", effort: "medium" });
+    expect(after["In Progress"]).toEqual({ model: "opus", effort: "medium" });
   });
   it("422 on an invalid model", async () => {
-    const res = await PUT(req("PUT", { "To QA": { model: "gpt", effort: "low" } }));
+    const res = await PUT(req("PUT", { "In Progress": { model: "gpt", effort: "low" } }));
     expect(res.status).toBe(422);
   });
   it("422 on an unknown status", async () => {

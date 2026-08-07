@@ -9,7 +9,7 @@ beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "mojito-")); });
 
 const ctx: LaunchContext = {
   identifier: "RIC-46",
-  statusName: "To Review",
+  statusName: "In Progress",
   title: "Toggle auto-advance from the terminal view",
   project: "Mojito",
   labels: ["Bug"],

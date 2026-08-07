@@ -4,7 +4,7 @@ import { tokenFromHeaders } from "@/server/auth";
 import { launchSession, launchCustomSession, launchNewTicketSession, launchRebaseSession, launchShellSession } from "@/server/launch";
 import { validateTicket } from "@/server/sessionKey";
 import { validateImages } from "@/server/imageUpload";
-import { uploadImage, getIssueDescription } from "@/server/linear";
+import { uploadImage, getIssueDescription, setIssueStatus } from "@/server/linear";
 import { hasSession, newSession, pipePane } from "@/server/tmux";
 
 export async function GET(req: Request) {
@@ -92,6 +92,9 @@ export async function POST(req: Request) {
   if (!res.ok) {
     const status = res.reason === "duplicate" ? 409 : 422;
     return NextResponse.json({ error: res.reason, id: res.id }, { status });
+  }
+  if (body.status === "Backlog" || body.status === "Todo") {
+    try { await setIssueStatus(cfg.linearApiKey, body.ticket, "In Progress"); } catch { /* board update is best-effort */ }
   }
   return NextResponse.json(res.meta, { status: 201 });
 }

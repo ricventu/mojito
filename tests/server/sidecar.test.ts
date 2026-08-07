@@ -43,12 +43,12 @@ describe("sidecar", () => {
     const sdir = join(dir, "sessions");
     mkdirSync(sdir, { recursive: true });
     // legacy sidecar: no `kind` field
-    writeFileSync(join(sdir, "mojito-RIC-1-to-code.json"), JSON.stringify({
-      id: "mojito-RIC-1-to-code", ticket: "RIC-1", launchStatus: "To Code", model: "opus",
+    writeFileSync(join(sdir, "mojito-RIC-1-in-progress.json"), JSON.stringify({
+      id: "mojito-RIC-1-in-progress", ticket: "RIC-1", launchStatus: "In Progress", model: "opus",
       effort: "high", state: "running", cwd: "/x",
       createdAt: "2026-07-11T00:00:00.000Z", title: "t", labels: [],
     }));
-    expect(readSidecar(dir, "mojito-RIC-1-to-code")?.kind).toBe("ticket");
+    expect(readSidecar(dir, "mojito-RIC-1-in-progress")?.kind).toBe("ticket");
   });
 
   it("maps a persisted lime kind to ticket when reading a legacy sidecar", () => {

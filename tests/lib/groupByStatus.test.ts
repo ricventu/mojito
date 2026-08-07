@@ -12,11 +12,11 @@ describe("groupByStatus", () => {
   it("orders groups by lifecycle rank", () => {
     const items: Item[] = [
       { id: "a", status: "Done" },
-      { id: "b", status: "To Code" },
+      { id: "b", status: "In Progress" },
       { id: "c", status: "Backlog" },
     ];
     expect(groupByStatus(items, get).map((g) => g.status)).toEqual([
-      "Backlog", "To Code", "Done",
+      "Backlog", "In Progress", "Done",
     ]);
   });
 
@@ -24,18 +24,18 @@ describe("groupByStatus", () => {
     const items: Item[] = [
       { id: "a", status: "Zeta" },
       { id: "b", status: "Alpha" },
-      { id: "c", status: "To Code" },
+      { id: "c", status: "In Progress" },
     ];
     expect(groupByStatus(items, get).map((g) => g.status)).toEqual([
-      "To Code", "Alpha", "Zeta",
+      "In Progress", "Alpha", "Zeta",
     ]);
   });
 
   it("preserves input order of items within a group", () => {
     const items: Item[] = [
-      { id: "a", status: "To Code" },
-      { id: "b", status: "To Code" },
-      { id: "c", status: "To Code" },
+      { id: "a", status: "In Progress" },
+      { id: "b", status: "In Progress" },
+      { id: "c", status: "In Progress" },
     ];
     expect(groupByStatus(items, get)[0].items.map((i) => i.id)).toEqual(["a", "b", "c"]);
   });

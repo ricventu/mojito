@@ -10,8 +10,9 @@ import { writeAutoScale, _resetScaleSettingsCache } from "@/server/scaleSettings
 let dir: string;
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "mojito-"));
-  // Point stage-defaults at an empty config dir so the built-in seeds apply
-  // (To Review/To Merge default to opus/xhigh) and auto-scale defaults to on.
+  // Point stage-defaults at an empty config dir so the built-in seeds apply. To
+  // Review/To Merge are no longer configured statuses (collapsed lifecycle), so they
+  // fall through to the FALLBACK profile (opus/high); auto-scale defaults to on.
   process.env.MOJITO_CONFIG_DIR = mkdtempSync(join(tmpdir(), "mojito-cfg-"));
   _resetStageDefaultsCache();
   _resetScaleSettingsCache();
@@ -35,7 +36,7 @@ function deps(changedLines: (cwd: string) => number | null) {
   };
 }
 
-function req(status: string, model = "opus", effort: LaunchRequest["effort"] = "xhigh"): LaunchRequest {
+function req(status: string, model = "opus", effort: LaunchRequest["effort"] = "high"): LaunchRequest {
   return { ticket: "RIC-1", status, model, effort,
     projectName: null, title: "t", labels: [], description: "" };
 }
@@ -50,7 +51,7 @@ describe("launchSession diff-scaling", () => {
       expect(res.meta.model).toBe("sonnet");
       expect(res.meta.effort).toBe("medium");
       // The pre-scaling profile is recorded so the UI can tell a downgrade from a choice.
-      expect(res.meta.scaledFrom).toEqual({ model: "opus", effort: "xhigh" });
+      expect(res.meta.scaledFrom).toEqual({ model: "opus", effort: "high" });
     }
     expect(d.commands[0]).toContain("--model 'sonnet'");
     expect(d.commands[0]).toContain("--effort 'medium'");
@@ -72,7 +73,7 @@ describe("launchSession diff-scaling", () => {
     if (res.ok) {
       expect(res.meta.model).toBe("opus");
       expect(res.meta.effort).toBe("medium");
-      expect(res.meta.scaledFrom).toEqual({ model: "opus", effort: "xhigh" });
+      expect(res.meta.scaledFrom).toEqual({ model: "opus", effort: "high" });
     }
   });
 
@@ -98,7 +99,7 @@ describe("launchSession diff-scaling", () => {
     const d = deps(() => null);
     const res = await launchSession(req("To Review"), d);
     expect(res.ok).toBe(true);
-    if (res.ok) { expect(res.meta.model).toBe("opus"); expect(res.meta.effort).toBe("xhigh"); }
+    if (res.ok) { expect(res.meta.model).toBe("opus"); expect(res.meta.effort).toBe("high"); }
   });
 
   it("never scales when the auto-scale setting is off", async () => {
@@ -108,7 +109,7 @@ describe("launchSession diff-scaling", () => {
     expect(res.ok).toBe(true);
     if (res.ok) {
       expect(res.meta.model).toBe("opus");
-      expect(res.meta.effort).toBe("xhigh");
+      expect(res.meta.effort).toBe("high");
       expect(res.meta.scaledFrom).toBeUndefined();
     }
   });

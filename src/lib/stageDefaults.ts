@@ -1,5 +1,4 @@
 import type { Effort } from "@/server/types";
-import { SMALL_DIFF_LINES, MEDIUM_DIFF_LINES } from "@/lib/reviewScale";
 
 export interface StageDefault {
   model: string;
@@ -11,48 +10,24 @@ export const MODELS = ["opus", "sonnet", "fable"] as const;
 export const EFFORTS: readonly Effort[] = ["low", "medium", "high", "xhigh", "max"];
 
 // The launchable lifecycle statuses (terminal states never launch, so they are not configured).
-export const LAUNCHABLE_STATUSES: string[] = ["Backlog", "Todo", "To Code", "To Review", "To QA", "To Merge"];
+export const LAUNCHABLE_STATUSES: string[] = ["Backlog", "Todo", "In Progress"];
 
 // Built-in seed defaults. Model cost/capability order is fable > opus > sonnet; fable is the
-// premium model (~2x opus) and is never a default — it stays opt-in via the UI. Effort matches
-// the previously hardcoded per-stage table:
-//   Backlog/Todo (design: brainstorm/debug -> plan) — highest stakes, a bad plan poisons
-//     everything downstream, so opus/xhigh.
-//   To Code (subagent-driven implementation) — subagents do the heavy lifting, the orchestrator
-//     coordinates/integrates/tests, so opus/high.
-//   To Review (read-only code review) — depth pays, opus covers it, no premium needed, so opus/xhigh.
-//   To QA (human-approval gate) — mechanical: summary, dispatch on verdict, set status, so the
-//     cheapest model at low effort: sonnet/low.
-//   To Merge (rebase + merge) — a content-changing rebase runs a merge-gating inline review with
-//     no re-QA behind the clean path, same profile as To Review, so opus/xhigh.
+// premium model (~2x opus) and is never a default — it stays opt-in via the UI.
+// One work session covers design through review; design quality dominates, so xhigh.
 export const BUILTIN_STAGE_DEFAULTS: StageDefaults = {
   Backlog: { model: "opus", effort: "xhigh" },
   Todo: { model: "opus", effort: "xhigh" },
-  "To Code": { model: "opus", effort: "high" },
-  "To Review": { model: "opus", effort: "xhigh" },
-  "To QA": { model: "sonnet", effort: "low" },
-  "To Merge": { model: "opus", effort: "xhigh" },
+  "In Progress": { model: "opus", effort: "xhigh" },
 };
 
 // App-wide fallback for any status outside the table.
 export const FALLBACK: StageDefault = { model: "opus", effort: "high" };
 
-// UI rows: Backlog and Todo are the same design stage, shown as one row writing both keys.
-// `hint` explains rows whose value acts as a ceiling rather than a fixed profile: review
-// launches left at these defaults auto-scale DOWN on small branches (never up, and never
-// when the user retunes the launch by hand). Thresholds come from @/lib/reviewScale.
+// UI rows: one row for the work states (Backlog/Todo/In Progress all share the same
+// design-through-review session profile), writing all three keys.
 export const STAGE_DEFAULT_ROWS: { label: string; statuses: string[]; hint?: string }[] = [
-  { label: "Backlog/Todo", statuses: ["Backlog", "Todo"] },
-  { label: "To Code", statuses: ["To Code"] },
-  {
-    label: "To Review", statuses: ["To Review"],
-    hint: `Ceiling, not fixed: branches under ${SMALL_DIFF_LINES} changed lines auto-scale down to sonnet/medium, under ${MEDIUM_DIFF_LINES} cap effort at high. Never scales up; manual launch picks are never touched.`,
-  },
-  { label: "To QA", statuses: ["To QA"] },
-  {
-    label: "To Merge", statuses: ["To Merge"],
-    hint: `Ceiling for effort only: branches under ${SMALL_DIFF_LINES} changed lines cap effort at medium, under ${MEDIUM_DIFF_LINES} at high. The model always runs as configured (this review gates the merge).`,
-  },
+  { label: "Work (Backlog/Todo/In Progress)", statuses: ["Backlog", "Todo", "In Progress"] },
 ];
 
 export function resolveModel(status: string, overrides: StageDefaults = {}): string {

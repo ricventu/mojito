@@ -29,20 +29,20 @@ describe("ticketStatuses", () => {
   it("returns distinct statuses ordered by lifecycle rank", () => {
     const tickets = [
       ticket({ statusName: "Done" }),
-      ticket({ statusName: "To Code" }),
+      ticket({ statusName: "In Progress" }),
       ticket({ statusName: "Todo" }),
-      ticket({ statusName: "To Code" }),
+      ticket({ statusName: "In Progress" }),
     ];
-    expect(ticketStatuses(tickets)).toEqual(["Todo", "To Code", "Done"]);
+    expect(ticketStatuses(tickets)).toEqual(["Todo", "In Progress", "Done"]);
   });
 
   it("sorts unknown statuses last, alphabetically among themselves", () => {
     const tickets = [
       ticket({ statusName: "Zeta" }),
       ticket({ statusName: "Alpha" }),
-      ticket({ statusName: "To Code" }),
+      ticket({ statusName: "In Progress" }),
     ];
-    expect(ticketStatuses(tickets)).toEqual(["To Code", "Alpha", "Zeta"]);
+    expect(ticketStatuses(tickets)).toEqual(["In Progress", "Alpha", "Zeta"]);
   });
 });
 
@@ -64,10 +64,10 @@ describe("mineOnly", () => {
   it("scopes the derived status chips, so no chip yields an empty list", () => {
     const mixed = [
       ticket({ statusName: "Todo", assignedToMe: true }),
-      ticket({ statusName: "To Code", assignedToMe: false }),
+      ticket({ statusName: "In Progress", assignedToMe: false }),
     ];
     expect(ticketStatuses(mineOnly(mixed, true))).toEqual(["Todo"]);
-    expect(ticketStatuses(mineOnly(mixed, false))).toEqual(["Todo", "To Code"]);
+    expect(ticketStatuses(mineOnly(mixed, false))).toEqual(["Todo", "In Progress"]);
   });
 });
 
@@ -89,7 +89,7 @@ describe("showsMineMarker", () => {
 describe("filterTickets", () => {
   const tickets = [
     ticket({ identifier: "RIC-1", title: "Alpha", statusName: "Todo", project: "Mojito", labels: ["Bug"] }),
-    ticket({ identifier: "RIC-2", title: "Beta", statusName: "To Code", project: "Lime", labels: [] }),
+    ticket({ identifier: "RIC-2", title: "Beta", statusName: "In Progress", project: "Lime", labels: [] }),
     ticket({ identifier: "RIC-3", title: "Gamma", statusName: "Todo", project: null, labels: ["Feature"] }),
   ];
 
@@ -115,7 +115,7 @@ describe("filterTickets", () => {
   it("filters by query across identifier, title, status, and labels", () => {
     expect(filterTickets(tickets, { query: "ric-2", project: null, status: null }).map((t) => t.identifier)).toEqual(["RIC-2"]);
     expect(filterTickets(tickets, { query: "beta", project: null, status: null }).map((t) => t.identifier)).toEqual(["RIC-2"]);
-    expect(filterTickets(tickets, { query: "to code", project: null, status: null }).map((t) => t.identifier)).toEqual(["RIC-2"]);
+    expect(filterTickets(tickets, { query: "in progress", project: null, status: null }).map((t) => t.identifier)).toEqual(["RIC-2"]);
     expect(filterTickets(tickets, { query: "feature", project: null, status: null }).map((t) => t.identifier)).toEqual(["RIC-3"]);
   });
 

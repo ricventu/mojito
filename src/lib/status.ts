@@ -1,17 +1,15 @@
 // Canonical lifecycle-status presentation metadata: display order + color hue.
-// Kept in sync with src/server/autoAdvance.ts (STAGE_OF) by tests/lib/status.test.ts.
+// Kept in sync with src/server/statusModel.ts (KNOWN_STATUSES) by tests/lib/status.test.ts.
 // Hue keys map to `.badge.<hue>` rules in src/app/globals.css.
 
 export const STATUS_ORDER: Record<string, number> = {
   Backlog: 0,
   Todo: 1,
-  "To Code": 2,
-  "To Review": 3,
-  "To QA": 4,
-  "To Merge": 5,
-  Done: 6,
-  Canceled: 7,
-  Duplicate: 8,
+  "In Progress": 2,
+  "To QA": 3,
+  Done: 4,
+  Canceled: 5,
+  Duplicate: 6,
 };
 
 /**
@@ -32,10 +30,8 @@ export const TERMINAL_STATUS = "Terminal";
 export const STATUS_COLOR: Record<string, string> = {
   Backlog: "grey",
   Todo: "grey",
-  "To Code": "blue",
-  "To Review": "indigo",
+  "In Progress": "blue",
   "To QA": "amber",
-  "To Merge": "teal",
   Done: "green",
   Canceled: "red",
   Duplicate: "muted",

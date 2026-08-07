@@ -3,14 +3,14 @@ import { statusSlug, tmuxName, parseIdentifier, validateTicket, customSessionNam
 
 describe("sessionKey", () => {
   it("slugs a status", () => {
-    expect(statusSlug("To Review")).toBe("to-review");
+    expect(statusSlug("To QA")).toBe("to-qa");
     expect(statusSlug("In Progress")).toBe("in-progress");
     expect(statusSlug("Backlog")).toBe("backlog");
   });
 
   it("builds a tmux-safe session name", () => {
-    expect(tmuxName("RIC-46", "To Review")).toBe("mojito-RIC-46-to-review");
-    expect(tmuxName("RIC-46", "To Review")).not.toMatch(/[.:\s]/);
+    expect(tmuxName("RIC-46", "In Progress")).toBe("mojito-RIC-46-in-progress");
+    expect(tmuxName("RIC-46", "In Progress")).not.toMatch(/[.:\s]/);
   });
 
   it("parses an identifier", () => {

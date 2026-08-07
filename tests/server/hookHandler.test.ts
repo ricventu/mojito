@@ -11,7 +11,7 @@ import type { SessionResult } from "@/server/sessionResult";
 let dir: string;
 function seed(over: Partial<SessionMeta> = {}): { registry: Registry; meta: SessionMeta } {
   const registry = new Registry(dir);
-  const meta: SessionMeta = { kind: "ticket", id: "mojito-RIC-46-to-code", ticket: "RIC-46", launchStatus: "To Code",
+  const meta: SessionMeta = { kind: "ticket", id: "mojito-RIC-46-in-progress", ticket: "RIC-46", launchStatus: "In Progress",
     model: "opus", effort: "high", state: "running", cwd: "/x",
     createdAt: "2026-07-11T00:00:00.000Z", title: "Some ticket", labels: [], ...over };
   registry.upsert(meta);
@@ -32,33 +32,33 @@ describe("handleHook — ticket sessions", () => {
     const bus = new EventBus();
     const events: unknown[] = [];
     bus.subscribe((e) => events.push(e));
-    await handleHook("mojito-RIC-46-to-code", "PermissionRequest", {
+    await handleHook("mojito-RIC-46-in-progress", "PermissionRequest", {
       registry, bus, readResult: noResult, moveToQa: noopMoveToQa, clearResult: noopClearResult,
     });
-    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("needs-input");
-    expect(events).toContainEqual({ type: "session.state", id: "mojito-RIC-46-to-code", state: "needs-input" });
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("needs-input");
+    expect(events).toContainEqual({ type: "session.state", id: "mojito-RIC-46-in-progress", state: "needs-input" });
   });
 
   it("(a) Stop + result ready-for-qa moves the ticket to QA and marks the session done", async () => {
     const { registry } = seed();
     const bus = new EventBus();
     const moveToQa = vi.fn(noopMoveToQa);
-    await handleHook("mojito-RIC-46-to-code", "Stop", {
+    await handleHook("mojito-RIC-46-in-progress", "Stop", {
       registry, bus, readResult: () => ({ outcome: "ready-for-qa" }), moveToQa, clearResult: noopClearResult,
     });
     expect(moveToQa).toHaveBeenCalledTimes(1);
     expect(moveToQa).toHaveBeenCalledWith("RIC-46");
-    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("done");
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("done");
   });
 
   it("(b) Stop + no result file is needs-input and never calls moveToQa", async () => {
     const { registry } = seed();
     const bus = new EventBus();
     const moveToQa = vi.fn(noopMoveToQa);
-    await handleHook("mojito-RIC-46-to-code", "Stop", {
+    await handleHook("mojito-RIC-46-in-progress", "Stop", {
       registry, bus, readResult: noResult, moveToQa, clearResult: noopClearResult,
     });
-    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("needs-input");
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("needs-input");
     expect(moveToQa).not.toHaveBeenCalled();
   });
 
@@ -66,20 +66,20 @@ describe("handleHook — ticket sessions", () => {
     const { registry } = seed();
     const bus = new EventBus();
     const moveToQa = vi.fn(noopMoveToQa);
-    await handleHook("mojito-RIC-46-to-code", "Stop", {
+    await handleHook("mojito-RIC-46-in-progress", "Stop", {
       registry, bus, readResult: () => ({ outcome: "blocked" }), moveToQa, clearResult: noopClearResult,
     });
-    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("needs-input");
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("needs-input");
     expect(moveToQa).not.toHaveBeenCalled();
   });
 
   it("(d) SessionEnd + no result is a failure", async () => {
     const { registry } = seed();
     const bus = new EventBus();
-    await handleHook("mojito-RIC-46-to-code", "SessionEnd", {
+    await handleHook("mojito-RIC-46-in-progress", "SessionEnd", {
       registry, bus, readResult: noResult, moveToQa: noopMoveToQa, clearResult: noopClearResult,
     });
-    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("failed");
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("failed");
   });
 
   it("(e) Stop + ready but moveToQa rejects stays needs-input so the user can retry", async () => {
@@ -87,11 +87,11 @@ describe("handleHook — ticket sessions", () => {
     const bus = new EventBus();
     const moveToQa = vi.fn(async () => { throw new Error("Linear API error"); });
     const clearResult = vi.fn(noopClearResult);
-    await handleHook("mojito-RIC-46-to-code", "Stop", {
+    await handleHook("mojito-RIC-46-in-progress", "Stop", {
       registry, bus, readResult: () => ({ outcome: "ready-for-qa" }), moveToQa, clearResult,
     });
     expect(moveToQa).toHaveBeenCalledTimes(1);
-    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("needs-input");
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("needs-input");
     // A failed moveToQa must NOT clear the result file — the retry on the next Stop/SessionEnd
     // depends on the file still being there.
     expect(clearResult).not.toHaveBeenCalled();
@@ -105,12 +105,12 @@ describe("handleHook — ticket sessions", () => {
     const clearResult = vi.fn(noopClearResult);
     const readResult = () => ({ outcome: "ready-for-qa" as const });
 
-    await handleHook("mojito-RIC-46-to-code", "Stop", { registry, bus, readResult, moveToQa, clearResult });
-    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("needs-input");
+    await handleHook("mojito-RIC-46-in-progress", "Stop", { registry, bus, readResult, moveToQa, clearResult });
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("needs-input");
     expect(moveToQa).toHaveBeenCalledTimes(1);
 
-    await handleHook("mojito-RIC-46-to-code", "SessionEnd", { registry, bus, readResult, moveToQa, clearResult });
-    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("failed");
+    await handleHook("mojito-RIC-46-in-progress", "SessionEnd", { registry, bus, readResult, moveToQa, clearResult });
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("failed");
     expect(moveToQa).toHaveBeenCalledTimes(2);
     expect(clearResult).not.toHaveBeenCalled();
   });
@@ -120,24 +120,24 @@ describe("handleHook — ticket sessions", () => {
     const bus = new EventBus();
     const moveToQa = vi.fn(noopMoveToQa);
     const readResult = () => ({ outcome: "ready-for-qa" as const });
-    await handleHook("mojito-RIC-46-to-code", "Stop", { registry, bus, readResult, moveToQa, clearResult: noopClearResult });
-    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("done");
+    await handleHook("mojito-RIC-46-in-progress", "Stop", { registry, bus, readResult, moveToQa, clearResult: noopClearResult });
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("done");
     expect(moveToQa).toHaveBeenCalledTimes(1);
 
-    await handleHook("mojito-RIC-46-to-code", "Stop", { registry, bus, readResult, moveToQa, clearResult: noopClearResult });
+    await handleHook("mojito-RIC-46-in-progress", "Stop", { registry, bus, readResult, moveToQa, clearResult: noopClearResult });
     expect(moveToQa).toHaveBeenCalledTimes(1); // guarded by meta.state === "done"
-    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("done");
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("done");
   });
 
   it("a successful Stop clears the result file exactly once, with the session id", async () => {
     const { registry } = seed();
     const bus = new EventBus();
     const clearResult = vi.fn(noopClearResult);
-    await handleHook("mojito-RIC-46-to-code", "Stop", {
+    await handleHook("mojito-RIC-46-in-progress", "Stop", {
       registry, bus, readResult: () => ({ outcome: "ready-for-qa" }), moveToQa: noopMoveToQa, clearResult,
     });
     expect(clearResult).toHaveBeenCalledTimes(1);
-    expect(clearResult).toHaveBeenCalledWith("mojito-RIC-46-to-code");
+    expect(clearResult).toHaveBeenCalledWith("mojito-RIC-46-in-progress");
   });
 
   it("does not re-fire moveToQa after a revive once the result file is gone (the reported bug)", async () => {
@@ -152,18 +152,18 @@ describe("handleHook — ticket sessions", () => {
     let fileGone = false;
     const readResult = (): SessionResult | null => (fileGone ? null : { outcome: "ready-for-qa" });
 
-    await handleHook("mojito-RIC-46-to-code", "Stop", { registry, bus, readResult, moveToQa, clearResult });
-    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("done");
+    await handleHook("mojito-RIC-46-in-progress", "Stop", { registry, bus, readResult, moveToQa, clearResult });
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("done");
     expect(moveToQa).toHaveBeenCalledTimes(1);
     expect(clearResult).toHaveBeenCalledTimes(1);
     fileGone = true; // mirrors what a real clearSessionResult would have done to the file
 
-    await handleHook("mojito-RIC-46-to-code", "UserPromptSubmit", { registry, bus, readResult, moveToQa, clearResult });
-    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("running");
+    await handleHook("mojito-RIC-46-in-progress", "UserPromptSubmit", { registry, bus, readResult, moveToQa, clearResult });
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("running");
 
-    await handleHook("mojito-RIC-46-to-code", "Stop", { registry, bus, readResult, moveToQa, clearResult });
+    await handleHook("mojito-RIC-46-in-progress", "Stop", { registry, bus, readResult, moveToQa, clearResult });
     expect(moveToQa).toHaveBeenCalledTimes(1); // not called again
-    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("needs-input");
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("needs-input");
   });
 
   it("ignores an unknown session id", async () => {
@@ -179,22 +179,22 @@ describe("handleHook — ticket sessions", () => {
     const bus = new EventBus();
     const events: unknown[] = [];
     bus.subscribe((e) => events.push(e));
-    await handleHook("mojito-RIC-46-to-code", "UserPromptSubmit", {
+    await handleHook("mojito-RIC-46-in-progress", "UserPromptSubmit", {
       registry, bus, readResult: noResult, moveToQa: noopMoveToQa, clearResult: noopClearResult,
     });
-    const m = registry.get("mojito-RIC-46-to-code");
+    const m = registry.get("mojito-RIC-46-in-progress");
     expect(m?.state).toBe("running");
     expect(m?.message).toBeUndefined();
-    expect(events).toContainEqual({ type: "session.state", id: "mojito-RIC-46-to-code", state: "running" });
+    expect(events).toContainEqual({ type: "session.state", id: "mojito-RIC-46-in-progress", state: "running" });
   });
 
   it("PostToolUse (any tool) clears needs-input back to running (RIC-117)", async () => {
     const { registry } = seed({ state: "needs-input", message: "claude needs your attention" });
     const bus = new EventBus();
-    await handleHook("mojito-RIC-46-to-code", "PostToolUse", {
+    await handleHook("mojito-RIC-46-in-progress", "PostToolUse", {
       registry, bus, readResult: noResult, moveToQa: noopMoveToQa, clearResult: noopClearResult,
     });
-    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("running");
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("running");
   });
 
   it("an idle Notification does NOT resurrect a finished (done) session (RIC-117)", async () => {
@@ -205,10 +205,10 @@ describe("handleHook — ticket sessions", () => {
     const bus = new EventBus();
     const events: unknown[] = [];
     bus.subscribe((e) => events.push(e));
-    await handleHook("mojito-RIC-46-to-code", "Notification", {
+    await handleHook("mojito-RIC-46-in-progress", "Notification", {
       registry, bus, readResult: noResult, moveToQa: noopMoveToQa, clearResult: noopClearResult,
     });
-    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("done");
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("done");
     expect(events).not.toContainEqual(
       expect.objectContaining({ type: "session.state", state: "needs-input" }),
     );
@@ -218,11 +218,11 @@ describe("handleHook — ticket sessions", () => {
     const { registry } = seed({ state: "done" });
     const bus = new EventBus();
     const moveToQa = vi.fn(noopMoveToQa);
-    await handleHook("mojito-RIC-46-to-code", "Notification", {
+    await handleHook("mojito-RIC-46-in-progress", "Notification", {
       registry, bus, readResult: () => ({ outcome: "ready-for-qa" }), moveToQa, clearResult: noopClearResult,
     });
     expect(moveToQa).not.toHaveBeenCalled();
-    expect(registry.get("mojito-RIC-46-to-code")?.state).toBe("done");
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("done");
   });
 });
 
@@ -251,7 +251,7 @@ describe("handleHook — custom sessions", () => {
     // On the lime fall-through path a plain mapHook("SessionEnd", false) would map to
     // "failed" — not "done". A "done" result here can only come from the custom branch's
     // unconditional done-on-SessionEnd override, so this fails if that branch is deleted.
-    const registry = seedCustom({ launchStatus: "To Code" });
+    const registry = seedCustom({ launchStatus: "In Progress" });
     const bus = new EventBus();
     const readResult = vi.fn(noResult);
     await handleHook("mojito-custom-general-abc", "SessionEnd",
@@ -261,7 +261,7 @@ describe("handleHook — custom sessions", () => {
   });
 
   it("never calls moveToQa for a custom session", async () => {
-    const registry = seedCustom({ launchStatus: "To Code" });
+    const registry = seedCustom({ launchStatus: "In Progress" });
     const bus = new EventBus();
     const moveToQa = vi.fn(noopMoveToQa);
     const readResult = vi.fn(noResult);
@@ -435,19 +435,19 @@ describe("handleHook — rebase sessions", () => {
 it("does not overwrite a lime session's title", async () => {
   const { registry } = seed({ title: "Linear title" });
   const bus = new EventBus();
-  await handleHook("mojito-RIC-46-to-code", "SessionStart",
+  await handleHook("mojito-RIC-46-in-progress", "SessionStart",
     { registry, bus, readResult: noResult, moveToQa: noopMoveToQa, clearResult: noopClearResult },
     { sessionTitle: "should be ignored" });
-  expect(registry.get("mojito-RIC-46-to-code")?.title).toBe("Linear title");
+  expect(registry.get("mojito-RIC-46-in-progress")?.title).toBe("Linear title");
 });
 
 it("never reads the transcript title for a lime session", async () => {
   const { registry } = seed({ title: "Linear title" });
   const bus = new EventBus();
   const readTranscriptTitle = vi.fn(() => "auto title");
-  await handleHook("mojito-RIC-46-to-code", "Stop",
+  await handleHook("mojito-RIC-46-in-progress", "Stop",
     { registry, bus, readResult: noResult, moveToQa: noopMoveToQa, clearResult: noopClearResult, readTranscriptTitle },
     { transcriptPath: "/some/transcript.jsonl" });
   expect(readTranscriptTitle).not.toHaveBeenCalled();
-  expect(registry.get("mojito-RIC-46-to-code")?.title).toBe("Linear title");
+  expect(registry.get("mojito-RIC-46-in-progress")?.title).toBe("Linear title");
 });

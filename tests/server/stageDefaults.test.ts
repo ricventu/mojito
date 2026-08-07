@@ -31,32 +31,31 @@ describe("configPath", () => {
 describe("no file present", () => {
   it("readOverrides is empty and effective equals the built-ins", () => {
     expect(readOverrides()).toEqual({});
-    expect(defaultModelForStatus("To QA")).toBe("sonnet");
-    expect(defaultModelForStatus("To Review")).toBe("opus");
-    expect(defaultEffortForStatus("To Review")).toBe("xhigh");
-    expect(defaultEffortForStatus("In Progress")).toBe("high");
+    expect(defaultModelForStatus("In Progress")).toBe("opus");
+    expect(defaultEffortForStatus("In Progress")).toBe("xhigh");
+    expect(defaultEffortForStatus("Todo")).toBe("xhigh");
   });
 });
 
 describe("override file present", () => {
   it("layers overrides over built-ins", () => {
-    writeFileSync(configPath(), JSON.stringify({ "To Review": { model: "fable", effort: "max" } }));
+    writeFileSync(configPath(), JSON.stringify({ "In Progress": { model: "fable", effort: "max" } }));
     _resetStageDefaultsCache();
-    expect(defaultModelForStatus("To Review")).toBe("fable");
-    expect(defaultEffortForStatus("To Review")).toBe("max");
-    expect(defaultModelForStatus("To QA")).toBe("sonnet"); // untouched -> built-in
+    expect(defaultModelForStatus("In Progress")).toBe("fable");
+    expect(defaultEffortForStatus("In Progress")).toBe("max");
+    expect(defaultModelForStatus("Todo")).toBe("opus"); // untouched -> built-in
   });
 });
 
 describe("invalid entry in override file", () => {
   it("drops the invalid entry and falls back to the built-in, keeping valid entries", () => {
     writeFileSync(configPath(), JSON.stringify({
-      "To Review": { model: "gpt", effort: "ultra" },
-      "To QA": { model: "opus", effort: "medium" },
+      "In Progress": { model: "gpt", effort: "ultra" },
+      "Todo": { model: "opus", effort: "medium" },
     }));
     _resetStageDefaultsCache();
-    expect(defaultModelForStatus("To Review")).toBe("opus"); // fell back to built-in
-    expect(defaultModelForStatus("To QA")).toBe("opus"); // valid override applied
+    expect(defaultModelForStatus("In Progress")).toBe("opus"); // fell back to built-in
+    expect(defaultModelForStatus("Todo")).toBe("opus"); // valid override applied
   });
 });
 
@@ -66,7 +65,7 @@ describe("corrupt file", () => {
     _resetStageDefaultsCache();
     expect(() => readOverrides()).not.toThrow();
     expect(readOverrides()).toEqual({});
-    expect(defaultModelForStatus("To QA")).toBe("sonnet");
+    expect(defaultModelForStatus("In Progress")).toBe("opus");
   });
 });
 
@@ -75,10 +74,10 @@ describe("writeOverrides", () => {
     const nested = join(dir, "deep");
     process.env.MOJITO_CONFIG_DIR = nested;
     _resetStageDefaultsCache();
-    writeOverrides({ "To QA": { model: "opus", effort: "medium" } });
+    writeOverrides({ "In Progress": { model: "opus", effort: "medium" } });
     expect(JSON.parse(readFileSync(join(nested, "stage-defaults.json"), "utf8")))
-      .toEqual({ "To QA": { model: "opus", effort: "medium" } });
-    expect(defaultModelForStatus("To QA")).toBe("opus");
-    expect(readEffective()["To QA"]).toEqual({ model: "opus", effort: "medium" });
+      .toEqual({ "In Progress": { model: "opus", effort: "medium" } });
+    expect(defaultModelForStatus("In Progress")).toBe("opus");
+    expect(readEffective()["In Progress"]).toEqual({ model: "opus", effort: "medium" });
   });
 });

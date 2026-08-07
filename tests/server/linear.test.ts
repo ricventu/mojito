@@ -18,7 +18,7 @@ describe("linear client", () => {
           {
             identifier: "RIC-46",
             title: "Do thing",
-            state: { name: "To Review", type: "started" },
+            state: { name: "In Progress", type: "started" },
             project: { name: "Lime" },
             labels: { nodes: [{ name: "bug" }] },
             assignee: { isMe: true },
@@ -30,7 +30,7 @@ describe("linear client", () => {
     expect(items[0]).toEqual({
       identifier: "RIC-46",
       title: "Do thing",
-      statusName: "To Review",
+      statusName: "In Progress",
       statusType: "started",
       project: "Lime",
       labels: ["bug"],
@@ -76,10 +76,10 @@ describe("linear mutations", () => {
   it("sets issue status by resolving the target state name to an id", async () => {
     const f = seqFetch([
       { issues: { nodes: [{ id: "issue-uuid", state: { name: "To QA" }, team: { id: "team-uuid" } }] } },
-      { team: { states: { nodes: [{ id: "s1", name: "To Code" }, { id: "s2", name: "To Merge" }] } } },
+      { team: { states: { nodes: [{ id: "s1", name: "Backlog" }, { id: "s2", name: "Done" }] } } },
       { issueUpdate: { success: true } },
     ]);
-    await setIssueStatus("k", "RIC-110", "To Merge", f);
+    await setIssueStatus("k", "RIC-110", "Done", f);
     const updateCall = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[2][1] as { body: string };
     expect(updateCall.body).toContain("issueUpdate");
     expect(updateCall.body).toContain("s2");
@@ -89,9 +89,9 @@ describe("linear mutations", () => {
   it("throws when the target state does not exist in the team", async () => {
     const f = seqFetch([
       { issues: { nodes: [{ id: "issue-uuid", state: { name: "To QA" }, team: { id: "team-uuid" } }] } },
-      { team: { states: { nodes: [{ id: "s1", name: "To Code" }] } } },
+      { team: { states: { nodes: [{ id: "s1", name: "Backlog" }] } } },
     ]);
-    await expect(setIssueStatus("k", "RIC-110", "To Merge", f)).rejects.toThrow(/To Merge/);
+    await expect(setIssueStatus("k", "RIC-110", "Done", f)).rejects.toThrow(/Done/);
   });
 
   it("assigns an issue to the viewer", async () => {

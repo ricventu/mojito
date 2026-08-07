@@ -7,9 +7,9 @@ import type { SessionMeta } from "@/server/types";
 function session(p: Partial<SessionMeta>): SessionMeta {
   return {
     kind: "ticket",
-    id: "mojito-RIC-1-to-code",
+    id: "mojito-RIC-1-in-progress",
     ticket: "RIC-1",
-    launchStatus: "To Code",
+    launchStatus: "In Progress",
     model: "opus",
     effort: "low",
     state: "running",
@@ -30,11 +30,11 @@ describe("sessionStatuses", () => {
   it("returns distinct launch statuses ordered by lifecycle rank", () => {
     const sessions = [
       session({ launchStatus: "Done" }),
-      session({ launchStatus: "To Code" }),
-      session({ launchStatus: "To Review" }),
-      session({ launchStatus: "To Code" }),
+      session({ launchStatus: "Todo" }),
+      session({ launchStatus: "In Progress" }),
+      session({ launchStatus: "Todo" }),
     ];
-    expect(sessionStatuses(sessions)).toEqual(["To Code", "To Review", "Done"]);
+    expect(sessionStatuses(sessions)).toEqual(["Todo", "In Progress", "Done"]);
   });
 
   it("surfaces custom sessions as the CUSTOM_STATUS bucket, sorted last", () => {
@@ -65,17 +65,17 @@ describe("sessionStatuses", () => {
     const sessions = [
       session({ launchStatus: "Zeta" }),
       session({ launchStatus: "Alpha" }),
-      session({ launchStatus: "To Code" }),
+      session({ launchStatus: "In Progress" }),
     ];
-    expect(sessionStatuses(sessions)).toEqual(["To Code", "Alpha", "Zeta"]);
+    expect(sessionStatuses(sessions)).toEqual(["In Progress", "Alpha", "Zeta"]);
   });
 });
 
 describe("filterSessions", () => {
   const sessions = [
-    session({ id: "a", ticket: "RIC-1", launchStatus: "To Code", projectName: "Mojito", title: "Alpha" }),
+    session({ id: "a", ticket: "RIC-1", launchStatus: "In Progress", projectName: "Mojito", title: "Alpha" }),
     session({ id: "b", ticket: "RIC-2", launchStatus: "To QA", projectName: "Lime", title: "Beta" }),
-    session({ id: "c", ticket: "RIC-3", launchStatus: "To Code", projectName: null, title: "Gamma" }),
+    session({ id: "c", ticket: "RIC-3", launchStatus: "In Progress", projectName: null, title: "Gamma" }),
   ];
 
   it("returns all sessions when no criteria are active", () => {
@@ -84,7 +84,7 @@ describe("filterSessions", () => {
   });
 
   it("filters by status", () => {
-    const out = filterSessions(sessions, { query: "", project: null, status: "To Code" });
+    const out = filterSessions(sessions, { query: "", project: null, status: "In Progress" });
     expect(out.map((s) => s.id)).toEqual(["a", "c"]);
   });
 
@@ -119,7 +119,7 @@ describe("filterSessions", () => {
 
   it("combines criteria with AND semantics", () => {
     // status matches a & c, project narrows to Mojito → only a
-    const out = filterSessions(sessions, { query: "", project: "Mojito", status: "To Code" });
+    const out = filterSessions(sessions, { query: "", project: "Mojito", status: "In Progress" });
     expect(out.map((s) => s.id)).toEqual(["a"]);
     // no session is both To QA and in Mojito
     expect(filterSessions(sessions, { query: "", project: "Mojito", status: "To QA" })).toEqual([]);
