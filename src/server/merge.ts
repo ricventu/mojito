@@ -25,6 +25,22 @@ function detailOf(e: unknown): string {
   return (e instanceof Error ? e.message : String(e)).slice(0, 500);
 }
 
+// Combined stdout+stderr of a failed exec, used only for marker classification (not
+// truncated like detailOf, since markers can appear anywhere in git's output).
+function outputOf(e: unknown): string {
+  if (e && typeof e === "object") {
+    const stdout = "stdout" in e && typeof (e as { stdout?: unknown }).stdout === "string" ? (e as { stdout: string }).stdout : "";
+    const stderr = "stderr" in e && typeof (e as { stderr?: unknown }).stderr === "string" ? (e as { stderr: string }).stderr : "";
+    return `${stdout}\n${stderr}`;
+  }
+  return e instanceof Error ? e.message : String(e);
+}
+
+// Markers git prints on a genuine rebase conflict, as opposed to a refusal that never
+// started applying patches (missing ref, etc). Mirrors ffPull.ts's DIVERGED_MARKERS
+// approach: classify by output text rather than assuming every failure is the same kind.
+const CONFLICT_MARKERS = ["CONFLICT", "could not apply"];
+
 export async function detectDefaultBranch(repo: string, run: GitRun = defaultRun): Promise<string> {
   try {
     const { stdout } = await run(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], repo);
@@ -47,8 +63,14 @@ export async function detectDefaultBranch(repo: string, run: GitRun = defaultRun
 /**
  * The QA-approve merge: rebase the worktree branch onto the (possibly remote) default
  * branch, then either fast-forward the repo root ("local") or push + open an MR ("mr").
- * A conflicted rebase is aborted so the worktree is always left clean for the
- * conflict-resolution session that follows.
+ *
+ * Two guards run before any rebase is attempted, so history is never touched on a
+ * refusal: a detached HEAD in the worktree, and an uncommitted-changes tree (non-empty
+ * `status --porcelain`) both report {status:"error"} without rebasing. A rebase failure
+ * is then classified by its output: genuine conflict markers ("CONFLICT", "could not
+ * apply") report {status:"conflict"}; anything else (e.g. a missing ref) reports
+ * {status:"error"}. Either way the rebase is aborted so the worktree is always left
+ * clean for whatever follows — a conflict-resolution session, or a retry.
  */
 export async function mergeTicketBranch(
   input: { worktree: string; repoRoot: string; mode: MergeMode },
@@ -58,6 +80,15 @@ export async function mergeTicketBranch(
   const { worktree, repoRoot, mode } = input;
   try {
     const branch = (await run(["rev-parse", "--abbrev-ref", "HEAD"], worktree)).stdout.trim();
+    if (!branch || branch === "HEAD") {
+      return { status: "error", detail: "worktree is on a detached HEAD" };
+    }
+
+    const dirty = (await run(["status", "--porcelain"], worktree)).stdout.trim();
+    if (dirty) {
+      return { status: "error", detail: "worktree has uncommitted changes" };
+    }
+
     const hasRemote = (await run(["remote"], worktree)).stdout.trim().length > 0;
     if (hasRemote) await run(["fetch", "--prune"], worktree);
     const def = await detectDefaultBranch(repoRoot, run);
@@ -71,7 +102,8 @@ export async function mergeTicketBranch(
       } catch {
         /* nothing to abort */
       }
-      return { status: "conflict", detail: detailOf(e) };
+      const isConflict = CONFLICT_MARKERS.some((m) => outputOf(e).includes(m));
+      return isConflict ? { status: "conflict", detail: detailOf(e) } : { status: "error", detail: detailOf(e) };
     }
 
     if (mode === "mr") {
@@ -81,13 +113,20 @@ export async function mergeTicketBranch(
         ? ["glab", "mr", "create", "--fill", "--yes"]
         : ["gh", "pr", "create", "--fill", "--head", branch];
       const { stdout } = await runCli(cmd, args, worktree);
-      return { status: "mr-created", url: (stdout.match(/https?:\/\/\S+/) ?? [""])[0] };
+      const url = stdout.match(/https?:\/\/\S+/);
+      return { status: "mr-created", url: url ? url[0] : stdout.trim().slice(0, 200) };
     }
 
     // local: the repo root's checkout receives the merge, so it must be on the default branch.
     const rootBranch = (await run(["rev-parse", "--abbrev-ref", "HEAD"], repoRoot)).stdout.trim();
     if (rootBranch !== def) return { status: "error", detail: `repo root is on ${rootBranch}, not ${def}` };
-    await run(["merge", "--ff-only", branch], repoRoot);
+    try {
+      await run(["merge", "--ff-only", branch], repoRoot);
+    } catch (e) {
+      // The ticket branch has already been rebased onto the target by this point, so
+      // the caller needs to know history moved even though the local merge failed.
+      return { status: "error", detail: `branch already rebased onto the target; ${detailOf(e)}` };
+    }
     const commit = (await run(["rev-parse", "--short", "HEAD"], repoRoot)).stdout.trim();
     return { status: "merged", commit };
   } catch (e) {
