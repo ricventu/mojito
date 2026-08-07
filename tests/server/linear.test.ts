@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { listOpenIssues, getIssueStatus, getIssueRef, setIssueStatus, setIssueAssignee, postComment, uploadImage } from "@/server/linear";
+import { listOpenIssues, getIssueStatus, getIssueRef, setIssueStatus, setIssueAssignee, postComment, uploadImage, getIssueDescription, createIssue } from "@/server/linear";
 
 function fakeFetch(payload: unknown) {
   return vi.fn(async () => ({ ok: true, json: async () => ({ data: payload }) })) as unknown as typeof fetch;
@@ -160,5 +160,58 @@ describe("uploadImage", () => {
     await expect(
       uploadImage("k", { filename: "a.png", contentType: "image/png", size: 1, bytes: new Uint8Array([1]) }, f),
     ).rejects.toThrow(/fileUpload/);
+  });
+});
+
+function fakeFetchWithCalls(responses: object[]) {
+  const calls: { body: string }[] = [];
+  let i = 0;
+  const impl = (async (_url: unknown, init?: { body?: unknown }) => {
+    calls.push({ body: String(init?.body ?? "") });
+    const data = responses[Math.min(i++, responses.length - 1)];
+    return { ok: true, json: async () => ({ data }) };
+  }) as unknown as typeof fetch;
+  return { impl, calls };
+}
+
+describe("getIssueDescription", () => {
+  it("returns the description", async () => {
+    const { impl } = fakeFetchWithCalls([{ issues: { nodes: [{ description: "the body" }] } }]);
+    expect(await getIssueDescription("key", "RIC-46", impl)).toBe("the body");
+  });
+  it("maps a null description to empty string", async () => {
+    const { impl } = fakeFetchWithCalls([{ issues: { nodes: [{ description: null }] } }]);
+    expect(await getIssueDescription("key", "RIC-46", impl)).toBe("");
+  });
+  it("throws when the issue does not exist", async () => {
+    const { impl } = fakeFetchWithCalls([{ issues: { nodes: [] } }]);
+    await expect(getIssueDescription("key", "RIC-999", impl)).rejects.toThrow("issue not found");
+  });
+});
+
+describe("createIssue", () => {
+  it("resolves team and project, then creates", async () => {
+    const { impl, calls } = fakeFetchWithCalls([
+      { teams: { nodes: [{ id: "team-1", key: "RIC" }] } },
+      { projects: { nodes: [{ id: "proj-1", name: "Mojito" }] } },
+      { issueCreate: { success: true, issue: { identifier: "RIC-200" } } },
+    ]);
+    const res = await createIssue("key", { teamKey: "RIC", title: "T", description: "D", projectName: "Mojito" }, impl);
+    expect(res.identifier).toBe("RIC-200");
+    expect(calls[2].body).toContain("proj-1");
+  });
+  it("creates without a project when projectName is null", async () => {
+    const { impl, calls } = fakeFetchWithCalls([
+      { teams: { nodes: [{ id: "team-1", key: "RIC" }] } },
+      { issueCreate: { success: true, issue: { identifier: "RIC-201" } } },
+    ]);
+    const res = await createIssue("key", { teamKey: "RIC", title: "T", description: "D", projectName: null }, impl);
+    expect(res.identifier).toBe("RIC-201");
+    expect(calls).toHaveLength(2);
+  });
+  it("throws when the team is unknown", async () => {
+    const { impl } = fakeFetchWithCalls([{ teams: { nodes: [] } }]);
+    await expect(createIssue("key", { teamKey: "XX", title: "T", description: "D", projectName: null }, impl))
+      .rejects.toThrow("team not found: XX");
   });
 });
