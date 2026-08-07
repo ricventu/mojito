@@ -21,8 +21,9 @@ export function writeSidecar(stateDir: string, meta: SessionMeta): void {
 export function readSidecar(stateDir: string, id: string): SessionMeta | null {
   try {
     const meta = JSON.parse(readFileSync(join(sessionsDir(stateDir), `${id}.json`), "utf8"));
-    // Sidecars written before `kind` existed default to the original lime behavior.
-    return { kind: "lime", ...meta } as SessionMeta;
+    // Sidecars written before `kind` existed, or by the lime era, are ticket sessions.
+    const kind = meta.kind === "lime" || meta.kind === undefined ? "ticket" : meta.kind;
+    return { ...meta, kind } as SessionMeta;
   } catch {
     return null;
   }

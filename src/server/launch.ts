@@ -116,7 +116,7 @@ export async function launchSession(
   await deps.pipePane(id, logfilePath(deps.stateDir, id));
 
   const meta: SessionMeta = {
-    kind: "lime",
+    kind: "ticket",
     id,
     ticket: req.ticket,
     launchStatus: req.status,

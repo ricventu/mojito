@@ -7,7 +7,7 @@ import { configPath, _resetStageDefaultsCache } from "@/server/stageDefaults";
 import type { SessionMeta } from "@/server/types";
 
 const prev: SessionMeta = {
-  kind: "lime", id: "mojito-RIC-1-to-code", ticket: "RIC-1", launchStatus: "To Code",
+  kind: "ticket", id: "mojito-RIC-1-to-code", ticket: "RIC-1", launchStatus: "To Code",
   model: "fable", effort: "high", autoAdvance: true, state: "done", cwd: "/x",
   createdAt: "2026-01-01T00:00:00Z", projectName: "Mojito", title: "T", labels: ["bug"],
 };

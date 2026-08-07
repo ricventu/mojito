@@ -6,7 +6,7 @@ import type { SessionMeta } from "@/server/types";
 // the rest are filled with valid-but-irrelevant defaults.
 function session(over: Partial<SessionMeta>): SessionMeta {
   return {
-    kind: "lime",
+    kind: "ticket",
     id: "mojito-RIC-129-todo",
     ticket: "RIC-129",
     launchStatus: "Todo",

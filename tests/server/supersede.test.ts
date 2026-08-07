@@ -12,7 +12,7 @@ let dir: string;
 function seed(id: string): Registry {
   const registry = new Registry(dir);
   const meta: SessionMeta = {
-    kind: "lime", id, ticket: "RIC-107", launchStatus: "Todo", model: "opus", effort: "high",
+    kind: "ticket", id, ticket: "RIC-107", launchStatus: "Todo", model: "opus", effort: "high",
     autoAdvance: true, state: "done", cwd: "/x", createdAt: "2026-07-13T00:00:00.000Z",
     title: "scroll", labels: [],
   };

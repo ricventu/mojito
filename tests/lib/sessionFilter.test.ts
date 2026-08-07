@@ -6,7 +6,7 @@ import type { SessionMeta } from "@/server/types";
 // minimal SessionMeta factory — only the fields these functions read matter
 function session(p: Partial<SessionMeta>): SessionMeta {
   return {
-    kind: "lime",
+    kind: "ticket",
     id: "mojito-RIC-1-to-code",
     ticket: "RIC-1",
     launchStatus: "To Code",

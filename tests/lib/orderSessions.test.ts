@@ -5,7 +5,7 @@ import type { SessionMeta } from "@/server/types";
 // minimal SessionMeta factory — only the fields orderSessions reads matter
 function s(id: string, ticket: string, createdAt: string): SessionMeta {
   return {
-    kind: "lime", id, ticket, createdAt,
+    kind: "ticket", id, ticket, createdAt,
     launchStatus: "", model: "", effort: "low", autoAdvance: false,
     state: "running", cwd: "", title: "", labels: [],
   } as SessionMeta;

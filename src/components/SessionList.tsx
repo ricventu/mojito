@@ -122,7 +122,7 @@ export default function SessionList(
                         )}
                         {s.kind === "rebase" && <span className="chip">rebase</span>}
                         {s.kind === "shell" && <span className="chip">terminal</span>}
-                        {s.kind === "lime" && (
+                        {s.kind === "ticket" && (
                           <button className={`chip toggle${s.autoAdvance ? " on" : ""}`} onClick={(e) => toggleAuto(e, s)}>
                             auto: {s.autoAdvance ? "on" : "off"}
                           </button>

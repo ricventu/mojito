@@ -6,7 +6,7 @@ import { writeSidecar, readSidecar, listSidecars, removeSidecar } from "@/server
 import type { SessionMeta } from "@/server/types";
 
 const meta: SessionMeta = {
-  kind: "lime",
+  kind: "ticket",
   id: "mojito-RIC-46-planned",
   ticket: "RIC-46",
   launchStatus: "Planned",
@@ -40,7 +40,7 @@ describe("sidecar", () => {
     expect(readSidecar(dir, "nope")).toBeNull();
   });
 
-  it("defaults a missing kind to lime when reading a legacy sidecar", () => {
+  it("defaults a missing kind to ticket when reading a legacy sidecar", () => {
     const sdir = join(dir, "sessions");
     mkdirSync(sdir, { recursive: true });
     // legacy sidecar: no `kind` field
@@ -49,7 +49,18 @@ describe("sidecar", () => {
       effort: "high", autoAdvance: false, state: "running", cwd: "/x",
       createdAt: "2026-07-11T00:00:00.000Z", title: "t", labels: [],
     }));
-    expect(readSidecar(dir, "mojito-RIC-1-to-code")?.kind).toBe("lime");
+    expect(readSidecar(dir, "mojito-RIC-1-to-code")?.kind).toBe("ticket");
+  });
+
+  it("maps a persisted lime kind to ticket when reading a legacy sidecar", () => {
+    const sdir = join(dir, "sessions");
+    mkdirSync(sdir, { recursive: true });
+    writeFileSync(join(sdir, "mojito-RIC-1-todo.json"), JSON.stringify({
+      kind: "lime", id: "mojito-RIC-1-todo", ticket: "RIC-1", launchStatus: "Todo", model: "opus",
+      effort: "high", autoAdvance: false, state: "running", cwd: "/x",
+      createdAt: "2026-07-11T00:00:00.000Z", title: "t", labels: [],
+    }));
+    expect(readSidecar(dir, "mojito-RIC-1-todo")?.kind).toBe("ticket");
   });
 
   it("preserves an explicit kind", () => {
