@@ -6,7 +6,7 @@ import type { SessionMeta } from "@/server/types";
 function s(id: string, ticket: string, createdAt: string): SessionMeta {
   return {
     kind: "ticket", id, ticket, createdAt,
-    launchStatus: "", model: "", effort: "low", autoAdvance: false,
+    launchStatus: "", model: "", effort: "low",
     state: "running", cwd: "", title: "", labels: [],
   } as SessionMeta;
 }

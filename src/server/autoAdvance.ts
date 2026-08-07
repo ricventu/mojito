@@ -1,5 +1,3 @@
-export type AdvanceDecision = { action: "stop" } | { action: "gate"; gate: string } | { action: "launch" };
-
 export const GATE_STATES = ["To QA", "To Merge"];
 export const TERMINAL_STATES = ["Done", "Canceled", "Duplicate"];
 
@@ -22,24 +20,4 @@ export const KNOWN_STATUSES: string[] = Object.keys(STAGE_OF);
 
 export function stageOf(status: string): number | undefined {
   return STAGE_OF[status];
-}
-
-/**
- * True only when the ticket moved to a status handled by a LATER stage than the
- * one the session launched in — a genuine stage handoff. A same-stage move
- * (Backlog→Todo) or a backward move returns false. For statuses outside the known
- * workflow, falls back to raw inequality so custom states keep the previous behavior.
- */
-export function stageAdvanced(fromStatus: string, toStatus: string): boolean {
-  const from = stageOf(fromStatus);
-  const to = stageOf(toStatus);
-  if (from === undefined || to === undefined) return toStatus !== fromStatus;
-  return to > from;
-}
-
-export function decideAutoAdvance(newStatus: string, autoAdvance: boolean): AdvanceDecision {
-  if (!autoAdvance) return { action: "stop" };
-  if (TERMINAL_STATES.includes(newStatus)) return { action: "stop" };
-  if (GATE_STATES.includes(newStatus)) return { action: "gate", gate: newStatus };
-  return { action: "launch" };
 }

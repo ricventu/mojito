@@ -83,7 +83,7 @@ export async function POST(req: Request) {
   try { description = await getIssueDescription(cfg.linearApiKey, body.ticket); } catch { /* launch anyway with empty description */ }
   const res = await launchSession(
     { ticket: body.ticket, status: body.status, model: body.model ?? "opus", effort: body.effort ?? "high",
-      autoAdvance: !!body.autoAdvance, projectName: body.projectName ?? null,
+      projectName: body.projectName ?? null,
       title: body.title ?? "", labels: Array.isArray(body.labels) ? body.labels : [],
       description },
     { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token, projectsPath: cfg.projectsPath,

@@ -33,7 +33,6 @@ export function syntheticStackSession(slug: string, project: string): SessionMet
     launchStatus: "",
     model: "",
     effort: "",
-    autoAdvance: false,
     state: "running",
     cwd: "",
     createdAt: "",

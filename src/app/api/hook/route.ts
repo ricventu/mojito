@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { getConfig, getRegistry, getBus } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
-import { getIssueStatus } from "@/server/linear";
+import { setIssueStatus } from "@/server/linear";
 import { handleHook } from "@/server/hookHandler";
 import { readTranscriptTitle } from "@/server/sessionTitle";
-import { runAutoAdvance } from "@/server/autoAdvanceRunner";
+import { readSessionResult } from "@/server/sessionResult";
 import type { HookEventName } from "@/server/types";
 
 const VALID: HookEventName[] = ["SessionStart", "UserPromptSubmit", "PermissionRequest", "Notification", "PreToolUse", "PostToolUse", "Stop", "SessionEnd"];
@@ -29,8 +29,8 @@ export async function POST(req: Request) {
   await handleHook(id, event, {
     registry: getRegistry(),
     bus: getBus(),
-    getIssueStatus: (ticket) => getIssueStatus(cfg.linearApiKey, ticket),
-    onAutoAdvance: (meta, newStatus) => void runAutoAdvance(meta, newStatus),
+    readResult: (sessionId) => readSessionResult(cfg.stateDir, sessionId),
+    moveToQa: (ticket) => setIssueStatus(cfg.linearApiKey, ticket, "To QA"),
     readTranscriptTitle,
   }, payload);
   return new NextResponse(null, { status: 204 });

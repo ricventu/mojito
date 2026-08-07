@@ -19,7 +19,6 @@ export interface SessionMeta {
   launchStatus: string;  // Linear status name at launch (empty for custom sessions)
   model: string;         // "opus" | "sonnet" | "fable" | full id
   effort: Effort | "";   // "" for shell sessions, which have no model/effort
-  autoAdvance: boolean;
   state: SessionState;
   cwd: string;
   createdAt: string;     // ISO

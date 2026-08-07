@@ -1,50 +1,32 @@
 import { describe, it, expect } from "vitest";
-import { decideAutoAdvance, stageAdvanced } from "@/server/autoAdvance";
+import { GATE_STATES, TERMINAL_STATES, KNOWN_STATUSES, stageOf } from "@/server/autoAdvance";
 
-describe("stageAdvanced", () => {
-  it("is true when moving to a later stage", () => {
-    expect(stageAdvanced("Todo", "To Code")).toBe(true);
-    expect(stageAdvanced("To Code", "To Review")).toBe(true);
-    expect(stageAdvanced("To Review", "To QA")).toBe(true);
+describe("stageOf", () => {
+  it("maps each lifecycle status to its stage number", () => {
+    expect(stageOf("Backlog")).toBe(1);
+    expect(stageOf("Todo")).toBe(1);
+    expect(stageOf("To Code")).toBe(2);
+    expect(stageOf("To Review")).toBe(3);
+    expect(stageOf("To QA")).toBe(4);
+    expect(stageOf("To Merge")).toBe(5);
+    expect(stageOf("Done")).toBe(6);
   });
-  it("is true when lime skips a stage (To Code -> To QA when the tree was already reviewed)", () => {
-    // Stage 2 exits straight to To QA when the reviewed-tree marker matches, so the
-    // handoff skips stage 3. Two-stage jumps must stay forward moves — reading this as
-    // "not advanced" would leave the session hanging instead of closing it out.
-    expect(stageAdvanced("To Code", "To QA")).toBe(true);
-  });
-  it("is false when the status is unchanged", () => {
-    expect(stageAdvanced("To Code", "To Code")).toBe(false);
-  });
-  it("is false for a same-stage move (Backlog and Todo are both stage 1)", () => {
-    expect(stageAdvanced("Backlog", "Todo")).toBe(false);
-    expect(stageAdvanced("Todo", "Backlog")).toBe(false);
-  });
-  it("is false on a backward move (QA reject sends To QA -> To Code)", () => {
-    // Reject is a manual/GUI action; a stray Stop hook seeing the backward move
-    // must not be read as a completed stage and relaunch Stage 2.
-    expect(stageAdvanced("To QA", "To Code")).toBe(false);
-  });
-  it("falls back to raw inequality for statuses outside the known workflow", () => {
-    expect(stageAdvanced("To Code", "Custom")).toBe(true);
-    expect(stageAdvanced("Custom", "Custom")).toBe(false);
+  it("is undefined for a status outside the known workflow", () => {
+    expect(stageOf("Custom")).toBeUndefined();
   });
 });
 
-describe("decideAutoAdvance", () => {
-  it("stops when the toggle is off", () => {
-    expect(decideAutoAdvance("In Progress", false)).toEqual({ action: "stop" });
+describe("KNOWN_STATUSES", () => {
+  it("lists every status stageOf recognizes", () => {
+    for (const name of KNOWN_STATUSES) expect(stageOf(name)).toBeDefined();
   });
-  it("stops at terminal states", () => {
-    expect(decideAutoAdvance("Done", true)).toEqual({ action: "stop" });
+});
+
+describe("GATE_STATES / TERMINAL_STATES", () => {
+  it("gate states are the human-decision statuses", () => {
+    expect(GATE_STATES).toEqual(["To QA", "To Merge"]);
   });
-  it("gates at human-decision states", () => {
-    // To QA gating is what makes lime's stage-3 skip free: stage 2 hands off straight to
-    // To QA and this returns "gate", so no follow-up session is ever launched.
-    expect(decideAutoAdvance("To QA", true)).toEqual({ action: "gate", gate: "To QA" });
-    expect(decideAutoAdvance("To Merge", true)).toEqual({ action: "gate", gate: "To Merge" });
-  });
-  it("launches otherwise", () => {
-    expect(decideAutoAdvance("Planned", true)).toEqual({ action: "launch" });
+  it("terminal states are the statuses that end the lifecycle", () => {
+    expect(TERMINAL_STATES).toEqual(["Done", "Canceled", "Duplicate"]);
   });
 });

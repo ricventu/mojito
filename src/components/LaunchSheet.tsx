@@ -26,7 +26,6 @@ export default function LaunchSheet(
     setModel(resolveModel(ticket.statusName, defaults));
     setEffort(resolveEffort(ticket.statusName, defaults));
   }, [defaults, ticket.statusName, touched]);
-  const [auto, setAuto] = useState(true);
   const [bareMode, setBareMode] = useState<"claude" | "terminal">("claude");
   const [err, setErr] = useState<string | null>(null);
   // Mirrors ticket.assignedToMe so the sheet can flip the label without waiting for the
@@ -101,7 +100,7 @@ export default function LaunchSheet(
     const res = await apiFetch(token, "/api/sessions", {
       method: "POST",
       body: JSON.stringify({ ticket: ticket.identifier, status: ticket.statusName, model, effort,
-        autoAdvance: auto, projectName: ticket.project, title: ticket.title, labels: ticket.labels }),
+        projectName: ticket.project, title: ticket.title, labels: ticket.labels }),
     });
     if (res.status === 409) { setErr("A session for this ticket+status already exists."); return; }
     if (!res.ok) { setErr(await res.text()); return; }
@@ -187,9 +186,6 @@ export default function LaunchSheet(
               </button>
             )}
             {selectors}
-            <label className="toggle" style={{ marginBottom: 12 }}>
-              <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> Auto-advance
-            </label>
             <button className="btn primary block" onClick={() => start()}>{existing ? "Start new session" : "Start session"}</button>
             {customBtn}
           </>

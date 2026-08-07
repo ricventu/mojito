@@ -1,14 +1,14 @@
 import type { HookEventName, SessionMeta } from "./types.js";
 import type { Registry } from "./registry.js";
 import type { EventBus } from "./events.js";
+import type { SessionResult } from "./sessionResult.js";
 import { mapHook, mapCustomHook } from "./hookMap.js";
-import { decideAutoAdvance, stageAdvanced } from "./autoAdvance.js";
 
 export interface HookDeps {
   registry: Registry;
   bus: EventBus;
-  getIssueStatus: (ticket: string) => Promise<string>;
-  onAutoAdvance: (meta: SessionMeta, newStatus: string) => void;
+  readResult: (id: string) => SessionResult | null;
+  moveToQa: (ticket: string) => Promise<void>;
   // Reads Claude Code's auto-generated session title from a transcript file (see
   // sessionTitle.ts). Optional so tests that don't exercise titling can omit it.
   readTranscriptTitle?: (transcriptPath: string) => string | null;
@@ -57,33 +57,23 @@ export async function handleHook(
     return;
   }
 
-  let statusAdvanced = false;
-  let newStatus = meta.launchStatus;
-  if (event === "Stop" || event === "SessionEnd") {
-    try {
-      newStatus = await deps.getIssueStatus(meta.ticket);
-      // Advance only on a genuine stage handoff (a move to a later stage), not on a
-      // same-stage or backward status change — otherwise a stray Stop hook could mark
-      // the session done and launch a duplicate stage.
-      statusAdvanced = stageAdvanced(meta.launchStatus, newStatus);
-    } catch {
-      statusAdvanced = false; // fetch failure => treat as not advanced (Stop => needs-input, SessionEnd => failed)
+  let ready = false;
+  if ((event === "Stop" || event === "SessionEnd") && meta.state !== "done") {
+    const result = deps.readResult(id);
+    if (result?.outcome === "ready-for-qa") {
+      try {
+        await deps.moveToQa(meta.ticket);
+        ready = true;
+      } catch {
+        ready = false; // Linear write failed: Stop => needs-input so the user can retry
+      }
     }
   }
 
-  const outcome = mapHook(event, statusAdvanced, meta.state);
-  const updated = deps.registry.patch(id, { state: outcome.state, message: outcome.alert?.message });
+  const outcome = mapHook(event, ready, meta.state);
+  deps.registry.patch(id, { state: outcome.state, message: outcome.alert?.message });
   deps.bus.emit({ type: "session.state", id, state: outcome.state });
   if (outcome.alert) {
     deps.bus.emit({ type: "session.alert", id, kind: outcome.alert.kind, ticket: meta.ticket, message: outcome.alert.message });
-  }
-
-  // Auto-advance only on a genuine stage handoff (a fresh Stop/SessionEnd that moved the
-  // ticket forward). statusAdvanced is set only for those events; a passive signal that
-  // merely preserves an already-done state (e.g. an idle Notification, RIC-117) leaves it
-  // false, so it can never relaunch a duplicate stage off the stale launchStatus.
-  if (outcome.state === "done" && statusAdvanced && updated) {
-    const decision = decideAutoAdvance(newStatus, updated.autoAdvance);
-    if (decision.action === "launch") deps.onAutoAdvance(updated, newStatus);
   }
 }

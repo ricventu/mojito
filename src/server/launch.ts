@@ -21,7 +21,6 @@ export interface LaunchRequest {
   status: string;
   model: string;
   effort: Effort;
-  autoAdvance: boolean;
   projectName: string | null;
   title: string;
   labels: string[];
@@ -129,7 +128,6 @@ export async function launchSession(
     launchStatus: req.status,
     model: req.model,
     effort: req.effort,
-    autoAdvance: req.autoAdvance,
     state: "starting",
     cwd,
     createdAt: (deps.nowIso ?? (() => new Date().toISOString()))(),
@@ -214,7 +212,6 @@ export async function launchCustomSession(
     launchStatus: "",
     model: req.model,
     effort: req.effort,
-    autoAdvance: false,
     state: "starting",
     cwd,
     createdAt: (deps.nowIso ?? (() => new Date().toISOString()))(),
@@ -288,7 +285,6 @@ export async function launchNewTicketSession(
     launchStatus: "",
     model: req.model,
     effort: req.effort,
-    autoAdvance: false,
     state: "starting",
     cwd,
     createdAt: (deps.nowIso ?? (() => new Date().toISOString()))(),
@@ -325,7 +321,7 @@ export function buildRebaseClaudeCommand(
 /**
  * Launch a one-off session that rebases the ticket's worktree branch onto the default
  * branch (the To-Merge "first part", no merge). Distinct session name so it never collides
- * with the To-QA gate session; autoAdvance is always off (this is not a lifecycle handoff).
+ * with the To-QA gate session; this is not a lifecycle handoff.
  */
 export async function launchRebaseSession(
   req: RebaseLaunchRequest,
@@ -368,7 +364,6 @@ export async function launchRebaseSession(
     launchStatus: "To QA",
     model: req.model,
     effort: req.effort,
-    autoAdvance: false,
     state: "starting",
     cwd,
     createdAt: (deps.nowIso ?? (() => new Date().toISOString()))(),
@@ -441,7 +436,6 @@ export async function launchShellSession(
     launchStatus: "",
     model: "",
     effort: "",
-    autoAdvance: false,
     // No hooks will ever move a shell off its initial state, so start it "running" for a
     // sensible badge. registry.recover flips it to "failed" only when its tmux dies.
     state: "running",

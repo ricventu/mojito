@@ -12,11 +12,10 @@ const meta: SessionMeta = {
   launchStatus: "Planned",
   model: "opus",
   effort: "high",
-  autoAdvance: false,
   state: "running",
   cwd: "/code/lime",
   createdAt: "2026-07-11T00:00:00.000Z",
-  title: "Auto-advance toggle",
+  title: "Some ticket",
   labels: ["Feature"],
 };
 
@@ -46,7 +45,7 @@ describe("sidecar", () => {
     // legacy sidecar: no `kind` field
     writeFileSync(join(sdir, "mojito-RIC-1-to-code.json"), JSON.stringify({
       id: "mojito-RIC-1-to-code", ticket: "RIC-1", launchStatus: "To Code", model: "opus",
-      effort: "high", autoAdvance: false, state: "running", cwd: "/x",
+      effort: "high", state: "running", cwd: "/x",
       createdAt: "2026-07-11T00:00:00.000Z", title: "t", labels: [],
     }));
     expect(readSidecar(dir, "mojito-RIC-1-to-code")?.kind).toBe("ticket");
@@ -57,7 +56,7 @@ describe("sidecar", () => {
     mkdirSync(sdir, { recursive: true });
     writeFileSync(join(sdir, "mojito-RIC-1-todo.json"), JSON.stringify({
       kind: "lime", id: "mojito-RIC-1-todo", ticket: "RIC-1", launchStatus: "Todo", model: "opus",
-      effort: "high", autoAdvance: false, state: "running", cwd: "/x",
+      effort: "high", state: "running", cwd: "/x",
       createdAt: "2026-07-11T00:00:00.000Z", title: "t", labels: [],
     }));
     expect(readSidecar(dir, "mojito-RIC-1-todo")?.kind).toBe("ticket");
@@ -68,7 +67,7 @@ describe("sidecar", () => {
     mkdirSync(sdir, { recursive: true });
     writeFileSync(join(sdir, "mojito-custom-general-abc.json"), JSON.stringify({
       kind: "custom", id: "mojito-custom-general-abc", ticket: "", launchStatus: "", model: "opus",
-      effort: "high", autoAdvance: false, state: "running", cwd: "/x",
+      effort: "high", state: "running", cwd: "/x",
       createdAt: "2026-07-11T00:00:00.000Z", title: "home", labels: [],
     }));
     expect(readSidecar(dir, "mojito-custom-general-abc")?.kind).toBe("custom");

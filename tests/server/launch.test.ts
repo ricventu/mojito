@@ -17,9 +17,9 @@ beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "mojito-")); });
 
 const baseReq = {
   ticket: "RIC-46", status: "Planned", model: "opus", effort: "high" as const,
-  autoAdvance: false, projectName: "Lime",
-  title: "Auto-advance toggle", labels: ["Feature"],
-  description: "Let the user toggle auto-advance from the terminal view.",
+  projectName: "Lime",
+  title: "Some ticket", labels: ["Feature"],
+  description: "Let the user do the thing from the terminal view.",
 };
 
 function deps(over: Record<string, unknown> = {}) {
@@ -110,8 +110,8 @@ describe("launchSession", () => {
     expect(statSync(p).mode & 0o777).toBe(0o600);
     expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({
       identifier: "RIC-46", statusName: "Planned",
-      title: "Auto-advance toggle", project: "Lime", labels: ["Feature"],
-      description: "Let the user toggle auto-advance from the terminal view.",
+      title: "Some ticket", project: "Lime", labels: ["Feature"],
+      description: "Let the user do the thing from the terminal view.",
     });
   });
 
@@ -147,7 +147,7 @@ describe("launchSession", () => {
     const d = deps();
     await launchSession(baseReq, d);
     const meta = d.registry.get("mojito-RIC-46-planned");
-    expect(meta?.title).toBe("Auto-advance toggle");
+    expect(meta?.title).toBe("Some ticket");
     expect(meta?.labels).toEqual(["Feature"]);
   });
 });
@@ -202,7 +202,7 @@ describe("launchCustomSession", () => {
     expect(res.ok).toBe(true);
     const meta = (res as { ok: true; meta: SessionMeta }).meta;
     expect(meta).toMatchObject({ kind: "custom", id: "mojito-custom-general-abc123", ticket: "",
-      launchStatus: "", cwd: "/home/me", projectName: null, title: "home", autoAdvance: false });
+      launchStatus: "", cwd: "/home/me", projectName: null, title: "home" });
     expect(d.newSession).toHaveBeenCalledWith("mojito-custom-general-abc123", "/home/me",
       expect.stringContaining("claude --model 'opus'"));
   });
@@ -280,7 +280,7 @@ describe("launchNewTicketSession", () => {
     const meta = (res as { ok: true; meta: SessionMeta }).meta;
     expect(meta).toMatchObject({
       kind: "custom", id: "mojito-custom-new-ticket-abc123", ticket: "", launchStatus: "",
-      cwd: "/home/me", projectName: null, title: "New ticket · home", autoAdvance: false,
+      cwd: "/home/me", projectName: null, title: "New ticket · home",
     });
     expect(d.newSession).toHaveBeenCalledWith(
       "mojito-custom-new-ticket-abc123", "/home/me",
@@ -332,14 +332,14 @@ describe("launchNewTicketSession", () => {
 });
 
 describe("launchRebaseSession", () => {
-  it("launches a rebase-kind session with autoAdvance off at To QA", async () => {
+  it("launches a rebase-kind session at To QA", async () => {
     const d = deps();
     const res = await launchRebaseSession(baseRebaseReq, d);
     expect(res.ok).toBe(true);
     const meta = (res as { ok: true; meta: SessionMeta }).meta;
     expect(meta).toMatchObject({
       kind: "rebase", id: "mojito-RIC-120-rebase", ticket: "RIC-120",
-      launchStatus: "To QA", autoAdvance: false, state: "starting", cwd: "/code/lime",
+      launchStatus: "To QA", state: "starting", cwd: "/code/lime",
     });
     expect(d.newSession).toHaveBeenCalledWith(
       "mojito-RIC-120-rebase", "/code/lime", expect.stringContaining("'/lime-rebase RIC-120'"));
@@ -380,7 +380,7 @@ describe("launchCustomSession from a ticket (RIC-128)", () => {
     const meta = (res as { ok: true; meta: SessionMeta }).meta;
     expect(meta).toMatchObject({ kind: "custom", id: "mojito-custom-ric-128-abc123",
       ticket: "RIC-128", launchStatus: "", cwd: "/wt/ric-128", projectName: "Mojito",
-      title: "Custom session from a ticket", labels: ["Feature"], autoAdvance: false });
+      title: "Custom session from a ticket", labels: ["Feature"] });
   });
 
   it("writes NO launch-context file (a bare interactive session, human-driven)", async () => {
@@ -429,7 +429,7 @@ describe("launchShellSession", () => {
     expect(res.ok).toBe(true);
     const meta = (res as { ok: true; meta: SessionMeta }).meta;
     expect(meta).toMatchObject({ kind: "shell", id: "mojito-shell-general-abc123", ticket: "",
-      launchStatus: "", cwd: "/home/me", projectName: null, title: "home", autoAdvance: false,
+      launchStatus: "", cwd: "/home/me", projectName: null, title: "home",
       state: "running", model: "", effort: "" });
     expect(d.newSession).toHaveBeenCalledWith("mojito-shell-general-abc123", "/home/me", "/bin/zsh -l");
     expect(d.pipePane).toHaveBeenCalledOnce();

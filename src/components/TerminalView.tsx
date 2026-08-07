@@ -26,7 +26,6 @@ export default function TerminalView(
   const rootRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const termRef = useRef<Terminal | null>(null);
-  const [auto, setAuto] = useState(session.autoAdvance);
   const [imgErr, setImgErr] = useState<string | null>(null);
   const [docsOpen, setDocsOpen] = useState(false);
   // While the keyboard is up the visible band is worth ~13 rows; the header and
@@ -345,11 +344,6 @@ export default function TerminalView(
       setImgErr("image upload failed");
     }
   };
-  const toggleAuto = async () => {
-    const nextValue = !auto;
-    const res = await apiFetch(token, `/api/sessions/${session.id}`, { method: "PATCH", body: JSON.stringify({ autoAdvance: nextValue }) });
-    if (res.ok) setAuto(nextValue);
-  };
   const active = session.state === "running" || session.state === "needs-input" || session.state === "starting" || session.state === "idle";
   const kill = async () => {
     const prompt = active
@@ -369,9 +363,6 @@ export default function TerminalView(
         <span className="status">· {session.launchStatus}</span>
         <span className="grow" />
         <button className="btn sm" aria-label="Documents" onClick={() => setDocsOpen(true)}>📄</button>
-        <button className={`chip toggle${auto ? " on" : ""}`} onClick={toggleAuto}>
-          auto: {auto ? "on" : "off"}
-        </button>
         <StateBadge state={session.state} />
         <button className={`btn sm${active ? " danger" : ""}`} onClick={kill}>
           {active ? "Kill" : "Dismiss"}

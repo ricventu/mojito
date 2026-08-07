@@ -37,7 +37,7 @@ function deps(changedLines: (cwd: string) => number | null) {
 
 function req(status: string, model = "opus", effort: LaunchRequest["effort"] = "xhigh"): LaunchRequest {
   return { ticket: "RIC-1", status, model, effort,
-    autoAdvance: false, projectName: null, title: "t", labels: [], description: "" };
+    projectName: null, title: "t", labels: [], description: "" };
 }
 
 describe("launchSession diff-scaling", () => {

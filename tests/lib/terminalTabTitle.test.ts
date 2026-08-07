@@ -12,7 +12,6 @@ function session(over: Partial<SessionMeta>): SessionMeta {
     launchStatus: "Todo",
     model: "opus",
     effort: "high",
-    autoAdvance: false,
     state: "running",
     cwd: "/tmp",
     createdAt: "2026-07-16T00:00:00.000Z",

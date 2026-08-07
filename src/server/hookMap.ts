@@ -5,7 +5,7 @@ export interface HookOutcome {
   alert: { kind: "needs-input" | "stage-done" | "failed"; message: string } | null;
 }
 
-export function mapHook(event: HookEventName, statusAdvanced: boolean, currentState: SessionState): HookOutcome {
+export function mapHook(event: HookEventName, ready: boolean, currentState: SessionState): HookOutcome {
   // Terminal states (done/failed) are sticky against passive/idle signals. Claude Code
   // fires an idle Notification ~60s after a turn ends (and may emit a late permission or
   // AskUserQuestion prompt). Once a session has finished its stage, none of these must
@@ -38,12 +38,12 @@ export function mapHook(event: HookEventName, statusAdvanced: boolean, currentSt
       // (an answered AskUserQuestion, a granted permission's tool, or resumed work).
       return { state: "running", alert: null };
     case "Stop":
-      return statusAdvanced
-        ? { state: "done", alert: { kind: "stage-done", message: "stage complete" } }
+      return ready
+        ? { state: "done", alert: { kind: "stage-done", message: "ready for QA" } }
         : { state: "needs-input", alert: { kind: "needs-input", message: "claude is waiting for you" } };
     case "SessionEnd":
-      return statusAdvanced
-        ? { state: "done", alert: { kind: "stage-done", message: "stage complete" } }
+      return ready
+        ? { state: "done", alert: { kind: "stage-done", message: "ready for QA" } }
         : { state: "failed", alert: { kind: "failed", message: "session ended unexpectedly" } };
   }
 }
