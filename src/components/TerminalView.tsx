@@ -15,7 +15,7 @@ import { urlLinkProvider } from "@/lib/terminalLinkProvider";
 import { isUsableGeometry } from "@/lib/terminalFit";
 import { keepSettling } from "@/lib/viewportSettle";
 import { terminalTabTitle } from "@/lib/terminalTabTitle";
-import { terminalHeadModel, isActiveSession } from "@/lib/terminalHeader";
+import { terminalHeadModel } from "@/lib/terminalHeader";
 import { readAsDataUrl } from "@/lib/readAsDataUrl";
 import { quoteArg } from "@/lib/quoteArg";
 import type { SessionMeta } from "@/server/types";
@@ -29,9 +29,10 @@ export default function TerminalView(
   const termRef = useRef<Terminal | null>(null);
   const [imgErr, setImgErr] = useState<string | null>(null);
   const [docsOpen, setDocsOpen] = useState(false);
-  // While the keyboard is up the visible band is worth ~13 rows; the header and
-  // the ticket title cost 8 of them, which is what leaves claude's TUI without
-  // room for its input line (see keyboardInset.ts). Hide them until it closes.
+  // While the keyboard is up the visible band is worth ~13 rows; the single
+  // header row costs roughly 2 of them, which is what leaves claude's TUI
+  // without room for its input line (see keyboardInset.ts). Hide it until it
+  // closes.
   const [kbdOpen, setKbdOpen] = useState(false);
   const kbdOpenRef = useRef(false);
   // Set by the mount effect so the re-fit below can reach into its closure.
@@ -346,9 +347,8 @@ export default function TerminalView(
     }
   };
   const head = terminalHeadModel(session);
-  const active = isActiveSession(session.state);
   const kill = async () => {
-    const prompt = active
+    const prompt = head.killDanger
       ? `Kill the running session for ${head.name}?`
       : `Dismiss the session for ${head.name}?`;
     if (!confirm(prompt)) return;
@@ -363,7 +363,7 @@ export default function TerminalView(
         <button className="back" aria-label="Back" onClick={onBack}>‹</button>
         <div className="term-ident">
           {head.id && <span className="id">{head.id}</span>}
-          {head.status && <span className="status">· {head.status}</span>}
+          {head.status && <span className="status">{head.status}</span>}
           {head.title && <span className="title">{head.title}</span>}
         </div>
         <div className="term-actions">

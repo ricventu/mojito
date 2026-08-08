@@ -29,10 +29,10 @@ export function termRootStyle(vv: VisualViewportMetrics): TermRootStyle {
 /**
  * Is the virtual keyboard up?
  *
- * The visible band then holds only ~13 terminal rows, and Mojito's own header
- * and ticket title eat 8 of them — enough that claude's TUI, once it has drawn a
- * recap and a todo panel, has no room left for its input line and simply omits
- * it. The terminal view hides that chrome while this is true.
+ * The visible band then holds only ~13 terminal rows, and Mojito's own single
+ * header row eats roughly 2 of them — enough that claude's TUI, once it has
+ * drawn a recap and a todo panel, has no room left for its input line and
+ * simply omits it. The terminal view hides that chrome while this is true.
  *
  * A keyboard takes a large bite; Safari's collapsing toolbars take a small one,
  * hence the threshold rather than any shrink at all.
