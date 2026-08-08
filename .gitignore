@@ -7,5 +7,6 @@ node_modules/
 .mojito-state/
 
 .worktrees/
+.claude/worktrees/
 .superpowers/
 tsconfig.tsbuildinfo
