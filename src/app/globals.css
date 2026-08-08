@@ -252,13 +252,41 @@ button.chip:active { transform: scale(.96); }
 .sheet-title { margin: 0 0 16px; font: 600 14px/1.35 var(--mono); color: var(--text); }
 
 /* ---- Terminal view ---- */
-.term-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border);
-  background: var(--surface); }
+/* Three zones: a fixed back button, a flexible identity block that absorbs all
+   truncation, and a fixed action cluster.
+
+   `min-width: 0` on the identity zone is the whole fix. Flex items default to
+   `min-width: auto` and refuse to shrink below their content, so the ticket id,
+   the status name and the title used to push the action cluster past the right
+   edge — and `.term-root` is position:fixed with body overflow hidden, so the
+   overflow could not be scrolled back into view. The Kill button was simply
+   unreachable on a phone. Keeping the actions `flex: none` and letting the
+   identity zone give way means the row can never overflow. */
+.term-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  border-bottom: 1px solid var(--border); background: var(--surface); }
 .term-head .back { width: 32px; height: 32px; border-radius: 8px; background: var(--surface-hi);
   border: 1px solid var(--border-hi); color: var(--text); font-size: 18px; cursor: pointer; flex: none; }
-.term-head .id { font: 700 13px var(--mono); }
-.term-head .status { font: 500 12px var(--mono); color: var(--text-dim); }
-.term-title { padding: 8px 14px; font: 600 14px/1.35 var(--mono); color: var(--text); border-bottom: 1px solid var(--border); }
+
+.term-ident { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.term-ident .id { flex: none; font: 700 13px var(--mono); color: var(--text); letter-spacing: -.01em; }
+.term-ident .status { flex: none; font: 500 12px var(--mono); color: var(--text-dim); white-space: nowrap; }
+.term-ident .title { flex: 1; min-width: 0; font: 500 13px/1.3 var(--mono); color: var(--text-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.term-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.term-actions .btn.sm { flex: none; }
+.term-head .kill .glyph { display: none; }
+
+/* Phone: shed the labels whose meaning is already carried by colour, or by the
+   card the user tapped to get here, so the title keeps as much width as it can. */
+@media (max-width: 480px) {
+  .term-ident .status { display: none; }
+  .term-head .badge { padding: 5px; gap: 0; }
+  .term-head .badge .lbl { display: none; }
+  .term-head .kill .lbl { display: none; }
+  .term-head .kill .glyph { display: inline; }
+  .term-head .kill { padding: 7px 10px; font-size: 13px; line-height: 1; }
+}
 .acc { display: flex; gap: 6px; overflow-x: auto; padding: 8px; border-top: 1px solid var(--border); background: var(--surface); }
 .acc .k { flex: none; padding: 10px 12px; border-radius: 8px; background: var(--surface-hi);
   border: 1px solid var(--border-hi); color: var(--text); font: 600 13px var(--mono); cursor: pointer; }

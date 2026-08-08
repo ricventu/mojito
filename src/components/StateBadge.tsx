@@ -11,5 +11,10 @@ const BADGE: Record<SessionState, { cls: string; label: string }> = {
 
 export default function StateBadge({ state }: { state: SessionState }) {
   const b = BADGE[state];
-  return <span className={`badge ${b.cls}`}><span className="dot" />{b.label}</span>;
+  return (
+    <span className={`badge ${b.cls}`}>
+      <span className="dot" />
+      <span className="lbl">{b.label}</span>
+    </span>
+  );
 }

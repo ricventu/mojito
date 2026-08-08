@@ -15,6 +15,7 @@ import { urlLinkProvider } from "@/lib/terminalLinkProvider";
 import { isUsableGeometry } from "@/lib/terminalFit";
 import { keepSettling } from "@/lib/viewportSettle";
 import { terminalTabTitle } from "@/lib/terminalTabTitle";
+import { terminalHeadModel, isActiveSession } from "@/lib/terminalHeader";
 import { readAsDataUrl } from "@/lib/readAsDataUrl";
 import { quoteArg } from "@/lib/quoteArg";
 import type { SessionMeta } from "@/server/types";
@@ -344,11 +345,12 @@ export default function TerminalView(
       setImgErr("image upload failed");
     }
   };
-  const active = session.state === "running" || session.state === "needs-input" || session.state === "starting" || session.state === "idle";
+  const head = terminalHeadModel(session);
+  const active = isActiveSession(session.state);
   const kill = async () => {
     const prompt = active
-      ? `Kill the running session for ${session.ticket}?`
-      : `Dismiss the session for ${session.ticket}?`;
+      ? `Kill the running session for ${head.name}?`
+      : `Dismiss the session for ${head.name}?`;
     if (!confirm(prompt)) return;
     await apiFetch(token, `/api/sessions/${session.id}`, { method: "DELETE" });
     onBack();
@@ -358,18 +360,27 @@ export default function TerminalView(
     <div className="term-root" ref={rootRef}>
       {!kbdOpen && (
       <header className="term-head">
-        <button className="back" onClick={onBack}>‹</button>
-        <span className="id">{session.ticket}</span>
-        <span className="status">· {session.launchStatus}</span>
-        <span className="grow" />
-        <button className="btn sm" aria-label="Documents" onClick={() => setDocsOpen(true)}>📄</button>
-        <StateBadge state={session.state} />
-        <button className={`btn sm${active ? " danger" : ""}`} onClick={kill}>
-          {active ? "Kill" : "Dismiss"}
-        </button>
+        <button className="back" aria-label="Back" onClick={onBack}>‹</button>
+        <div className="term-ident">
+          {head.id && <span className="id">{head.id}</span>}
+          {head.status && <span className="status">· {head.status}</span>}
+          {head.title && <span className="title">{head.title}</span>}
+        </div>
+        <div className="term-actions">
+          <button className="btn sm" aria-label="Documents" title="Documents" onClick={() => setDocsOpen(true)}>📄</button>
+          <StateBadge state={session.state} />
+          <button
+            className={`btn sm kill${head.killDanger ? " danger" : ""}`}
+            aria-label={head.killLabel}
+            title={head.killLabel}
+            onClick={kill}
+          >
+            <span className="lbl">{head.killLabel}</span>
+            <span className="glyph" aria-hidden="true">✕</span>
+          </button>
+        </div>
       </header>
       )}
-      {session.title && !kbdOpen && <div className="term-title">{session.title}</div>}
       <div ref={holder} className="term-body" />
       {imgErr && <div className="term-img-err err-text">{imgErr}</div>}
       <AccessoryBar onSend={send} onPasteText={(t) => termRef.current?.paste(t)} onPickImages={pickImages} />
