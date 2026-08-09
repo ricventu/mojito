@@ -251,6 +251,17 @@ button.chip:active { transform: scale(.96); }
 .sheet h3 { margin: 0 0 6px; }
 .sheet-title { margin: 0 0 16px; font: 600 14px/1.35 var(--mono); color: var(--text); }
 
+/* ---- Verdict outcome panel (launch sheet) ---- */
+.outcome { border: 1px solid var(--border-hi); border-radius: var(--r-sm);
+  padding: 12px; background: var(--bg); margin: 0 0 4px; }
+.outcome.warn { border-color: color-mix(in srgb, var(--attn) 40%, var(--border)); background: var(--attn-bg); }
+.outcome-head { margin: 0; font: 600 14px/1.35 var(--mono); color: var(--text); }
+.outcome-body { margin: 8px 0 0; font-size: 13px; color: var(--text-dim); }
+/* The MR URL is long and the sheet is phone-width: wrap it anywhere rather than
+   letting it push the sheet into a horizontal scroll. */
+.outcome-link { display: block; margin-top: 8px; font: 13px/1.4 var(--mono);
+  color: var(--accent); overflow-wrap: anywhere; }
+
 /* ---- Terminal view ---- */
 /* Three zones: a fixed back button, a flexible identity block that absorbs all
    truncation, and a fixed action cluster.

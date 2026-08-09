@@ -7,6 +7,18 @@ import { tmuxName } from "@/server/sessionKey";
 import StateBadge from "./StateBadge";
 import QaVerdictButtons from "./QaVerdictButtons";
 import type { SessionMeta, TicketSummary } from "@/server/types";
+import type { QaVerdictResult } from "@/server/qaVerdict";
+
+// The two verdict outcomes worth holding the sheet open for. Anything else — including a
+// body from a server that predates or postdates this client — closes the sheet, so a
+// version skew degrades to the old behaviour instead of showing a blank panel.
+function holdsSheetOpen(r: unknown): r is Extract<QaVerdictResult, { done: "mr-created" | "conflict-session" }> {
+  if (r === null || typeof r !== "object") return false;
+  const done = (r as { done?: unknown }).done;
+  if (done === "mr-created") return typeof (r as { url?: unknown }).url === "string";
+  if (done === "conflict-session") return typeof (r as { sessionId?: unknown }).sessionId === "string";
+  return false;
+}
 
 export default function LaunchSheet(
   { token, ticket, sessions, onClose, onLaunched, onOpen, onOpenDocs }:
@@ -27,6 +39,10 @@ export default function LaunchSheet(
   }, [defaults, ticket.statusName, touched]);
   const [err, setErr] = useState<string | null>(null);
   const [verdictPending, setVerdictPending] = useState<"approve-local" | "approve-mr" | "reject" | null>(null);
+  // Set only for the two outcomes that carry information the user cannot get from the
+  // board or the session list: the MR URL, and the fact that a merge conflict happened.
+  // The other two close the sheet, as they always have.
+  const [outcome, setOutcome] = useState<QaVerdictResult | null>(null);
   // Mirrors ticket.assignedToMe so the sheet can flip the label without waiting for the
   // list to refetch — the ticket prop is a snapshot taken when the sheet opened.
   const [mine, setMine] = useState(ticket.assignedToMe);
@@ -51,7 +67,15 @@ export default function LaunchSheet(
         body: JSON.stringify({ arg, ...(reason === undefined ? {} : { reason }),
           projectName: ticket.project, title: ticket.title }),
       });
-      if (res.ok) { onLaunched(); onClose(); return; }
+      if (res.ok) {
+        // Refresh either way: every verdict moves the board, launches a session, or both.
+        onLaunched();
+        let result: unknown = null;
+        try { result = (await res.json())?.result; } catch { /* keep null and just close */ }
+        if (holdsSheetOpen(result)) setOutcome(result);
+        else onClose();
+        return;
+      }
       let message = `verdict failed (${res.status})`;
       try { const b = await res.json(); if (b?.error) message = b.error; } catch { /* non-JSON */ }
       setErr(message);
@@ -142,6 +166,44 @@ export default function LaunchSheet(
       <button className="btn ghost" onClick={() => startShell()}>Terminal</button>
     </div>
   );
+
+  // The conflict session is registered before the verdict responds, so the onLaunched()
+  // refetch normally has it by the time this renders — but the prop update is a round trip
+  // behind, so the button says what it is waiting for instead of silently doing nothing.
+  // Looking the session up by id in the live list is how page.tsx opens alerts, too.
+  const conflictSession = outcome?.done === "conflict-session"
+    ? sessions.find((s) => s.id === outcome.sessionId)
+    : undefined;
+
+  if (outcome) {
+    return (
+      <div className="sheet-backdrop" onClick={onClose}>
+        <div className="sheet" onClick={(e) => e.stopPropagation()}>
+          <h3><span className="id" style={{ fontSize: 16 }}>{ticket.identifier}</span> <span className="chip">{ticket.statusName}</span></h3>
+          {outcome.done === "mr-created" ? (
+            <div className="outcome">
+              <p className="outcome-head">MR opened · {ticket.identifier} moved to Done</p>
+              <a className="outcome-link" href={outcome.url} target="_blank" rel="noreferrer">{outcome.url}</a>
+            </div>
+          ) : (
+            <div className="outcome warn">
+              <p className="outcome-head">Merge conflict — the branch was not merged</p>
+              <p className="outcome-body">
+                The rebase stopped on a conflict, so {ticket.identifier} stays at To QA.
+                A conflict session was launched to resolve it.
+              </p>
+              <button className="btn primary block" style={{ marginTop: 12 }}
+                disabled={!conflictSession}
+                onClick={() => conflictSession && onOpen(conflictSession)}>
+                {conflictSession ? "Open conflict session" : "Starting…"}
+              </button>
+            </div>
+          )}
+          <button className="btn ghost block" style={{ marginTop: 12 }} onClick={onClose}>Close</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
