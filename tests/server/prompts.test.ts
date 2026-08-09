@@ -22,4 +22,15 @@ describe("prompt builder", () => {
       expect(p).toContain('"ready-for-qa"');
     }
   });
+
+  it("tells the work session to read the assets Mojito downloaded", () => {
+    const p = buildWorkPrompt(vars);
+    expect(p).toContain("localPath");
+    expect(p).toContain("Read tool");
+    expect(p).toContain("attachments");
+  });
+
+  it("leaves the conflict prompt free of the asset paragraph", () => {
+    expect(buildConflictPrompt(vars)).not.toContain("localPath");
+  });
 });

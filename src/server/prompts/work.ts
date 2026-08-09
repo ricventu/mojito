@@ -7,6 +7,11 @@ First read the JSON session context at {{CONTEXT_PATH}}: identifier, statusName,
 title, project, labels, description, and optionally rejectReason. Never use any Linear
 tool, MCP server, or API in this session — Mojito manages Linear for you.
 
+The context may also carry \`assets\` (each \`{url, localPath}\`) and \`attachments\`
+(each \`{title, url, localPath?}\`). Read every \`localPath\` with the Read tool before
+you design — Mojito already downloaded those files for you and they are part of the
+ticket. An attachment with no \`localPath\` is a plain link, informational only.
+
 Follow this sequence:
 
 1. Isolation: create (or reuse) a worktree and branch named after {{TICKET}} via
