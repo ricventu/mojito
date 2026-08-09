@@ -1,18 +1,22 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useStageDefaults } from "@/lib/useStageDefaults";
-import { useSelfUpdate } from "@/lib/useSelfUpdate";
+import type { SelfUpdate } from "@/lib/useSelfUpdate";
 import { MODELS, EFFORTS, STAGE_DEFAULT_ROWS, resolveModel, resolveEffort, minimalOverrides, type StageDefaults } from "@/lib/stageDefaults";
 
-export default function SettingsSheet({ token, onClose }: { token: string; onClose: () => void }) {
+export default function SettingsSheet({ token, onClose, selfUpdate }: {
+  token: string; onClose: () => void; selfUpdate: SelfUpdate;
+}) {
   const { defaults, loading, error, save } = useStageDefaults(token);
   // Local draft: one {model, effort} per launchable status, seeded from the fetched effective table.
   const [draft, setDraft] = useState<StageDefaults>({});
   const [saving, setSaving] = useState(false);
 
   // Self-update ("Pull & deploy"): only shown when the server exposes it
-  // (MOJITO_SELF_UPDATE=1). `phase` drives the button label and banners.
-  const { enabled: selfUpdateEnabled, phase, message: pullMsg, error: pullErr, run: onPull } = useSelfUpdate(token);
+  // (MOJITO_SELF_UPDATE=1). `phase` drives the button label and banners. The hook
+  // itself lives in page.tsx (one instance, shared with the Stacks self-row) so this
+  // sheet can never disagree with that row about whether a deploy is in flight.
+  const { enabled: selfUpdateEnabled, phase, message: pullMsg, error: pullErr, run: onPull } = selfUpdate;
 
   useEffect(() => {
     if (loading) return;

@@ -85,9 +85,9 @@ Failure classification, by git's own output (stdout+stderr, English pinned by `L
   `{ ok: true; result: GitPushResult } | { ok: false; error: string; code: number; detail?: string }`,
   with `rejected` → 409, `detached`/`failed` → 500, unknown slug → 404.
 - **Pushability is not gated.** Every mapped project — the Mojito self-row included — can
-  push: a push mutates no working tree and fires no local hook, so the `pullable` reasoning
-  (below) does not apply. `StackDeps` gains an optional `push?: (cwd) => Promise<GitPushResult>`
-  seam for tests, matching `pull?`.
+  push: a push fires no **post-merge** hook (the deploy trigger), so the `pullable`
+  reasoning (below) does not apply. `StackDeps` gains an optional
+  `push?: (cwd) => Promise<GitPushResult>` seam for tests, matching `pull?`.
 - `StackTarget` and `StackRow` gain `self: boolean` — the server-side path comparison that
   already computes `pullable`, exposed explicitly instead of leaving the client to infer
   "self" from `!pullable`.

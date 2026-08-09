@@ -20,14 +20,24 @@ export class GitPushError extends Error {
 }
 
 // LC_ALL=C pins git's output to English so the markers below match a localized
-// environment too (mirrors ffPull.ts). 60s covers a slow push; maxBuffer prevents
-// ENOBUFS from misreporting a push that actually landed.
+// environment too (mirrors ffPull.ts). 120s covers a slow push (matches merge.ts's
+// comparable fetch+rebase timeout — a push killed at the timeout misreports a push
+// that may have landed, the same hazard maxBuffer guards against below).
+// GIT_TERMINAL_PROMPT=0 makes a checkout with no usable credential helper fail fast
+// instead of blocking on an interactive prompt until the timeout.
 const defaultRun: GitRun = (args, cwd) =>
-  pexec("git", args, { cwd, timeout: 60_000, encoding: "utf8", env: { ...process.env, LC_ALL: "C" }, maxBuffer: 1024 * 1024 * 64 });
+  pexec("git", args, {
+    cwd,
+    timeout: 120_000,
+    encoding: "utf8",
+    env: { ...process.env, LC_ALL: "C", GIT_TERMINAL_PROMPT: "0" },
+    maxBuffer: 1024 * 1024 * 64,
+  });
 
-// A server-side hook declining the push (protected branch). Checked FIRST: this text
-// also contains "rejected", but pulling would not help, so it must never be classified
-// as a non-fast-forward.
+// A server-side hook declining the push (protected branch). Checked FIRST: git prints
+// the "Updates were rejected" hint alongside a hook refusal too, but pulling would not
+// help here, so that hint must never be enough on its own to classify this as a
+// non-fast-forward.
 const REMOTE_REJECTED_MARKER = "[remote rejected]";
 // Markers git prints when the push is refused because origin is ahead.
 const REJECTED_MARKERS = ["[rejected]", "Updates were rejected"];
@@ -56,6 +66,10 @@ async function remoteSha(branch: string, cwd: string, run: GitRun): Promise<stri
  * Push the branch checked out at `cwd` to origin. Stateless: single-flight is the
  * caller's responsibility, as with ffPull. Never forces — a push that cannot
  * fast-forward is surfaced as `rejected`, not resolved.
+ *
+ * Pushes to `origin` explicitly (matching merge.ts's "mr" push), whereas ffPull follows
+ * the branch's configured upstream — the two differ if a checkout's upstream is not
+ * `origin`.
  */
 export async function gitPush(cwd: string, run: GitRun = defaultRun): Promise<GitPushResult> {
   const branch = (await run(["rev-parse", "--abbrev-ref", "HEAD"], cwd)).stdout.trim();

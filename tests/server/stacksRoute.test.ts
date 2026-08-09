@@ -20,6 +20,7 @@ import { POST as PUSH } from "@/app/api/stacks/[slug]/push/route";
 import { POST as RESOLVE } from "@/app/api/stacks/[slug]/resolve/route";
 import { listStacks, startStack, stopStack, pullStack, pushStack, resolveStack, currentBranch } from "@/server/projectStack";
 import { launchStackResolveSession } from "@/server/launch";
+import type { StackRow } from "@/lib/stacks";
 
 const TOKEN = "test-token";
 function req(auth = true): Request {
@@ -38,8 +39,10 @@ describe("GET /api/stacks", () => {
     expect((await GET(req(false))).status).toBe(401);
   });
   it("200 with the stack rows", async () => {
-    const rows = [{ project: "Factorybook", slug: "factorybook", hasStack: true, status: "stopped", pullable: true }];
-    vi.mocked(listStacks).mockResolvedValue(rows as never);
+    const rows: StackRow[] = [
+      { project: "Factorybook", slug: "factorybook", hasStack: true, status: "stopped", pullable: true, self: false },
+    ];
+    vi.mocked(listStacks).mockResolvedValue(rows);
     const res = await GET(req());
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ stacks: rows });

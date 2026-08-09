@@ -2,15 +2,14 @@
 import { useState } from "react";
 import { apiFetch } from "@/lib/client";
 import { useStacks } from "@/lib/useStacks";
-import { useSelfUpdate } from "@/lib/useSelfUpdate";
+import type { SelfUpdate } from "@/lib/useSelfUpdate";
 import { pullMessage, pushMessage, syntheticStackSession, type PullResponse, type PushResponse, type StackRow } from "@/lib/stacks";
 import type { SessionMeta } from "@/server/types";
 
-type SelfUpdate = ReturnType<typeof useSelfUpdate>;
-
-export default function StacksPanel({ token, onOpenLogs }: { token: string; onOpenLogs: (s: SessionMeta) => void }) {
+export default function StacksPanel({ token, onOpenLogs, selfUpdate }: {
+  token: string; onOpenLogs: (s: SessionMeta) => void; selfUpdate: SelfUpdate;
+}) {
   const { stacks, refresh } = useStacks(token);
-  const selfUpdate = useSelfUpdate(token);
   return (
     <div className="pad">
       <section>

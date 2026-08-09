@@ -7,9 +7,20 @@ import { selfUpdateMessage, type SelfUpdateResponse } from "./selfUpdate";
 export type SelfUpdatePhase = "idle" | "pulling" | "deploying" | "timeout";
 
 /**
+ * The return type of `useSelfUpdate`. Callers (`StacksPanel`, `SettingsSheet`) take
+ * this as a prop rather than re-declaring it, since the hook is called once — in
+ * `page.tsx` — and shared between them.
+ */
+export type SelfUpdate = ReturnType<typeof useSelfUpdate>;
+
+/**
  * The server's "Pull & deploy" control, shared by the Settings sheet and the Stacks
  * self-row. `enabled` mirrors MOJITO_SELF_UPDATE: when false the server has no
  * /api/self-update endpoint and no caller should render the control.
+ *
+ * Called once, at the top level of `page.tsx`, and passed down to both callers —
+ * calling it twice would mean two independent capability probes and two independent
+ * phase machines that could disagree about whether a deploy is in flight.
  */
 export function useSelfUpdate(token: string) {
   const [enabled, setEnabled] = useState(false);

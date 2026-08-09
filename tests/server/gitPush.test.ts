@@ -87,12 +87,21 @@ describe("gitPush", () => {
   });
 
   it("maps a protected-branch [remote rejected] to failed, not rejected", async () => {
+    // Real git output for a hook-declined push also carries the "Updates were
+    // rejected" hint (the same one a genuine non-fast-forward prints), so this
+    // fixture must include it: without the REMOTE_REJECTED_MARKER guard in
+    // gitPush.ts, that hint alone would make this classify as "rejected".
     const run = fakeRun({
       remote: shas("a", "a"),
-      push: gitFail(" ! [remote rejected] main -> main (protected branch hook declined)"),
+      push: gitFail(
+        " ! [remote rejected] main -> main (protected branch hook declined)\n" +
+          "error: failed to push some refs to 'origin'\n" +
+          "hint: Updates were rejected because the remote contains work that you do",
+      ),
     });
     const err = await gitPush("/repo", run).catch((e) => e);
     expect(err.kind).toBe("failed");
+    expect(err.kind).not.toBe("rejected");
     expect(err.detail).toContain("protected branch");
   });
 

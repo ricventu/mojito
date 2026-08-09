@@ -203,8 +203,9 @@ export type StackPushResult =
 
 /**
  * Push the mapped checkout's current branch. Unlike pull, the Mojito self-row IS
- * pushable: a push mutates no working tree and fires no local hook, so the post-merge
- * deploy hazard that makes the self-row unpullable does not apply here.
+ * pushable: a push fires no **post-merge** hook (the deploy trigger), so the post-merge
+ * deploy hazard that makes the self-row unpullable does not apply here. (A `pre-push`
+ * hook, if one existed, would still run — it just isn't the hazard in play.)
  */
 export async function pushStack(slug: string, deps: StackDeps): Promise<StackPushResult> {
   const target = resolveStack(slug, deps);
