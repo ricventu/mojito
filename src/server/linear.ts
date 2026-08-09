@@ -170,6 +170,20 @@ export async function downloadLinearAsset(
   maxBytes: number,
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ bytes: Buffer; contentType: string }> {
+  // The caller only ever hands over URLs that already passed isLinearUploadUrl, but the
+  // API key leaves the process here — so the host is re-checked where the credential is
+  // attached rather than trusted from one layer up. `hostname` (not `host`) is what makes
+  // userinfo tricks like https://uploads.linear.app@evil.com/ fail.
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("invalid Linear asset URL");
+  }
+  if (parsed.protocol !== "https:" || parsed.hostname.toLowerCase() !== "uploads.linear.app") {
+    throw new Error(`refusing to send the Linear API key to ${parsed.host}`);
+  }
+
   const res = await fetchImpl(url, {
     headers: { Authorization: apiKey },
     signal: AbortSignal.timeout(ASSET_TIMEOUT_MS),

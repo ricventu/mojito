@@ -274,9 +274,16 @@ describe("downloadLinearAsset", () => {
   });
 
   it("rejects an oversized asset from content-length without reading the body", async () => {
-    const f = fakeAssetFetch({ headers: { "content-length": "5000" } });
+    const arrayBuffer = vi.fn(async () => new Uint8Array(1).buffer);
+    const f = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-length": "5000" }),
+      arrayBuffer,
+    })) as unknown as typeof fetch;
     await expect(downloadLinearAsset("k", "https://uploads.linear.app/x", 1000, f))
       .rejects.toThrow("too large");
+    expect(arrayBuffer).not.toHaveBeenCalled();
   });
 
   it("rejects an oversized body even when content-length lies", async () => {
@@ -288,5 +295,25 @@ describe("downloadLinearAsset", () => {
   it("degrades a missing content-type to an empty string", async () => {
     const f = fakeAssetFetch({ body: new Uint8Array([9]) });
     expect((await downloadLinearAsset("k", "https://uploads.linear.app/x", 1000, f)).contentType).toBe("");
+  });
+
+  it("refuses to send the API key to another host", async () => {
+    const f = fakeAssetFetch({});
+    await expect(downloadLinearAsset("k", "https://evil.com/a.png", 1000, f)).rejects.toThrow("refusing");
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("refuses a userinfo-smuggled host", async () => {
+    const f = fakeAssetFetch({});
+    await expect(downloadLinearAsset("k", "https://uploads.linear.app@evil.com/a.png", 1000, f))
+      .rejects.toThrow("refusing");
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("refuses a plaintext http asset URL", async () => {
+    const f = fakeAssetFetch({});
+    await expect(downloadLinearAsset("k", "http://uploads.linear.app/a.png", 1000, f))
+      .rejects.toThrow("refusing");
+    expect(f).not.toHaveBeenCalled();
   });
 });
