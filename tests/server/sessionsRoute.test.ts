@@ -137,4 +137,19 @@ describe("POST /api/sessions (ticket)", () => {
     expect(h.prepareTicketAssets).not.toHaveBeenCalled();
     expect(h.launchSession).not.toHaveBeenCalled();
   });
+
+  // The board move is best-effort by design (the session is already running, so a failed
+  // status write must not fail the request) — but silence made a stuck board look normal.
+  it("still returns 201 and warns when the Backlog -> In Progress board move fails", async () => {
+    h.setIssueStatus.mockImplementation(async () => { throw new Error("Linear 500"); });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const res = await POST(req({ ...launch, status: "Backlog" }));
+      expect(res.status).toBe(201);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("RIC-46"));
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("Linear 500"));
+    } finally {
+      warn.mockRestore();
+    }
+  });
 });

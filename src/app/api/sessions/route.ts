@@ -80,7 +80,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: res.reason, id: res.id }, { status });
   }
   if (body.status === "Backlog" || body.status === "Todo") {
-    try { await setIssueStatus(cfg.linearApiKey, body.ticket, "In Progress"); } catch { /* board update is best-effort */ }
+    // Best-effort: the session is already running, so a failed status write must not fail
+    // the request — but it does leave the board behind, so say so rather than swallowing it.
+    try {
+      await setIssueStatus(cfg.linearApiKey, body.ticket, "In Progress");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`sessions route: setIssueStatus failed for ${body.ticket}: ${message}`);
+    }
   }
   return NextResponse.json(res.meta, { status: 201 });
 }
