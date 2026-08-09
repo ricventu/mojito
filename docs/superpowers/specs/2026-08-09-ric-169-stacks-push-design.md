@@ -58,9 +58,11 @@ Steps:
    "repo is on a detached HEAD")`, before anything is pushed.
 2. `git rev-parse --short origin/<branch>` → `from`. Failure means the remote branch does
    not exist yet; `from` is `""` and this is not an error.
-3. `git push origin <branch>` — `execFile`, no shell, `LC_ALL=C`, 60s timeout,
-   `maxBuffer` 64MB (same reasoning as `ffPull`: an ENOBUFS must not misreport a push that
-   actually landed).
+3. `git push origin <branch>` — `execFile`, no shell, `LC_ALL=C`,
+   `GIT_TERMINAL_PROMPT=0`, 120s timeout (matching `merge.ts`'s comparable fetch+rebase),
+   `maxBuffer` 64MB. The last three all guard the same hazard as `ffPull`'s: neither an
+   ENOBUFS, nor a timeout, nor a checkout blocking on a credential prompt may misreport a
+   push that actually landed.
 4. `git rev-parse --short origin/<branch>` → `to`. `git push` updates the remote-tracking
    ref itself, so `from === to` means "up-to-date" and a change means "pushed". A new
    remote branch (`from === ""`) is always "pushed".
@@ -69,7 +71,7 @@ Failure classification, by git's own output (stdout+stderr, English pinned by `L
 
 | Output contains | kind | Why |
 | --- | --- | --- |
-| `[remote rejected]` | `failed` | A server-side hook refused (protected branch). Pulling would not help, so it must not say "Pull first". Checked **before** the marker below, since this text also contains "rejected". |
+| `[remote rejected]` | `failed` | A server-side hook refused (protected branch). Pulling would not help, so it must not say "Pull first". Checked **before** the markers below, because git prints the `Updates were rejected` hint alongside a hook refusal too — without this guard that hint would misclassify the refusal as a non-fast-forward. |
 | `[rejected]` or `Updates were rejected` | `rejected` | Non-fast-forward: `origin` has commits the checkout does not. |
 | anything else | `failed` | Network, auth, no `origin`, not a repo. |
 
