@@ -5,10 +5,18 @@ import type { MergeOutcome } from "@/server/merge";
 const h = vi.hoisted(() => ({
   getIssueStatus: vi.fn(async () => "To QA"),
   setIssueStatus: vi.fn(async () => {}),
-  getIssueContent: vi.fn(async () => ({ description: "the ticket description", attachments: [] })),
+  // attachments typed explicitly, not left to infer as never[], so a later
+  // mockImplementation can hand back a non-empty attachments array.
+  getIssueContent: vi.fn(async () => ({
+    description: "the ticket description", attachments: [] as { title: string; url: string }[],
+  })),
+  downloadLinearAsset: vi.fn(async () => ({ bytes: Buffer.from([1]), contentType: "image/png" })),
+  prepareTicketAssets: vi.fn(async (input: { attachments: { title: string; url: string }[] }) =>
+    ({ assets: [], attachments: input.attachments })),
   mergeTicketBranch: vi.fn(async () => ({ status: "merged", commit: "abc1234" }) as MergeOutcome),
   repoRootFromWorktree: vi.fn(async () => "/code/mojito" as string | null),
-  launchSession: vi.fn(async () => ({ ok: true, meta: {} }) as { ok: boolean; reason?: string }),
+  // Takes an (unused) param so mock.calls[0][0] indexes into a non-empty tuple below.
+  launchSession: vi.fn(async (_req: unknown) => ({ ok: true, meta: {} }) as { ok: boolean; reason?: string }),
   launchConflictSession: vi.fn(async () => ({ ok: true, meta: {} }) as { ok: boolean; reason?: string }),
   supersedeSession: vi.fn(async () => {}),
   resolveTicketWorktree: vi.fn(() => "/code/mojito/.worktrees/ric-110" as string | null),
@@ -19,7 +27,10 @@ const h = vi.hoisted(() => ({
 
 vi.mock("@/server/linear", () => ({
   getIssueStatus: h.getIssueStatus, setIssueStatus: h.setIssueStatus,
-  getIssueContent: h.getIssueContent,
+  getIssueContent: h.getIssueContent, downloadLinearAsset: h.downloadLinearAsset,
+}));
+vi.mock("@/server/ticketAssets", () => ({
+  prepareTicketAssets: h.prepareTicketAssets, MAX_ASSET_BYTES: 10 * 1024 * 1024,
 }));
 vi.mock("@/server/merge", () => ({
   mergeTicketBranch: h.mergeTicketBranch, repoRootFromWorktree: h.repoRootFromWorktree,
@@ -61,6 +72,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   h.getIssueStatus.mockImplementation(async () => "To QA");
   h.getIssueContent.mockImplementation(async () => ({ description: "the ticket description", attachments: [] }));
+  h.downloadLinearAsset.mockImplementation(async () => ({ bytes: Buffer.from([1]), contentType: "image/png" }));
+  h.prepareTicketAssets.mockImplementation(async (input) => ({ assets: [], attachments: input.attachments }));
   h.mergeTicketBranch.mockImplementation(async () => ({ status: "merged", commit: "abc1234" }));
   h.launchSession.mockImplementation(async () => ({ ok: true, meta: {} }));
   h.launchConflictSession.mockImplementation(async () => ({ ok: true, meta: {} }));
@@ -250,6 +263,19 @@ describe("/api/tickets/[id]/verdict", () => {
     expect(h.launchSession).toHaveBeenCalledWith(
       expect.objectContaining({ description: "" }), expect.anything(),
     );
+  });
+
+  it("hands the rework session the ticket's downloaded assets", async () => {
+    h.getIssueContent.mockImplementation(async () => ({
+      description: "![](https://uploads.linear.app/w/a/one.png)",
+      attachments: [{ title: "The PR", url: "https://github.com/x/y/pull/1" }],
+    }));
+    await POST(req({ arg: "reject", reason: "missed the edge case", projectName: "Mojito" }), params());
+    const passed = h.launchSession.mock.calls[0][0] as {
+      attachments: { title: string }[]; rejectReason: string;
+    };
+    expect(passed.rejectReason).toBe("missed the edge case");
+    expect(passed.attachments).toEqual([{ title: "The PR", url: "https://github.com/x/y/pull/1" }]);
   });
 
 });

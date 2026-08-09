@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getConfig, getRegistry } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
-import { getIssueStatus, setIssueStatus, getIssueContent } from "@/server/linear";
+import { getIssueStatus, setIssueStatus, getIssueContent, downloadLinearAsset, type IssueContent } from "@/server/linear";
+import { prepareTicketAssets, MAX_ASSET_BYTES } from "@/server/ticketAssets";
 import { launchSession, launchConflictSession } from "@/server/launch";
 import { loadProjectMap, resolvePathForProject } from "@/server/projects";
 import { mergeTicketBranch, repoRootFromWorktree } from "@/server/merge";
@@ -45,8 +46,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // stale-session cleanup below must not retire the session this request just started.
   let workSessionRelaunched = false;
 
-  const describe = async () => {
-    try { return (await getIssueContent(cfg.linearApiKey, id)).description; } catch { return ""; }
+  const content = async (): Promise<IssueContent> => {
+    try { return await getIssueContent(cfg.linearApiKey, id); } catch { return { description: "", attachments: [] }; }
   };
 
   const result = await resolveTicketVerdict(
@@ -72,10 +73,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             // live conflict session running in the very worktree the rework session takes over.
             const cid = conflictSessionName(id);
             if (registry.get(cid)) await supersedeSession(cid, { closeSession, registry });
+            const c = await content();
+            const prepared = await prepareTicketAssets({
+              stateDir: cfg.stateDir, id: sid, description: c.description, attachments: c.attachments,
+              download: (url) => downloadLinearAsset(cfg.linearApiKey, url, MAX_ASSET_BYTES),
+            });
             const res = await launchSession(
               { ticket: id, status, model: defaultModelForStatus(status),
                 effort: defaultEffortForStatus(status), projectName, title, labels: [],
-                description: await describe(), rejectReason },
+                description: c.description, assets: prepared.assets, attachments: prepared.attachments,
+                rejectReason },
               tmuxDeps,
             );
             if (!res.ok) throw new Error(`rework session not launched: ${res.reason}`);
@@ -86,7 +93,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             if (registry.get(sid)) await supersedeSession(sid, { closeSession, registry });
             const status = "In Progress";
             const res = await launchConflictSession(
-              { ticket: id, projectName, title, description: await describe(),
+              { ticket: id, projectName, title, description: (await content()).description,
                 model: defaultModelForStatus(status), effort: defaultEffortForStatus(status) },
               tmuxDeps,
             );
