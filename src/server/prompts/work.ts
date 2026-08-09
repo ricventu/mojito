@@ -8,9 +8,12 @@ title, project, labels, description, and optionally rejectReason. Never use any 
 tool, MCP server, or API in this session — Mojito manages Linear for you.
 
 The context may also carry \`assets\` (each \`{url, localPath}\`) and \`attachments\`
-(each \`{title, url, localPath?}\`). Read every \`localPath\` with the Read tool before
-you design — Mojito already downloaded those files for you and they are part of the
-ticket. An attachment with no \`localPath\` is a plain link, informational only.
+(each \`{title, url, localPath?}\`) — Mojito already downloaded those files for you
+because this session holds no Linear credential. Before you design, open every
+\`localPath\` you can with the Read tool — images, PDFs, and text files. A \`localPath\`
+ending in \`.bin\` is a content type Mojito could not identify; treat it only as a file
+you know exists, not one you can Read. An attachment with no \`localPath\` is a plain
+link, informational only.
 
 Follow this sequence:
 

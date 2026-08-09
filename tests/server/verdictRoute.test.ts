@@ -29,9 +29,12 @@ vi.mock("@/server/linear", () => ({
   getIssueStatus: h.getIssueStatus, setIssueStatus: h.setIssueStatus,
   getIssueContent: h.getIssueContent, downloadLinearAsset: h.downloadLinearAsset,
 }));
-vi.mock("@/server/ticketAssets", () => ({
-  prepareTicketAssets: h.prepareTicketAssets, MAX_ASSET_BYTES: 10 * 1024 * 1024,
-}));
+vi.mock("@/server/ticketAssets", async () => {
+  // Pins the mock to the real constant rather than a hand-copied number, so this test
+  // would fail if MAX_ASSET_BYTES ever changed without the assertion being updated too.
+  const actual = await vi.importActual<typeof import("@/server/ticketAssets")>("@/server/ticketAssets");
+  return { prepareTicketAssets: h.prepareTicketAssets, MAX_ASSET_BYTES: actual.MAX_ASSET_BYTES };
+});
 vi.mock("@/server/merge", () => ({
   mergeTicketBranch: h.mergeTicketBranch, repoRootFromWorktree: h.repoRootFromWorktree,
 }));

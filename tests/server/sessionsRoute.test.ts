@@ -27,21 +27,27 @@ const h = vi.hoisted(() => ({
     { ok: boolean; reason?: string; meta?: unknown }),
   launchCustomSession: vi.fn(async () => ({ ok: true, meta: {} })),
   launchShellSession: vi.fn(async () => ({ ok: true, meta: {} })),
+  // Controllable per test so one test can prove the duplicate check runs before assets
+  // are ever touched.
+  hasSession: vi.fn(async () => false),
 }));
 
 vi.mock("@/server/linear", () => ({
   getIssueContent: h.getIssueContent, downloadLinearAsset: h.downloadLinearAsset,
   setIssueStatus: h.setIssueStatus,
 }));
-vi.mock("@/server/ticketAssets", () => ({
-  prepareTicketAssets: h.prepareTicketAssets, MAX_ASSET_BYTES: 10 * 1024 * 1024,
-}));
+vi.mock("@/server/ticketAssets", async () => {
+  // Pins the mock to the real constant rather than a hand-copied number, so this test
+  // would fail if MAX_ASSET_BYTES ever changed without the assertion being updated too.
+  const actual = await vi.importActual<typeof import("@/server/ticketAssets")>("@/server/ticketAssets");
+  return { prepareTicketAssets: h.prepareTicketAssets, MAX_ASSET_BYTES: actual.MAX_ASSET_BYTES };
+});
 vi.mock("@/server/launch", () => ({
   launchSession: h.launchSession, launchCustomSession: h.launchCustomSession,
   launchShellSession: h.launchShellSession,
 }));
 vi.mock("@/server/tmux", () => ({
-  hasSession: vi.fn(async () => false), newSession: vi.fn(async () => {}), pipePane: vi.fn(async () => {}),
+  hasSession: h.hasSession, newSession: vi.fn(async () => {}), pipePane: vi.fn(async () => {}),
 }));
 vi.mock("@/server/app", () => ({
   getConfig: () => ({ token: "test-token", linearApiKey: "k", stateDir: "/state", port: 4711,
@@ -75,6 +81,7 @@ beforeEach(() => {
     attachments: input.attachments,
   }));
   h.launchSession.mockImplementation(async () => ({ ok: true, meta: { id: "mojito-RIC-46-work" } }));
+  h.hasSession.mockImplementation(async () => false);
 });
 
 describe("POST /api/sessions (ticket)", () => {
@@ -116,6 +123,18 @@ describe("POST /api/sessions (ticket)", () => {
   it("rejects a malformed ticket id with 422 rather than a 500", async () => {
     const res = await POST(req({ ...launch, ticket: "not a ticket" }));
     expect(res.status).toBe(422);
+    expect(h.launchSession).not.toHaveBeenCalled();
+  });
+
+  // A live session under that id already owns its <id>-assets directory: preparing
+  // assets before this check would clear and redownload into it, corrupting a running
+  // session's files for a request that is going to 409 anyway.
+  it("409s on a duplicate live session without ever preparing or downloading assets", async () => {
+    h.hasSession.mockImplementation(async () => true);
+    const res = await POST(req(launch));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "duplicate", id: "mojito-RIC-46-work" });
+    expect(h.prepareTicketAssets).not.toHaveBeenCalled();
     expect(h.launchSession).not.toHaveBeenCalled();
   });
 });

@@ -3,6 +3,10 @@ import { join } from "node:path";
 
 export const MAX_ASSET_BYTES = 10 * 1024 * 1024; // 10 MB
 export const MAX_ASSETS = 20;
+// Downloads run sequentially and a launch is something the user is waiting on, not a
+// batch job — so the whole step gets one deadline rather than letting worst case (20
+// assets x their own 15 s timeout) hang the launch button for five minutes.
+export const ASSET_BUDGET_MS = 30_000;
 
 const UPLOAD_PREFIX = "https://uploads.linear.app/";
 
@@ -22,6 +26,10 @@ const EXT_BY_CONTENT_TYPE = new Map<string, string>([
 
 export function isLinearUploadUrl(url: string): boolean {
   return url.startsWith(UPLOAD_PREFIX);
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 /**
@@ -88,6 +96,8 @@ export interface PrepareTicketAssetsInput {
   description: string;
   attachments: { title: string; url: string }[];
   download: (url: string) => Promise<{ bytes: Buffer; contentType: string }>;
+  // Injectable clock so tests can drive the ASSET_BUDGET_MS deadline without real time.
+  now?: () => number;
 }
 
 export interface PreparedTicketAssets {
@@ -100,43 +110,60 @@ export interface PreparedTicketAssets {
  * session — which holds no Linear credential — can Read them.
  *
  * Best-effort by construction: this never rejects. A single unreachable asset costs only
- * itself (its URL still stands in the description text), and a state directory that
- * cannot be written costs only the assets — the launch proceeds either way.
+ * itself (its URL still stands in the description text), a state directory that cannot
+ * be written costs only the assets, and a malformed input (e.g. a non-string
+ * description) costs only the assets too — the launch proceeds either way. The outer
+ * try/catch is what makes that a structural guarantee rather than something review has
+ * to keep re-checking every time this function changes.
  */
 export async function prepareTicketAssets(
   input: PrepareTicketAssetsInput,
 ): Promise<PreparedTicketAssets> {
-  const attachments: TicketAttachment[] = input.attachments.map((a) => ({ title: a.title, url: a.url }));
-
-  // Description uploads first: they are what a session most often needs, so they are the
-  // ones that survive the cap.
-  const jobs: { url: string; attachmentIndex: number | null }[] = [
-    ...extractAssetUrls(input.description).map((url) => ({ url, attachmentIndex: null })),
-    ...attachments.flatMap((a, i) => (isLinearUploadUrl(a.url) ? [{ url: a.url, attachmentIndex: i }] : [])),
-  ].slice(0, MAX_ASSETS);
-
-  if (jobs.length === 0) return { assets: [], attachments };
-
-  const dir = assetsDir(input.stateDir, input.id);
   try {
-    clearTicketAssets(input.stateDir, input.id);
-    mkdirSync(dir, { recursive: true, mode: 0o700 });
-  } catch {
-    return { assets: [], attachments };
-  }
+    const now = input.now ?? Date.now;
+    const start = now();
 
-  const assets: TicketAsset[] = [];
-  for (const [i, job] of jobs.entries()) {
+    const attachments: TicketAttachment[] = input.attachments.map((a) => ({ title: a.title, url: a.url }));
+
+    // Description uploads first: they are what a session most often needs, so they are the
+    // ones that survive the cap.
+    const jobs: { url: string; attachmentIndex: number | null }[] = [
+      ...extractAssetUrls(input.description).map((url) => ({ url, attachmentIndex: null })),
+      ...attachments.flatMap((a, i) => (isLinearUploadUrl(a.url) ? [{ url: a.url, attachmentIndex: i }] : [])),
+    ].slice(0, MAX_ASSETS);
+
+    if (jobs.length === 0) return { assets: [], attachments };
+
+    const dir = assetsDir(input.stateDir, input.id);
     try {
-      const { bytes, contentType } = await input.download(job.url);
-      const localPath = join(dir, assetFilename(job.url, i + 1, contentType));
-      writeFileSync(localPath, bytes, { mode: 0o600 });
-      if (job.attachmentIndex === null) assets.push({ url: job.url, localPath });
-      else attachments[job.attachmentIndex].localPath = localPath;
-    } catch {
-      // Best-effort: this asset is simply absent, and its URL still stands in the
-      // description text or the attachment entry.
+      clearTicketAssets(input.stateDir, input.id);
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
+    } catch (err) {
+      console.warn(`ticketAssets: could not prepare asset directory ${dir}: ${errorMessage(err)}`);
+      return { assets: [], attachments };
     }
+
+    const assets: TicketAsset[] = [];
+    for (const [i, job] of jobs.entries()) {
+      // One deadline for the whole step: a launch is something the user is waiting on
+      // (often from a phone over Tailscale), not a batch job, so a slow or hanging asset
+      // must not stack its 15 s timeout on top of nineteen others. Assets already
+      // downloaded keep their entries; the rest are simply not there, exactly like any
+      // other skipped asset.
+      if (now() - start >= ASSET_BUDGET_MS) break;
+      try {
+        const { bytes, contentType } = await input.download(job.url);
+        const localPath = join(dir, assetFilename(job.url, i + 1, contentType));
+        writeFileSync(localPath, bytes, { mode: 0o600 });
+        if (job.attachmentIndex === null) assets.push({ url: job.url, localPath });
+        else attachments[job.attachmentIndex].localPath = localPath;
+      } catch (err) {
+        console.warn(`ticketAssets: could not download asset ${job.url}: ${errorMessage(err)}`);
+      }
+    }
+    return { assets, attachments };
+  } catch (err) {
+    console.warn(`ticketAssets: prepareTicketAssets failed unexpectedly: ${errorMessage(err)}`);
+    return { assets: [], attachments: [] };
   }
-  return { assets, attachments };
 }

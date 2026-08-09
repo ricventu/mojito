@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   extractAssetUrls, isLinearUploadUrl, assetFilename, assetsDir, clearTicketAssets,
-  prepareTicketAssets, MAX_ASSETS,
+  prepareTicketAssets, MAX_ASSETS, ASSET_BUDGET_MS,
 } from "@/server/ticketAssets";
 
 let dir: string;
@@ -221,5 +221,42 @@ describe("prepareTicketAssets", () => {
     });
     expect(got.assets).toEqual([]);
     expect(got.attachments).toEqual([{ title: "The PR", url: "https://github.com/x/y/pull/1" }]);
+  });
+
+  it("never rejects when the description is not a string", async () => {
+    // extractAssetUrls calls description.matchAll — a non-string input throws there,
+    // outside every inner try/catch, so only the outer guard catches this.
+    const got = await prepareTicketAssets({
+      stateDir: dir, id: "s",
+      description: undefined as unknown as string,
+      attachments: [{ title: "The PR", url: "https://github.com/x/y/pull/1" }],
+      download: async () => { throw new Error("must not be called"); },
+    });
+    expect(got).toEqual({ assets: [], attachments: [] });
+  });
+
+  it("stops downloading once the elapsed time reaches the budget, keeping what it already has", async () => {
+    const description = Array.from(
+      { length: 5 },
+      (_, i) => `![](https://uploads.linear.app/w/${i}/a.png)`,
+    ).join(" ");
+    let clock = 0;
+    let calls = 0;
+    const got = await prepareTicketAssets({
+      stateDir: dir, id: "s", description, attachments: [],
+      now: () => clock,
+      download: async () => {
+        calls += 1;
+        // Jump the injected clock past the budget partway through, right after the
+        // second job's download starts — the third job's pre-flight check must then
+        // see the budget already spent and stop before ever calling download again.
+        if (calls === 2) clock = ASSET_BUDGET_MS;
+        return png(calls);
+      },
+    });
+    expect(calls).toBe(2);
+    expect(got.assets).toHaveLength(2);
+    expect(readFileSync(got.assets[0].localPath)).toEqual(Buffer.from([1]));
+    expect(readFileSync(got.assets[1].localPath)).toEqual(Buffer.from([2]));
   });
 });

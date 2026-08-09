@@ -45,12 +45,23 @@ export async function POST(req: Request) {
     return NextResponse.json(res.meta, { status: 201 });
   }
   // The session id has to be known before the launch, because the assets are written into
-  // a directory named after it. tmuxName validates the ticket, so a malformed one is a 422
-  // here rather than an unhandled throw inside launchSession.
+  // a directory named after it. tmuxName validates both the ticket and the status (a
+  // missing or non-string status throws inside statusSlug), so either being malformed is
+  // a 422 here rather than an unhandled throw inside launchSession.
   let id: string;
-  try { id = tmuxName(body.ticket, body.status); } catch { return NextResponse.json({ error: "invalid ticket" }, { status: 422 }); }
+  try { id = tmuxName(body.ticket, body.status); } catch { return NextResponse.json({ error: "invalid ticket or status" }, { status: 422 }); }
+  // The asset directory is named after the session id, and preparing it destroys the
+  // previous contents — so the duplicate check has to happen before the download, not
+  // only inside launchSession, or a rejected 409 would wipe a live session's assets.
+  if (await hasSession(id)) return NextResponse.json({ error: "duplicate", id }, { status: 409 });
   let content: IssueContent = { description: "", attachments: [] };
-  try { content = await getIssueContent(cfg.linearApiKey, body.ticket); } catch { /* launch anyway with empty description */ }
+  try {
+    content = await getIssueContent(cfg.linearApiKey, body.ticket);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`sessions route: getIssueContent failed for ${body.ticket}: ${message}`);
+    // launch anyway with empty description
+  }
   // Never rejects: an unreachable asset costs itself, not the launch.
   const prepared = await prepareTicketAssets({
     stateDir: cfg.stateDir, id, description: content.description, attachments: content.attachments,

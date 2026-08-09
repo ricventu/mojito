@@ -161,8 +161,10 @@ const ASSET_TIMEOUT_MS = 15_000;
  * the API key, and a spawned session never has one — so Mojito pulls the bytes at launch
  * instead. Redirects are followed to the signed storage URL; `fetch` drops the
  * Authorization header on that cross-origin hop, which is correct: the target is
- * pre-signed. Size is checked twice because `content-length` is advisory — the header
- * check is what keeps an oversized asset from ever being buffered.
+ * pre-signed. Size is checked twice because `content-length` is advisory: the header
+ * check rejects an oversized asset before it is buffered only when the header is present
+ * and honest — an absent or lying header still means an unbounded `arrayBuffer()` read,
+ * which is what the post-read check below catches instead.
  */
 export async function downloadLinearAsset(
   apiKey: string,

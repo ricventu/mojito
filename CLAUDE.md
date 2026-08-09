@@ -13,8 +13,10 @@ Mojito owns the whole lifecycle — there is no external plugin:
   creation, status transitions, and assignee — never comments. **Spawned sessions never
   touch Linear** (no MCP, no API); their prompt forbids it.
 - **Session context**: the launcher writes `<stateDir>/context/<id>.json`
-  (`{identifier, statusName, title, project, labels, description, rejectReason?}`);
-  the prompt embeds the path.
+  (`{identifier, statusName, title, project, labels, description, assets?, attachments?,
+  rejectReason?}`); the prompt embeds the path. `assets`/`attachments` point at files
+  Mojito already downloaded into the sibling `<stateDir>/context/<id>-assets/` directory,
+  since the spawned session holds no Linear credential of its own.
 - **Outcome channel**: the session's last action is writing
   `<stateDir>/results/<id>.json` (`{outcome: "ready-for-qa" | "blocked", notes}`).
   The Stop hook reads it (`src/server/hookHandler.ts`) and Mojito moves the status.
