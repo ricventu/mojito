@@ -25,7 +25,6 @@ export default function LaunchSheet(
     setModel(resolveModel(ticket.statusName, defaults));
     setEffort(resolveEffort(ticket.statusName, defaults));
   }, [defaults, ticket.statusName, touched]);
-  const [bareMode, setBareMode] = useState<"claude" | "terminal">("claude");
   const [err, setErr] = useState<string | null>(null);
   // Mirrors ticket.assignedToMe so the sheet can flip the label without waiting for the
   // list to refetch — the ticket prop is a snapshot taken when the sheet opened.
@@ -124,15 +123,12 @@ export default function LaunchSheet(
         <select value={effort} onChange={(e) => { setEffort(e.target.value); setTouched(true); }}>{EFFORTS.map((x) => <option key={x}>{x}</option>)}</select></label>
     </div>
   );
+  // One tap per action: a bare Claude session or a plain terminal in the ticket's
+  // worktree — direct, self-describing buttons instead of a mode toggle.
   const customBtn = (
-    <div style={{ marginTop: 12 }}>
-      <div className="btns" style={{ marginBottom: 8 }}>
-        <button className={`btn ${bareMode === "claude" ? "primary" : "ghost"}`} onClick={() => setBareMode("claude")}>Claude</button>
-        <button className={`btn ${bareMode === "terminal" ? "primary" : "ghost"}`} onClick={() => setBareMode("terminal")}>Terminal</button>
-      </div>
-      {bareMode === "claude"
-        ? <button className="btn ghost block" onClick={() => startCustom()}>Custom session</button>
-        : <button className="btn ghost block" onClick={() => startShell()}>Start terminal</button>}
+    <div className="btns" style={{ marginTop: 12 }}>
+      <button className="btn ghost" onClick={() => startCustom()}>Claude session</button>
+      <button className="btn ghost" onClick={() => startShell()}>Terminal</button>
     </div>
   );
 
