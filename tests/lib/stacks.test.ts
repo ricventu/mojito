@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pullMessage, syntheticStackSession } from "@/lib/stacks";
+import { pullMessage, pushMessage, syntheticStackSession } from "@/lib/stacks";
 
 describe("pullMessage", () => {
   it("updated -> ok with from/to", () => {
@@ -18,6 +18,38 @@ describe("pullMessage", () => {
   });
   it("failed -> err offering resolve", () => {
     expect(pullMessage({ error: "failed", detail: "network down" }).canResolve).toBe(true);
+  });
+});
+
+describe("pushMessage", () => {
+  it("pushed -> ok with branch and from/to", () => {
+    expect(pushMessage({ status: "pushed", branch: "main", from: "aaa", to: "bbb" }))
+      .toEqual({ kind: "ok", text: "Pushed main aaa → bbb." });
+  });
+  it("pushed with no previous remote ref -> ok naming it a new branch", () => {
+    expect(pushMessage({ status: "pushed", branch: "main", from: "", to: "bbb" }))
+      .toEqual({ kind: "ok", text: "Pushed main (new remote branch)." });
+  });
+  it("up-to-date -> ok", () => {
+    expect(pushMessage({ status: "up-to-date", branch: "main", from: "aaa", to: "aaa" }))
+      .toEqual({ kind: "ok", text: "Nothing to push (main at aaa)." });
+  });
+  it("rejected -> err pointing at Pull", () => {
+    const m = pushMessage({ error: "rejected", detail: "! [rejected] main -> main" });
+    expect(m.kind).toBe("err");
+    expect(m.text).toMatch(/Pull first/);
+    expect(m.text).toContain("! [rejected] main -> main");
+  });
+  it("detached -> err", () => {
+    expect(pushMessage({ error: "detached", detail: "repo is on a detached HEAD" }))
+      .toEqual({ kind: "err", text: "Repo is on a detached HEAD — nothing to push." });
+  });
+  it("failed -> err with the detail", () => {
+    expect(pushMessage({ error: "failed", detail: "could not read Username" }))
+      .toEqual({ kind: "err", text: "Push failed — could not read Username" });
+  });
+  it("failed with no detail -> err", () => {
+    expect(pushMessage({ error: "failed" })).toEqual({ kind: "err", text: "Push failed" });
   });
 });
 

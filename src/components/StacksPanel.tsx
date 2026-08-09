@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { apiFetch } from "@/lib/client";
 import { useStacks } from "@/lib/useStacks";
-import { pullMessage, syntheticStackSession, type PullResponse, type StackRow } from "@/lib/stacks";
+import { pullMessage, pushMessage, syntheticStackSession, type PullResponse, type PushResponse, type StackRow } from "@/lib/stacks";
 import type { SessionMeta } from "@/server/types";
 
 export default function StacksPanel({ token, onOpenLogs }: { token: string; onOpenLogs: (s: SessionMeta) => void }) {
@@ -38,6 +38,14 @@ function StackRowView({ row, token, onOpenLogs, refresh }: {
       await refresh();
     } finally { setBusy(false); }
   };
+  const push = async () => {
+    setBusy(true);
+    try {
+      const res = await apiFetch(token, `/api/stacks/${row.slug}/push`, { method: "POST" });
+      setMsg({ ...pushMessage((await res.json()) as PushResponse), canResolve: false });
+      await refresh();
+    } finally { setBusy(false); }
+  };
   const resolve = async () => {
     setBusy(true);
     try {
@@ -69,6 +77,7 @@ function StackRowView({ row, token, onOpenLogs, refresh }: {
         {row.pullable && (
           <button className="btn sm ghost" disabled={busy} onClick={pull}>Pull</button>
         )}
+        <button className="btn sm ghost" disabled={busy} onClick={push}>Push</button>
       </div>
       {msg && <p className={msg.kind === "err" ? "err-text" : "sheet-title"}>{msg.text}</p>}
       {msg?.canResolve && (
