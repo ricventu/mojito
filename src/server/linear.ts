@@ -154,6 +154,37 @@ export async function getIssueContent(
   return { description: node.description ?? "", attachments };
 }
 
+const ASSET_TIMEOUT_MS = 15_000;
+
+/**
+ * Fetch one `uploads.linear.app` asset. Linear serves these only to a request carrying
+ * the API key, and a spawned session never has one — so Mojito pulls the bytes at launch
+ * instead. Redirects are followed to the signed storage URL; `fetch` drops the
+ * Authorization header on that cross-origin hop, which is correct: the target is
+ * pre-signed. Size is checked twice because `content-length` is advisory — the header
+ * check is what keeps an oversized asset from ever being buffered.
+ */
+export async function downloadLinearAsset(
+  apiKey: string,
+  url: string,
+  maxBytes: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ bytes: Buffer; contentType: string }> {
+  const res = await fetchImpl(url, {
+    headers: { Authorization: apiKey },
+    signal: AbortSignal.timeout(ASSET_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`Linear asset download failed: ${res.status}`);
+  const declared = Number(res.headers.get("content-length") ?? "");
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    throw new Error(`Linear asset too large: ${declared} bytes`);
+  }
+  const bytes = Buffer.from(await res.arrayBuffer());
+  if (bytes.length > maxBytes) throw new Error(`Linear asset too large: ${bytes.length} bytes`);
+  const contentType = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  return { bytes, contentType };
+}
+
 export async function createIssue(
   apiKey: string,
   input: { teamKey: string; title: string; description: string; projectName: string | null },

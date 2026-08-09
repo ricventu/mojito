@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { listOpenIssues, getIssueStatus, getIssueRef, setIssueStatus, setIssueAssignee, postComment, uploadImage, getIssueContent, createIssue } from "@/server/linear";
+import { listOpenIssues, getIssueStatus, getIssueRef, setIssueStatus, setIssueAssignee, postComment, uploadImage, getIssueContent, createIssue, downloadLinearAsset } from "@/server/linear";
 
 function fakeFetch(payload: unknown) {
   return vi.fn(async () => ({ ok: true, json: async () => ({ data: payload }) })) as unknown as typeof fetch;
@@ -238,5 +238,55 @@ describe("createIssue", () => {
     const { impl } = fakeFetchWithCalls([{ teams: { nodes: [] } }]);
     await expect(createIssue("key", { teamKey: "XX", title: "T", description: "D", projectName: null }, impl))
       .rejects.toThrow("team not found: XX");
+  });
+});
+
+function fakeAssetFetch(opts: {
+  ok?: boolean; status?: number; body?: Uint8Array; headers?: Record<string, string>;
+}) {
+  const headers = new Headers(opts.headers ?? {});
+  const body = opts.body ?? new Uint8Array();
+  return vi.fn(async () => ({
+    ok: opts.ok ?? true,
+    status: opts.status ?? 200,
+    headers,
+    arrayBuffer: async () => body.buffer,
+  })) as unknown as typeof fetch;
+}
+
+describe("downloadLinearAsset", () => {
+  it("sends the API key and returns the bytes with a normalized content type", async () => {
+    const f = fakeAssetFetch({
+      body: new Uint8Array([1, 2, 3]),
+      headers: { "content-type": "image/png; charset=binary", "content-length": "3" },
+    });
+    const got = await downloadLinearAsset("k", "https://uploads.linear.app/a/b/c.png", 1000, f);
+    expect(got.contentType).toBe("image/png");
+    expect([...got.bytes]).toEqual([1, 2, 3]);
+    const init = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(init.headers.Authorization).toBe("k");
+  });
+
+  it("throws on a non-2xx response", async () => {
+    const f = fakeAssetFetch({ ok: false, status: 404 });
+    await expect(downloadLinearAsset("k", "https://uploads.linear.app/x", 1000, f))
+      .rejects.toThrow("404");
+  });
+
+  it("rejects an oversized asset from content-length without reading the body", async () => {
+    const f = fakeAssetFetch({ headers: { "content-length": "5000" } });
+    await expect(downloadLinearAsset("k", "https://uploads.linear.app/x", 1000, f))
+      .rejects.toThrow("too large");
+  });
+
+  it("rejects an oversized body even when content-length lies", async () => {
+    const f = fakeAssetFetch({ body: new Uint8Array(2000), headers: { "content-length": "1" } });
+    await expect(downloadLinearAsset("k", "https://uploads.linear.app/x", 1000, f))
+      .rejects.toThrow("too large");
+  });
+
+  it("degrades a missing content-type to an empty string", async () => {
+    const f = fakeAssetFetch({ body: new Uint8Array([9]) });
+    expect((await downloadLinearAsset("k", "https://uploads.linear.app/x", 1000, f)).contentType).toBe("");
   });
 });
