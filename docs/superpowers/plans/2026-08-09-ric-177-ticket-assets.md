@@ -460,7 +460,7 @@ describe("assetFilename", () => {
 
   it("sanitizes a traversal-shaped segment into a flat name", () => {
     const name = assetFilename("https://uploads.linear.app/w/..%2F..%2Fetc%2Fpasswd", 1, "image/png");
-    expect(name).toBe("01-.._.._etc_passwd");
+    expect(name).toBe("01-.._.._etc_passwd.png");
     expect(name).not.toContain("/");
   });
 

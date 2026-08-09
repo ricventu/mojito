@@ -150,7 +150,9 @@ sanitized with `[^A-Za-z0-9._-] → _`. The index guarantees uniqueness when two
 share a name; the sanitization is what makes traversal impossible (`..%2F..%2Fetc` becomes
 `.._.._etc`), and it is applied to the derived segment only — the directory always comes
 from `assetsDir`. An empty or dot-only segment degrades to `asset`. If the sanitized
-basename has no extension, one is appended from the content type:
+basename has no extension, one is appended from the content type — "no extension" means
+no `.` followed by alphanumerics at the very end, so a sanitized traversal segment like
+`.._.._etc_passwd` still earns its content-type extension:
 
 | content type | ext |
 |---|---|
