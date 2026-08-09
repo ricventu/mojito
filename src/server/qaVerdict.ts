@@ -9,13 +9,14 @@ export interface QaVerdictDeps {
   merge: (mode: MergeMode) => Promise<MergeOutcome>;
   setIssueStatus: (ticket: string, target: string) => Promise<void>;
   launchRework: (rejectReason: string) => Promise<void>;
-  launchConflictFix: (detail: string) => Promise<void>;
+  // Returns the launched session's tmux id, so the caller can offer to open it.
+  launchConflictFix: (detail: string) => Promise<string>;
 }
 
 export type QaVerdictResult =
   | { done: "merged"; commit: string }
   | { done: "mr-created"; url: string }
-  | { done: "conflict-session" }
+  | { done: "conflict-session"; sessionId: string }
   | { done: "rework-session" };
 
 /**
@@ -50,11 +51,12 @@ export async function resolveQaVerdict(
     case "mr-created":
       await deps.setIssueStatus(ticket, "Done");
       return { done: "mr-created", url: outcome.url };
-    case "conflict":
+    case "conflict": {
       // The branch is not merged and history was not moved: leave the ticket at To QA
       // so the conflict-fix session's own result can drive the next transition.
-      await deps.launchConflictFix(outcome.detail);
-      return { done: "conflict-session" };
+      const sessionId = await deps.launchConflictFix(outcome.detail);
+      return { done: "conflict-session", sessionId };
+    }
     case "error":
       throw new QaVerdictError(`merge failed: ${outcome.detail}`);
   }

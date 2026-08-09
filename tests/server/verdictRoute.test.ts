@@ -184,7 +184,9 @@ describe("/api/tickets/[id]/verdict", () => {
     h.mergeTicketBranch.mockImplementation(async () => ({ status: "conflict", detail: "CONFLICT in a.ts" }));
     const res = await POST(req(approve), params());
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, result: { done: "conflict-session" } });
+    expect(await res.json()).toEqual({
+      ok: true, result: { done: "conflict-session", sessionId: "mojito-RIC-110-conflict" },
+    });
     expect(h.launchConflictSession).toHaveBeenCalledWith(
       expect.objectContaining({ ticket: "RIC-110", projectName: "Mojito", title: "Some ticket",
         description: "the ticket description" }),

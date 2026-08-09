@@ -98,6 +98,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               tmuxDeps,
             );
             if (!res.ok) throw new Error(`conflict session not launched: ${res.reason}`);
+            return sid;
           },
         }),
       supersedeStaleSession: async (t) => {

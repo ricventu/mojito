@@ -7,7 +7,7 @@ function deps(outcome: MergeOutcome = { status: "merged", commit: "abc1234" }) {
     merge: vi.fn(async () => outcome),
     setIssueStatus: vi.fn(async () => {}),
     launchRework: vi.fn(async () => {}),
-    launchConflictFix: vi.fn(async () => {}),
+    launchConflictFix: vi.fn(async () => "mojito-RIC-110-conflict"),
   };
 }
 
@@ -41,7 +41,7 @@ describe("resolveQaVerdict approve", () => {
     const res = await resolveQaVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
     expect(d.launchConflictFix).toHaveBeenCalledWith("CONFLICT (content): src/a.ts");
     expect(d.setIssueStatus).not.toHaveBeenCalled();
-    expect(res).toEqual({ done: "conflict-session" });
+    expect(res).toEqual({ done: "conflict-session", sessionId: "mojito-RIC-110-conflict" });
   });
 
   it("a merge error throws QaVerdictError and writes no status, launches nothing", async () => {
