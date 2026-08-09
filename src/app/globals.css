@@ -257,6 +257,9 @@ button.chip:active { transform: scale(.96); }
 .outcome.warn { border-color: color-mix(in srgb, var(--attn) 40%, var(--border)); background: var(--attn-bg); }
 .outcome-head { margin: 0; font: 600 14px/1.35 var(--mono); color: var(--text); }
 .outcome-body { margin: 8px 0 0; font-size: 13px; color: var(--text-dim); }
+/* The failed merge attempt's git diagnostic: monospace, clipped, scrollable. */
+.outcome-body.mono { font: 12px/1.4 var(--mono); white-space: pre-wrap; word-break: break-word;
+  max-height: 96px; overflow-y: auto; }
 /* The MR URL is long and the sheet is phone-width: wrap it anywhere rather than
    letting it push the sheet into a horizontal scroll. */
 .outcome-link { display: block; margin-top: 8px; font: 13px/1.4 var(--mono);

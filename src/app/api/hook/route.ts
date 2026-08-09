@@ -31,6 +31,7 @@ export async function POST(req: Request) {
     bus: getBus(),
     readResult: (sessionId) => readSessionResult(cfg.stateDir, sessionId),
     moveToQa: (ticket) => setIssueStatus(cfg.linearApiKey, ticket, "To QA"),
+    moveToDone: (ticket) => setIssueStatus(cfg.linearApiKey, ticket, "Done"),
     clearResult: (sessionId) => clearSessionResult(cfg.stateDir, sessionId),
     readTranscriptTitle,
   }, payload);

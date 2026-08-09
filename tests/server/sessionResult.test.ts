@@ -12,6 +12,11 @@ describe("sessionResult", () => {
     writeFileSync(resultPath(stateDir, "s1"), JSON.stringify({ outcome: "ready-for-qa", notes: "built X" }));
     expect(readSessionResult(stateDir, "s1")).toEqual({ outcome: "ready-for-qa", notes: "built X" });
   });
+  it("round-trips a merged result (the merge-fix session's outcome)", () => {
+    const stateDir = dir();
+    writeFileSync(resultPath(stateDir, "s3"), JSON.stringify({ outcome: "merged", notes: "ff onto main" }));
+    expect(readSessionResult(stateDir, "s3")).toEqual({ outcome: "merged", notes: "ff onto main" });
+  });
   it("returns null for a missing file", () => {
     expect(readSessionResult(dir(), "absent")).toBeNull();
   });

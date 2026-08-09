@@ -3,8 +3,10 @@ import { join } from "node:path";
 
 // What a ticket session reports back at the end of its work. Written by the spawned
 // session (the launch prompt names this exact path); read by the Stop/SessionEnd hook.
+// "merged" is written only by the merge-fix session (an approved merge it completed
+// itself); work sessions report "ready-for-qa" or "blocked".
 export interface SessionResult {
-  outcome: "ready-for-qa" | "blocked";
+  outcome: "ready-for-qa" | "merged" | "blocked";
   notes?: string;
 }
 
@@ -22,7 +24,7 @@ export function readSessionResult(stateDir: string, id: string): SessionResult |
       outcome?: unknown;
       notes?: unknown;
     };
-    if (parsed.outcome !== "ready-for-qa" && parsed.outcome !== "blocked") return null;
+    if (parsed.outcome !== "ready-for-qa" && parsed.outcome !== "merged" && parsed.outcome !== "blocked") return null;
     return { outcome: parsed.outcome, ...(typeof parsed.notes === "string" ? { notes: parsed.notes } : {}) };
   } catch {
     return null;

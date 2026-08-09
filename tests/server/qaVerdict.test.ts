@@ -7,7 +7,7 @@ function deps(outcome: MergeOutcome = { status: "merged", commit: "abc1234" }) {
     merge: vi.fn(async () => outcome),
     setIssueStatus: vi.fn(async () => {}),
     launchRework: vi.fn(async () => {}),
-    launchConflictFix: vi.fn(async () => "mojito-RIC-110-conflict"),
+    launchMergeFix: vi.fn(async () => "mojito-RIC-110-conflict"),
   };
 }
 
@@ -25,7 +25,7 @@ describe("resolveQaVerdict approve", () => {
     expect(d.setIssueStatus).toHaveBeenCalledWith("RIC-110", "Done");
     expect(res).toEqual({ done: "merged", commit: "abc1234" });
     expect(d.launchRework).not.toHaveBeenCalled();
-    expect(d.launchConflictFix).not.toHaveBeenCalled();
+    expect(d.launchMergeFix).not.toHaveBeenCalled();
   });
 
   it("approve-mr opens an MR and moves the ticket to Done", async () => {
@@ -36,27 +36,32 @@ describe("resolveQaVerdict approve", () => {
     expect(res).toEqual({ done: "mr-created", url: "https://git.example/mr/7" });
   });
 
-  it("a merge conflict launches the conflict-fix session and writes NO status", async () => {
+  it("a merge conflict launches the merge-fix session and writes NO status", async () => {
     const d = deps({ status: "conflict", detail: "CONFLICT (content): src/a.ts" });
     const res = await resolveQaVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
-    expect(d.launchConflictFix).toHaveBeenCalledWith("CONFLICT (content): src/a.ts");
+    expect(d.launchMergeFix).toHaveBeenCalledWith("CONFLICT (content): src/a.ts", "local");
     expect(d.setIssueStatus).not.toHaveBeenCalled();
-    expect(res).toEqual({ done: "conflict-session", sessionId: "mojito-RIC-110-conflict" });
+    expect(res).toEqual({
+      done: "fix-session", sessionId: "mojito-RIC-110-conflict", detail: "CONFLICT (content): src/a.ts",
+    });
   });
 
-  it("a merge error throws QaVerdictError and writes no status, launches nothing", async () => {
+  it("a repairable merge error also launches the merge-fix session, carrying the approved mode", async () => {
     const d = deps({ status: "error", detail: "worktree has uncommitted changes" });
-    await expect(resolveQaVerdict({ ticket: "RIC-110", arg: "approve-local" }, d))
-      .rejects.toBeInstanceOf(QaVerdictError);
+    const res = await resolveQaVerdict({ ticket: "RIC-110", arg: "approve-mr" }, d);
+    expect(d.launchMergeFix).toHaveBeenCalledWith("worktree has uncommitted changes", "mr");
     expect(d.setIssueStatus).not.toHaveBeenCalled();
-    expect(d.launchConflictFix).not.toHaveBeenCalled();
-    expect(d.launchRework).not.toHaveBeenCalled();
+    expect(res).toEqual({
+      done: "fix-session", sessionId: "mojito-RIC-110-conflict", detail: "worktree has uncommitted changes",
+    });
   });
 
-  it("surfaces the merge failure detail in the error message", async () => {
-    const d = deps({ status: "error", detail: "repo root is on other, not main" });
+  it("a failed fix-session launch propagates and writes no status", async () => {
+    const d = deps({ status: "error", detail: "fatal: whatever" });
+    d.launchMergeFix.mockImplementation(async () => { throw new Error("no worktree"); });
     await expect(resolveQaVerdict({ ticket: "RIC-110", arg: "approve-local" }, d))
-      .rejects.toThrow(/repo root is on other, not main/);
+      .rejects.toThrow(/no worktree/);
+    expect(d.setIssueStatus).not.toHaveBeenCalled();
   });
 });
 
@@ -106,6 +111,6 @@ describe("resolveQaVerdict reject", () => {
   it("exposes no comment dependency at all (the reason travels in the context file)", async () => {
     const d = deps();
     await resolveQaVerdict({ ticket: "RIC-110", arg: "reject", reason: "broken" }, d);
-    expect(Object.keys(d)).toEqual(["merge", "setIssueStatus", "launchRework", "launchConflictFix"]);
+    expect(Object.keys(d)).toEqual(["merge", "setIssueStatus", "launchRework", "launchMergeFix"]);
   });
 });

@@ -3,10 +3,10 @@ import { getConfig, getRegistry } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
 import { getIssueStatus, setIssueStatus, getIssueContent, downloadLinearAsset, type IssueContent } from "@/server/linear";
 import { prepareTicketAssets, MAX_ASSET_BYTES } from "@/server/ticketAssets";
-import { launchSession, launchConflictSession } from "@/server/launch";
+import { launchSession, launchMergeFixSession } from "@/server/launch";
 import { loadProjectMap, resolvePathForProject } from "@/server/projects";
 import { mergeTicketBranch, repoRootFromWorktree } from "@/server/merge";
-import { resolveQaVerdict } from "@/server/qaVerdict";
+import { resolveQaVerdict, QaVerdictError } from "@/server/qaVerdict";
 import { resolveTicketVerdict } from "@/server/ticketVerdict";
 import { tmuxName, conflictSessionName, validateTicket } from "@/server/sessionKey";
 import { defaultModelForStatus, defaultEffortForStatus } from "@/server/stageDefaults";
@@ -57,10 +57,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       resolveVerdict: (i) =>
         resolveQaVerdict(i, {
           merge: async (mode) => {
+            // Precondition failures throw (HTTP 400): with no worktree there is nothing a
+            // merge-fix session could even open. Everything mergeTicketBranch returns as
+            // conflict/error is repairable in the worktree, so qaVerdict launches the fix.
             const { worktree, repoRoot } = await resolveDirs();
-            if (!worktree) return { status: "error", detail: "no worktree for ticket" } as const;
+            if (!worktree) throw new QaVerdictError("no worktree for ticket");
             if (!repoRoot || worktree === repoRoot) {
-              return { status: "error", detail: "cannot resolve the main checkout for the ticket worktree" } as const;
+              throw new QaVerdictError("cannot resolve the main checkout for the ticket worktree");
             }
             return mergeTicketBranch({ worktree, repoRoot, mode });
           },
@@ -88,16 +91,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             if (!res.ok) throw new Error(`rework session not launched: ${res.reason}`);
             workSessionRelaunched = true;
           },
-          launchConflictFix: async () => {
+          launchMergeFix: async (detail, mode) => {
             const sid = conflictSessionName(id);
             if (registry.get(sid)) await supersedeSession(sid, { closeSession, registry });
             const status = "In Progress";
-            const res = await launchConflictSession(
+            const res = await launchMergeFixSession(
               { ticket: id, projectName, title, description: (await content()).description,
-                model: defaultModelForStatus(status), effort: defaultEffortForStatus(status) },
+                model: defaultModelForStatus(status), effort: defaultEffortForStatus(status),
+                mergeMode: mode, blocker: detail },
               tmuxDeps,
             );
-            if (!res.ok) throw new Error(`conflict session not launched: ${res.reason}`);
+            if (!res.ok) throw new Error(`merge-fix session not launched: ${res.reason}`);
             return sid;
           },
         }),

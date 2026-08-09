@@ -156,15 +156,15 @@ export default function LaunchSheet(
     </div>
   );
 
-  // The conflict session is registered before the verdict responds, so the onLaunched()
+  // The fix session is registered before the verdict responds, so the onLaunched()
   // refetch normally has it by the time this renders — but the prop update is a round trip
   // behind, so the button says what it is waiting for instead of silently doing nothing.
   // Looking the session up by id in the live list is how page.tsx opens alerts, too.
   // If that one onLaunched() refresh happens to fail, it is not the only rescue: the
-  // conflict session emits hook events as Claude starts, and useEvents' SSE handler
+  // fix session emits hook events as Claude starts, and useEvents' SSE handler
   // (src/app/page.tsx) calls refreshSessions() on every event, so the list — and this
   // button — self-heals within seconds without any retry logic here.
-  const conflictSession = outcome?.done === "conflict-session"
+  const fixSession = outcome?.done === "fix-session"
     ? sessions.find((s) => s.id === outcome.sessionId)
     : undefined;
 
@@ -184,15 +184,16 @@ export default function LaunchSheet(
             </div>
           ) : (
             <div className="outcome warn">
-              <p className="outcome-head">Merge conflict — the branch was not merged</p>
+              <p className="outcome-head">Merge not completed automatically</p>
               <p className="outcome-body">
-                The rebase stopped on a conflict, so {ticket.identifier} stays at To QA.
-                A conflict session was launched to resolve it.
+                A fix session was launched to finish the approved merge; {ticket.identifier} moves
+                to Done when it reports the merge as completed.
               </p>
+              {outcome.detail && <p className="outcome-body mono">{outcome.detail}</p>}
               <button className="btn primary block" style={{ marginTop: 12 }}
-                disabled={!conflictSession}
-                onClick={() => conflictSession && onOpen(conflictSession)}>
-                {conflictSession ? "Open conflict session" : "Starting…"}
+                disabled={!fixSession}
+                onClick={() => fixSession && onOpen(fixSession)}>
+                {fixSession ? "Open fix session" : "Starting…"}
               </button>
             </div>
           )}

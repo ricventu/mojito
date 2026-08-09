@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   launchSession, buildClaudeCommand, launchCustomSession, buildCustomClaudeCommand,
-  launchConflictSession,
+  launchMergeFixSession,
   buildShellCommand, launchShellSession,
   buildResolvePrompt, launchStackResolveSession,
 } from "@/server/launch";
@@ -263,13 +263,14 @@ describe("launchCustomSession", () => {
 const baseConflictReq = {
   ticket: "RIC-120", projectName: "Mojito", title: "some ticket title",
   description: "Let the user do the thing.", model: "opus", effort: "xhigh" as const,
+  mergeMode: "local" as const, blocker: "CONFLICT (content): src/a.ts",
 };
 
-describe("launchConflictSession", () => {
-  it("launches a ticket-kind session at To QA under the -conflict id, seeded with the conflict prompt", async () => {
+describe("launchMergeFixSession", () => {
+  it("launches a ticket-kind session at To QA under the -conflict id, seeded with the merge-fix prompt", async () => {
     let command = "";
     const d = deps({ newSession: vi.fn(async (_n: string, _c: string, cmd: string) => { command = cmd; }) });
-    const res = await launchConflictSession(baseConflictReq, d);
+    const res = await launchMergeFixSession(baseConflictReq, d);
     expect(res.ok).toBe(true);
     const meta = (res as { ok: true; meta: SessionMeta }).meta;
     expect(meta).toMatchObject({
@@ -277,9 +278,11 @@ describe("launchConflictSession", () => {
       launchStatus: "To QA", state: "starting", cwd: "/code/lime",
     });
     expect(meta.id.endsWith("-conflict")).toBe(true);
-    // The conflict prompt, not the work prompt, and no lime slash command.
+    // The merge-fix prompt, not the work prompt, and no lime slash command.
     expect(command.startsWith("claude --model")).toBe(true);
     expect(command).toContain("QA-approved branch");
+    expect(command).toContain("CONFLICT (content): src/a.ts"); // the blocker is embedded
+    expect(command).toContain("--ff-only"); // local-mode completion step
     expect(command).toContain(join(dir, "context", "mojito-RIC-120-conflict.json"));
     expect(command).toContain(join(dir, "results", "mojito-RIC-120-conflict.json"));
     expect(command).not.toContain("/lime-");
@@ -287,7 +290,7 @@ describe("launchConflictSession", () => {
 
   it("writes a launch context at To QA carrying the description and no labels", async () => {
     const d = deps();
-    await launchConflictSession(baseConflictReq, d);
+    await launchMergeFixSession(baseConflictReq, d);
     const p = join(dir, "context", "mojito-RIC-120-conflict.json");
     expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({
       identifier: "RIC-120", statusName: "To QA", title: "some ticket title",
@@ -302,19 +305,19 @@ describe("launchConflictSession", () => {
     write(stale, JSON.stringify({ outcome: "ready-for-qa" }));
     let goneBeforeSpawn: boolean | undefined;
     const d = deps({ newSession: vi.fn(async () => { goneBeforeSpawn = !existsSync(stale); }) });
-    await launchConflictSession(baseConflictReq, d);
+    await launchMergeFixSession(baseConflictReq, d);
     expect(goneBeforeSpawn).toBe(true);
   });
 
   it("refuses a duplicate", async () => {
     const d = deps({ hasSession: vi.fn(async () => true) });
-    const res = await launchConflictSession(baseConflictReq, d);
+    const res = await launchMergeFixSession(baseConflictReq, d);
     expect(res).toMatchObject({ ok: false, reason: "duplicate", id: "mojito-RIC-120-conflict" });
   });
 
   it("refuses when no repo resolves", async () => {
     const d = deps({ resolveCwd: () => null });
-    const res = await launchConflictSession(baseConflictReq, d);
+    const res = await launchMergeFixSession(baseConflictReq, d);
     expect(res).toMatchObject({ ok: false, reason: "no-repo" });
   });
 });

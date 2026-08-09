@@ -17,7 +17,7 @@ const h = vi.hoisted(() => ({
   repoRootFromWorktree: vi.fn(async () => "/code/mojito" as string | null),
   // Takes an (unused) param so mock.calls[0][0] indexes into a non-empty tuple below.
   launchSession: vi.fn(async (_req: unknown) => ({ ok: true, meta: {} }) as { ok: boolean; reason?: string }),
-  launchConflictSession: vi.fn(async () => ({ ok: true, meta: {} }) as { ok: boolean; reason?: string }),
+  launchMergeFixSession: vi.fn(async () => ({ ok: true, meta: {} }) as { ok: boolean; reason?: string }),
   supersedeSession: vi.fn(async () => {}),
   resolveTicketWorktree: vi.fn(() => "/code/mojito/.worktrees/ric-110" as string | null),
   resolveTicketCwd: vi.fn(() => "/code/mojito" as string | null),
@@ -39,7 +39,7 @@ vi.mock("@/server/merge", () => ({
   mergeTicketBranch: h.mergeTicketBranch, repoRootFromWorktree: h.repoRootFromWorktree,
 }));
 vi.mock("@/server/launch", () => ({
-  launchSession: h.launchSession, launchConflictSession: h.launchConflictSession,
+  launchSession: h.launchSession, launchMergeFixSession: h.launchMergeFixSession,
 }));
 vi.mock("@/server/supersede", () => ({ supersedeSession: h.supersedeSession }));
 vi.mock("@/server/ticketCwd", () => ({
@@ -79,7 +79,7 @@ beforeEach(() => {
   h.prepareTicketAssets.mockImplementation(async (input) => ({ assets: [], attachments: input.attachments }));
   h.mergeTicketBranch.mockImplementation(async () => ({ status: "merged", commit: "abc1234" }));
   h.launchSession.mockImplementation(async () => ({ ok: true, meta: {} }));
-  h.launchConflictSession.mockImplementation(async () => ({ ok: true, meta: {} }));
+  h.launchMergeFixSession.mockImplementation(async () => ({ ok: true, meta: {} }));
   h.resolveTicketWorktree.mockImplementation(() => "/code/mojito/.worktrees/ric-110");
   h.resolveTicketCwd.mockImplementation(() => "/code/mojito");
   h.resolvePathForProject.mockImplementation(() => "/code/mojito");
@@ -180,28 +180,33 @@ describe("/api/tickets/[id]/verdict", () => {
     expect(h.mergeTicketBranch).not.toHaveBeenCalled();
   });
 
-  it("a merge conflict launches the conflict session and leaves the status alone", async () => {
+  it("a merge conflict launches the merge-fix session and leaves the status alone", async () => {
     h.mergeTicketBranch.mockImplementation(async () => ({ status: "conflict", detail: "CONFLICT in a.ts" }));
     const res = await POST(req(approve), params());
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      ok: true, result: { done: "conflict-session", sessionId: "mojito-RIC-110-conflict" },
+      ok: true, result: { done: "fix-session", sessionId: "mojito-RIC-110-conflict", detail: "CONFLICT in a.ts" },
     });
-    expect(h.launchConflictSession).toHaveBeenCalledWith(
+    expect(h.launchMergeFixSession).toHaveBeenCalledWith(
       expect.objectContaining({ ticket: "RIC-110", projectName: "Mojito", title: "Some ticket",
-        description: "the ticket description" }),
+        description: "the ticket description", mergeMode: "local", blocker: "CONFLICT in a.ts" }),
       expect.anything(),
     );
     expect(h.setIssueStatus).not.toHaveBeenCalled();
   });
 
-  it("a merge error is refused with no status write and no session", async () => {
+  it("a repairable merge error also launches the merge-fix session with the approved mode", async () => {
     h.mergeTicketBranch.mockImplementation(async () => ({ status: "error", detail: "dirty worktree" }));
     const res = await POST(req(approve), params());
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: expect.stringContaining("dirty worktree") });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      ok: true, result: { done: "fix-session", sessionId: "mojito-RIC-110-conflict", detail: "dirty worktree" },
+    });
+    expect(h.launchMergeFixSession).toHaveBeenCalledWith(
+      expect.objectContaining({ mergeMode: "local", blocker: "dirty worktree" }),
+      expect.anything(),
+    );
     expect(h.setIssueStatus).not.toHaveBeenCalled();
-    expect(h.launchConflictSession).not.toHaveBeenCalled();
   });
 
   it("reject moves the ticket to In Progress and launches rework carrying the reason", async () => {

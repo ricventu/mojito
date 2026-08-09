@@ -10,7 +10,8 @@ import { resolveTicketCwd } from "./ticketCwd.js";
 import { logfilePath } from "./sidecar.js";
 import type { Registry } from "./registry.js";
 import { writeLaunchContext } from "./launchContext.js";
-import { buildWorkPrompt, buildConflictPrompt } from "./prompts.js";
+import { buildWorkPrompt, buildMergeFixPrompt } from "./prompts.js";
+import type { MergeMode } from "./merge.js";
 import { resultPath, clearSessionResult } from "./sessionResult.js";
 import type { TicketAsset, TicketAttachment } from "./ticketAssets.js";
 
@@ -198,24 +199,29 @@ export async function launchCustomSession(
   return { ok: true, meta };
 }
 
-export interface ConflictLaunchRequest {
+export interface MergeFixLaunchRequest {
   ticket: string;
   projectName: string | null;
   title: string;
   description: string;
   model: string;
   effort: Effort;
+  // The merge mode the human approved (the session completes the merge that way) and
+  // the failed attempt's diagnostic, embedded in the prompt.
+  mergeMode: MergeMode;
+  blocker: string;
 }
 
 /**
- * Launch the conflict-resolution session for a QA-approved branch whose server-side
- * merge hit conflicts while updating the branch onto the default branch (see
- * mergeTicketBranch). The ticket stays at To QA — the session resolves the conflicts by
- * hand, then reports through the standard result file — so the launch context carries
- * statusName "To QA" and its own `-conflict` session id.
+ * Launch the merge-fix session for a QA-approved branch whose server-side merge could
+ * not complete (rebase conflict, diverged default branch, dirty worktree, ...; see
+ * mergeTicketBranch). The merge is already approved, so the session finishes it in the
+ * approved mode and reports "merged" through the standard result file — the hook then
+ * moves the ticket to Done. The launch context carries statusName "To QA" and the
+ * ticket's own `-conflict` session id.
  */
-export async function launchConflictSession(
-  req: ConflictLaunchRequest,
+export async function launchMergeFixSession(
+  req: MergeFixLaunchRequest,
   deps: LaunchDeps,
 ): Promise<{ ok: true; meta: SessionMeta } | { ok: false; reason: "duplicate" | "no-repo"; id?: string }> {
   validateTicket(req.ticket);
@@ -244,10 +250,12 @@ export async function launchConflictSession(
     description: req.description,
   });
   clearSessionResult(deps.stateDir, id); // the id repeats per ticket: a stale result must not satisfy this session's Stop hook
-  const command = buildClaudeCommand(req, settingsPath, buildConflictPrompt({
+  const command = buildClaudeCommand(req, settingsPath, buildMergeFixPrompt({
     ticket: req.ticket,
     contextPath,
     resultPath: resultPath(deps.stateDir, id),
+    mergeMode: req.mergeMode,
+    blocker: req.blocker,
   }));
   await deps.newSession(id, cwd, command);
   await deps.pipePane(id, logfilePath(deps.stateDir, id));

@@ -9,9 +9,12 @@ export interface HookDeps {
   bus: EventBus;
   readResult: (id: string) => SessionResult | null;
   moveToQa: (ticket: string) => Promise<void>;
+  // "merged" — written only by the merge-fix session, which completed an already-approved
+  // merge itself — closes the lifecycle: the ticket goes straight to Done.
+  moveToDone: (ticket: string) => Promise<void>;
   // Clears the result file so a later Stop/SessionEnd on this same session (e.g. after the
-  // user revives it with a prompt) never re-reads a stale "ready-for-qa" and re-fires
-  // moveToQa. Called only on a SUCCESSFUL moveToQa — a failed write leaves the file in place
+  // user revives it with a prompt) never re-reads a stale result and re-fires the status
+  // move. Called only on a SUCCESSFUL move — a failed write leaves the file in place
   // so the next Stop/SessionEnd can retry it.
   clearResult: (id: string) => void;
   // Reads Claude Code's auto-generated session title from a transcript file (see
@@ -60,13 +63,16 @@ export async function handleHook(
   }
 
   let ready = false;
+  let merged = false;
   if ((event === "Stop" || event === "SessionEnd") && meta.state !== "done") {
     const result = deps.readResult(id);
-    if (result?.outcome === "ready-for-qa") {
+    if (result?.outcome === "ready-for-qa" || result?.outcome === "merged") {
       try {
-        await deps.moveToQa(meta.ticket);
-        deps.clearResult(id); // success only: a stale file must never re-fire moveToQa on a later Stop
+        if (result.outcome === "merged") await deps.moveToDone(meta.ticket);
+        else await deps.moveToQa(meta.ticket);
+        deps.clearResult(id); // success only: a stale file must never re-fire the move on a later Stop
         ready = true;
+        merged = result.outcome === "merged";
       } catch {
         ready = false; // Linear write failed: Stop => needs-input so the user can retry
       }
@@ -74,6 +80,7 @@ export async function handleHook(
   }
 
   const outcome = mapHook(event, ready, meta.state);
+  if (merged && outcome.alert) outcome.alert.message = "merged"; // mapHook's default copy says "ready for QA"
   deps.registry.patch(id, { state: outcome.state, message: outcome.alert?.message });
   deps.bus.emit({ type: "session.state", id, state: outcome.state });
   if (outcome.alert) {
