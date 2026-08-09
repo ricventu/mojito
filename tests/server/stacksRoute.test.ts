@@ -5,6 +5,7 @@ vi.mock("@/server/projectStack", () => ({
   startStack: vi.fn(),
   stopStack: vi.fn(),
   pullStack: vi.fn(),
+  pushStack: vi.fn(),
   resolveStack: vi.fn(),
   currentBranch: vi.fn(),
 }));
@@ -15,8 +16,9 @@ import { GET } from "@/app/api/stacks/route";
 import { POST as START } from "@/app/api/stacks/[slug]/start/route";
 import { POST as STOP } from "@/app/api/stacks/[slug]/stop/route";
 import { POST as PULL } from "@/app/api/stacks/[slug]/pull/route";
+import { POST as PUSH } from "@/app/api/stacks/[slug]/push/route";
 import { POST as RESOLVE } from "@/app/api/stacks/[slug]/resolve/route";
-import { listStacks, startStack, stopStack, pullStack, resolveStack, currentBranch } from "@/server/projectStack";
+import { listStacks, startStack, stopStack, pullStack, pushStack, resolveStack, currentBranch } from "@/server/projectStack";
 import { launchStackResolveSession } from "@/server/launch";
 
 const TOKEN = "test-token";
@@ -146,5 +148,38 @@ describe("POST /api/stacks/[slug]/resolve", () => {
     vi.mocked(currentBranch).mockResolvedValue("main");
     vi.mocked(launchStackResolveSession).mockResolvedValue({ ok: false, reason: "no-repo" });
     expect((await RESOLVE(...resolveReq("factorybook"))).status).toBe(422);
+  });
+});
+
+function pushReq(slug: string, auth = true): [Request, { params: Promise<{ slug: string }> }] {
+  return [
+    new Request(`http://localhost/api/stacks/${slug}/push`, { method: "POST", headers: auth ? { "x-mojito-token": TOKEN } : {} }),
+    { params: Promise.resolve({ slug }) },
+  ];
+}
+
+describe("POST /api/stacks/[slug]/push", () => {
+  it("401 without token", async () => {
+    expect((await PUSH(...pushReq("factorybook", false))).status).toBe(401);
+  });
+  it("200 returns the push result at top level", async () => {
+    vi.mocked(pushStack).mockResolvedValue({ ok: true, result: { status: "pushed", branch: "main", from: "a", to: "b" } });
+    const res = await PUSH(...pushReq("factorybook"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "pushed", branch: "main", from: "a", to: "b" });
+  });
+  it("404 for an unknown slug", async () => {
+    vi.mocked(pushStack).mockResolvedValue({ ok: false, error: "unknown stack", code: 404 });
+    expect((await PUSH(...pushReq("nope"))).status).toBe(404);
+  });
+  it("409 rejected with detail", async () => {
+    vi.mocked(pushStack).mockResolvedValue({ ok: false, error: "rejected", code: 409, detail: "! [rejected] main -> main" });
+    const res = await PUSH(...pushReq("factorybook"));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "rejected", detail: "! [rejected] main -> main" });
+  });
+  it("500 failed", async () => {
+    vi.mocked(pushStack).mockResolvedValue({ ok: false, error: "failed", code: 500, detail: "could not read Username" });
+    expect((await PUSH(...pushReq("factorybook"))).status).toBe(500);
   });
 });
