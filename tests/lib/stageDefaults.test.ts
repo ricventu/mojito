@@ -4,6 +4,7 @@ import {
   resolveModel, resolveEffort, mergeEffective, validateStageDefaults,
   sanitizeOverrides, minimalOverrides,
 } from "@/lib/stageDefaults";
+import { WORK_STATES } from "@/server/statusModel";
 
 describe("built-in seed defaults", () => {
   it("reserves fable (never a default) and uses opus/xhigh for every work status", () => {
@@ -92,5 +93,15 @@ describe("minimalOverrides", () => {
   it("keeps only the entries that differ from the built-ins", () => {
     const draft = { ...BUILTIN_STAGE_DEFAULTS, "Todo": { model: "opus", effort: "medium" as const } };
     expect(minimalOverrides(draft)).toEqual({ "Todo": { model: "opus", effort: "medium" } });
+  });
+});
+
+describe("LAUNCHABLE_STATUSES / WORK_STATES sync", () => {
+  it("is exactly the server model's work states, in the same order", () => {
+    expect(LAUNCHABLE_STATUSES).toEqual(WORK_STATES);
+  });
+
+  it("gives every launchable status a built-in seed default", () => {
+    expect(Object.keys(BUILTIN_STAGE_DEFAULTS).sort()).toEqual([...LAUNCHABLE_STATUSES].sort());
   });
 });
