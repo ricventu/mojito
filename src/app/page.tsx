@@ -6,6 +6,7 @@ import { usePersistedState } from "@/lib/usePersistedState";
 import { useTickets } from "@/lib/useTickets";
 import { useSessions } from "@/lib/useSessions";
 import { useEvents } from "@/lib/useEvents";
+import { useSelfUpdate } from "@/lib/useSelfUpdate";
 import TokenGate from "@/components/TokenGate";
 import TicketList from "@/components/TicketList";
 import SessionList from "@/components/SessionList";
@@ -32,6 +33,11 @@ export default function Home() {
   const [docsFor, setDocsFor] = useState<{ target: DocsTarget; label: string } | null>(null);
   const { tickets, refresh: refreshTickets } = useTickets(token);
   const { sessions, refresh: refreshSessions } = useSessions(token);
+  // Owned here — not by StacksPanel or SettingsSheet — so a deploy's health poll and
+  // "Deploying…" state survive switching tabs or opening a terminal, both of which
+  // unmount StacksPanel mid-deploy. Called unconditionally, above the token/terminal/docs
+  // early returns below, per the rules of hooks; the hook itself no-ops until a token exists.
+  const selfUpdate = useSelfUpdate(token);
 
   const onEvent = useCallback((e: MojitoEvent) => {
     refreshSessions();
@@ -64,13 +70,13 @@ export default function Home() {
   return (
     <div style={{ paddingBottom: 64 }}>
       <AlertLayer alerts={alerts} onOpen={(id) => { const s = sessions.find((x) => x.id === id); if (s) setOpen(s); }} onClear={() => setAlerts([])} />
-      {settingsOpen && <SettingsSheet token={token} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsSheet token={token} onClose={() => setSettingsOpen(false)} selfUpdate={selfUpdate} />}
       {tab === "tickets"
         ? <TicketList token={token} tickets={tickets} sessions={sessions}
             onLaunched={() => { refreshSessions(); refreshTickets(); }} onOpen={setOpen}
             onOpenDocs={(t) => setDocsFor({ target: { ticket: t.identifier, project: t.project }, label: t.identifier })} />
         : tab === "stacks"
-        ? <StacksPanel token={token} onOpenLogs={setOpen} />
+        ? <StacksPanel token={token} onOpenLogs={setOpen} selfUpdate={selfUpdate} />
         : <SessionList token={token} sessions={sessions} onOpen={setOpen} onChanged={refreshSessions}
             onOpenDocs={(s) => setDocsFor({ target: { session: s.id }, label: s.ticket || s.title })} />}
       <nav className="nav">

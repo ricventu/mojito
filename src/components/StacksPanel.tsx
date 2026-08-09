@@ -2,25 +2,28 @@
 import { useState } from "react";
 import { apiFetch } from "@/lib/client";
 import { useStacks } from "@/lib/useStacks";
-import { pullMessage, syntheticStackSession, type PullResponse, type StackRow } from "@/lib/stacks";
+import type { SelfUpdate } from "@/lib/useSelfUpdate";
+import { pullMessage, pushMessage, syntheticStackSession, type PullResponse, type PushResponse, type StackRow } from "@/lib/stacks";
 import type { SessionMeta } from "@/server/types";
 
-export default function StacksPanel({ token, onOpenLogs }: { token: string; onOpenLogs: (s: SessionMeta) => void }) {
+export default function StacksPanel({ token, onOpenLogs, selfUpdate }: {
+  token: string; onOpenLogs: (s: SessionMeta) => void; selfUpdate: SelfUpdate;
+}) {
   const { stacks, refresh } = useStacks(token);
   return (
     <div className="pad">
       <section>
         <h4 className="sect">Stacks</h4>
         {stacks.map((row) => (
-          <StackRowView key={row.slug} row={row} token={token} onOpenLogs={onOpenLogs} refresh={refresh} />
+          <StackRowView key={row.slug} row={row} token={token} onOpenLogs={onOpenLogs} refresh={refresh} selfUpdate={selfUpdate} />
         ))}
       </section>
     </div>
   );
 }
 
-function StackRowView({ row, token, onOpenLogs, refresh }: {
-  row: StackRow; token: string; onOpenLogs: (s: SessionMeta) => void; refresh: () => void;
+function StackRowView({ row, token, onOpenLogs, refresh, selfUpdate }: {
+  row: StackRow; token: string; onOpenLogs: (s: SessionMeta) => void; refresh: () => void; selfUpdate: SelfUpdate;
 }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string; canResolve: boolean } | null>(null);
@@ -35,6 +38,14 @@ function StackRowView({ row, token, onOpenLogs, refresh }: {
     try {
       const res = await apiFetch(token, `/api/stacks/${row.slug}/pull`, { method: "POST" });
       setMsg(pullMessage((await res.json()) as PullResponse));
+      await refresh();
+    } finally { setBusy(false); }
+  };
+  const push = async () => {
+    setBusy(true);
+    try {
+      const res = await apiFetch(token, `/api/stacks/${row.slug}/push`, { method: "POST" });
+      setMsg({ ...pushMessage((await res.json()) as PushResponse), canResolve: false });
       await refresh();
     } finally { setBusy(false); }
   };
@@ -69,8 +80,27 @@ function StackRowView({ row, token, onOpenLogs, refresh }: {
         {row.pullable && (
           <button className="btn sm ghost" disabled={busy} onClick={pull}>Pull</button>
         )}
+        <button className="btn sm ghost" disabled={busy} onClick={push}>Push</button>
+        {/* Mojito's own checkout has a post-merge hook that starts the deploy unit, so its
+            Pull is the guarded /api/self-update flow (banner + health-poll + reload), not
+            the raw stacks pull. Hidden entirely when MOJITO_SELF_UPDATE is off. */}
+        {row.self && selfUpdate.enabled && (
+          <button
+            className="btn sm ghost"
+            disabled={busy || selfUpdate.phase === "pulling" || selfUpdate.phase === "deploying"}
+            onClick={selfUpdate.run}
+          >
+            {selfUpdate.phase === "pulling" ? "Pulling…" : selfUpdate.phase === "deploying" ? "Deploying…" : "Pull & deploy"}
+          </button>
+        )}
       </div>
       {msg && <p className={msg.kind === "err" ? "err-text" : "sheet-title"}>{msg.text}</p>}
+      {row.self && selfUpdate.message && <p className="sheet-title">{selfUpdate.message}</p>}
+      {row.self && selfUpdate.phase === "deploying" && (
+        <p className="sheet-title">Deploying — the server restarts in ~1 min…</p>
+      )}
+      {row.self && selfUpdate.phase === "timeout" && <p className="err-text">Deploy still running — reload manually.</p>}
+      {row.self && selfUpdate.error && <p className="err-text">{selfUpdate.error}</p>}
       {msg?.canResolve && (
         <button className="btn sm primary" disabled={busy} onClick={resolve}>Resolve with Claude</button>
       )}

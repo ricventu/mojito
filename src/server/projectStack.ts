@@ -6,6 +6,7 @@ import { listMappedProjects, loadProjectMap, type ProjectMap } from "./projects.
 import { statusSlug, stackSessionName } from "./sessionKey.js";
 import { listAllPanes as tmuxListAllPanes, startStackSession, stopStackSession, type PaneInfo } from "./tmux.js";
 import { ffPull, FfPullError, type FfPullResult, type GitRun } from "./ffPull.js";
+import { gitPush, GitPushError, type GitPushResult } from "./gitPush.js";
 import type { StackRow, StackStatus } from "@/lib/stacks";
 
 const pexec = promisify(execFile);
@@ -21,6 +22,7 @@ export interface StackDeps {
   startSession?: (name: string, cwd: string, command: string) => Promise<void>;
   stopSession?: (name: string) => Promise<void>;
   pull?: (cwd: string) => Promise<FfPullResult>;
+  push?: (cwd: string) => Promise<GitPushResult>;
 }
 
 export interface StackTarget {
@@ -28,6 +30,7 @@ export interface StackTarget {
   path: string;
   hasStack: boolean;
   pullable: boolean;
+  self: boolean;
 }
 
 function defaultIsExecutable(p: string): boolean {
@@ -88,6 +91,7 @@ export function resolveStack(slug: string, deps: StackDeps): StackTarget | null 
     path: match.path,
     hasStack: isExecutable(join(match.path, "scripts", "start.sh")),
     pullable: resolve(match.path) !== resolve(deps.selfPath),
+    self: resolve(match.path) === resolve(deps.selfPath),
   };
 }
 
@@ -106,6 +110,7 @@ export async function listStacks(deps: StackDeps): Promise<StackRow[]> {
       hasStack,
       status: hasStack ? deriveStatus(slug, path, panes) : null,
       pullable: resolve(path) !== resolve(deps.selfPath),
+      self: resolve(path) === resolve(deps.selfPath),
     };
   });
 }
@@ -156,9 +161,26 @@ export type StackPullResult =
   | { ok: false; error: string; code: number; detail?: string };
 
 const pullInflight = new Map<string, Promise<FfPullResult>>();
+const pushInflight = new Map<string, Promise<GitPushResult>>();
 
 export function _resetStackInflight(): void {
   pullInflight.clear();
+  pushInflight.clear();
+}
+
+// One in-flight git operation per slug: a second POST while one runs gets its result.
+function singleFlight<T>(map: Map<string, Promise<T>>, slug: string, op: () => Promise<T>): Promise<T> {
+  const running = map.get(slug);
+  if (running) return running;
+  const started = (async () => {
+    try {
+      return await op();
+    } finally {
+      map.delete(slug);
+    }
+  })();
+  map.set(slug, started);
+  return started;
 }
 
 export async function pullStack(slug: string, deps: StackDeps): Promise<StackPullResult> {
@@ -166,21 +188,34 @@ export async function pullStack(slug: string, deps: StackDeps): Promise<StackPul
   if (!target || !target.pullable) return { ok: false, error: "not pullable", code: 404 };
   const pull = deps.pull ?? ((cwd: string) => ffPull(cwd));
   try {
-    let inflight = pullInflight.get(slug);
-    if (!inflight) {
-      inflight = (async () => {
-        try {
-          return await pull(target.path);
-        } finally {
-          pullInflight.delete(slug);
-        }
-      })();
-      pullInflight.set(slug, inflight);
-    }
-    return { ok: true, result: await inflight };
+    return { ok: true, result: await singleFlight(pullInflight, slug, () => pull(target.path)) };
   } catch (e) {
     if (e instanceof FfPullError) {
       return { ok: false, error: e.kind, code: e.kind === "diverged" ? 409 : 500, detail: e.detail };
+    }
+    return { ok: false, error: "failed", code: 500, detail: String(e) };
+  }
+}
+
+export type StackPushResult =
+  | { ok: true; result: GitPushResult }
+  | { ok: false; error: string; code: number; detail?: string };
+
+/**
+ * Push the mapped checkout's current branch. Unlike pull, the Mojito self-row IS
+ * pushable: a push fires no **post-merge** hook (the deploy trigger), so the post-merge
+ * deploy hazard that makes the self-row unpullable does not apply here. (A `pre-push`
+ * hook, if one existed, would still run — it just isn't the hazard in play.)
+ */
+export async function pushStack(slug: string, deps: StackDeps): Promise<StackPushResult> {
+  const target = resolveStack(slug, deps);
+  if (!target) return { ok: false, error: "unknown stack", code: 404 };
+  const push = deps.push ?? ((cwd: string) => gitPush(cwd));
+  try {
+    return { ok: true, result: await singleFlight(pushInflight, slug, () => push(target.path)) };
+  } catch (e) {
+    if (e instanceof GitPushError) {
+      return { ok: false, error: e.kind, code: e.kind === "rejected" ? 409 : 500, detail: e.detail };
     }
     return { ok: false, error: "failed", code: 500, detail: String(e) };
   }

@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { listStacks, resolveStack, startStack, stopStack, pullStack, _resetStackInflight, type StackDeps, type PaneInfo } from "@/server/projectStack";
+import { listStacks, resolveStack, startStack, stopStack, pullStack, pushStack, _resetStackInflight, type StackDeps, type PaneInfo } from "@/server/projectStack";
 import { FfPullError, type FfPullResult } from "@/server/ffPull";
+import { GitPushError, type GitPushResult } from "@/server/gitPush";
 
 const pane = (session: string, cwd: string, dead = false, deadStatus = ""): PaneInfo =>
   ({ session, cwd, dead, deadStatus });
@@ -53,6 +54,9 @@ describe("listStacks", () => {
     const rows = await listStacks(deps());
     const mojito = rows.find((r) => r.project === "Mojito")!;
     expect(mojito.pullable).toBe(false);
+    expect(mojito.self).toBe(true);
+    const fb = rows.find((r) => r.project === "Factorybook")!;
+    expect(fb.self).toBe(false);
   });
 
   it("derives status from the stack's own child session (found by path)", async () => {
@@ -103,9 +107,9 @@ describe("listStacks", () => {
 describe("resolveStack", () => {
   it("finds a project by slug and reports hasStack + pullable", () => {
     expect(resolveStack("factorybook", deps())).toEqual({
-      project: "Factorybook", path: "/repo/fb", hasStack: true, pullable: true,
+      project: "Factorybook", path: "/repo/fb", hasStack: true, pullable: true, self: false,
     });
-    expect(resolveStack("mojito", deps())).toMatchObject({ pullable: false });
+    expect(resolveStack("mojito", deps())).toMatchObject({ pullable: false, self: true });
   });
   it("returns null for an unknown slug", () => {
     expect(resolveStack("nope", deps())).toBeNull();
@@ -209,6 +213,56 @@ describe("pullStack", () => {
     const p2 = pullStack("factorybook", d);
     release();
     await Promise.all([p1, p2]);
+    expect(calls).toBe(1);
+  });
+});
+
+describe("pushStack", () => {
+  const pushed: GitPushResult = { status: "pushed", branch: "main", from: "aaa", to: "bbb" };
+
+  it("404 for an unknown slug", async () => {
+    expect(await pushStack("nope", deps())).toEqual({ ok: false, error: "unknown stack", code: 404 });
+  });
+
+  it("returns the push result for a mapped project", async () => {
+    expect(await pushStack("factorybook", deps({ push: async () => pushed })))
+      .toEqual({ ok: true, result: pushed });
+  });
+
+  it("pushes the Mojito self-row, unlike pull", async () => {
+    const seen: string[] = [];
+    const res = await pushStack("mojito", deps({ push: async (cwd) => { seen.push(cwd); return pushed; } }));
+    expect(res).toEqual({ ok: true, result: pushed });
+    expect(seen).toEqual([SELF]);
+  });
+
+  it("maps rejected to 409 and every other kind to 500", async () => {
+    const rejected = await pushStack("factorybook", deps({
+      push: async () => { throw new GitPushError("rejected", "! [rejected] main -> main"); },
+    }));
+    expect(rejected).toMatchObject({ ok: false, error: "rejected", code: 409 });
+    _resetStackInflight();
+    const detached = await pushStack("factorybook", deps({
+      push: async () => { throw new GitPushError("detached", "repo is on a detached HEAD"); },
+    }));
+    expect(detached).toMatchObject({ ok: false, error: "detached", code: 500 });
+    _resetStackInflight();
+    const failed = await pushStack("factorybook", deps({
+      push: async () => { throw new GitPushError("failed", "could not read Username"); },
+    }));
+    expect(failed).toMatchObject({ ok: false, error: "failed", code: 500, detail: "could not read Username" });
+  });
+
+  it("single-flights concurrent pushes for the same slug", async () => {
+    let calls = 0;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => { release = r; });
+    const d = deps({ push: async () => { calls += 1; await gate; return pushed; } });
+    const p1 = pushStack("factorybook", d);
+    const p2 = pushStack("factorybook", d);
+    release();
+    expect(await p1).toEqual({ ok: true, result: pushed });
+    expect(await p2).toEqual({ ok: true, result: pushed });
     expect(calls).toBe(1);
   });
 });
