@@ -33,3 +33,25 @@ describe("writeLaunchContext", () => {
     expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({ ...ctx, rejectReason: "missed the edge case" });
   });
 });
+
+describe("writeLaunchContext asset fields", () => {
+  it("round-trips assets and attachments", () => {
+    const withAssets: LaunchContext = {
+      ...ctx,
+      assets: [{ url: "https://uploads.linear.app/w/a.png", localPath: "/state/context/s-assets/01-a.png" }],
+      attachments: [
+        { title: "Spec", url: "https://uploads.linear.app/w/s.pdf", localPath: "/state/context/s-assets/02-s.pdf" },
+        { title: "The PR", url: "https://github.com/x/y/pull/1" },
+      ],
+    };
+    const p = writeLaunchContext(dir, "mojito-RIC-46-work", withAssets);
+    expect(JSON.parse(readFileSync(p, "utf8"))).toEqual(withAssets);
+  });
+
+  it("omits both fields when the ticket carries nothing", () => {
+    const p = writeLaunchContext(dir, "mojito-RIC-46-work", ctx);
+    const written = JSON.parse(readFileSync(p, "utf8"));
+    expect("assets" in written).toBe(false);
+    expect("attachments" in written).toBe(false);
+  });
+});

@@ -149,6 +149,28 @@ describe("launchSession", () => {
     expect(meta?.title).toBe("Some ticket");
     expect(meta?.labels).toEqual(["Feature"]);
   });
+
+  it("forwards assets and attachments into the context file", async () => {
+    const d = deps();
+    await launchSession({
+      ...baseReq,
+      assets: [{ url: "https://uploads.linear.app/w/a.png", localPath: "/state/context/x-assets/01-a.png" }],
+      attachments: [{ title: "The PR", url: "https://github.com/x/y/pull/1" }],
+    }, d);
+    const written = JSON.parse(readFileSync(join(dir, "context", "mojito-RIC-46-planned.json"), "utf8"));
+    expect(written.assets).toEqual([
+      { url: "https://uploads.linear.app/w/a.png", localPath: "/state/context/x-assets/01-a.png" },
+    ]);
+    expect(written.attachments).toEqual([{ title: "The PR", url: "https://github.com/x/y/pull/1" }]);
+  });
+
+  it("omits the asset fields when the request carries none", async () => {
+    const d = deps();
+    await launchSession({ ...baseReq, assets: [], attachments: [] }, d);
+    const written = JSON.parse(readFileSync(join(dir, "context", "mojito-RIC-46-planned.json"), "utf8"));
+    expect("assets" in written).toBe(false);
+    expect("attachments" in written).toBe(false);
+  });
 });
 
 function customDeps(over: Record<string, unknown> = {}) {

@@ -1,5 +1,6 @@
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { TicketAsset, TicketAttachment } from "./ticketAssets.js";
 
 export interface LaunchContext {
   identifier: string;
@@ -8,6 +9,10 @@ export interface LaunchContext {
   project: string | null;
   labels: string[];
   description: string;
+  // Linear uploads Mojito already downloaded for the session — it holds no Linear
+  // credential of its own, so a bare URL would be unreadable to it. Omitted when empty.
+  assets?: TicketAsset[];
+  attachments?: TicketAttachment[];
   rejectReason?: string;
 }
 

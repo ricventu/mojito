@@ -12,6 +12,7 @@ import type { Registry } from "./registry.js";
 import { writeLaunchContext } from "./launchContext.js";
 import { buildWorkPrompt, buildConflictPrompt } from "./prompts.js";
 import { resultPath, clearSessionResult } from "./sessionResult.js";
+import type { TicketAsset, TicketAttachment } from "./ticketAssets.js";
 
 export interface LaunchRequest {
   ticket: string;
@@ -22,6 +23,8 @@ export interface LaunchRequest {
   title: string;
   labels: string[];
   description: string;
+  assets?: TicketAsset[];
+  attachments?: TicketAttachment[];
   rejectReason?: string;
 }
 
@@ -81,6 +84,8 @@ export async function launchSession(
     project: req.projectName,
     labels: req.labels,
     description: req.description,
+    ...(req.assets?.length ? { assets: req.assets } : {}),
+    ...(req.attachments?.length ? { attachments: req.attachments } : {}),
     ...(req.rejectReason ? { rejectReason: req.rejectReason } : {}),
   });
   clearSessionResult(deps.stateDir, id); // ids repeat per ticket+status: a stale result must not satisfy the new session's Stop hook
