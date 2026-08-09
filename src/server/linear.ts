@@ -310,25 +310,6 @@ export async function setIssueAssignee(
   );
 }
 
-export async function postComment(
-  apiKey: string,
-  identifier: string,
-  body: string,
-  fetchImpl: typeof fetch = fetch,
-): Promise<void> {
-  const ref = await getIssueRef(apiKey, identifier, fetchImpl);
-  await query<{ commentCreate: { success: boolean } }>(
-    apiKey,
-    {
-      query: `mutation ($issueId: String!, $body: String!) {
-        commentCreate(input: { issueId: $issueId, body: $body }) { success }
-      }`,
-      variables: { issueId: ref.id, body },
-    },
-    fetchImpl,
-  );
-}
-
 export async function uploadImage(
   apiKey: string,
   file: { filename: string; contentType: string; size: number; bytes: Uint8Array },

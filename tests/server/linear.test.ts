@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { listOpenIssues, getIssueStatus, getIssueRef, setIssueStatus, setIssueAssignee, postComment, uploadImage, getIssueContent, createIssue, downloadLinearAsset } from "@/server/linear";
+import { listOpenIssues, getIssueStatus, getIssueRef, setIssueStatus, setIssueAssignee, uploadImage, getIssueContent, createIssue, downloadLinearAsset } from "@/server/linear";
 
 function fakeFetch(payload: unknown) {
   return vi.fn(async () => ({ ok: true, json: async () => ({ data: payload }) })) as unknown as typeof fetch;
@@ -118,17 +118,6 @@ describe("linear mutations", () => {
     expect(calls).toHaveLength(2);
     const update = JSON.parse(calls[1][1].body as string);
     expect(update.variables).toEqual({ id: "issue-uuid", assigneeId: null });
-  });
-
-  it("posts a comment on the resolved issue node", async () => {
-    const f = seqFetch([
-      { issues: { nodes: [{ id: "issue-uuid", state: { name: "To QA" }, team: { id: "team-uuid" } }] } },
-      { commentCreate: { success: true } },
-    ]);
-    await postComment("k", "RIC-110", "QA rejected — nope", f);
-    const commentCall = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[1][1] as { body: string };
-    expect(commentCall.body).toContain("commentCreate");
-    expect(commentCall.body).toContain("issue-uuid");
   });
 });
 
