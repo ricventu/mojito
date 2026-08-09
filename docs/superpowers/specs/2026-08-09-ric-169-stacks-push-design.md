@@ -116,16 +116,17 @@ keeps returning 404 for the Mojito self-row** (`pullable: false`), unchanged fro
   - pushed, known `from`: `Pushed <branch> <from> → <to>.`
   - pushed, new remote branch: `Pushed <branch> (new remote branch).`
   - up-to-date: `Nothing to push (<branch> at <to>).`
-  - `rejected`: `origin/<branch> has commits you don't have — Pull first.` (detail appended
-    when present). The advice is actionable because the Pull button sits next to it and
-    already offers "Resolve with Claude" on a diverged history.
+  - `rejected`: `origin has commits you don't have — Pull first.` (detail appended when
+    present; the 409 body carries `{error, detail}` only, so the message does not name the
+    branch). The advice is actionable because the Pull button sits next to it and already
+    offers "Resolve with Claude" on a diverged history.
   - `detached`: `Repo is on a detached HEAD — nothing to push.`
   - other: `Push failed — <detail>`.
 
 `pushMessage` returns no `canResolve`: the push path never launches a Claude session. The
 existing `pullMessage` shape is left alone.
 
-### `src/lib/useSelfUpdate.ts` (new)
+### `src/lib/selfUpdate.ts` + `src/lib/useSelfUpdate.ts` (new)
 
 The "Pull & deploy" behavior currently inline in `SettingsSheet.tsx` — the
 `MOJITO_SELF_UPDATE` capability probe, the `idle | pulling | deploying | timeout` phase
@@ -138,8 +139,11 @@ useSelfUpdate(token): { enabled, phase, message, error, run }
 ```
 
 Behavior is unchanged, including the unmount cleanup that cancels the pending tick and the
-5-minute timeout. `SettingsSheet` renders from the hook; the Stacks self-row uses the same
-hook, so both call sites share one implementation instead of duplicating a deploy poller.
+5-minute timeout. The response→text mapping the sheet does inline becomes a pure
+`selfUpdateMessage(res)` in `src/lib/selfUpdate.ts` (the testable seam, since hooks are not
+rendered in this suite). `SettingsSheet` renders from the hook; the Stacks self-row uses
+the same hook, so both call sites share one implementation instead of duplicating a deploy
+poller.
 
 ### `src/components/StacksPanel.tsx`
 
@@ -189,7 +193,10 @@ RIC-165's guarantee that the stacks pull never touches Mojito's own checkout.
 - `tests/server/stacksRoute.test.ts` (extended): `/push` 401 without token, 404, 200 body,
   409 `rejected`, 500 `failed`.
 - `tests/lib/stacks.test.ts` (extended): every `pushMessage` branch.
-- `useSelfUpdate`: the existing `tests/lib/deployPoll.test.ts` still covers the state
-  machine; the extraction is verified by the suite continuing to pass plus a test that the
-  hook exposes `enabled: false` (and therefore renders nothing) when
-  `GET /api/self-update` reports it disabled.
+- `useSelfUpdate`: vitest runs in the `node` environment over `tests/**/*.test.ts` with no
+  React Testing Library, so hooks and components are never rendered in this suite — the
+  codebase's convention is to test the pure helper a hook wraps (`deployPoll.ts`,
+  `readPersisted`, `pullMessage`). The extraction follows it: the response→message mapping
+  moves into a pure `selfUpdateMessage(res)` in `src/lib/selfUpdate.ts`, unit-tested for
+  every branch (updated / up-to-date / diverged / failed / network error); the effectful
+  hook is left to the existing `deployPoll` tests plus typecheck.
