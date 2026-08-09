@@ -1,4 +1,4 @@
-import { rmSync } from "node:fs";
+import { rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const MAX_ASSET_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -69,4 +69,74 @@ export function assetsDir(stateDir: string, id: string): string {
  */
 export function clearTicketAssets(stateDir: string, id: string): void {
   rmSync(assetsDir(stateDir, id), { recursive: true, force: true });
+}
+
+export interface TicketAsset {
+  url: string;
+  localPath: string;
+}
+
+export interface TicketAttachment {
+  title: string;
+  url: string;
+  localPath?: string;
+}
+
+export interface PrepareTicketAssetsInput {
+  stateDir: string;
+  id: string;
+  description: string;
+  attachments: { title: string; url: string }[];
+  download: (url: string) => Promise<{ bytes: Buffer; contentType: string }>;
+}
+
+export interface PreparedTicketAssets {
+  assets: TicketAsset[];
+  attachments: TicketAttachment[];
+}
+
+/**
+ * Put every Linear upload a ticket carries on disk and name the local paths, so the work
+ * session — which holds no Linear credential — can Read them.
+ *
+ * Best-effort by construction: this never rejects. A single unreachable asset costs only
+ * itself (its URL still stands in the description text), and a state directory that
+ * cannot be written costs only the assets — the launch proceeds either way.
+ */
+export async function prepareTicketAssets(
+  input: PrepareTicketAssetsInput,
+): Promise<PreparedTicketAssets> {
+  const attachments: TicketAttachment[] = input.attachments.map((a) => ({ title: a.title, url: a.url }));
+
+  // Description uploads first: they are what a session most often needs, so they are the
+  // ones that survive the cap.
+  const jobs: { url: string; attachmentIndex: number | null }[] = [
+    ...extractAssetUrls(input.description).map((url) => ({ url, attachmentIndex: null })),
+    ...attachments.flatMap((a, i) => (isLinearUploadUrl(a.url) ? [{ url: a.url, attachmentIndex: i }] : [])),
+  ].slice(0, MAX_ASSETS);
+
+  if (jobs.length === 0) return { assets: [], attachments };
+
+  const dir = assetsDir(input.stateDir, input.id);
+  try {
+    clearTicketAssets(input.stateDir, input.id);
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+  } catch {
+    return { assets: [], attachments };
+  }
+
+  const assets: TicketAsset[] = [];
+  for (const [i, job] of jobs.entries()) {
+    try {
+      const { bytes, contentType } = await input.download(job.url);
+      const localPath = join(dir, assetFilename(job.url, i + 1, contentType));
+      writeFileSync(localPath, bytes, { mode: 0o600 });
+      if (job.attachmentIndex === null) assets.push({ url: job.url, localPath });
+      else attachments[job.attachmentIndex].localPath = localPath;
+    } catch {
+      // Best-effort: this asset is simply absent, and its URL still stands in the
+      // description text or the attachment entry.
+    }
+  }
+  return { assets, attachments };
 }
