@@ -129,11 +129,11 @@ describe("POST /api/stacks/[slug]/resolve", () => {
   it("404 when the row is unknown or not pullable", async () => {
     vi.mocked(resolveStack).mockReturnValue(null);
     expect((await RESOLVE(...resolveReq("nope"))).status).toBe(404);
-    vi.mocked(resolveStack).mockReturnValue({ project: "Mojito", path: "/repo/mojito", hasStack: false, pullable: false });
+    vi.mocked(resolveStack).mockReturnValue({ project: "Mojito", path: "/repo/mojito", hasStack: false, pullable: false, self: true });
     expect((await RESOLVE(...resolveReq("mojito"))).status).toBe(404);
   });
   it("201 with meta on success", async () => {
-    vi.mocked(resolveStack).mockReturnValue({ project: "Factorybook", path: "/repo/fb", hasStack: true, pullable: true });
+    vi.mocked(resolveStack).mockReturnValue({ project: "Factorybook", path: "/repo/fb", hasStack: true, pullable: true, self: false });
     vi.mocked(currentBranch).mockResolvedValue("main");
     vi.mocked(launchStackResolveSession).mockResolvedValue({ ok: true, meta: { id: "mojito-custom-factorybook-abc", kind: "custom" } as never });
     const res = await RESOLVE(...resolveReq("factorybook"));
@@ -142,7 +142,7 @@ describe("POST /api/stacks/[slug]/resolve", () => {
     expect(vi.mocked(launchStackResolveSession).mock.calls[0][0]).toEqual({ projectName: "Factorybook", branch: "main" });
   });
   it("422 when the repo cannot be resolved", async () => {
-    vi.mocked(resolveStack).mockReturnValue({ project: "Factorybook", path: "/repo/fb", hasStack: true, pullable: true });
+    vi.mocked(resolveStack).mockReturnValue({ project: "Factorybook", path: "/repo/fb", hasStack: true, pullable: true, self: false });
     vi.mocked(currentBranch).mockResolvedValue("main");
     vi.mocked(launchStackResolveSession).mockResolvedValue({ ok: false, reason: "no-repo" });
     expect((await RESOLVE(...resolveReq("factorybook"))).status).toBe(422);

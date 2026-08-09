@@ -8,6 +8,7 @@ export interface StackRow {
   hasStack: boolean;
   status: StackStatus | null; // meaningful only when hasStack
   pullable: boolean; // false for the Mojito self-row
+  self: boolean; // the Mojito checkout this server runs from
 }
 
 export type PullResponse =
