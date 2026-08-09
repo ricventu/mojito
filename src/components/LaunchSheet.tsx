@@ -26,6 +26,7 @@ export default function LaunchSheet(
     setEffort(resolveEffort(ticket.statusName, defaults));
   }, [defaults, ticket.statusName, touched]);
   const [err, setErr] = useState<string | null>(null);
+  const [verdictPending, setVerdictPending] = useState<"approve-local" | "approve-mr" | "reject" | null>(null);
   // Mirrors ticket.assignedToMe so the sheet can flip the label without waiting for the
   // list to refetch — the ticket prop is a snapshot taken when the sheet opened.
   const [mine, setMine] = useState(ticket.assignedToMe);
@@ -40,15 +41,25 @@ export default function LaunchSheet(
   // and title are sent because the server needs them to locate the worktree and to seed
   // whatever session the verdict ends up launching.
   const submitVerdict = async (arg: "approve-local" | "approve-mr" | "reject", reason?: string) => {
-    const res = await apiFetch(token, `/api/tickets/${ticket.identifier}/verdict`, {
-      method: "POST",
-      body: JSON.stringify({ arg, ...(reason === undefined ? {} : { reason }),
-        projectName: ticket.project, title: ticket.title }),
-    });
-    if (res.ok) { onLaunched(); onClose(); return; }
-    let message = `verdict failed (${res.status})`;
-    try { const b = await res.json(); if (b?.error) message = b.error; } catch { /* non-JSON */ }
-    setErr(message);
+    // The server-side rebase+merge takes 10s+; without a pending state the click looks
+    // like a no-op and closing the sheet aborts the request mid-merge.
+    setErr(null);
+    setVerdictPending(arg);
+    try {
+      const res = await apiFetch(token, `/api/tickets/${ticket.identifier}/verdict`, {
+        method: "POST",
+        body: JSON.stringify({ arg, ...(reason === undefined ? {} : { reason }),
+          projectName: ticket.project, title: ticket.title }),
+      });
+      if (res.ok) { onLaunched(); onClose(); return; }
+      let message = `verdict failed (${res.status})`;
+      try { const b = await res.json(); if (b?.error) message = b.error; } catch { /* non-JSON */ }
+      setErr(message);
+    } catch {
+      setErr("verdict request failed — check the connection and retry");
+    } finally {
+      setVerdictPending(null);
+    }
   };
 
   // Take the ticket or hand it back. The sheet stays open — assigning a ticket and then
@@ -139,7 +150,8 @@ export default function LaunchSheet(
         {ticket.title && <p className="sheet-title">{ticket.title}</p>}
         {isToQa ? (
           <>
-            <QaVerdictButtons onApprove={(a) => submitVerdict(a)} onReject={(reason) => submitVerdict("reject", reason)} />
+            <QaVerdictButtons pending={verdictPending} onApprove={(a) => submitVerdict(a)} onReject={(reason) => submitVerdict("reject", reason)} />
+            {err && <p className="err-text">{err}</p>}
             {selectors}
             {customBtn}
           </>
@@ -165,7 +177,7 @@ export default function LaunchSheet(
           {mine ? "Unassign" : "Assign to me"}
         </button>
         <button className="btn ghost block" style={{ marginTop: 12 }} onClick={onOpenDocs}>Docs</button>
-        {err && <p className="err-text">{err}</p>}
+        {!isToQa && err && <p className="err-text">{err}</p>}
       </div>
     </div>
   );
