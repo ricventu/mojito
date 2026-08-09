@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getConfig, getRegistry } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
-import { getIssueStatus, setIssueStatus, getIssueDescription } from "@/server/linear";
+import { getIssueStatus, setIssueStatus, getIssueContent } from "@/server/linear";
 import { launchSession, launchConflictSession } from "@/server/launch";
 import { loadProjectMap, resolvePathForProject } from "@/server/projects";
 import { mergeTicketBranch, repoRootFromWorktree } from "@/server/merge";
@@ -46,7 +46,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   let workSessionRelaunched = false;
 
   const describe = async () => {
-    try { return await getIssueDescription(cfg.linearApiKey, id); } catch { return ""; }
+    try { return (await getIssueContent(cfg.linearApiKey, id)).description; } catch { return ""; }
   };
 
   const result = await resolveTicketVerdict(

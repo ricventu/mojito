@@ -5,7 +5,7 @@ import type { MergeOutcome } from "@/server/merge";
 const h = vi.hoisted(() => ({
   getIssueStatus: vi.fn(async () => "To QA"),
   setIssueStatus: vi.fn(async () => {}),
-  getIssueDescription: vi.fn(async () => "the ticket description"),
+  getIssueContent: vi.fn(async () => ({ description: "the ticket description", attachments: [] })),
   mergeTicketBranch: vi.fn(async () => ({ status: "merged", commit: "abc1234" }) as MergeOutcome),
   repoRootFromWorktree: vi.fn(async () => "/code/mojito" as string | null),
   launchSession: vi.fn(async () => ({ ok: true, meta: {} }) as { ok: boolean; reason?: string }),
@@ -19,7 +19,7 @@ const h = vi.hoisted(() => ({
 
 vi.mock("@/server/linear", () => ({
   getIssueStatus: h.getIssueStatus, setIssueStatus: h.setIssueStatus,
-  getIssueDescription: h.getIssueDescription,
+  getIssueContent: h.getIssueContent,
 }));
 vi.mock("@/server/merge", () => ({
   mergeTicketBranch: h.mergeTicketBranch, repoRootFromWorktree: h.repoRootFromWorktree,
@@ -60,7 +60,7 @@ const approve = { arg: "approve-local", projectName: "Mojito", title: "Some tick
 beforeEach(() => {
   vi.clearAllMocks();
   h.getIssueStatus.mockImplementation(async () => "To QA");
-  h.getIssueDescription.mockImplementation(async () => "the ticket description");
+  h.getIssueContent.mockImplementation(async () => ({ description: "the ticket description", attachments: [] }));
   h.mergeTicketBranch.mockImplementation(async () => ({ status: "merged", commit: "abc1234" }));
   h.launchSession.mockImplementation(async () => ({ ok: true, meta: {} }));
   h.launchConflictSession.mockImplementation(async () => ({ ok: true, meta: {} }));
@@ -244,7 +244,7 @@ describe("/api/tickets/[id]/verdict", () => {
   });
 
   it("launches rework with an empty description when Linear cannot be read", async () => {
-    h.getIssueDescription.mockImplementation(async () => { throw new Error("Linear down"); });
+    h.getIssueContent.mockImplementation(async () => { throw new Error("Linear down"); });
     const res = await POST(req({ arg: "reject", reason: "broken", projectName: "Mojito", title: "T" }), params());
     expect(res.status).toBe(200);
     expect(h.launchSession).toHaveBeenCalledWith(

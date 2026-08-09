@@ -102,18 +102,43 @@ export async function getIssueRef(
   return { id: node.id, teamId: node.team.id, statusName: node.state?.name ?? "" };
 }
 
-export async function getIssueDescription(
+export interface IssueAttachmentRef {
+  title: string;
+  url: string;
+}
+
+export interface IssueContent {
+  description: string;
+  attachments: IssueAttachmentRef[];
+}
+
+/**
+ * The description plus the issue's attachment list in one round trip. Every caller on
+ * the launch path wants both — the description for the prompt context, the attachments
+ * so Mojito can download the ones that are Linear uploads.
+ */
+export async function getIssueContent(
   apiKey: string,
   identifier: string,
   fetchImpl: typeof fetch = fetch,
-): Promise<string> {
+): Promise<IssueContent> {
   const { teamKey, number } = parseIdentifier(identifier);
-  const data = await query<{ issues: { nodes: { description?: string | null }[] } }>(
+  const data = await query<{
+    issues: {
+      nodes: {
+        description?: string | null;
+        attachments?: { nodes?: { title?: string | null; url?: string | null }[] };
+      }[];
+    };
+  }>(
     apiKey,
     {
       query: `query ($key: String!, $n: Float!) {
         issues(filter: { team: { key: { eq: $key } }, number: { eq: $n } }, first: 1) {
-          nodes { description }
+          nodes {
+            description
+            attachments(first: 25) { nodes { title url } }
+          }
         }
       }`,
       variables: { key: teamKey, n: number },
@@ -122,7 +147,11 @@ export async function getIssueDescription(
   );
   const node = data.issues.nodes[0];
   if (!node) throw new Error(`issue not found: ${identifier}`);
-  return node.description ?? "";
+  const attachments: IssueAttachmentRef[] = [];
+  for (const a of node.attachments?.nodes ?? []) {
+    if (typeof a?.url === "string" && a.url) attachments.push({ title: a.title ?? "", url: a.url });
+  }
+  return { description: node.description ?? "", attachments };
 }
 
 export async function createIssue(

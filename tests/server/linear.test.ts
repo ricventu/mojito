@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { listOpenIssues, getIssueStatus, getIssueRef, setIssueStatus, setIssueAssignee, postComment, uploadImage, getIssueDescription, createIssue } from "@/server/linear";
+import { listOpenIssues, getIssueStatus, getIssueRef, setIssueStatus, setIssueAssignee, postComment, uploadImage, getIssueContent, createIssue } from "@/server/linear";
 
 function fakeFetch(payload: unknown) {
   return vi.fn(async () => ({ ok: true, json: async () => ({ data: payload }) })) as unknown as typeof fetch;
@@ -174,18 +174,43 @@ function fakeFetchWithCalls(responses: object[]) {
   return { impl, calls };
 }
 
-describe("getIssueDescription", () => {
-  it("returns the description", async () => {
-    const { impl } = fakeFetchWithCalls([{ issues: { nodes: [{ description: "the body" }] } }]);
-    expect(await getIssueDescription("key", "RIC-46", impl)).toBe("the body");
+describe("getIssueContent", () => {
+  it("returns the description and the attachment list", async () => {
+    const impl = fakeFetch({ issues: { nodes: [{
+      description: "the body",
+      attachments: { nodes: [{ title: "Design", url: "https://figma.com/x" }] },
+    }] } });
+    expect(await getIssueContent("key", "RIC-46", impl)).toEqual({
+      description: "the body",
+      attachments: [{ title: "Design", url: "https://figma.com/x" }],
+    });
   });
-  it("maps a null description to empty string", async () => {
-    const { impl } = fakeFetchWithCalls([{ issues: { nodes: [{ description: null }] } }]);
-    expect(await getIssueDescription("key", "RIC-46", impl)).toBe("");
+
+  it("degrades a null description and a missing attachment connection to empty", async () => {
+    const impl = fakeFetch({ issues: { nodes: [{ description: null }] } });
+    expect(await getIssueContent("key", "RIC-46", impl)).toEqual({ description: "", attachments: [] });
   });
+
+  it("drops attachments with no url and defaults a missing title", async () => {
+    const impl = fakeFetch({ issues: { nodes: [{
+      description: "",
+      attachments: { nodes: [{ title: "no url" }, { url: "https://example.com/a" }] },
+    }] } });
+    expect((await getIssueContent("key", "RIC-46", impl)).attachments)
+      .toEqual([{ title: "", url: "https://example.com/a" }]);
+  });
+
   it("throws when the issue does not exist", async () => {
-    const { impl } = fakeFetchWithCalls([{ issues: { nodes: [] } }]);
-    await expect(getIssueDescription("key", "RIC-999", impl)).rejects.toThrow("issue not found");
+    const impl = fakeFetch({ issues: { nodes: [] } });
+    await expect(getIssueContent("key", "RIC-999", impl)).rejects.toThrow("issue not found");
+  });
+
+  it("asks for the attachments in the same query as the description", async () => {
+    const impl = fakeFetch({ issues: { nodes: [{ description: "" }] } });
+    await getIssueContent("key", "RIC-46", impl);
+    const body = (impl as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string;
+    expect(body).toContain("description");
+    expect(body).toContain("attachments(first: 25)");
   });
 });
 

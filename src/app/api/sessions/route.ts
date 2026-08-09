@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getConfig, getRegistry } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
 import { launchSession, launchCustomSession, launchShellSession } from "@/server/launch";
-import { getIssueDescription, setIssueStatus } from "@/server/linear";
+import { getIssueContent, setIssueStatus } from "@/server/linear";
 import { hasSession, newSession, pipePane } from "@/server/tmux";
 
 export async function GET(req: Request) {
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     return NextResponse.json(res.meta, { status: 201 });
   }
   let description = "";
-  try { description = await getIssueDescription(cfg.linearApiKey, body.ticket); } catch { /* launch anyway with empty description */ }
+  try { description = (await getIssueContent(cfg.linearApiKey, body.ticket)).description; } catch { /* launch anyway with empty description */ }
   const res = await launchSession(
     { ticket: body.ticket, status: body.status, model: body.model ?? "opus", effort: body.effort ?? "high",
       projectName: body.projectName ?? null,
