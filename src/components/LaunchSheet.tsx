@@ -7,18 +7,7 @@ import { tmuxName } from "@/server/sessionKey";
 import StateBadge from "./StateBadge";
 import QaVerdictButtons from "./QaVerdictButtons";
 import type { SessionMeta, TicketSummary } from "@/server/types";
-import type { QaVerdictResult } from "@/server/qaVerdict";
-
-// The two verdict outcomes worth holding the sheet open for. Anything else — including a
-// body from a server that predates or postdates this client — closes the sheet, so a
-// version skew degrades to the old behaviour instead of showing a blank panel.
-function holdsSheetOpen(r: unknown): r is Extract<QaVerdictResult, { done: "mr-created" | "conflict-session" }> {
-  if (r === null || typeof r !== "object") return false;
-  const done = (r as { done?: unknown }).done;
-  if (done === "mr-created") return typeof (r as { url?: unknown }).url === "string";
-  if (done === "conflict-session") return typeof (r as { sessionId?: unknown }).sessionId === "string";
-  return false;
-}
+import { holdsSheetOpen, type HeldOutcome } from "@/lib/verdictOutcome";
 
 export default function LaunchSheet(
   { token, ticket, sessions, onClose, onLaunched, onOpen, onOpenDocs }:
@@ -42,7 +31,7 @@ export default function LaunchSheet(
   // Set only for the two outcomes that carry information the user cannot get from the
   // board or the session list: the MR URL, and the fact that a merge conflict happened.
   // The other two close the sheet, as they always have.
-  const [outcome, setOutcome] = useState<QaVerdictResult | null>(null);
+  const [outcome, setOutcome] = useState<HeldOutcome | null>(null);
   // Mirrors ticket.assignedToMe so the sheet can flip the label without waiting for the
   // list to refetch — the ticket prop is a snapshot taken when the sheet opened.
   const [mine, setMine] = useState(ticket.assignedToMe);
@@ -171,14 +160,22 @@ export default function LaunchSheet(
   // refetch normally has it by the time this renders — but the prop update is a round trip
   // behind, so the button says what it is waiting for instead of silently doing nothing.
   // Looking the session up by id in the live list is how page.tsx opens alerts, too.
+  // If that one onLaunched() refresh happens to fail, it is not the only rescue: the
+  // conflict session emits hook events as Claude starts, and useEvents' SSE handler
+  // (src/app/page.tsx) calls refreshSessions() on every event, so the list — and this
+  // button — self-heals within seconds without any retry logic here.
   const conflictSession = outcome?.done === "conflict-session"
     ? sessions.find((s) => s.id === outcome.sessionId)
     : undefined;
 
   if (outcome) {
+    // This backdrop is intentionally inert (no onClick): unlike the main return below,
+    // this panel holds the only copy of the MR URL / conflict notice anywhere in the UI,
+    // and there is no undo. A stray tap on the dead zone above the sheet must not be able
+    // to discard it — dismissal requires the explicit Close button.
     return (
-      <div className="sheet-backdrop" onClick={onClose}>
-        <div className="sheet" onClick={(e) => e.stopPropagation()}>
+      <div className="sheet-backdrop">
+        <div className="sheet">
           <h3><span className="id" style={{ fontSize: 16 }}>{ticket.identifier}</span> <span className="chip">{ticket.statusName}</span></h3>
           {outcome.done === "mr-created" ? (
             <div className="outcome">

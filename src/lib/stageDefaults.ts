@@ -11,8 +11,8 @@ export const EFFORTS: readonly Effort[] = ["low", "medium", "high", "xhigh", "ma
 
 // The launchable lifecycle statuses (terminal states never launch, so they are not configured).
 // Mirrors WORK_STATES in src/server/statusModel.ts — kept in sync by
-// tests/lib/stageDefaults.test.ts. Mirrored rather than imported: this module is client
-// code (LaunchSheet imports it), and the server model must not reach the browser bundle.
+// tests/lib/stageDefaults.test.ts. Mirrored rather than imported: this module is reachable
+// from the browser bundle (LaunchSheet imports it), and the server model must not be.
 export const LAUNCHABLE_STATUSES: string[] = ["Backlog", "Todo", "In Progress"];
 
 // Built-in seed defaults. Model cost/capability order is fable > opus > sonnet; fable is the
