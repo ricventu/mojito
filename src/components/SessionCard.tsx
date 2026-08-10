@@ -1,6 +1,7 @@
 "use client";
 import StateBadge from "./StateBadge";
 import { isActiveSession } from "@/lib/activeSession";
+import { tapProps } from "@/lib/tapProps";
 import type { SessionMeta } from "@/server/types";
 
 /**
@@ -15,7 +16,7 @@ export default function SessionCard(
   const active = isActiveSession(s);
   return (
     <div className={`card${s.state === "needs-input" ? " attn" : ""}`}>
-      <div className="tap" onClick={onOpen}>
+      <div className="tap" {...tapProps(onOpen)}>
         {s.kind === "custom" || s.kind === "shell" ? (
           <>
             <div className="row">

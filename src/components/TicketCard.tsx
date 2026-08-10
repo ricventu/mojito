@@ -2,11 +2,14 @@
 import SessionRow from "./SessionRow";
 import { showsMineMarker } from "@/lib/ticketFilter";
 import { activeSessionLevel } from "@/lib/ticketSessionLevel";
+import { tapProps } from "@/lib/tapProps";
 import type { SessionMeta } from "@/server/types";
 import type { TicketRow } from "@/lib/unifiedRows";
 
 /**
- * A ticket card with its live sessions listed inside it.
+ * A ticket card with all of its sessions listed inside it — finished ones included.
+ * Filtering to only the live ones would push a done or failed session out to the
+ * "No ticket" group, which is worse: it would look orphaned instead of resolved.
  *
  * The card is a div, not a button as the old ticket list had it: nesting the session
  * rows' own controls inside a button is invalid HTML. The header keeps the whole-area
@@ -28,7 +31,7 @@ export default function TicketCard(
   const attn = activeSessionLevel(ticket.identifier, sessions) === "attn";
   return (
     <div className={`card${attn ? " attn" : ""}`}>
-      <div className="tap" onClick={onPick}>
+      <div className="tap" {...tapProps(onPick)}>
         <div>
           <span className="id">{ticket.identifier}</span>
           {showsMineMarker(ticket, mine) && <span className="chip mine">Mine</span>}

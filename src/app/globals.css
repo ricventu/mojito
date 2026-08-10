@@ -80,8 +80,6 @@ label { color: var(--text); }
   padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow);
   transition: border-color .15s, transform .1s; color: var(--text);
 }
-.card.tap { cursor: pointer; }
-.card.tap:active { transform: scale(.99); }
 .card .tap { cursor: pointer; }
 .card .tap:active { transform: scale(.99); }
 .card.attn {
@@ -125,7 +123,6 @@ label { color: var(--text); }
 /* ---- Filter bar (tickets / sessions) ---- */
 .filter { margin: 2px 2px 8px; }
 .filter-top { display: flex; align-items: center; gap: 8px; }
-.filter-top .btn { flex: none; }
 .filter .search { width: 100%; box-sizing: border-box; -webkit-appearance: none; appearance: none; }
 .filter-top .search { flex: 1; min-width: 0; }
 .filter-actions { display: flex; gap: 8px; margin-top: 8px; }
@@ -133,7 +130,7 @@ label { color: var(--text); }
 .filter-chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 2px; scrollbar-width: none; }
 .filter-chips::-webkit-scrollbar { display: none; }
 .filter-chips .chip { flex: none; white-space: nowrap; }
-/* The assignee toggle leads the status row but belongs to a different axis than the
+/* The Sessions toggle leads the status row but belongs to a different axis than the
    status chips beside it — extra space keeps the two from reading as one group. */
 .filter-chips .chip.lead { margin-right: 14px; }
 
@@ -188,26 +185,22 @@ button.chip:active { transform: scale(.96); }
 @keyframes mojito-pulse { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .badge .dot { animation: none; } }
 
-/* ---- Active-session dot (ticket cards) ---- */
-/* Assignee marker on a ticket card. Text rather than a dot on purpose: a second dot
-   next to .s-dot would read as another session state. */
+/* ---- Assignee marker (ticket cards) ---- */
+/* Text rather than a dot on purpose: TicketCard has no s-dot of its own to read as
+   another session state (see its doc comment), so a plain chip is unambiguous. */
 .chip.mine {
   margin-left: 6px; vertical-align: middle;
   color: var(--accent); background: var(--accent-soft);
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
+/* ---- Status dot (Stacks rows) ---- */
 .s-dot {
   display: inline-block;
   width: 8px; height: 8px;
   border-radius: 50%;
   margin-left: 6px;
   vertical-align: middle;
-}
-.s-dot.run  { background: var(--run); }
-.s-dot.attn {
-  background: var(--attn);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--attn) 25%, transparent);
 }
 .s-dot.running { background: var(--ok); }
 .s-dot.stopped { background: var(--text-faint); }

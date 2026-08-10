@@ -3,9 +3,10 @@
 ## Goal
 
 Replace the two separate list screens (Tickets, Sessions) with a single list. The ticket
-is the anchor row; its live sessions render nested inside its card. Sessions that belong
-to no visible ticket get their own **No ticket** group. A new **Sessions** filter narrows
-the list to what is running right now — every active session and terminal.
+is the anchor row; all of its sessions — finished ones included — render nested inside
+its card. Sessions that belong to no visible ticket get their own **No ticket** group.
+A new **Sessions** filter narrows the list to what is running right now — every active
+session and terminal.
 
 ## Decisions taken with the user
 

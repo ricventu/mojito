@@ -1,5 +1,4 @@
 "use client";
-export { NO_PROJECT } from "@/lib/ticketFilter";
 
 export default function FilterBar(
   { query, onQuery, projects, active, onProject, statuses, activeStatus, onStatus,
@@ -49,12 +48,13 @@ export default function FilterBar(
       )}
       {(hasStatuses || onMine || onSessionsOnly) && (
         <div className="filter-chips">
-          {/* The scope toggles lead the row: .filter-chips scrolls horizontally, so a
-              trailing toggle would sit off-screen on a phone once the statuses fill the
-              width. "lead" carries the gap and belongs on the last of them. */}
+          {/* .filter-chips scrolls horizontally, so a trailing toggle would sit
+              off-screen on a phone once the statuses fill the width. "lead" carries
+              the gap and sits on Sessions, the scope toggle adjacent to the status
+              chips — Mine always sits before it, so it needs no gap of its own. */}
           {onMine && (
             <button
-              className={`chip toggle${!onSessionsOnly ? " lead" : ""}${mine ? " on" : ""}`}
+              className={`chip toggle${mine ? " on" : ""}`}
               aria-pressed={mine}
               onClick={() => onMine(!mine)}
             >

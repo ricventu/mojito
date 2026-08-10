@@ -1,6 +1,7 @@
 "use client";
 import StateBadge from "./StateBadge";
 import { isActiveSession } from "@/lib/activeSession";
+import { tapProps } from "@/lib/tapProps";
 import type { SessionMeta } from "@/server/types";
 
 /**
@@ -20,7 +21,7 @@ export default function SessionRow(
   const active = isActiveSession(session);
   return (
     <div className="srow">
-      <div className="srow-tap" onClick={onOpen}>
+      <div className="srow-tap" {...tapProps(onOpen)}>
         <div className="row">
           <span className="srow-label">{rowLabel(session)}</span>
           <span className="grow" />
