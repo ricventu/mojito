@@ -115,6 +115,8 @@ label { color: var(--text); }
 .filter-top .btn { flex: none; }
 .filter .search { width: 100%; box-sizing: border-box; -webkit-appearance: none; appearance: none; }
 .filter-top .search { flex: 1; min-width: 0; }
+.filter-actions { display: flex; gap: 8px; margin-top: 8px; }
+.filter-actions .btn { flex: 1; min-width: 0; }
 .filter-chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 2px; scrollbar-width: none; }
 .filter-chips::-webkit-scrollbar { display: none; }
 .filter-chips .chip { flex: none; white-space: nowrap; }
