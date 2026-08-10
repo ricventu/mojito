@@ -1,3 +1,8 @@
+/* xterm's stylesheet, loaded globally rather than from TerminalView.tsx — a
+   node_modules CSS import inside that dynamic (ssr: false) component breaks
+   `next build`. See the note in src/components/TerminalView.tsx. */
+@import "@xterm/xterm/css/xterm.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
