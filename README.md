@@ -13,6 +13,22 @@ make start
 Starts the dev server (Mac kept awake via `caffeinate`) and prints every reachable
 URL: **Local**, **Wi-Fi/LAN**, and — when the tailnet is up — **Tailscale**.
 
+```bash
+make prod
+```
+
+Same conveniences — `caffeinate`, the URL banner, a health supervisor that restarts a
+wedged server, and automatic pickup of source changes — but the app is served from an
+optimized `next build`, so the GUI is noticeably faster. Use it when you're *running*
+Mojito rather than working on it.
+
+The trade-off is no HMR: a source change under `src/` (or in `server.ts` /
+`next.config.mjs` / `tailwind.config.ts` / `postcss.config.mjs` / `package.json` /
+`tsconfig.json`) triggers `tsc --noEmit` and then a full rebuild, and the app is **down
+for the length of that build**. The typecheck runs first, while the old build is still
+being served, so a typo costs no downtime — the rebuild only starts once the tree is
+clean. `public/` is not watched: Next serves it from disk, no rebuild needed.
+
 Config lives in `.env.local`:
 
 - `MOJITO_PORT` — port to bind (default `4711`).

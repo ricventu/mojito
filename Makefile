@@ -36,6 +36,7 @@ SHOW_URLS = Q=""; if [ -n "$$TOKEN" ]; then Q="/?token=$$TOKEN"; fi; \
 help:
 	@echo "Targets:"
 	@echo "  make start    dev server (Mac kept awake), prints every URL: local, Wi-Fi, Tailscale"
+	@echo "  make prod     same conveniences as start, but serves an optimized next build"
 	@echo "  make restart  prod deploy: next build, then restart $(SERVICE) (systemd --user) + health check"
 
 ## start: dev server, Mac kept awake via caffeinate; prints every reachable URL
@@ -48,6 +49,19 @@ start:
 	echo ""; \
 	export MOJITO_PORT="$$PORT"; \
 	exec caffeinate -is ./scripts/dev-supervisor.sh
+
+## prod: everything `make start` gives you — caffeinate, the URL banner, a health
+## supervisor and auto-pickup of source changes — but serving an optimized
+## `next build` instead of the dev server, so the GUI is fast. The trade-off vs
+## `start`: no HMR. A source change triggers typecheck + full rebuild, and the app
+## is down for the length of that build (see scripts/prod-supervisor.mjs).
+prod:
+	@$(LOAD_ENV); \
+	$(SHOW_URLS); \
+	echo "  (production build — Mac kept awake, rebuilds on change, Ctrl-C to stop)"; \
+	echo ""; \
+	export MOJITO_PORT="$$PORT"; \
+	exec caffeinate -is node ./scripts/prod-supervisor.mjs
 
 ## restart: rebuild the Next app (next build) then restart the systemd user service
 ## and wait for /api/health. Production deploy path on the Linux box (NOT `make start`,
@@ -68,4 +82,4 @@ restart:
 	echo "WARN: no HTTP 200 after 30s — check: journalctl --user -u $(SERVICE) -e" >&2; \
 	exit 1
 
-.PHONY: help start restart
+.PHONY: help start prod restart
