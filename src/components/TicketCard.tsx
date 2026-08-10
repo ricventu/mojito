@@ -1,0 +1,55 @@
+"use client";
+import SessionRow from "./SessionRow";
+import { showsMineMarker } from "@/lib/ticketFilter";
+import { activeSessionLevel } from "@/lib/ticketSessionLevel";
+import type { SessionMeta } from "@/server/types";
+import type { TicketRow } from "@/lib/unifiedRows";
+
+/**
+ * A ticket card with its live sessions listed inside it.
+ *
+ * The card is a div, not a button as the old ticket list had it: nesting the session
+ * rows' own controls inside a button is invalid HTML. The header keeps the whole-area
+ * tap that opens LaunchSheet, the same way the session cards have always done it.
+ *
+ * There is no s-dot here. With the sessions listed inline it would state the same fact
+ * twice; instead a session waiting on input colours the whole card via .card.attn.
+ */
+export default function TicketCard(
+  { row, mine, onPick, onOpenSession, onDismissSession }: {
+    row: TicketRow;
+    mine: boolean;
+    onPick: () => void;
+    onOpenSession: (s: SessionMeta) => void;
+    onDismissSession: (s: SessionMeta) => void;
+  },
+) {
+  const { ticket, sessions } = row;
+  const attn = activeSessionLevel(ticket.identifier, sessions) === "attn";
+  return (
+    <div className={`card${attn ? " attn" : ""}`}>
+      <div className="tap" onClick={onPick}>
+        <div>
+          <span className="id">{ticket.identifier}</span>
+          {showsMineMarker(ticket, mine) && <span className="chip mine">Mine</span>}
+        </div>
+        <div className="title">{ticket.title}</div>
+        {ticket.labels.length > 0 && (
+          <div className="meta">{ticket.labels.map((l) => <span key={l} className="chip">{l}</span>)}</div>
+        )}
+      </div>
+      {sessions.length > 0 && (
+        <div className="srows">
+          {sessions.map((s) => (
+            <SessionRow
+              key={s.id}
+              session={s}
+              onOpen={() => onOpenSession(s)}
+              onDismiss={() => onDismissSession(s)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
