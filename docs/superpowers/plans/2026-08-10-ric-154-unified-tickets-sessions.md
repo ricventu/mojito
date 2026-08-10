@@ -268,15 +268,29 @@ describe("buildUnifiedRows", () => {
     expect(rows.looseSessions.map((s) => s.id)).toEqual(["shell"]);
   });
 
-  // The invariant: a session whose ticket is filtered away is never lost, it goes loose.
-  it("keeps a session loose when the query hides its ticket", () => {
+  // The query narrows the loose set on the session's own fields, exactly as the old
+  // session list did. A session that matches the search survives its ticket being hidden.
+  it("keeps a session loose when the query hides its ticket but matches the session", () => {
+    const rows = buildUnifiedRows({
+      tickets: [ticket({ identifier: "RIC-1", title: "Alpha", statusName: "Todo" })],
+      sessions: [session({ id: "a", ticket: "RIC-1", model: "fable" })],
+      filter: { query: "fable", project: null, status: null }, sessionsOnly: false,
+    });
+    expect(rows.ticketRows).toEqual([]);
+    expect(rows.looseSessions.map((s) => s.id)).toEqual(["a"]);
+  });
+
+  // The other side of the same rule, and the reason the query is not neutralised for
+  // ticket-bearing sessions: if it were, searching for one ticket would drop every other
+  // ticket's sessions into the "No ticket" group.
+  it("drops a session when the query matches neither it nor its ticket", () => {
     const rows = buildUnifiedRows({
       tickets: [ticket({ identifier: "RIC-1", title: "Alpha" })],
       sessions: [session({ id: "a", ticket: "RIC-1" })],
       filter: { query: "zzz", project: null, status: null }, sessionsOnly: false,
     });
     expect(rows.ticketRows).toEqual([]);
-    expect(rows.looseSessions.map((s) => s.id)).toEqual(["a"]);
+    expect(rows.looseSessions).toEqual([]);
   });
 
   // The ticket has moved on since its session launched, so a status chip can hide the
@@ -432,9 +446,15 @@ export interface UnifiedFilter {
  * `tickets` must already be scoped by mineOnly() — the Mine toggle is a scope, not a
  * criterion, so the chips can be derived from the scoped list (see mergedStatuses).
  *
- * The loose set is what makes the merge safe: a session whose ticket is hidden by the
- * query, a status chip or Mine is not nested anywhere, so instead of disappearing it
- * falls through to "No ticket" — where its card still shows the ticket identifier.
+ * The loose set is what makes the merge safe when something structural hides a ticket —
+ * Mine scoping it out, or the ticket not being among the ones fetched. Its session is
+ * nested nowhere, so instead of disappearing it falls through to "No ticket", where its
+ * card still shows the ticket identifier.
+ *
+ * The loose set is still narrowed by the query, project and status chips on the session's
+ * own fields, exactly as the old session list narrowed it. Neutralising the query here
+ * would mean searching for one ticket dumped every other ticket's sessions into
+ * "No ticket".
  */
 export function buildUnifiedRows(
   { tickets, sessions, filter, sessionsOnly }: {

@@ -93,11 +93,19 @@ above — ticket-less sessions are always visible — is about the *default* vie
 no filter to appear. Restricting them to the active ones is what turning **Sessions** on
 asks for.
 
-Step 3 is what guarantees no session can vanish. A session whose ticket is filtered out —
-by the query, by a status chip, or by **Mine** — is not nested anywhere, so it falls into
-the loose set and shows up under **No ticket**. That is a deliberate trade: the group name
-is imprecise for those (they do have a ticket, and their card shows its identifier), but
-losing a running session off the screen would be worse.
+Step 3 is what keeps a session from vanishing when something *structural* hides its ticket —
+**Mine** scoping it out, or the ticket not being among the ones fetched. Such a session is
+nested nowhere, so it falls into the loose set and shows up under **No ticket**. The group
+name is imprecise for those (they do have a ticket, and their card shows its identifier),
+but losing a running session off the screen would be worse.
+
+The loose set is still filtered by the query, project and status chips on the session's own
+fields, exactly as `SessionList` filters today, because narrowing is what those controls are
+for: typing `RIC-176` must not turn every other ticket's sessions into **No ticket** entries.
+A session therefore survives a search only when it matches the search itself — on its ticket
+identifier, launch status, model, title or last message. One whose ticket the query hides and
+which does not match the query on its own is correctly off the screen; that is what the user
+asked for.
 
 ### Components
 
