@@ -2,7 +2,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import "@xterm/xterm/css/xterm.css";
+// xterm's stylesheet is pulled in globally from src/app/globals.css, NOT with an
+// `import "@xterm/xterm/css/xterm.css"` here: a node_modules CSS import inside
+// this `ssr: false` dynamic chunk makes `next build` emit a stray
+// .next/server/vendor-chunks/ layout whose webpack-runtime disagrees with the
+// path it requires, and the build dies collecting page data for /_document
+// ("Cannot find module './chunks/vendor-chunks/next.js'"). `next dev` is
+// unaffected, so this only ever broke the production build.
 import AccessoryBar from "./AccessoryBar";
 import DocsView from "./DocsView";
 import StateBadge from "./StateBadge";
