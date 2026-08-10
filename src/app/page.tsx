@@ -8,8 +8,7 @@ import { useSessions } from "@/lib/useSessions";
 import { useEvents } from "@/lib/useEvents";
 import { useSelfUpdate } from "@/lib/useSelfUpdate";
 import TokenGate from "@/components/TokenGate";
-import TicketList from "@/components/TicketList";
-import SessionList from "@/components/SessionList";
+import UnifiedList from "@/components/UnifiedList";
 import StacksPanel from "@/components/StacksPanel";
 import AlertLayer from "@/components/AlertLayer";
 import SettingsSheet from "@/components/SettingsSheet";
@@ -71,18 +70,19 @@ export default function Home() {
     <div style={{ paddingBottom: 64 }}>
       <AlertLayer alerts={alerts} onOpen={(id) => { const s = sessions.find((x) => x.id === id); if (s) setOpen(s); }} onClear={() => setAlerts([])} />
       {settingsOpen && <SettingsSheet token={token} onClose={() => setSettingsOpen(false)} selfUpdate={selfUpdate} />}
-      {tab === "tickets"
-        ? <TicketList token={token} tickets={tickets} sessions={sessions}
-            onLaunched={() => { refreshSessions(); refreshTickets(); }} onOpen={setOpen}
-            onOpenDocs={(t) => setDocsFor({ target: { ticket: t.identifier, project: t.project }, label: t.identifier })} />
-        : tab === "stacks"
+      {tab === "stacks"
         ? <StacksPanel token={token} onOpenLogs={setOpen} selfUpdate={selfUpdate} />
-        : <SessionList token={token} sessions={sessions} onOpen={setOpen} onChanged={refreshSessions}
-            onOpenDocs={(s) => setDocsFor({ target: { session: s.id }, label: s.ticket || s.title })} />}
+        : <UnifiedList token={token} tickets={tickets} sessions={sessions}
+            onLaunched={() => { refreshSessions(); refreshTickets(); }}
+            onChanged={refreshSessions}
+            onOpen={setOpen}
+            onOpenTicketDocs={(t) => setDocsFor({ target: { ticket: t.identifier, project: t.project }, label: t.identifier })}
+            onOpenSessionDocs={(s) => setDocsFor({ target: { session: s.id }, label: s.ticket || s.title })} />}
+      {/* Anything that is not "stacks" is the unified list, so a browser still holding
+          the removed "sessions" value in mojito-tab lands somewhere real. */}
       <nav className="nav">
-        <button className={`tab${tab === "tickets" ? " active" : ""}`} onClick={() => setTab("tickets")}>Tickets</button>
-        <button className={`tab${tab === "sessions" ? " active" : ""}`} onClick={() => setTab("sessions")}>
-          Sessions{needsInput ? <span className="count">{needsInput}</span> : null}
+        <button className={`tab${tab !== "stacks" ? " active" : ""}`} onClick={() => setTab("tickets")}>
+          Tickets{needsInput ? <span className="count">{needsInput}</span> : null}
         </button>
         <button className={`tab${tab === "stacks" ? " active" : ""}`} onClick={() => setTab("stacks")}>Stacks</button>
         <button className="tab settings" aria-label="Settings" onClick={() => setSettingsOpen(true)}>⚙</button>
