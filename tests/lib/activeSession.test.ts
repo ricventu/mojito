@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isActiveSession } from "@/lib/activeSession";
+import { isActiveSession, isActiveState } from "@/lib/activeSession";
 import type { SessionMeta, SessionState } from "@/server/types";
 
 // minimal SessionMeta factory — only state matters here
@@ -25,5 +25,21 @@ describe("isActiveSession", () => {
   it("counts done and failed as finished", () => {
     expect(isActiveSession(s("done"))).toBe(false);
     expect(isActiveSession(s("failed"))).toBe(false);
+  });
+});
+
+describe("isActiveState", () => {
+  it("matches isActiveSession's verdict for every SessionState", () => {
+    const expected: Record<SessionState, boolean> = {
+      starting: true,
+      running: true,
+      idle: true,
+      "needs-input": true,
+      done: false,
+      failed: false,
+    };
+    for (const [state, want] of Object.entries(expected) as [SessionState, boolean][]) {
+      expect(isActiveState(state)).toBe(want);
+    }
   });
 });

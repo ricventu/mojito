@@ -8,14 +8,14 @@ import FilterBar from "./FilterBar";
 import TicketCard from "./TicketCard";
 import SessionCard from "./SessionCard";
 import StatusBadge from "./StatusBadge";
-import { mineOnly, NO_PROJECT } from "@/lib/ticketFilter";
+import { mineOnly } from "@/lib/ticketFilter";
 import { sessionStatus } from "@/lib/sessionFilter";
 import { groupByStatus } from "@/lib/groupByStatus";
 import { orderSessions } from "@/lib/orderSessions";
 import { isActiveSession } from "@/lib/activeSession";
 import { usePersistedState } from "@/lib/usePersistedState";
 import {
-  buildUnifiedRows, mergedProjects, mergedStatuses, orderTicketRows, type TicketRow,
+  buildUnifiedRows, groupByProject, mergedProjects, mergedStatuses, orderTicketRows,
 } from "@/lib/unifiedRows";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 
@@ -69,30 +69,12 @@ export default function UnifiedList(
     [scoped, sessions, query, project, status, sessionsOnly],
   );
 
-  // Bucket both kinds by project, in encounter order — tickets first, so a project that
-  // only holds a loose session lands after the ones with tickets. Both lists preserve
-  // Map insertion order.
-  const byProject = useMemo(() => {
-    const t = new Map<string, TicketRow[]>();
-    const s = new Map<string, SessionMeta[]>();
-    const order: string[] = [];
-    const note = (name: string) => { if (!order.includes(name)) order.push(name); };
-    for (const row of ticketRows) {
-      const name = row.ticket.project ?? NO_PROJECT;
-      note(name);
-      const list = t.get(name);
-      if (list) list.push(row);
-      else t.set(name, [row]);
-    }
-    for (const ssn of looseSessions) {
-      const name = ssn.projectName ?? NO_PROJECT;
-      note(name);
-      const list = s.get(name);
-      if (list) list.push(ssn);
-      else s.set(name, [ssn]);
-    }
-    return { order, tickets: t, sessions: s };
-  }, [ticketRows, looseSessions]);
+  // Bucket both kinds by project — see groupByProject for the encounter-order and
+  // never-lost-a-section rules.
+  const projectSections = useMemo(
+    () => groupByProject(ticketRows, looseSessions),
+    [ticketRows, looseSessions],
+  );
 
   const dismiss = async (s: SessionMeta) => {
     const label = s.ticket || s.title;
@@ -144,10 +126,10 @@ export default function UnifiedList(
           {sessionsOnly ? "No active sessions." : "No matching tickets or sessions."}
         </p>
       )}
-      {byProject.order.map((proj) => (
-        <section key={proj}>
-          <h4 className="sect">{proj}</h4>
-          {groupByStatus(byProject.tickets.get(proj) ?? [], (r) => r.ticket.statusName).map((group) => (
+      {projectSections.map((sec) => (
+        <section key={sec.project}>
+          <h4 className="sect">{sec.project}</h4>
+          {groupByStatus(sec.ticketRows, (r) => r.ticket.statusName).map((group) => (
             <div key={group.status}>
               <div className="substatus"><StatusBadge status={group.status} /></div>
               {orderTicketRows(group.items).map((row) => (
@@ -162,10 +144,10 @@ export default function UnifiedList(
               ))}
             </div>
           ))}
-          {(byProject.sessions.get(proj)?.length ?? 0) > 0 && (
+          {sec.sessions.length > 0 && (
             <>
               <div className="substatus"><span className="sub-label">{NO_TICKET}</span></div>
-              {groupByStatus(byProject.sessions.get(proj)!, sessionStatus).map((group) => (
+              {groupByStatus(sec.sessions, sessionStatus).map((group) => (
                 <div key={group.status}>
                   {group.status && <div className="substatus"><StatusBadge status={group.status} /></div>}
                   {orderSessions(group.items).map((s) => (

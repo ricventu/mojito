@@ -95,10 +95,61 @@ export function mergedStatuses(tickets: TicketSummary[], sessions: SessionMeta[]
     });
 }
 
-/** Distinct project names across tickets and sessions, with NO_PROJECT for either side's blanks. */
+/**
+ * Distinct project names across tickets and sessions, with NO_PROJECT for either
+ * side's blanks.
+ *
+ * `tickets` is the mine-scoped list, same as mergedStatuses: sessions are not scoped
+ * by Mine, so the full list comes in.
+ */
 export function mergedProjects(tickets: TicketSummary[], sessions: SessionMeta[]): string[] {
   return Array.from(new Set([
     ...tickets.map((t) => t.project ?? NO_PROJECT),
     ...sessions.map((s) => s.projectName ?? NO_PROJECT),
   ])).sort();
+}
+
+/** A project's ticket rows and loose sessions, bucketed for the unified list's sections. */
+export interface ProjectSection {
+  project: string;
+  ticketRows: TicketRow[];
+  sessions: SessionMeta[];
+}
+
+/**
+ * Buckets ticket rows and loose sessions by project, in encounter order — tickets
+ * first, so a project that only holds a loose session still gets its own section,
+ * appended after the ones that also have tickets. This is what keeps "a project
+ * section is never lost" true: every ticket row and every loose session lands in
+ * exactly one section, and a project is never dropped just because one side has
+ * nothing for it.
+ *
+ * Both sides key on the same sentinel — `row.ticket.project ?? NO_PROJECT` and
+ * `ssn.projectName ?? NO_PROJECT` — so a null-project ticket and a null-project
+ * session land in the same NO_PROJECT section. Item order within a section is the
+ * input order; sorting is the caller's job (see orderTicketRows, orderSessions).
+ * Does not mutate its inputs.
+ */
+export function groupByProject(
+  ticketRows: TicketRow[],
+  looseSessions: SessionMeta[],
+): ProjectSection[] {
+  const sections = new Map<string, ProjectSection>();
+  const order: string[] = [];
+  const sectionFor = (name: string): ProjectSection => {
+    let section = sections.get(name);
+    if (!section) {
+      section = { project: name, ticketRows: [], sessions: [] };
+      sections.set(name, section);
+      order.push(name);
+    }
+    return section;
+  };
+  for (const row of ticketRows) {
+    sectionFor(row.ticket.project ?? NO_PROJECT).ticketRows.push(row);
+  }
+  for (const ssn of looseSessions) {
+    sectionFor(ssn.projectName ?? NO_PROJECT).sessions.push(ssn);
+  }
+  return order.map((name) => sections.get(name)!);
 }

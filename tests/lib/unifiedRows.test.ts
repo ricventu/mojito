@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { buildUnifiedRows, orderTicketRows, mergedStatuses, mergedProjects } from "@/lib/unifiedRows";
+import {
+  buildUnifiedRows, groupByProject, orderTicketRows, mergedStatuses, mergedProjects,
+  type TicketRow,
+} from "@/lib/unifiedRows";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 
 function ticket(p: Partial<TicketSummary>): TicketSummary {
@@ -123,6 +126,32 @@ describe("buildUnifiedRows", () => {
       filter: { query: "", project: null, status: "In Progress" }, sessionsOnly: false,
     });
     expect(rows.ticketRows).toEqual([]);
+    expect(rows.looseSessions).toEqual([]);
+  });
+
+  // The other half of the same rule: when the ticket IS visible, its sessions stay
+  // nested regardless of whether their own fields would pass the filter — the status
+  // chip only ever screens tickets and loose sessions, never a session already nested
+  // under a visible ticket.
+  it("keeps a session nested under its visible ticket even when the session's own status would fail the chip", () => {
+    const rows = buildUnifiedRows({
+      tickets: [ticket({ identifier: "RIC-1", statusName: "Todo" })],
+      sessions: [session({ id: "a", ticket: "RIC-1", launchStatus: "In Progress" })],
+      filter: { query: "", project: null, status: "Todo" }, sessionsOnly: false,
+    });
+    expect(rows.ticketRows[0].sessions.map((s) => s.id)).toEqual(["a"]);
+    expect(rows.looseSessions).toEqual([]);
+  });
+
+  // Inverse pairing of the same rule, with the two statuses swapped, so the previous
+  // test is not just an artefact of which literal happened to be "Todo".
+  it("keeps a session nested under its visible ticket, statuses swapped from the case above", () => {
+    const rows = buildUnifiedRows({
+      tickets: [ticket({ identifier: "RIC-1", statusName: "In Progress" })],
+      sessions: [session({ id: "a", ticket: "RIC-1", launchStatus: "Todo" })],
+      filter: { query: "", project: null, status: "In Progress" }, sessionsOnly: false,
+    });
+    expect(rows.ticketRows[0].sessions.map((s) => s.id)).toEqual(["a"]);
     expect(rows.looseSessions).toEqual([]);
   });
 
@@ -261,5 +290,53 @@ describe("mergedProjects", () => {
       [ticket({ project: "Mojito" })],
       [session({ projectName: "Mojito" })],
     )).toEqual(["Mojito"]);
+  });
+});
+
+describe("groupByProject", () => {
+  function row(p: Partial<TicketSummary>): TicketRow {
+    return { ticket: ticket(p), sessions: [] };
+  }
+
+  it("gives a project holding only loose sessions its own section", () => {
+    const sections = groupByProject([], [session({ id: "a", projectName: "Atlas" })]);
+    expect(sections).toEqual([
+      { project: "Atlas", ticketRows: [], sessions: [session({ id: "a", projectName: "Atlas" })] },
+    ]);
+  });
+
+  it("gives a project holding only ticket rows its own section", () => {
+    const r = row({ identifier: "RIC-1", project: "Mojito" });
+    const sections = groupByProject([r], []);
+    expect(sections).toEqual([{ project: "Mojito", ticketRows: [r], sessions: [] }]);
+  });
+
+  it("carries both ticket rows and sessions in one section when a project has both", () => {
+    const r = row({ identifier: "RIC-1", project: "Mojito" });
+    const s = session({ id: "a", projectName: "Mojito" });
+    const sections = groupByProject([r], [s]);
+    expect(sections).toEqual([{ project: "Mojito", ticketRows: [r], sessions: [s] }]);
+  });
+
+  it("orders ticket-bearing projects before loose-only ones", () => {
+    const r = row({ identifier: "RIC-1", project: "Mojito" });
+    const s = session({ id: "a", projectName: "Atlas" });
+    const sections = groupByProject([r], [s]);
+    expect(sections.map((sec) => sec.project)).toEqual(["Mojito", "Atlas"]);
+  });
+
+  it("puts a null-project ticket and a null-project session in the same NO_PROJECT section", () => {
+    const r = row({ identifier: "RIC-1", project: null });
+    const s = session({ id: "a", projectName: null });
+    const sections = groupByProject([r], [s]);
+    expect(sections).toEqual([{ project: "No project", ticketRows: [r], sessions: [s] }]);
+  });
+
+  it("does not mutate its inputs", () => {
+    const ticketRows = [row({ identifier: "RIC-1", project: "Mojito" })];
+    const looseSessions = [session({ id: "a", projectName: "Atlas" })];
+    groupByProject(ticketRows, looseSessions);
+    expect(ticketRows).toHaveLength(1);
+    expect(looseSessions).toHaveLength(1);
   });
 });

@@ -1,3 +1,4 @@
+import { isActiveState } from "@/lib/activeSession";
 import type { SessionMeta, SessionState } from "@/server/types";
 
 /**
@@ -23,16 +24,16 @@ export interface TerminalHeadModel {
  * Can this session still be interrupted? "done" and "failed" ones are inert —
  * the button then only dismisses a leftover card, so it is not styled as
  * destructive.
+ *
+ * Delegates to activeSession.ts's isActiveState, the single definition of the
+ * active-state set — this module used to keep its own copy of the same four states.
+ * Kept as a same-named export, with this exact `(state: SessionState)` signature,
+ * because TerminalView calls it; isActiveSession in activeSession.ts takes a full
+ * `SessionMeta` instead, so passing one where the other is expected is a type error,
+ * not a silent behaviour change.
  */
-const ACTIVE: ReadonlySet<SessionState> = new Set<SessionState>([
-  "starting",
-  "running",
-  "needs-input",
-  "idle",
-]);
-
 export function isActiveSession(state: SessionState): boolean {
-  return ACTIVE.has(state);
+  return isActiveState(state);
 }
 
 export function terminalHeadModel(session: SessionMeta): TerminalHeadModel {
