@@ -1347,12 +1347,31 @@ In `src/app/globals.css`, immediately after the `.substatus` rule (around line 1
 }
 ```
 
-- [ ] **Step 3: Run the gate**
+- [ ] **Step 3: Restore the tap affordance on nested tap regions**
+
+`globals.css` styles the tappable card with the *compound* selector `.card.tap`, which needs
+both classes on one element. That held while the ticket card was a single
+`<button className="card tap">`, but `TicketCard` and `SessionCard` both put `tap` on a child
+of `.card`, so the selector no longer matches and the card body loses its pointer cursor and
+its press-scale — on a phone, a tap with no feedback reads as a dead tap.
+
+Add the descendant equivalents next to the existing `.card.tap` rules (around line 83), leaving
+those in place:
+
+```css
+.card .tap { cursor: pointer; }
+.card .tap:active { transform: scale(.99); }
+```
+
+This also fixes the same silent gap in the session cards, which have had `tap` on a child
+element all along.
+
+- [ ] **Step 4: Run the gate**
 
 Run: `npx tsc --noEmit && npx vitest run`
 Expected: PASS. `UnifiedList` is not mounted yet; this confirms every prop and import lines up.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add src/components/UnifiedList.tsx src/app/globals.css
