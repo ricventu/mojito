@@ -82,6 +82,8 @@ label { color: var(--text); }
 }
 .card.tap { cursor: pointer; }
 .card.tap:active { transform: scale(.99); }
+.card .tap { cursor: pointer; }
+.card .tap:active { transform: scale(.99); }
 .card.attn {
   background: linear-gradient(90deg, var(--attn-bg), var(--surface) 60%);
   border-color: color-mix(in srgb, var(--attn) 45%, var(--border));
@@ -115,6 +117,10 @@ label { color: var(--text); }
 
 /* ---- Status sub-group header (within a project section) ---- */
 .substatus { margin: 12px 2px 8px; }
+.sub-label {
+  font: 600 11px/1 var(--mono); color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: .06em;
+}
 
 /* ---- Filter bar (tickets / sessions) ---- */
 .filter { margin: 2px 2px 8px; }
