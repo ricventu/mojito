@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildUnifiedRows, orderTicketRows } from "@/lib/unifiedRows";
+import { buildUnifiedRows, orderTicketRows, mergedStatuses, mergedProjects } from "@/lib/unifiedRows";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 
 function ticket(p: Partial<TicketSummary>): TicketSummary {
@@ -211,5 +211,55 @@ describe("orderTicketRows", () => {
     ];
     orderTicketRows(rows);
     expect(rows.map((r) => r.ticket.identifier)).toEqual(["RIC-1", "RIC-2"]);
+  });
+});
+
+describe("mergedStatuses", () => {
+  it("returns [] when there is nothing", () => {
+    expect(mergedStatuses([], [])).toEqual([]);
+  });
+
+  it("unions ticket and session statuses without duplicates", () => {
+    const statuses = mergedStatuses(
+      [ticket({ statusName: "Todo" }), ticket({ statusName: "In Progress" })],
+      [session({ launchStatus: "Todo" })],
+    );
+    expect(statuses).toEqual(["Todo", "In Progress"]);
+  });
+
+  it("ranks lifecycle statuses before the synthetic Custom and Terminal buckets", () => {
+    const statuses = mergedStatuses(
+      [ticket({ statusName: "To QA" }), ticket({ statusName: "Backlog" })],
+      [
+        session({ kind: "custom", ticket: "", launchStatus: "" }),
+        session({ kind: "shell", ticket: "", launchStatus: "" }),
+      ],
+    );
+    expect(statuses).toEqual(["Backlog", "To QA", "Custom", "Terminal"]);
+  });
+
+  it("drops empty statuses", () => {
+    expect(mergedStatuses([ticket({ statusName: "" })], [])).toEqual([]);
+  });
+});
+
+describe("mergedProjects", () => {
+  it("unions ticket and session project names, sorted", () => {
+    expect(mergedProjects(
+      [ticket({ project: "Mojito" })],
+      [session({ projectName: "Atlas" })],
+    )).toEqual(["Atlas", "Mojito"]);
+  });
+
+  it("includes the no-project sentinel when either side lacks a project", () => {
+    expect(mergedProjects([ticket({ project: null })], [])).toEqual(["No project"]);
+    expect(mergedProjects([], [session({ projectName: null })])).toEqual(["No project"]);
+  });
+
+  it("does not duplicate a project both sides carry", () => {
+    expect(mergedProjects(
+      [ticket({ project: "Mojito" })],
+      [session({ projectName: "Mojito" })],
+    )).toEqual(["Mojito"]);
   });
 });

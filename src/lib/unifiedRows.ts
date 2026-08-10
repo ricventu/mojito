@@ -1,9 +1,10 @@
 import type { SessionMeta, TicketSummary } from "@/server/types";
-import { filterTickets } from "@/lib/ticketFilter";
-import { filterSessions } from "@/lib/sessionFilter";
+import { filterTickets, ticketStatuses, NO_PROJECT } from "@/lib/ticketFilter";
+import { filterSessions, sessionStatuses } from "@/lib/sessionFilter";
 import { orderSessions } from "@/lib/orderSessions";
 import { orderTickets } from "@/lib/orderTickets";
 import { isActiveSession } from "@/lib/activeSession";
+import { statusRank } from "@/lib/status";
 
 /** A ticket and the sessions that belong to it, rendered nested inside its card. */
 export interface TicketRow {
@@ -72,4 +73,32 @@ export function buildUnifiedRows(
 export function orderTicketRows(rows: TicketRow[]): TicketRow[] {
   const byId = new Map(rows.map((r) => [r.ticket.identifier, r]));
   return orderTickets(rows.map((r) => r.ticket)).map((t) => byId.get(t.identifier)!);
+}
+
+/**
+ * Distinct statuses across tickets and sessions, ordered by lifecycle rank (unknown
+ * ones — including the synthetic Custom and Terminal buckets — last, alphabetical
+ * tie-break). Same comparison ticketStatuses and sessionStatuses each apply on their
+ * own side, so a merged chip row stays in lifecycle order.
+ *
+ * `tickets` is the mine-scoped list, matching how the old ticket list derived its chips:
+ * toggling Mine must never leave a chip that matches nothing. Sessions are not scoped
+ * by Mine, so the full list comes in.
+ */
+export function mergedStatuses(tickets: TicketSummary[], sessions: SessionMeta[]): string[] {
+  const all = new Set([...ticketStatuses(tickets), ...sessionStatuses(sessions)]);
+  return Array.from(all)
+    .filter((v) => v !== "")
+    .sort((a, b) => {
+      const byRank = statusRank(a) - statusRank(b);
+      return byRank !== 0 ? byRank : a.localeCompare(b);
+    });
+}
+
+/** Distinct project names across tickets and sessions, with NO_PROJECT for either side's blanks. */
+export function mergedProjects(tickets: TicketSummary[], sessions: SessionMeta[]): string[] {
+  return Array.from(new Set([
+    ...tickets.map((t) => t.project ?? NO_PROJECT),
+    ...sessions.map((s) => s.projectName ?? NO_PROJECT),
+  ])).sort();
 }
