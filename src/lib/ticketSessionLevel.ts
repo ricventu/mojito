@@ -1,4 +1,5 @@
 import type { SessionMeta } from "@/server/types";
+import { isActiveSession } from "@/lib/activeSession";
 
 export type ActiveLevel = "attn" | "run";
 
@@ -16,7 +17,7 @@ export function activeSessionLevel(
   for (const ssn of sessions) {
     if (ssn.ticket !== ticket) continue;
     if (ssn.state === "needs-input") return "attn"; // highest priority — done early
-    if (ssn.state === "running" || ssn.state === "starting" || ssn.state === "idle") level = "run";
+    if (isActiveSession(ssn)) level = "run";
   }
   return level;
 }
