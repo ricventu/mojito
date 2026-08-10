@@ -29,9 +29,8 @@ Mojito owns the whole lifecycle — there is no external plugin:
   Progress (see `tmuxName` in `src/server/sessionKey.ts`); the conflict session is
   `mojito-<ticket>-conflict`.
 - **Projects map**: `~/.config/mojito/projects.json` (Linear team key → project name →
-  repo path), resolved with a fallback chain (`resolveProjectsPath` in
-  `src/server/config.ts`): env `MOJITO_PROJECTS` → legacy env `LIME_PROJECTS` →
-  `~/.config/mojito/projects.json` → legacy `~/.claude/lime-projects.json`.
+  repo path), resolved by `resolveProjectsPath` in `src/server/config.ts`: env
+  `MOJITO_PROJECTS` → `~/.config/mojito/projects.json`.
 
 ## Tests
 
