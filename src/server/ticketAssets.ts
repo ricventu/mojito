@@ -107,7 +107,7 @@ export interface PreparedTicketAssets {
 
 /**
  * Put every Linear upload a ticket carries on disk and name the local paths, so the work
- * session — which holds no Linear credential — can Read them.
+ * session — whose Read tool can't reach URLs that sit behind Linear's file auth — can Read them.
  *
  * Best-effort by construction: this never rejects. A single unreachable asset costs only
  * itself (its URL still stands in the description text), a state directory that cannot

@@ -1,15 +1,21 @@
 // The full work-phase prompt for a ticket session: design → plan → implement → review
-// in one session. The session never touches Linear — Mojito owns all Linear reads and
-// writes; the session's only output channels are git commits and the result file.
+// in one session. Mojito's two channels are the context file (the ticket data, already
+// read, so the session spends no tokens fetching it) and the result file (the outcome).
+//
+// The prompt says NOTHING about how the session may use Linear, deliberately (RIC-184).
+// It used to ban Linear outright, which killed the follow-up tickets that surface
+// mid-session; a permission grant was tried instead and was worse, since it had the
+// session opening tickets without asking. Neither is needed: with no instruction, the
+// session behaves like any other — it proposes, the user confirms. Do not add one back.
 export const WORK_PROMPT_TEMPLATE = `You are working Linear ticket {{TICKET}} end to end in this repository.
 
 First read the JSON session context at {{CONTEXT_PATH}}: identifier, statusName,
-title, project, labels, description, and optionally rejectReason. Never use any Linear
-tool, MCP server, or API in this session — Mojito manages Linear for you.
+title, project, labels, description, and optionally rejectReason. Mojito already
+read all of that from Linear, so you never have to spend tokens re-reading it.
 
 The context may also carry \`assets\` (each \`{url, localPath}\`) and \`attachments\`
 (each \`{title, url, localPath?}\`) — Mojito already downloaded those files for you
-because this session holds no Linear credential. Before you design, open every
+because their URLs sit behind Linear's file auth. Before you design, open every
 \`localPath\` you can with the Read tool — images, PDFs, and text files. A \`localPath\`
 ending in \`.bin\` is a content type Mojito could not identify; treat it only as a file
 you know exists, not one you can Read. An attachment with no \`localPath\` is a plain

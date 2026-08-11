@@ -10,13 +10,20 @@ Mojito owns the whole lifecycle — there is no external plugin:
   conflict resolution) from templates in `src/server/prompts/`. Sessions are spawned as
   detached tmux sessions running `claude … '<prompt>'`.
 - **Linear**: `src/server/linear.ts` is a direct GraphQL client. Mojito writes issue
-  creation, status transitions, and assignee — never comments. **Spawned sessions never
-  touch Linear** (no MCP, no API); their prompt forbids it.
+  creation, status transitions, and assignee — never comments. **The prompts say nothing
+  about Linear to the spawned session** (RIC-184) — no ban, no permission. It used to ban
+  Linear outright, which killed the follow-up tickets that surface mid-session; an explicit
+  permission was tried next and was worse, since it had sessions opening tickets without
+  asking. With no instruction the session behaves like any other: it proposes, the user
+  confirms. `tests/server/prompts.test.ts` fails on either polarity creeping back. Nothing
+  needs enforcing anyway — `setIssueStatus` writes the target state unconditionally, so
+  Mojito's move is last-write-wins whatever the session did.
 - **Session context**: the launcher writes `<stateDir>/context/<id>.json`
   (`{identifier, statusName, title, project, labels, description, assets?, attachments?,
-  rejectReason?}`); the prompt embeds the path. `assets`/`attachments` point at files
+  rejectReason?}`); the prompt embeds the path. It exists to save the session the tokens of
+  re-reading Linear, not to fence it in. `assets`/`attachments` point at files
   Mojito already downloaded into the sibling `<stateDir>/context/<id>-assets/` directory,
-  since the spawned session holds no Linear credential of its own.
+  since those URLs sit behind Linear's file auth.
 - **Outcome channel**: the session's last action is writing
   `<stateDir>/results/<id>.json` (`{outcome: "ready-for-qa" | "blocked", notes}`).
   The Stop hook reads it (`src/server/hookHandler.ts`) and Mojito moves the status.
