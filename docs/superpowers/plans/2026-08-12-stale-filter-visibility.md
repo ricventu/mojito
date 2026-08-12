@@ -537,6 +537,18 @@ In `src/components/LaunchSheet.tsx`, add to the imports:
 import { apiError } from "@/lib/apiError";
 ```
 
+Above the component's `export default function LaunchSheet(`, add the module constant. The
+three handlers below deliberately keep their own shape rather than collapsing into one
+parameterised helper — `start()` alone does a DELETE first and special-cases 409, and a
+wrapper carrying that as a callback reads worse than the repetition it removes. Only the
+message is shared, so the one thing that would drift is the one thing hoisted:
+
+```tsx
+// Shared by all three launch handlers: the only part of their shape that would drift if
+// copied. A thrown fetch is the case that used to show the user nothing at all.
+const LAUNCH_FAILED = "launch request failed — check the connection and retry";
+```
+
 Beside the existing `verdictPending` state (line 30), add:
 
 ```tsx
@@ -569,7 +581,7 @@ Replace `start()` (lines 99-112) with:
       onLaunched();
       onClose();
     } catch {
-      setErr("launch request failed — check the connection and retry");
+      setErr(LAUNCH_FAILED);
     } finally {
       setLaunching(null);
     }
@@ -594,7 +606,7 @@ Replace `startCustom()` (lines 116-125) with:
       onLaunched();
       onClose();
     } catch {
-      setErr("launch request failed — check the connection and retry");
+      setErr(LAUNCH_FAILED);
     } finally {
       setLaunching(null);
     }
@@ -619,7 +631,7 @@ Replace `startShell()` (lines 129-138) with:
       onLaunched();
       onClose();
     } catch {
-      setErr("launch request failed — check the connection and retry");
+      setErr(LAUNCH_FAILED);
     } finally {
       setLaunching(null);
     }
