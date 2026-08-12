@@ -54,9 +54,9 @@ export default function UnifiedList(
   // activeFilters treat Mine like every other filter instead of special-casing the one
   // that would otherwise put a chip in the sticky bar on every single visit.
   // `=== "1"` rather than `!== "0"`: with an off default, an unrecognised stored value
-  // should read as off. usePersistedState only writes on change, so this default reaches
-  // any browser that never touched the toggle, while one that did keeps its stored
-  // choice — explicit beats default.
+  // should read as off. usePersistedState only writes when the toggle is used, so a
+  // browser that never touched it has no stored value at all and reaches this default,
+  // while one that did keeps its stored choice — explicit beats default.
   const [mineRaw, setMineRaw] = usePersistedState("mojito-list-mine", "0");
   const mine = mineRaw === "1";
   const setMine = (v: boolean) => setMineRaw(v ? "1" : "0");

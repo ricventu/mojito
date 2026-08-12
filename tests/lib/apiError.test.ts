@@ -27,7 +27,7 @@ describe("apiError", () => {
     expect(await apiError(new Response(null, { status: 500 }), "launch failed")).toBe("launch failed (500)");
   });
 
-  it("stringifies a non-string error field rather than rendering [object Object]", async () => {
+  it("coerces a non-string error field", async () => {
     expect(await apiError(json({ error: 42 }, 400), "launch failed")).toBe("42");
   });
 });

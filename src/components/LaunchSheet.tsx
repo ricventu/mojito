@@ -76,9 +76,7 @@ export default function LaunchSheet(
         else onClose();
         return;
       }
-      let message = `verdict failed (${res.status})`;
-      try { const b = await res.json(); if (b?.error) message = b.error; } catch { /* non-JSON */ }
-      setErr(message);
+      setErr(await apiError(res, "verdict failed"));
     } catch {
       setErr("verdict request failed — check the connection and retry");
     } finally {
@@ -243,7 +241,9 @@ export default function LaunchSheet(
   }
 
   return (
-    <div className="sheet-backdrop" onClick={onClose}>
+    // Ignore the backdrop tap while a launch is in flight: unmounting the sheet mid-launch
+    // would drop the later setErr(...) on the floor, leaving a failed launch reporting nothing.
+    <div className="sheet-backdrop" onClick={launchBusy ? undefined : onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <h3><span className="id" style={{ fontSize: 16 }}>{ticket.identifier}</span> <span className="chip">{ticket.statusName}</span></h3>
         {ticket.title && <p className="sheet-title">{ticket.title}</p>}
