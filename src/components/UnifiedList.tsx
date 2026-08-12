@@ -5,6 +5,8 @@ import LaunchSheet from "./LaunchSheet";
 import NewTicketSheet from "./NewTicketSheet";
 import NewSessionSheet from "./NewSessionSheet";
 import FilterBar from "./FilterBar";
+import ActiveFilters from "./ActiveFilters";
+import { activeFilters, type FilterKey } from "@/lib/activeFilters";
 import TicketCard from "./TicketCard";
 import SessionCard from "./SessionCard";
 import StatusBadge from "./StatusBadge";
@@ -47,9 +49,16 @@ export default function UnifiedList(
   const [statusRaw, setStatusRaw] = usePersistedState("mojito-list-status", "");
   const status = statusRaw === "" ? null : statusRaw;
   const setStatus = (s: string | null) => setStatusRaw(s ?? "");
-  // Default on, as it was on the ticket list before the merge.
-  const [mineRaw, setMineRaw] = usePersistedState("mojito-list-mine", "1");
-  const mine = mineRaw !== "0";
+  // Default off: the landing view is the whole board. With off as the baseline, "narrows
+  // the list" and "deviates from the default" become the same thing, which is what lets
+  // activeFilters treat Mine like every other filter instead of special-casing the one
+  // that would otherwise put a chip in the sticky bar on every single visit.
+  // `=== "1"` rather than `!== "0"`: with an off default, an unrecognised stored value
+  // should read as off. usePersistedState only writes when the toggle is used, so a
+  // browser that never touched it has no stored value at all and reaches this default,
+  // while one that did keeps its stored choice — explicit beats default.
+  const [mineRaw, setMineRaw] = usePersistedState("mojito-list-mine", "0");
+  const mine = mineRaw === "1";
   const setMine = (v: boolean) => setMineRaw(v ? "1" : "0");
   // Default off: the full board is the landing view.
   const [sessionsRaw, setSessionsRaw] = usePersistedState("mojito-list-sessions", "0");
@@ -75,6 +84,33 @@ export default function UnifiedList(
     () => groupByProject(ticketRows, looseSessions),
     [ticketRows, looseSessions],
   );
+
+  const filters = useMemo(
+    () => activeFilters({ query, project, status, mine, sessionsOnly }),
+    [query, project, status, mine, sessionsOnly],
+  );
+
+  const clearFilter = (key: FilterKey) => {
+    // A Record rather than a switch: TypeScript requires every FilterKey to have an
+    // entry, so a new filter fails to compile here instead of silently no-op'ing when
+    // its chip is tapped.
+    const clear: Record<FilterKey, () => void> = {
+      query: () => setQuery(""),
+      project: () => setProject(null),
+      status: () => setStatus(null),
+      mine: () => setMine(false),
+      sessions: () => setSessionsOnly(false),
+    };
+    clear[key]();
+  };
+
+  const clearAllFilters = () => {
+    setQuery("");
+    setProject(null);
+    setStatus(null);
+    setMine(false);
+    setSessionsOnly(false);
+  };
 
   const dismiss = async (s: SessionMeta) => {
     const label = s.ticket || s.title;
@@ -120,6 +156,11 @@ export default function UnifiedList(
             </>
           }
         />
+      )}
+      {/* Guarded by !empty for the same reason FilterBar is: with no tickets and no
+          sessions at all there is nothing for a filter to be hiding. */}
+      {!empty && (
+        <ActiveFilters filters={filters} onClear={clearFilter} onClearAll={clearAllFilters} />
       )}
       {noMatches && (
         <p className="empty">
