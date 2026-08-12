@@ -5,6 +5,8 @@ import LaunchSheet from "./LaunchSheet";
 import NewTicketSheet from "./NewTicketSheet";
 import NewSessionSheet from "./NewSessionSheet";
 import FilterBar from "./FilterBar";
+import ActiveFilters from "./ActiveFilters";
+import { activeFilters, type FilterKey } from "@/lib/activeFilters";
 import TicketCard from "./TicketCard";
 import SessionCard from "./SessionCard";
 import StatusBadge from "./StatusBadge";
@@ -76,6 +78,29 @@ export default function UnifiedList(
     [ticketRows, looseSessions],
   );
 
+  const filters = useMemo(
+    () => activeFilters({ query, project, status, mine, sessionsOnly }),
+    [query, project, status, mine, sessionsOnly],
+  );
+
+  const clearFilter = (key: FilterKey) => {
+    switch (key) {
+      case "query": setQuery(""); return;
+      case "project": setProject(null); return;
+      case "status": setStatus(null); return;
+      case "mine": setMine(false); return;
+      case "sessions": setSessionsOnly(false); return;
+    }
+  };
+
+  const clearAllFilters = () => {
+    setQuery("");
+    setProject(null);
+    setStatus(null);
+    setMine(false);
+    setSessionsOnly(false);
+  };
+
   const dismiss = async (s: SessionMeta) => {
     const label = s.ticket || s.title;
     const prompt = isActiveSession(s)
@@ -120,6 +145,11 @@ export default function UnifiedList(
             </>
           }
         />
+      )}
+      {/* Guarded by !empty for the same reason FilterBar is: with no tickets and no
+          sessions at all there is nothing for a filter to be hiding. */}
+      {!empty && (
+        <ActiveFilters filters={filters} onClear={clearFilter} onClearAll={clearAllFilters} />
       )}
       {noMatches && (
         <p className="empty">

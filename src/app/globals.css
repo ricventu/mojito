@@ -139,6 +139,39 @@ label { color: var(--text); }
    status chips beside it — extra space keeps the two from reading as one group. */
 .filter-chips .chip.lead { margin-right: 14px; }
 
+/* ---- Active filter bar (sticky) ---- */
+/* Pinned, unlike .filter above, which scrolls away: with the filter bar off screen a
+   filtered list looks like a complete one, which is how a leftover search query hid a
+   freshly launched session. z-index sits under .nav (40) and the sheets (100); no
+   ancestor sets overflow or transform, so `sticky` resolves against the viewport. The
+   negative margin cancels .pad's padding so the bar spans the full width and its
+   bottom border reads as a divider. */
+.active-filters {
+  position: sticky; top: 0; z-index: 30;
+  margin: 0 -12px 8px; padding: 8px 12px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 6px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.active-filters::-webkit-scrollbar { display: none; }
+.active-filters .chip { flex: none; }
+.af-lead {
+  flex: none; font: 600 10px/1 var(--sans); letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-faint);
+}
+/* Brand lime, matching .filter-chips .chip.on — these are the active filters. Spelled
+   out rather than reusing the `on` class, whose unscoped .chip.on rule is blue and
+   outranks a single class. */
+.af-chip {
+  max-width: 46vw;
+  color: var(--accent); background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+/* A long query truncates rather than pushing Clear all off the row. */
+.af-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.af-x { margin-left: 6px; opacity: .7; }
+.af-all { color: var(--text-dim); white-space: nowrap; }
+
 /* ---- Chips (labels / meta) ---- */
 .chip {
   display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px;
