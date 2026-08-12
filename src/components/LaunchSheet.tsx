@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client";
+import { apiError } from "@/lib/apiError";
 import { resolveEffort, resolveModel, MODELS, EFFORTS } from "@/lib/stageDefaults";
 import { useStageDefaults } from "@/lib/useStageDefaults";
 import { tmuxName } from "@/server/sessionKey";
@@ -8,6 +9,10 @@ import StateBadge from "./StateBadge";
 import QaVerdictButtons from "./QaVerdictButtons";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 import { holdsSheetOpen, type HeldOutcome } from "@/lib/verdictOutcome";
+
+// Shared by all three launch handlers: the only part of their shape that would drift if
+// copied. A thrown fetch is the case that used to show the user nothing at all.
+const LAUNCH_FAILED = "launch request failed — check the connection and retry";
 
 export default function LaunchSheet(
   { token, ticket, sessions, onClose, onLaunched, onOpen, onOpenDocs }:
@@ -28,6 +33,12 @@ export default function LaunchSheet(
   }, [defaults, ticket.statusName, touched]);
   const [err, setErr] = useState<string | null>(null);
   const [verdictPending, setVerdictPending] = useState<"approve-local" | "approve-mr" | "reject" | null>(null);
+  // One state for all three launch buttons, mirroring how a single verdictPending covers
+  // the three verdict buttons. The ticket launch is the slow one: its POST runs a Linear
+  // fetch and then downloads the ticket's assets before it answers, seconds during which
+  // the button used to look dead.
+  const [launching, setLaunching] = useState<"work" | "custom" | "shell" | null>(null);
+  const launchBusy = launching !== null;
   // Set only for the two outcomes that carry information the user cannot get from the
   // board or the session list: the MR URL, and the fact that a merge conflict happened.
   // The other two close the sheet, as they always have.
@@ -97,44 +108,68 @@ export default function LaunchSheet(
 
   // Launch a claude session.
   const start = async () => {
-    // A finished session for this ticket+status keeps the same tmux name, so clear it first
-    // (kill + deregister) before relaunching, else the server rejects the launch as a duplicate.
-    if (existing) await apiFetch(token, `/api/sessions/${existing.id}`, { method: "DELETE" });
-    const res = await apiFetch(token, "/api/sessions", {
-      method: "POST",
-      body: JSON.stringify({ ticket: ticket.identifier, status: ticket.statusName, model, effort,
-        projectName: ticket.project, title: ticket.title, labels: ticket.labels }),
-    });
-    if (res.status === 409) { setErr("A session for this ticket+status already exists."); return; }
-    if (!res.ok) { setErr(await res.text()); return; }
-    onLaunched();
-    onClose();
+    setErr(null);
+    setLaunching("work");
+    try {
+      // A finished session for this ticket+status keeps the same tmux name, so clear it first
+      // (kill + deregister) before relaunching, else the server rejects the launch as a duplicate.
+      if (existing) await apiFetch(token, `/api/sessions/${existing.id}`, { method: "DELETE" });
+      const res = await apiFetch(token, "/api/sessions", {
+        method: "POST",
+        body: JSON.stringify({ ticket: ticket.identifier, status: ticket.statusName, model, effort,
+          projectName: ticket.project, title: ticket.title, labels: ticket.labels }),
+      });
+      if (res.status === 409) { setErr("A session for this ticket+status already exists."); return; }
+      if (!res.ok) { setErr(await apiError(res, "launch failed")); return; }
+      onLaunched();
+      onClose();
+    } catch {
+      setErr(LAUNCH_FAILED);
+    } finally {
+      setLaunching(null);
+    }
   };
 
   // Launch a bare, ticket-scoped custom session (RIC-128). Opens in the ticket's worktree if one
   // exists (else the repo root). Custom ids are random-suffixed, so no need to clear an existing one.
   const startCustom = async () => {
-    const res = await apiFetch(token, "/api/sessions", {
-      method: "POST",
-      body: JSON.stringify({ kind: "custom", ticket: ticket.identifier, status: ticket.statusName,
-        projectName: ticket.project, title: ticket.title, labels: ticket.labels, model, effort }),
-    });
-    if (!res.ok) { setErr(await res.text()); return; }
-    onLaunched();
-    onClose();
+    setErr(null);
+    setLaunching("custom");
+    try {
+      const res = await apiFetch(token, "/api/sessions", {
+        method: "POST",
+        body: JSON.stringify({ kind: "custom", ticket: ticket.identifier, status: ticket.statusName,
+          projectName: ticket.project, title: ticket.title, labels: ticket.labels, model, effort }),
+      });
+      if (!res.ok) { setErr(await apiError(res, "launch failed")); return; }
+      onLaunched();
+      onClose();
+    } catch {
+      setErr(LAUNCH_FAILED);
+    } finally {
+      setLaunching(null);
+    }
   };
 
   // Launch a plain zsh terminal in the ticket's worktree (RIC-155). Like startCustom, shell ids
   // are random-suffixed, so there is no existing session to clear first.
   const startShell = async () => {
-    const res = await apiFetch(token, "/api/sessions", {
-      method: "POST",
-      body: JSON.stringify({ kind: "shell", ticket: ticket.identifier, status: ticket.statusName,
-        projectName: ticket.project, title: ticket.title, labels: ticket.labels }),
-    });
-    if (!res.ok) { setErr(await res.text()); return; }
-    onLaunched();
-    onClose();
+    setErr(null);
+    setLaunching("shell");
+    try {
+      const res = await apiFetch(token, "/api/sessions", {
+        method: "POST",
+        body: JSON.stringify({ kind: "shell", ticket: ticket.identifier, status: ticket.statusName,
+          projectName: ticket.project, title: ticket.title, labels: ticket.labels }),
+      });
+      if (!res.ok) { setErr(await apiError(res, "terminal failed")); return; }
+      onLaunched();
+      onClose();
+    } catch {
+      setErr(LAUNCH_FAILED);
+    } finally {
+      setLaunching(null);
+    }
   };
 
   const isToQa = ticket.statusName === "To QA";
@@ -151,8 +186,12 @@ export default function LaunchSheet(
   // worktree — direct, self-describing buttons instead of a mode toggle.
   const customBtn = (
     <div className="btns" style={{ marginTop: 12 }}>
-      <button className="btn ghost" onClick={() => startCustom()}>Claude session</button>
-      <button className="btn ghost" onClick={() => startShell()}>Terminal</button>
+      <button className="btn ghost" disabled={launchBusy} onClick={() => startCustom()}>
+        {launching === "custom" ? "Starting…" : "Claude session"}
+      </button>
+      <button className="btn ghost" disabled={launchBusy} onClick={() => startShell()}>
+        {launching === "shell" ? "Opening…" : "Terminal"}
+      </button>
     </div>
   );
 
@@ -229,7 +268,9 @@ export default function LaunchSheet(
               </button>
             )}
             {selectors}
-            <button className="btn primary block" onClick={() => start()}>{existing ? "Start new session" : "Start session"}</button>
+            <button className="btn primary block" disabled={launchBusy} onClick={() => start()}>
+              {launching === "work" ? "Starting…" : existing ? "Start new session" : "Start session"}
+            </button>
             {customBtn}
           </>
         )}
