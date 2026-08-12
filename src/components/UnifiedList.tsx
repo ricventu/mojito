@@ -49,9 +49,16 @@ export default function UnifiedList(
   const [statusRaw, setStatusRaw] = usePersistedState("mojito-list-status", "");
   const status = statusRaw === "" ? null : statusRaw;
   const setStatus = (s: string | null) => setStatusRaw(s ?? "");
-  // Default on, as it was on the ticket list before the merge.
-  const [mineRaw, setMineRaw] = usePersistedState("mojito-list-mine", "1");
-  const mine = mineRaw !== "0";
+  // Default off: the landing view is the whole board. With off as the baseline, "narrows
+  // the list" and "deviates from the default" become the same thing, which is what lets
+  // activeFilters treat Mine like every other filter instead of special-casing the one
+  // that would otherwise put a chip in the sticky bar on every single visit.
+  // `=== "1"` rather than `!== "0"`: with an off default, an unrecognised stored value
+  // should read as off. usePersistedState only writes on change, so this default reaches
+  // any browser that never touched the toggle, while one that did keeps its stored
+  // choice — explicit beats default.
+  const [mineRaw, setMineRaw] = usePersistedState("mojito-list-mine", "0");
+  const mine = mineRaw === "1";
   const setMine = (v: boolean) => setMineRaw(v ? "1" : "0");
   // Default off: the full board is the landing view.
   const [sessionsRaw, setSessionsRaw] = usePersistedState("mojito-list-sessions", "0");
