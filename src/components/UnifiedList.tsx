@@ -84,13 +84,17 @@ export default function UnifiedList(
   );
 
   const clearFilter = (key: FilterKey) => {
-    switch (key) {
-      case "query": setQuery(""); return;
-      case "project": setProject(null); return;
-      case "status": setStatus(null); return;
-      case "mine": setMine(false); return;
-      case "sessions": setSessionsOnly(false); return;
-    }
+    // A Record rather than a switch: TypeScript requires every FilterKey to have an
+    // entry, so a new filter fails to compile here instead of silently no-op'ing when
+    // its chip is tapped.
+    const clear: Record<FilterKey, () => void> = {
+      query: () => setQuery(""),
+      project: () => setProject(null),
+      status: () => setStatus(null),
+      mine: () => setMine(false),
+      sessions: () => setSessionsOnly(false),
+    };
+    clear[key]();
   };
 
   const clearAllFilters = () => {
