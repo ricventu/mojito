@@ -5,6 +5,7 @@ node_modules/
 .env.local
 *.log
 .mojito-state/
+.prod-supervisor.pid
 
 .worktrees/
 .claude/worktrees/

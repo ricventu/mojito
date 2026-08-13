@@ -23,11 +23,17 @@
 //            (~build duration) rather than the server serving a half-written
 //            `.next`.
 //
+// The rebuild cycle is also reachable on demand: SIGUSR2 runs it even when nothing
+// changed. That is what Mojito's "Pull & deploy" button signals on macOS (it finds
+// us through the pid we write to .prod-supervisor.pid), standing in for the systemd
+// deploy unit the Linux box uses. SIGUSR2 rather than SIGHUP because Node exits on
+// an unhandled SIGHUP: handling it would turn closing this terminal into a rebuild.
+//
 // Written in JS rather than bash (unlike the dev supervisor) because the file
 // watching needs `fs.watch({recursive})` — macOS has no `fswatch` by default.
 
 import { spawn } from "node:child_process";
-import { watch } from "node:fs";
+import { unlinkSync, watch, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const PORT = process.env.MOJITO_PORT || "4711";
@@ -46,6 +52,9 @@ const KILL_GRACE_MS = 5_000;
 const RESPAWN_DELAY_MS = 2_000;
 // A `.next` that cannot boot at all would otherwise respawn forever.
 const MAX_CRASHES = 3;
+// Our pid, for whoever wants to ask for a rebuild — read by supervisorPidPath()
+// in src/server/selfUpdate.ts. Relative to the repo root we chdir into below.
+const PID_FILE = ".prod-supervisor.pid";
 
 // Root-level files worth a rebuild, watched via the (non-recursive) root
 // watcher rather than individually: editors replace files by rename, which
@@ -286,6 +295,13 @@ async function shutdown(signal) {
   clearTimeout(rebuildTimer);
   clearInterval(pollTimer);
   for (const w of watchers) w.close();
+  // Leave no pid claiming to listen. A SIGKILL still can, hence the liveness probe
+  // on the reading side.
+  try {
+    unlinkSync(PID_FILE);
+  } catch {
+    /* never written, or already gone */
+  }
   if (oneShot) killGroup(oneShot.pid, "SIGTERM"); // a build in flight
   await stopServer();
   process.exit(0);
@@ -295,11 +311,30 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => void shutdown(signal));
 }
 
+// Only after the initial build: before it there is no server for anyone to ask, and
+// triggerRebuild() would race that build (its `rebuilding` guard is not held during it).
+function acceptRebuildSignals() {
+  try {
+    writeFileSync(PID_FILE, `${process.pid}\n`);
+  } catch (err) {
+    console.error(`[prod-supervisor] cannot write ${PID_FILE} — no on-demand rebuild:`, err);
+    return;
+  }
+  // triggerRebuild() coalesces, so a double-tap on the button costs one extra cycle,
+  // never two concurrent builds.
+  process.on("SIGUSR2", () => {
+    log("SIGUSR2 — rebuild requested");
+    void triggerRebuild();
+  });
+  log(`accepting rebuild requests — SIGUSR2 to pid ${process.pid} (${PID_FILE})`);
+}
+
 async function main() {
   if ((await runOnce(["run", "build"], "initial production build")) !== 0) {
     console.error("[prod-supervisor] initial build failed — nothing to serve. Fix the build and rerun `make prod`.");
     process.exit(1);
   }
+  acceptRebuildSignals();
   await startServer();
   startWatchers();
   pollTimer = setInterval(() => void poll(), POLL_INTERVAL_MS);

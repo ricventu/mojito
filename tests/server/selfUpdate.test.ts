@@ -1,5 +1,14 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { isSelfUpdateEnabled, runSelfUpdate, _resetSelfUpdate } from "@/server/selfUpdate";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  isSelfUpdateEnabled,
+  runSelfUpdate,
+  signalProdSupervisor,
+  supervisorPidPath,
+  _resetSelfUpdate,
+} from "@/server/selfUpdate";
 import type { FfPullResult } from "@/server/ffPull";
 
 afterEach(() => {
@@ -58,6 +67,52 @@ describe("runSelfUpdate single-flight", () => {
     runSelfUpdate(d.pull, async () => {});
     expect(d.calls()).toBe(1);
     d.release({ status: "up-to-date", from: "a", to: "a" });
+  });
+});
+
+// The macOS deploy trigger. `kill` is injected so the suite never actually signals a
+// process, but the pid file is read off a real disk: parsing and the liveness probe are
+// the whole point of this function.
+describe("signalProdSupervisor", () => {
+  const root = () => mkdtempSync(join(tmpdir(), "mojito-supervisor-"));
+  function recorder(onProbe?: () => void) {
+    const sent: [number, NodeJS.Signals | 0][] = [];
+    const kill = (pid: number, signal: NodeJS.Signals | 0) => {
+      if (signal === 0) onProbe?.();
+      sent.push([pid, signal]);
+    };
+    return { kill, sent };
+  }
+
+  it("probes the recorded pid, then sends it SIGUSR2", async () => {
+    const dir = root();
+    writeFileSync(supervisorPidPath(dir), "4242\n");
+    const r = recorder();
+    await signalProdSupervisor(dir, r.kill);
+    expect(r.sent).toEqual([[4242, 0], [4242, "SIGUSR2"]]);
+  });
+
+  it("fails when there is no pid file — nothing was started by `make prod`", async () => {
+    const r = recorder();
+    await expect(signalProdSupervisor(root(), r.kill)).rejects.toThrow(/no prod supervisor/i);
+    expect(r.sent).toEqual([]);
+  });
+
+  it("fails when the recorded process is gone instead of signalling a stale pid", async () => {
+    const dir = root();
+    writeFileSync(supervisorPidPath(dir), "4242");
+    const r = recorder(() => { throw Object.assign(new Error("kill ESRCH"), { code: "ESRCH" }); });
+    await expect(signalProdSupervisor(dir, r.kill)).rejects.toThrow(/no prod supervisor/i);
+    // The probe failed, so SIGUSR2 must never have gone out — to 4242 or anyone else.
+    expect(r.sent.some(([, signal]) => signal === "SIGUSR2")).toBe(false);
+  });
+
+  it("fails when the pid file does not hold a pid", async () => {
+    const dir = root();
+    writeFileSync(supervisorPidPath(dir), "not-a-pid");
+    const r = recorder();
+    await expect(signalProdSupervisor(dir, r.kill)).rejects.toThrow(/no prod supervisor/i);
+    expect(r.sent).toEqual([]);
   });
 });
 
