@@ -63,15 +63,15 @@ describe("handleHook — ticket sessions", () => {
     expect(moveToQa).not.toHaveBeenCalled();
   });
 
-  it("(c) Stop + result blocked is needs-input and never calls moveToQa", async () => {
+  it("(c) Stop + an unreadable result is needs-input and never calls moveToQa", async () => {
     const { registry } = seed();
     const bus = new EventBus();
     const moveToQa = vi.fn(noopMoveToQa);
     await handleHook("mojito-RIC-46-in-progress", "Stop", {
-      registry, bus, readResult: () => ({ outcome: "blocked" }), moveToQa, moveToDone: noopMoveToDone, clearResult: noopClearResult,
+      registry, bus, readResult: noResult, moveToQa, moveToDone: noopMoveToDone, clearResult: noopClearResult,
     });
-    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("needs-input");
     expect(moveToQa).not.toHaveBeenCalled();
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("needs-input");
   });
 
   it("(d) SessionEnd + no result is a failure", async () => {
@@ -137,7 +137,7 @@ describe("handleHook — ticket sessions", () => {
     const moveToDone = vi.fn(noopMoveToDone);
     const clearResult = vi.fn(noopClearResult);
     await handleHook("mojito-RIC-46-in-progress", "Stop", {
-      registry, bus, readResult: () => ({ outcome: "merged", notes: "ff onto main" }), moveToQa, moveToDone, clearResult,
+      registry, bus, readResult: () => ({ outcome: "merged" }), moveToQa, moveToDone, clearResult,
     });
     expect(moveToDone).toHaveBeenCalledTimes(1);
     expect(moveToDone).toHaveBeenCalledWith("RIC-46");
