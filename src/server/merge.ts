@@ -62,6 +62,32 @@ export async function detectDefaultBranch(repo: string, run: GitRun = defaultRun
 }
 
 /**
+ * Whether a checkout's HEAD is the project's default branch. This is the genuine "the work
+ * never took a branch of its own" case: whatever was committed is already on the default
+ * branch, so there is nothing for Mojito to merge.
+ *
+ * Deliberately not routed through `isAlreadyMerged`: when the local default branch is ahead
+ * of its remote, the ancestry check against `origin/<def>` answers false and would strand the
+ * ticket at a gate that can never clear.
+ *
+ * Answers false on a detached HEAD and on any git failure, so a broken check degrades to the
+ * ordinary approve path — same policy as `isAlreadyMerged`.
+ */
+export async function isOnDefaultBranch(
+  input: { checkout: string; repoRoot: string },
+  run: GitRun = defaultRun,
+): Promise<boolean> {
+  const { checkout, repoRoot } = input;
+  try {
+    const branch = (await run(["rev-parse", "--abbrev-ref", "HEAD"], checkout)).stdout.trim();
+    if (!branch || branch === "HEAD") return false;
+    return branch === (await detectDefaultBranch(repoRoot, run));
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The main checkout behind a linked worktree, asked of git rather than of the project map:
  * `--git-common-dir` is the shared `.git` directory (the linked worktree's own gitdir points
  * at `<root>/.git/worktrees/<name>`, but the *common* dir is always `<root>/.git`), so its

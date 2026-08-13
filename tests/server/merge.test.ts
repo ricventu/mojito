@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { mergeTicketBranch, repoRootFromWorktree, isAlreadyMerged, type GitRun, type CliRun } from "@/server/merge";
+import { mergeTicketBranch, repoRootFromWorktree, isAlreadyMerged, isOnDefaultBranch, type GitRun, type CliRun } from "@/server/merge";
 
 const pexec = promisify(execFile);
 
@@ -404,5 +404,60 @@ describe("isAlreadyMerged", () => {
     expect(await isAlreadyMerged({ worktree: "/w", repoRoot: "/r" }, run)).toBe(true);
     expect(seen.some((a) => a[0] === "fetch")).toBe(false);
     expect(seen).toContainEqual(["merge-base", "--is-ancestor", "ric-46", "main"]);
+  });
+});
+
+describe("isOnDefaultBranch", () => {
+  it("is true when the checkout's HEAD is the default branch", async () => {
+    const on = await isOnDefaultBranch(
+      { checkout: "/w", repoRoot: "/r" },
+      scriptedRun({ ...BASE, "rev-parse --abbrev-ref HEAD": "main" }),
+    );
+    expect(on).toBe(true);
+  });
+
+  it("is false when the checkout is on a ticket branch", async () => {
+    const on = await isOnDefaultBranch({ checkout: "/w", repoRoot: "/r" }, scriptedRun({ ...BASE }));
+    expect(on).toBe(false);
+  });
+
+  it("is false on a detached HEAD", async () => {
+    const on = await isOnDefaultBranch(
+      { checkout: "/w", repoRoot: "/r" },
+      scriptedRun({ ...BASE, "rev-parse --abbrev-ref HEAD": "HEAD" }),
+    );
+    expect(on).toBe(false);
+  });
+
+  // Never asks the remote for its HEAD twice over: the local candidates answer when
+  // origin/HEAD is missing, which is the no-remote fixture case.
+  it("falls back to the local default branch when origin/HEAD is missing", async () => {
+    const on = await isOnDefaultBranch(
+      { checkout: "/w", repoRoot: "/r" },
+      scriptedRun({ "rev-parse --abbrev-ref HEAD": "main" }, ["symbolic-ref --short refs/remotes/origin/HEAD"]),
+    );
+    expect(on).toBe(true);
+  });
+
+  // A broken check must degrade to "not on the default branch", which routes the gate to
+  // the ordinary approve path rather than to the status-only Mark Done.
+  it("is false when the default branch cannot be determined", async () => {
+    const on = await isOnDefaultBranch(
+      { checkout: "/w", repoRoot: "/r" },
+      scriptedRun({ "rev-parse --abbrev-ref HEAD": "main" }, [
+        "symbolic-ref --short refs/remotes/origin/HEAD",
+        "rev-parse --verify refs/heads/main",
+        "rev-parse --verify refs/heads/master",
+      ]),
+    );
+    expect(on).toBe(false);
+  });
+
+  it("is false when git fails outright", async () => {
+    const on = await isOnDefaultBranch(
+      { checkout: "/w", repoRoot: "/r" },
+      scriptedRun({}, ["rev-parse --abbrev-ref HEAD"]),
+    );
+    expect(on).toBe(false);
   });
 });

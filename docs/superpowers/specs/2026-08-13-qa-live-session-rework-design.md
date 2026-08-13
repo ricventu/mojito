@@ -163,8 +163,11 @@ No server-side status change is needed: `src/app/api/sessions/route.ts:82` moves
 
 `src/components/LaunchSheet.tsx`, To QA branch — today it renders the verdict buttons and the
 bare Claude/Terminal buttons, and offers no way to open the ticket's live work session, which
-is now the primary QA action. It gets the two-state treatment the work states already have:
-"Open running session" when the `-work` session is live, a work launch button when it is not.
+is now the primary QA action. It offers "Open session" whenever a `-work` session is registered
+(its scrollback is worth reading dead or alive) and a work launch button whenever that session
+is not alive — both at once for a registered-but-dead session, since registry entries are never
+dropped automatically and `start()` clears one before relaunching. That choice goes into a pure
+`qaSessionModel` helper in `src/lib`, alongside `qaGateModel`.
 To QA stays out of `LAUNCHABLE_STATUSES`, so that launch borrows the In Progress model/effort
 defaults rather than adding a stage-defaults row and its sync test.
 
@@ -200,11 +203,29 @@ It reads history only — no fetch side effects beyond updating remote refs, no 
 checkout — so it is safe to run on sheet open.
 
 **The question, in one place.** New `hasNothingToMerge(projectsPath, ticket, projectName)` in
-`src/server/ticketMergeState.ts` answers `true` when the ticket has no branch of its own
-(no worktree, or `worktree === repoRoot`) and otherwise defers to `isAlreadyMerged`. Both the
-endpoint and the verdict call it, so the gate and the guard can never disagree. It needs the
-worktree/repo-root resolution the verdict route holds inline today, so that block moves to a
-shared `src/server/ticketDirs.ts`.
+`src/server/ticketMergeState.ts`. Both the endpoint and the verdict call it, so the gate and
+the guard can never disagree. It needs the worktree/repo-root resolution the verdict route
+holds inline today, so that block moves to a shared `src/server/ticketDirs.ts`.
+
+It never answers `true` without asking git about a branch — a wrong `true` hides the approves
+and writes Done over unmerged commits:
+
+1. Main checkout unresolvable → `false`. "I could not tell" is not "there is nothing to merge";
+   the ordinary approve path runs and fails loudly if it must.
+2. Otherwise the checkout to inspect is the ticket's worktree, or the repo root when it has
+   none.
+3. That checkout's HEAD is the default branch → `true` (new `isOnDefaultBranch` in
+   `src/server/merge.ts`). This is the real "no branch of its own" case. It does not go through
+   `isAlreadyMerged`: a local default branch ahead of its remote fails the ancestry check and
+   would strand the ticket at a gate that can never clear.
+4. Otherwise defer to `isAlreadyMerged({worktree: thatCheckout, repoRoot})`.
+
+There is deliberately no `worktree === repoRoot → true` short-circuit. `matchWorktree` matches
+any worktree whose branch carries the ticket id, the main one included, so a session that ran
+`git checkout -b ric-190-fix` in the repo root and committed there hits that case with real
+unmerged work. Such a ticket now answers `false`, the gate offers the approves, and
+`approve-local` throws `cannot resolve the main checkout for the ticket worktree` (400) — an
+honest error to act on instead of a silent Done over unmerged commits.
 
 **Endpoint.** `GET /api/tickets/[id]/merge-state?projectName=<name>` →
 `{ nothingToMerge: boolean }`. Named for what it answers: "merged" would be a lie for a ticket
@@ -255,8 +276,12 @@ Additions:
 - `isAlreadyMerged`, against a scripted `GitRun`: true when `--is-ancestor` exits 0; true when
   it fails but `cherry` prints no `+` line (the squash-merge case); false when `cherry` prints
   one; false on a detached HEAD; false when any git call throws.
-- `hasNothingToMerge`: true when the ticket has no worktree, true when `worktree === repoRoot`
-  (neither case runs git), and otherwise whatever `isAlreadyMerged` answers.
+- `isOnDefaultBranch`, against the same scripted `GitRun`: true when HEAD is the default
+  branch; false on a ticket branch, on a detached HEAD, and on any git failure.
+- `hasNothingToMerge`: false when the main checkout cannot be resolved; true when the inspected
+  checkout (worktree, else repo root) is on the default branch; false when it is on a ticket
+  branch — including `worktree === repoRoot`, the case that used to short-circuit to true; and
+  otherwise whatever `isAlreadyMerged` answers.
 - `mark-done` writes Done and touches no git; `mark-done` with commits still to merge throws
   `QaVerdictError` and leaves the status alone.
 - `qaGateModel`: checking → no verdict buttons; nothing-to-merge → `mark-done` only, no

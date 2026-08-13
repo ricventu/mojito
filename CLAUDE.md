@@ -35,9 +35,12 @@ Mojito owns the whole lifecycle — there is no external plugin:
   moves the status.
 - **QA gate**: approve runs the server-side rebase+merge (`src/server/merge.ts`,
   zero tokens on the clean path; a Claude session only on conflict). When there is
-  nothing to merge — the branch already landed outside Mojito, or the work never took
-  one (`hasNothingToMerge` in `src/server/ticketMergeState.ts`) — the gate offers
-  `mark-done` instead, which writes Done straight and runs no git. There is no reject:
+  nothing to merge — the branch already landed outside Mojito, or the checkout holding
+  the work sits on the default branch (`hasNothingToMerge` in
+  `src/server/ticketMergeState.ts`) — the gate offers `mark-done` instead, which writes
+  Done straight and runs no git. That answer always comes from git: anything undecidable
+  (no resolvable main checkout, a failing git call) answers "there IS something to merge",
+  because a wrong `true` writes Done over unmerged commits. There is no reject:
   a ticket that fails QA is reworked by typing into its still-live work session, and the
   ticket parks at To QA meanwhile.
 - **Status model**: `src/server/statusModel.ts` is authoritative; `src/lib/status.ts`
