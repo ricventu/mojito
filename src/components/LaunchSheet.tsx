@@ -10,6 +10,7 @@ import QaVerdictButtons from "./QaVerdictButtons";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 import { holdsSheetOpen, type HeldOutcome } from "@/lib/verdictOutcome";
 import { qaGateModel, type MergeState } from "@/lib/qaGate";
+import { qaSessionModel } from "@/lib/qaSession";
 
 // Shared by all three launch handlers: the only part of their shape that would drift if
 // copied. A thrown fetch is the case that used to show the user nothing at all.
@@ -74,6 +75,10 @@ export default function LaunchSheet(
   const existing = sessions.find((s) => s.id === existingId);
   const existingActive = existing != null
     && (existing.state === "running" || existing.state === "needs-input" || existing.state === "starting");
+  // What the To QA branch offers for the work session: open it while it is registered, and
+  // start a replacement whenever it is not alive. start() clears a dead registration first,
+  // so both can be on screen at once.
+  const qaSession = qaSessionModel({ registered: existing != null, active: existingActive });
 
   // The To QA verdict is resolved server-side: approve merges (or opens an MR) with no
   // session at all, and only a merge conflict spawns one. projectName and title are sent
@@ -275,13 +280,14 @@ export default function LaunchSheet(
             {err && <p className="err-text">{err}</p>}
             {/* QA rework happens in the session that built the branch, so the sheet's job at
                 To QA is to get you into it — or to replace it if it died. */}
-            {existing ? (
+            {qaSession.open && existing && (
               <button className="btn ghost block" style={{ marginTop: 12 }} onClick={() => onOpen(existing)}>
                 Open session (<StateBadge state={existing.state} />)
               </button>
-            ) : (
+            )}
+            {qaSession.start && (
               <button className="btn primary block" style={{ marginTop: 12 }} disabled={launchBusy} onClick={() => start()}>
-                {launching === "work" ? "Starting…" : "Start work session"}
+                {launching === "work" ? "Starting…" : existing ? "Start new work session" : "Start work session"}
               </button>
             )}
             {selectors}
