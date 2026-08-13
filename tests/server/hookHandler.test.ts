@@ -256,10 +256,9 @@ describe("handleHook — ticket sessions", () => {
   });
 
   // The QA rework loop: a session that reached To QA stays alive, the human types feedback into
-  // it, and the next round has to move the board again. Two things make that work and both are
-  // load-bearing — the session's own Write of the result file fires PostToolUse, which pulls it
-  // out of "done" before Stop arrives, and clearResult runs only on success so no round
-  // re-fires an old file.
+  // it, and the next round has to move the board again. This test pins the load-bearing mechanism:
+  // PostToolUse revives a "done" session back to "running", so the subsequent Stop hook can call
+  // moveToQa again. (The clearResult mechanism that prevents re-firing old files is tested separately.)
   it("moves the ticket again on a later round (Stop -> PostToolUse -> Stop)", async () => {
     const { registry } = seed();
     const bus = new EventBus();
