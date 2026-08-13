@@ -16,7 +16,7 @@ describe("resolveTicketVerdict", () => {
     const d = deps();
     const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
     expect(res).toEqual({ ok: true, result: { done: "merged", commit: "abc1234" } });
-    expect(d.resolveVerdict).toHaveBeenCalledWith({ ticket: "RIC-110", arg: "approve-local", reason: undefined });
+    expect(d.resolveVerdict).toHaveBeenCalledWith({ ticket: "RIC-110", arg: "approve-local" });
     expect(d.supersedeStaleSession).toHaveBeenCalledWith("RIC-110");
   });
 
@@ -24,13 +24,6 @@ describe("resolveTicketVerdict", () => {
     const d = deps({ resolveVerdict: vi.fn(async () => ({ done: "mr-created", url: "https://x/mr/1" }) as const) });
     const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve-mr" }, d);
     expect(res).toEqual({ ok: true, result: { done: "mr-created", url: "https://x/mr/1" } });
-  });
-
-  it("reject passes the reason through and returns the rework result", async () => {
-    const d = deps({ resolveVerdict: vi.fn(async () => ({ done: "rework-session" }) as const) });
-    const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "reject", reason: "broken" }, d);
-    expect(res).toEqual({ ok: true, result: { done: "rework-session" } });
-    expect(d.resolveVerdict).toHaveBeenCalledWith({ ticket: "RIC-110", arg: "reject", reason: "broken" });
   });
 
   it("returns 409 and touches nothing when the ticket is not at To QA", async () => {
@@ -54,10 +47,17 @@ describe("resolveTicketVerdict", () => {
     expect(res).toEqual({ ok: false, code: 400, error: "invalid arg" });
   });
 
+  it("rejects the retired 'reject' arg", async () => {
+    const d = deps();
+    const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "reject" }, d);
+    expect(res).toEqual({ ok: false, code: 400, error: "invalid arg" });
+    expect(d.getIssueStatus).not.toHaveBeenCalled();
+  });
+
   it("maps QaVerdictError to 400 and skips supersede", async () => {
-    const d = deps({ resolveVerdict: vi.fn(async () => { throw new QaVerdictError("rejection reason required"); }) });
-    const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "reject", reason: "" }, d);
-    expect(res).toEqual({ ok: false, code: 400, error: "rejection reason required" });
+    const d = deps({ resolveVerdict: vi.fn(async () => { throw new QaVerdictError("no worktree for ticket"); }) });
+    const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
+    expect(res).toEqual({ ok: false, code: 400, error: "no worktree for ticket" });
     expect(d.supersedeStaleSession).not.toHaveBeenCalled();
   });
 

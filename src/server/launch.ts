@@ -26,7 +26,6 @@ export interface LaunchRequest {
   description: string;
   assets?: TicketAsset[];
   attachments?: TicketAttachment[];
-  rejectReason?: string;
 }
 
 export interface LaunchDeps {
@@ -87,7 +86,6 @@ export async function launchSession(
     description: req.description,
     ...(req.assets?.length ? { assets: req.assets } : {}),
     ...(req.attachments?.length ? { attachments: req.attachments } : {}),
-    ...(req.rejectReason ? { rejectReason: req.rejectReason } : {}),
   });
   clearSessionResult(deps.stateDir, id); // ids repeat per ticket+status: a stale result must not satisfy the new session's Stop hook
   const command = buildClaudeCommand(req, settingsPath, buildWorkPrompt({

@@ -6,7 +6,7 @@ export type VerdictResult =
 
 export interface TicketVerdictDeps {
   getIssueStatus: (ticket: string) => Promise<string>;
-  resolveVerdict: (input: { ticket: string; arg: QaArg; reason?: string }) => Promise<QaVerdictResult>;
+  resolveVerdict: (input: { ticket: string; arg: QaArg }) => Promise<QaVerdictResult>;
   supersedeStaleSession: (ticket: string) => Promise<void>;
 }
 
@@ -17,10 +17,10 @@ export interface TicketVerdictDeps {
  * caller can retry.
  */
 export async function resolveTicketVerdict(
-  input: { ticket: string; arg: string; reason?: string },
+  input: { ticket: string; arg: string },
   deps: TicketVerdictDeps,
 ): Promise<VerdictResult> {
-  const { ticket, arg, reason } = input;
+  const { ticket, arg } = input;
   if (!QA_ARGS.includes(arg as QaArg)) return { ok: false, code: 400, error: "invalid arg" };
 
   const status = await deps.getIssueStatus(ticket);
@@ -28,7 +28,7 @@ export async function resolveTicketVerdict(
 
   let result: QaVerdictResult;
   try {
-    result = await deps.resolveVerdict({ ticket, arg: arg as QaArg, reason });
+    result = await deps.resolveVerdict({ ticket, arg: arg as QaArg });
   } catch (e) {
     const error = e instanceof Error ? e.message : "verdict failed";
     return { ok: false, code: e instanceof QaVerdictError ? 400 : 422, error };

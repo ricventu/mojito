@@ -13,14 +13,13 @@ export interface LaunchContext {
   // credential of its own, so a bare URL would be unreadable to it. Omitted when empty.
   assets?: TicketAsset[];
   attachments?: TicketAttachment[];
-  rejectReason?: string;
 }
 
 /**
  * Write the per-session launch context the spawned session itself reads (the file's
  * path is embedded directly in the Mojito-built work prompt — no env var involved) so
- * it can skip a Linear `get_issue`/description fetch and, on QA rework, see why the
- * ticket bounced back. Returns the file path so the caller can embed it in the prompt.
+ * it can skip a Linear `get_issue`/description fetch. Returns the file path so the
+ * caller can embed it in the prompt.
  */
 export function writeLaunchContext(stateDir: string, id: string, ctx: LaunchContext): string {
   const dir = join(stateDir, "context");

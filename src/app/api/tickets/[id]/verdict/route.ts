@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { getConfig, getRegistry } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
-import { getIssueStatus, setIssueStatus, getIssueContent, downloadLinearAsset, type IssueContent } from "@/server/linear";
-import { prepareTicketAssets, MAX_ASSET_BYTES } from "@/server/ticketAssets";
-import { launchSession, launchMergeFixSession } from "@/server/launch";
+import { getIssueStatus, setIssueStatus, getIssueContent, type IssueContent } from "@/server/linear";
+import { launchMergeFixSession } from "@/server/launch";
 import { loadProjectMap, resolvePathForProject } from "@/server/projects";
 import { mergeTicketBranch, repoRootFromWorktree } from "@/server/merge";
 import { resolveQaVerdict, QaVerdictError } from "@/server/qaVerdict";
@@ -22,7 +21,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   let body;
   try { body = await req.json(); } catch { return new NextResponse("bad json", { status: 400 }); }
   const arg: string = typeof body.arg === "string" ? body.arg : "";
-  const reason: string | undefined = typeof body.reason === "string" ? body.reason : undefined;
   const projectName: string | null = typeof body.projectName === "string" ? body.projectName : null;
   const title: string = typeof body.title === "string" ? body.title : "";
 
@@ -35,23 +33,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // worktree has no branch to merge. The main checkout comes from the project map when the
   // project is mapped, and otherwise from git itself (repoRootFromWorktree) — asking the
   // worktree beats guessing, and resolveTicketCwd would just hand back the worktree again.
-  // Resolved lazily — a reject never merges, so it must not pay for the git lookups.
   const resolveDirs = async () => {
     const worktree = resolveTicketWorktree(cfg.projectsPath, id, projectName);
     const mapped = projectName ? resolvePathForProject(loadProjectMap(cfg.projectsPath), projectName) : null;
     return { worktree, repoRoot: mapped ?? (worktree ? await repoRootFromWorktree(worktree) : null) };
   };
 
-  // A reject relaunches the ticket's work session under the same id, so the
-  // stale-session cleanup below must not retire the session this request just started.
-  let workSessionRelaunched = false;
-
   const content = async (): Promise<IssueContent> => {
     try { return await getIssueContent(cfg.linearApiKey, id); } catch { return { description: "", attachments: [] }; }
   };
 
   const result = await resolveTicketVerdict(
-    { ticket: id, arg, reason },
+    { ticket: id, arg },
     {
       getIssueStatus: (t) => getIssueStatus(cfg.linearApiKey, t),
       resolveVerdict: (i) =>
@@ -68,29 +61,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             return mergeTicketBranch({ worktree, repoRoot, mode });
           },
           setIssueStatus: (t, s) => setIssueStatus(cfg.linearApiKey, t, s),
-          launchRework: async (rejectReason) => {
-            const status = "In Progress";
-            const sid = tmuxName(id, status);
-            if (registry.get(sid)) await supersedeSession(sid, { closeSession, registry });
-            // A ticket that hit a merge conflict and is then rejected would otherwise keep a
-            // live conflict session running in the very worktree the rework session takes over.
-            const cid = conflictSessionName(id);
-            if (registry.get(cid)) await supersedeSession(cid, { closeSession, registry });
-            const c = await content();
-            const prepared = await prepareTicketAssets({
-              stateDir: cfg.stateDir, id: sid, description: c.description, attachments: c.attachments,
-              download: (url) => downloadLinearAsset(cfg.linearApiKey, url, MAX_ASSET_BYTES),
-            });
-            const res = await launchSession(
-              { ticket: id, status, model: defaultModelForStatus(status),
-                effort: defaultEffortForStatus(status), projectName, title, labels: [],
-                description: c.description, assets: prepared.assets, attachments: prepared.attachments,
-                rejectReason },
-              tmuxDeps,
-            );
-            if (!res.ok) throw new Error(`rework session not launched: ${res.reason}`);
-            workSessionRelaunched = true;
-          },
           launchMergeFix: async (detail, mode) => {
             const sid = conflictSessionName(id);
             if (registry.get(sid)) await supersedeSession(sid, { closeSession, registry });
@@ -106,7 +76,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           },
         }),
       supersedeStaleSession: async (t) => {
-        if (workSessionRelaunched) return;
         const sid = tmuxName(t, "In Progress");
         if (registry.get(sid)) await supersedeSession(sid, { closeSession, registry });
       },

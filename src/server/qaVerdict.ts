@@ -1,7 +1,7 @@
 import type { MergeMode, MergeOutcome } from "./merge.js";
 
-export type QaArg = "approve-local" | "approve-mr" | "reject";
-export const QA_ARGS: readonly QaArg[] = ["approve-local", "approve-mr", "reject"];
+export type QaArg = "approve-local" | "approve-mr";
+export const QA_ARGS: readonly QaArg[] = ["approve-local", "approve-mr"];
 
 export class QaVerdictError extends Error {}
 
@@ -10,7 +10,6 @@ export interface QaVerdictDeps {
   // checkout); any outcome it RETURNS as conflict/error is one a merge-fix session can work on.
   merge: (mode: MergeMode) => Promise<MergeOutcome>;
   setIssueStatus: (ticket: string, target: string) => Promise<void>;
-  launchRework: (rejectReason: string) => Promise<void>;
   // Launches the merge-fix session (it completes the approved merge itself and reports
   // "merged", which moves the ticket to Done). Returns the session's tmux id so the
   // caller can offer to open it.
@@ -20,33 +19,19 @@ export interface QaVerdictDeps {
 export type QaVerdictResult =
   | { done: "merged"; commit: string }
   | { done: "mr-created"; url: string }
-  | { done: "fix-session"; sessionId: string; detail: string }
-  | { done: "rework-session" };
+  | { done: "fix-session"; sessionId: string; detail: string };
 
 /**
- * Resolve a To QA verdict. Approve runs the server-side merge (zero tokens on the
- * clean path) and only launches a session when that merge hits a conflict; reject
- * sends the reason to the next work session through its context file — nothing is
- * posted to Linear.
+ * Resolve a To QA verdict. Approve runs the server-side merge (zero tokens on the clean
+ * path) and only launches a session when that merge hits a conflict. There is no reject:
+ * a ticket that fails QA is reworked by talking to the session that built it, which is
+ * still alive in tmux — Mojito is not in that loop at all.
  */
 export async function resolveQaVerdict(
-  input: { ticket: string; arg: QaArg; reason?: string },
+  input: { ticket: string; arg: QaArg },
   deps: QaVerdictDeps,
 ): Promise<QaVerdictResult> {
-  const { ticket, arg, reason } = input;
-  if (arg === "reject") {
-    const trimmed = (reason ?? "").trim();
-    if (!trimmed) throw new QaVerdictError("rejection reason required");
-    // Launch first, status second. The reason exists only in the launched session's context
-    // file, so a failed launch must leave the ticket at To QA: the reject is then simply
-    // retried with the reason intact, instead of stranding the ticket at In Progress where
-    // the To-QA guard would 409 every retry and the typed reason would be lost. The inverse
-    // failure is benign — a status write that fails after a successful launch only lags the
-    // board until the session's own move to To QA.
-    await deps.launchRework(trimmed);
-    await deps.setIssueStatus(ticket, "In Progress");
-    return { done: "rework-session" };
-  }
+  const { ticket, arg } = input;
   const mode: MergeMode = arg === "approve-local" ? "local" : "mr";
   const outcome = await deps.merge(mode);
   switch (outcome.status) {

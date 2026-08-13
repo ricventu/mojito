@@ -27,11 +27,6 @@ describe("writeLaunchContext", () => {
     const p = writeLaunchContext(dir, "mojito-RIC-46-to-review", ctx);
     expect(statSync(p).mode & 0o777).toBe(0o600);
   });
-
-  it("includes rejectReason when given (QA rework)", () => {
-    const p = writeLaunchContext(dir, "mojito-RIC-46-to-code", { ...ctx, rejectReason: "missed the edge case" });
-    expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({ ...ctx, rejectReason: "missed the edge case" });
-  });
 });
 
 describe("writeLaunchContext asset fields", () => {
