@@ -41,8 +41,9 @@ until reject killed it.
 
 - A work session finishes a round and writes `{"outcome": "ready-for-qa"}`. The Stop hook
   moves the ticket to To QA. The session stays alive — with reject gone, nothing kills it.
-- The QA gate checks whether the branch is already merged. If it is, the only action is
-  `mark-done` — status to Done, no git. If it is not, the gate offers `approve-local` and
+- The QA gate asks whether there is anything left to merge. If there is not — the branch is
+  already in the default branch, or the work never took a branch of its own — the only action
+  is `mark-done`: status to Done, no git. Otherwise the gate offers `approve-local` and
   `approve-mr` as today.
 - Rework: the human opens the live session and types what is wrong. That round ends, the
   session writes the result file again, the hook re-fires the move — a no-op, the ticket is
@@ -95,11 +96,12 @@ still closes itself out to Done without a human step.
 
 ### 4. The work prompt
 
-`src/server/prompts/work.ts` keeps only what a session cannot infer: the two Mojito channels
-and the worktree convention. The design/plan/implement/review sequence goes; how to work is a
-session-level decision, the same as in any other repository. The Bug → `systematic-debugging`
-routing goes with it — the labels are in the context file, so the session can make that call
-itself.
+`src/server/prompts/work.ts` keeps only what a session cannot infer: Mojito's two channels.
+The design/plan/implement/review sequence goes, and so does the worktree instruction — both
+are session-level decisions, the same as in a hand-started session. A one-line fix does not
+need a branch of its own any more than it needs a brainstorming round. The Bug →
+`systematic-debugging` routing goes too: the labels are in the context file, so the session
+can make that call itself.
 
 ```
 You are working Linear ticket {{TICKET}} end to end in this repository.
@@ -108,12 +110,7 @@ First read the JSON session context at {{CONTEXT_PATH}}: identifier, statusName,
 title, project, labels, and description. Mojito already read all of that from Linear,
 so you never have to spend tokens re-reading it.
 
-{{ASSETS_PARAGRAPH}}
-Isolation: create (or reuse) a worktree and branch named after {{TICKET}} via the
-superpowers:using-git-worktrees skill. If the current directory already is that
-worktree, stay in it.
-
-Result file — REQUIRED. As the very last action of a round, write {{RESULT_PATH}}
+{{ASSETS_PARAGRAPH}}Result file — REQUIRED. As the very last action of a round, write {{RESULT_PATH}}
 with exactly this JSON object:
   {"outcome": "ready-for-qa"}
 It is the only signal Mojito has to move {{TICKET}} to To QA. Your session stays
@@ -141,6 +138,11 @@ that are not in its context file. `launchSession` already holds the answer: it p
 decides whether the keys land in the context file. The paragraph now says "also carries"
 rather than "may also carry", because it only appears when they are there.
 
+Dropping the worktree instruction has one downstream consequence, handled in section 6: a
+ticket worked directly in the project checkout has no branch for approve to merge. Rather than
+letting that ticket dead-end at the gate with `no worktree for ticket`, "nothing to merge" and
+"already merged" collapse into the same answer, and both offer Mark Done.
+
 The Linear silence established by RIC-184 is untouched: the prompt still says nothing about
 whether the session may use Linear, and `tests/server/prompts.test.ts` still fails on either
 polarity creeping back.
@@ -166,13 +168,19 @@ is now the primary QA action. It gets the two-state treatment the work states al
 To QA stays out of `LAUNCHABLE_STATUSES`, so that launch borrows the In Progress model/effort
 defaults rather than adding a stage-defaults row and its sync test.
 
-### 6. Already-merged detection and `mark-done`
+### 6. "Nothing to merge" detection and `mark-done`
 
-When you merge the branch yourself — a GitHub PR, a squash from the web UI, a local merge
-outside Mojito — approve has nothing left to do, and the paths where it still *fails* are
-exactly the ones a live session at To QA makes likely: the session left the worktree dirty
-(`status --porcelain` non-empty → `{status:"error"}`), or the repo root is parked on another
-branch. Both spawn a conflict session to fix a merge that already happened.
+Two situations reach To QA with no merge left for Mojito to run. You merged the branch
+yourself — a GitHub PR, a squash from the web UI, a local merge — or the session never took a
+branch at all, which the prompt now permits for small work. In the first case approve's paths
+that still *fail* are exactly the ones a live session at To QA makes likely: the session left
+the worktree dirty (`status --porcelain` non-empty → `{status:"error"}`), or the repo root is
+parked on another branch, and both spawn a conflict session to fix a merge that already
+happened. In the second, approve cannot even start: `resolveDirs` finds no worktree and the
+verdict throws `no worktree for ticket`.
+
+Both collapse to the same question — *is there anything left to merge?* — and to the same
+answer when there is not: write Done.
 
 **Detection.** New `isAlreadyMerged({worktree, repoRoot}, run)` in `src/server/merge.ts`,
 sharing that module's `GitRun` seam and default runner:
@@ -191,23 +199,31 @@ sharing that module's `GitRun` seam and default runner:
 It reads history only — no fetch side effects beyond updating remote refs, no rebase, no
 checkout — so it is safe to run on sheet open.
 
-**Endpoint.** `GET /api/tickets/[id]/merge-state` → `{ merged: boolean }`. It needs the same
-worktree/repo-root resolution the verdict route does inline today, so that block moves to a
-shared `src/server/ticketDirs.ts` and both call it.
+**The question, in one place.** New `hasNothingToMerge(projectsPath, ticket, projectName)` in
+`src/server/ticketMergeState.ts` answers `true` when the ticket has no branch of its own
+(no worktree, or `worktree === repoRoot`) and otherwise defers to `isAlreadyMerged`. Both the
+endpoint and the verdict call it, so the gate and the guard can never disagree. It needs the
+worktree/repo-root resolution the verdict route holds inline today, so that block moves to a
+shared `src/server/ticketDirs.ts`.
+
+**Endpoint.** `GET /api/tickets/[id]/merge-state?projectName=<name>` →
+`{ nothingToMerge: boolean }`. Named for what it answers: "merged" would be a lie for a ticket
+that never had a branch.
 
 **Verdict.** `"mark-done"` joins `QA_ARGS`. In `resolveQaVerdict` it re-runs the check
-server-side and, if the branch is *not* merged, throws `QaVerdictError("branch is not
-merged")` → 400. Otherwise it writes Done and returns `{done: "marked-done"}`. The re-check
-closes the window between the sheet rendering and the click, and costs one `fetch` on a path
-that would otherwise do far more work. `supersedeStaleSession` then retires the work session,
-as it does after any successful verdict — the ticket is finished either way.
+server-side and, if there *is* something to merge, throws
+`QaVerdictError("branch has unmerged commits")` → 400. Otherwise it writes Done and returns
+`{done: "marked-done"}`. The re-check closes the window between the sheet rendering and the
+click, and costs one `fetch` on a path that would otherwise do far more work.
+`supersedeStaleSession` then retires the work session, as it does after any successful
+verdict — the ticket is finished either way.
 
 **UI.** `LaunchSheet`'s To QA branch fetches the merge state when it opens and renders one of
 three states: checking (a disabled row, so no verdict is submitted against an unknown state),
-merged (a single "Mark Done" button — the two approves are hidden, since re-merging a merged
-branch is a no-op at best), not merged (`approve-local` / `approve-mr`, as today). The choice
-of state goes into a pure `qaGateModel` helper in `src/lib`, following `terminalHeadModel` and
-`holdsSheetOpen`. `holdsSheetOpen` answers `false` for `marked-done`: there is no URL or
+nothing-to-merge (a single "Mark Done" button — the two approves are hidden, since re-merging a
+merged branch is a no-op at best and a missing branch has nothing to merge), mergeable
+(`approve-local` / `approve-mr`, as today). The choice of state goes into a pure `qaGateModel`
+helper in `src/lib`, following `terminalHeadModel` and `holdsSheetOpen`. `holdsSheetOpen` answers `false` for `marked-done`: there is no URL or
 diagnostic to keep on screen.
 
 ## Failure modes
@@ -239,15 +255,18 @@ Additions:
 - `isAlreadyMerged`, against a scripted `GitRun`: true when `--is-ancestor` exits 0; true when
   it fails but `cherry` prints no `+` line (the squash-merge case); false when `cherry` prints
   one; false on a detached HEAD; false when any git call throws.
-- `mark-done` writes Done and touches no git; `mark-done` on an unmerged branch throws
+- `hasNothingToMerge`: true when the ticket has no worktree, true when `worktree === repoRoot`
+  (neither case runs git), and otherwise whatever `isAlreadyMerged` answers.
+- `mark-done` writes Done and touches no git; `mark-done` with commits still to merge throws
   `QaVerdictError` and leaves the status alone.
-- `qaGateModel`: checking → no verdict buttons; merged → `mark-done` only, no approves;
-  not merged → both approves, no `mark-done`.
+- `qaGateModel`: checking → no verdict buttons; nothing-to-merge → `mark-done` only, no
+  approves; mergeable → both approves, no `mark-done`.
 - `readSessionResult` returns `null` for `blocked` and drops `notes` when a file carries it.
 - `tmuxName(t, "To QA")` === `mojito-<t>-work`, next to the existing work-state case.
 - `hookHandler`: a Stop → PostToolUse → Stop sequence fires `moveToQa` twice. This is the
   rework-loop guard.
-- `prompts`: the work prompt contains no `blocked`, no `notes`, and no `rejectReason`.
+- `prompts`: the work prompt contains no `blocked`, no `notes`, no `rejectReason`, and no
+  worktree instruction.
 - `prompts`: with `hasAssets: false` the prompt contains no `localPath` and no `attachments`,
   and leaves no blank gap where the paragraph would be; with `hasAssets: true` it contains
   both. The existing "tells the work session to read the assets Mojito downloaded" case

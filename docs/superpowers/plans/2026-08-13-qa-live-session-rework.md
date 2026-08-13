@@ -246,11 +246,14 @@ Replace the `tells the work session to read the assets Mojito downloaded` case w
   });
 
   // The method is the session's business; the prompt carries only what a session cannot infer.
-  it("carries no rework branch, no blocked outcome, and no notes field", () => {
+  // That includes whether the work is worth a branch of its own — a one-line fix is not, and
+  // the QA gate answers "nothing to merge" for a ticket that never took one.
+  it("carries no rework branch, no blocked outcome, no notes field, and no worktree rule", () => {
     const p = buildWorkPrompt(vars);
     expect(p).not.toContain("rejectReason");
     expect(p).not.toContain("blocked");
     expect(p).not.toContain("notes");
+    expect(p).not.toContain("worktree");
   });
 ```
 
@@ -265,9 +268,11 @@ Replace the whole body of `src/server/prompts/work.ts`:
 
 ```ts
 // The work-phase prompt for a ticket session. It carries only what a session cannot work out
-// for itself: Mojito's two channels (the context file it reads, the result file it writes) and
-// the worktree convention. How to take the ticket from there — which skills, how much design up
-// front — is a session-level decision, exactly as in a hand-started session.
+// for itself: Mojito's two channels — the context file it reads, the result file it writes.
+// Everything else is a session-level decision, exactly as in a hand-started session: which
+// skills, how much design up front, and whether the work is worth a worktree and a branch at
+// all (a one-line fix is not). A ticket that ends up with no branch of its own is not a
+// problem for the QA gate — it answers "nothing to merge" and offers Mark Done.
 //
 // The prompt says NOTHING about how the session may use Linear, deliberately (RIC-184).
 // It used to ban Linear outright, which killed the follow-up tickets that surface
@@ -280,11 +285,7 @@ First read the JSON session context at {{CONTEXT_PATH}}: identifier, statusName,
 title, project, labels, and description. Mojito already read all of that from Linear,
 so you never have to spend tokens re-reading it.
 
-{{ASSETS_PARAGRAPH}}Isolation: create (or reuse) a worktree and branch named after {{TICKET}} via
-the superpowers:using-git-worktrees skill. If the current directory already is
-that worktree, stay in it.
-
-Result file — REQUIRED. As the very last action of a round, write {{RESULT_PATH}}
+{{ASSETS_PARAGRAPH}}Result file — REQUIRED. As the very last action of a round, write {{RESULT_PATH}}
 with exactly this JSON object:
   {"outcome": "ready-for-qa"}
 It is the only signal Mojito has to move {{TICKET}} to To QA. Your session stays
@@ -970,32 +971,76 @@ git commit -m "feat(merge): detect a branch that is already in the default branc
 
 ---
 
-### Task 9: Shared ticket dirs + the `merge-state` endpoint
+### Task 9: Shared ticket dirs, `hasNothingToMerge`, and the `merge-state` endpoint
 
 **Files:**
 - Create: `src/server/ticketDirs.ts`
+- Create: `src/server/ticketMergeState.ts`
 - Create: `src/app/api/tickets/[id]/merge-state/route.ts`
 - Modify: `src/app/api/tickets/[id]/verdict/route.ts` (use the shared resolver)
-- Test: `tests/server/mergeStateRoute.test.ts`
+- Test: `tests/server/ticketMergeState.test.ts`, `tests/server/mergeStateRoute.test.ts`
 
 **Interfaces:**
-- Produces: `resolveTicketDirs(projectsPath: string, ticket: string, projectName: string | null): Promise<{ worktree: string | null; repoRoot: string | null }>`; `GET /api/tickets/<id>/merge-state?projectName=<name>` → `{ merged: boolean }`.
+- Produces: `resolveTicketDirs(projectsPath: string, ticket: string, projectName: string | null): Promise<{ worktree: string | null; repoRoot: string | null }>`; `hasNothingToMerge(projectsPath: string, ticket: string, projectName: string | null, deps?: MergeStateDeps): Promise<boolean>`; `GET /api/tickets/<id>/merge-state?projectName=<name>` → `{ nothingToMerge: boolean }`.
 - Consumes: `isAlreadyMerged` (Task 8).
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing tests**
 
-Create `tests/server/mergeStateRoute.test.ts`, mirroring the mocking style of `tests/server/verdictRoute.test.ts` (read it first and match its `vi.mock` setup):
+Create `tests/server/ticketMergeState.test.ts` — this is where the semantics live, so it gets the thorough treatment:
+
+```ts
+import { describe, it, expect, vi } from "vitest";
+import { hasNothingToMerge } from "@/server/ticketMergeState";
+
+function deps(over: Partial<Parameters<typeof hasNothingToMerge>[3]> = {}) {
+  return {
+    resolveTicketDirs: vi.fn(async () => ({ worktree: "/repo/.worktrees/RIC-110", repoRoot: "/repo" })),
+    isAlreadyMerged: vi.fn(async () => false),
+    ...over,
+  };
+}
+
+describe("hasNothingToMerge", () => {
+  it("defers to the git check when the ticket has a worktree of its own", async () => {
+    const d = deps({ isAlreadyMerged: vi.fn(async () => true) });
+    expect(await hasNothingToMerge("/cfg.json", "RIC-110", "mojito", d)).toBe(true);
+    expect(d.isAlreadyMerged).toHaveBeenCalledWith({ worktree: "/repo/.worktrees/RIC-110", repoRoot: "/repo" });
+  });
+
+  it("is false when the branch still has commits to merge", async () => {
+    expect(await hasNothingToMerge("/cfg.json", "RIC-110", "mojito", deps())).toBe(false);
+  });
+
+  // The prompt no longer tells a session to take a branch, so small work lands straight in the
+  // checkout. There is nothing to merge, and no git call worth making.
+  it("is true without touching git when the ticket has no worktree", async () => {
+    const d = deps({ resolveTicketDirs: vi.fn(async () => ({ worktree: null, repoRoot: "/repo" })) });
+    expect(await hasNothingToMerge("/cfg.json", "RIC-110", "mojito", d)).toBe(true);
+    expect(d.isAlreadyMerged).not.toHaveBeenCalled();
+  });
+
+  it("is true when the worktree IS the main checkout", async () => {
+    const d = deps({ resolveTicketDirs: vi.fn(async () => ({ worktree: "/repo", repoRoot: "/repo" })) });
+    expect(await hasNothingToMerge("/cfg.json", "RIC-110", "mojito", d)).toBe(true);
+    expect(d.isAlreadyMerged).not.toHaveBeenCalled();
+  });
+
+  it("is true when the main checkout cannot be resolved", async () => {
+    const d = deps({ resolveTicketDirs: vi.fn(async () => ({ worktree: "/repo/.worktrees/RIC-110", repoRoot: null })) });
+    expect(await hasNothingToMerge("/cfg.json", "RIC-110", "mojito", d)).toBe(true);
+    expect(d.isAlreadyMerged).not.toHaveBeenCalled();
+  });
+});
+```
+
+Then create `tests/server/mergeStateRoute.test.ts`, mirroring the mocking style of `tests/server/verdictRoute.test.ts` (read it first and match its `vi.mock` setup):
 
 ```ts
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const h = vi.hoisted(() => ({
-  isAlreadyMerged: vi.fn(async () => true),
-  resolveTicketDirs: vi.fn(async () => ({ worktree: "/repo/.worktrees/RIC-110", repoRoot: "/repo" })),
-}));
+const h = vi.hoisted(() => ({ hasNothingToMerge: vi.fn(async () => true) }));
 
-vi.mock("@/server/merge", () => ({ isAlreadyMerged: h.isAlreadyMerged }));
-vi.mock("@/server/ticketDirs", () => ({ resolveTicketDirs: h.resolveTicketDirs }));
+vi.mock("@/server/ticketMergeState", () => ({ hasNothingToMerge: h.hasNothingToMerge }));
 vi.mock("@/server/app", () => ({
   getConfig: () => ({ token: "t", projectsPath: "/cfg/projects.json" }),
 }));
@@ -1008,32 +1053,26 @@ const req = (qs = "?projectName=mojito") =>
   new Request(`http://localhost/api/tickets/RIC-110/merge-state${qs}`, { headers: { authorization: "Bearer t" } });
 
 beforeEach(() => {
-  h.isAlreadyMerged.mockClear();
-  h.resolveTicketDirs.mockClear();
-  h.resolveTicketDirs.mockResolvedValue({ worktree: "/repo/.worktrees/RIC-110", repoRoot: "/repo" });
+  h.hasNothingToMerge.mockClear();
+  h.hasNothingToMerge.mockResolvedValue(true);
 });
 
 describe("GET /api/tickets/[id]/merge-state", () => {
-  it("answers the git check", async () => {
+  it("answers the check, passing the project through", async () => {
     const res = await GET(req(), params("RIC-110"));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ merged: true });
-    expect(h.isAlreadyMerged).toHaveBeenCalledWith({ worktree: "/repo/.worktrees/RIC-110", repoRoot: "/repo" });
+    expect(await res.json()).toEqual({ nothingToMerge: true });
+    expect(h.hasNothingToMerge).toHaveBeenCalledWith("/cfg/projects.json", "RIC-110", "mojito");
   });
 
-  it("answers false without touching git when the ticket has no worktree", async () => {
-    h.resolveTicketDirs.mockResolvedValue({ worktree: null, repoRoot: "/repo" });
-    const res = await GET(req(), params("RIC-110"));
-    expect(await res.json()).toEqual({ merged: false });
-    expect(h.isAlreadyMerged).not.toHaveBeenCalled();
+  it("passes a null project when the query string omits it", async () => {
+    await GET(req(""), params("RIC-110"));
+    expect(h.hasNothingToMerge).toHaveBeenCalledWith("/cfg/projects.json", "RIC-110", null);
   });
 
-  // The worktree IS the main checkout: there is no separate branch to compare.
-  it("answers false when the worktree and the repo root are the same path", async () => {
-    h.resolveTicketDirs.mockResolvedValue({ worktree: "/repo", repoRoot: "/repo" });
-    const res = await GET(req(), params("RIC-110"));
-    expect(await res.json()).toEqual({ merged: false });
-    expect(h.isAlreadyMerged).not.toHaveBeenCalled();
+  it("reports a mergeable branch", async () => {
+    h.hasNothingToMerge.mockResolvedValue(false);
+    expect(await (await GET(req(), params("RIC-110"))).json()).toEqual({ nothingToMerge: false });
   });
 
   it("401s without a token", async () => {
@@ -1047,10 +1086,10 @@ describe("GET /api/tickets/[id]/merge-state", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [ ] **Step 2: Run them and watch them fail**
 
-Run: `npx vitest run tests/server/mergeStateRoute.test.ts`
-Expected: FAIL — the route module does not exist.
+Run: `npx vitest run tests/server/ticketMergeState.test.ts tests/server/mergeStateRoute.test.ts`
+Expected: FAIL — neither module exists.
 
 - [ ] **Step 3: Implement — `src/server/ticketDirs.ts`**
 
@@ -1081,7 +1120,41 @@ export async function resolveTicketDirs(
 }
 ```
 
-- [ ] **Step 4: Implement — the route**
+- [ ] **Step 4: Implement — `src/server/ticketMergeState.ts`**
+
+```ts
+import { isAlreadyMerged } from "./merge.js";
+import { resolveTicketDirs } from "./ticketDirs.js";
+
+export interface MergeStateDeps {
+  resolveTicketDirs: typeof resolveTicketDirs;
+  isAlreadyMerged: (input: { worktree: string; repoRoot: string }) => Promise<boolean>;
+}
+
+/**
+ * Whether a QA approve would have nothing to do. Two ways that happens: the ticket has no
+ * branch of its own (the session worked straight in the checkout — the work prompt no longer
+ * asks for a worktree, and a one-line fix does not need one), or its branch is already in the
+ * default branch because someone merged it outside Mojito.
+ *
+ * The gate and the mark-done guard both call this, so what the UI offers and what the server
+ * accepts can never disagree.
+ */
+export async function hasNothingToMerge(
+  projectsPath: string,
+  ticket: string,
+  projectName: string | null,
+  deps: MergeStateDeps = { resolveTicketDirs, isAlreadyMerged },
+): Promise<boolean> {
+  const { worktree, repoRoot } = await deps.resolveTicketDirs(projectsPath, ticket, projectName);
+  // No branch to compare: no worktree, no resolvable main checkout, or the "worktree" IS the
+  // main checkout. None of these is a merge question, so none pays for a git call.
+  if (!worktree || !repoRoot || worktree === repoRoot) return true;
+  return deps.isAlreadyMerged({ worktree, repoRoot });
+}
+```
+
+- [ ] **Step 5: Implement — the route**
 
 Create `src/app/api/tickets/[id]/merge-state/route.ts`:
 
@@ -1089,15 +1162,13 @@ Create `src/app/api/tickets/[id]/merge-state/route.ts`:
 import { NextResponse } from "next/server";
 import { getConfig } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
-import { isAlreadyMerged } from "@/server/merge";
-import { resolveTicketDirs } from "@/server/ticketDirs";
+import { hasNothingToMerge } from "@/server/ticketMergeState";
 import { validateTicket } from "@/server/sessionKey";
 
 /**
- * Whether the ticket's branch is already in the default branch. Read by the QA gate before
- * it offers a verdict: a branch merged outside Mojito needs no merge, only a status write.
- * Read-only and best-effort — anything it cannot determine answers false, which leaves the
- * ordinary approve path in place.
+ * Whether a QA approve on this ticket would have anything to merge. Read by the QA gate
+ * before it offers a verdict: a branch already merged — or work that never took a branch —
+ * needs no merge, only a status write. Read-only and best-effort.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const cfg = getConfig();
@@ -1105,16 +1176,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const { id } = await params;
   try { validateTicket(id); } catch { return new NextResponse("invalid ticket", { status: 400 }); }
   const projectName = new URL(req.url).searchParams.get("projectName") || null;
-
-  const { worktree, repoRoot } = await resolveTicketDirs(cfg.projectsPath, id, projectName);
-  // No worktree means no branch of its own; worktree === repoRoot means the "branch" is the
-  // main checkout. Neither is a merge question, so neither pays for a git call.
-  if (!worktree || !repoRoot || worktree === repoRoot) return NextResponse.json({ merged: false });
-  return NextResponse.json({ merged: await isAlreadyMerged({ worktree, repoRoot }) });
+  return NextResponse.json({ nothingToMerge: await hasNothingToMerge(cfg.projectsPath, id, projectName) });
 }
 ```
 
-- [ ] **Step 5: Use the shared resolver in the verdict route**
+- [ ] **Step 6: Use the shared resolver in the verdict route**
 
 In `src/app/api/tickets/[id]/verdict/route.ts`, replace the inline `resolveDirs` closure with the shared function, keeping the laziness:
 
@@ -1128,16 +1194,16 @@ import { resolveTicketDirs } from "@/server/ticketDirs";
 
 Drop the imports that become unused (`loadProjectMap`, `resolvePathForProject`, `resolveTicketWorktree`, and `repoRootFromWorktree` if nothing else in the file uses it).
 
-- [ ] **Step 6: Run the gate**
+- [ ] **Step 7: Run the gate**
 
 Run: `npx tsc --noEmit && npx vitest run`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add src/server/ticketDirs.ts src/app/api/tickets tests/server/mergeStateRoute.test.ts
-git commit -m "feat(qa): expose whether a ticket branch is already merged"
+git add src/server/ticketDirs.ts src/server/ticketMergeState.ts src/app/api/tickets tests/server/ticketMergeState.test.ts tests/server/mergeStateRoute.test.ts
+git commit -m "feat(qa): expose whether a ticket has anything left to merge"
 ```
 
 ---
@@ -1150,12 +1216,12 @@ git commit -m "feat(qa): expose whether a ticket branch is already merged"
 - Test: `tests/server/qaVerdict.test.ts`, `tests/server/verdictRoute.test.ts`
 
 **Interfaces:**
-- Produces: `QaArg` gains `"mark-done"`; `QaVerdictDeps` gains `isMerged: () => Promise<boolean>`; `QaVerdictResult` gains `{ done: "marked-done" }`.
-- Consumes: `isAlreadyMerged` (Task 8), `resolveTicketDirs` (Task 9).
+- Produces: `QaArg` gains `"mark-done"`; `QaVerdictDeps` gains `nothingToMerge: () => Promise<boolean>`; `QaVerdictResult` gains `{ done: "marked-done" }`.
+- Consumes: `hasNothingToMerge` (Task 9).
 
 - [ ] **Step 1: Write the failing tests**
 
-In `tests/server/qaVerdict.test.ts`, add `isMerged: vi.fn(async () => true)` to the `deps()` factory, update the two key-order assertions accordingly (`["merge", "setIssueStatus", "launchMergeFix", "isMerged"]`), extend the arg-set case, and add the block:
+In `tests/server/qaVerdict.test.ts`, add `nothingToMerge: vi.fn(async () => true)` to the `deps()` factory, update the two key-order assertions accordingly (`["merge", "setIssueStatus", "launchMergeFix", "nothingToMerge"]`), extend the arg-set case, and add the block:
 
 ```ts
 describe("QA_ARGS", () => {
@@ -1165,7 +1231,7 @@ describe("QA_ARGS", () => {
 });
 
 describe("resolveQaVerdict mark-done", () => {
-  it("writes Done and runs no git when the branch is already merged", async () => {
+  it("writes Done and runs no git when there is nothing to merge", async () => {
     const d = deps();
     const res = await resolveQaVerdict({ ticket: "RIC-110", arg: "mark-done" }, d);
     expect(res).toEqual({ done: "marked-done" });
@@ -1175,9 +1241,9 @@ describe("resolveQaVerdict mark-done", () => {
   });
 
   // The gate rendered from a check that may be seconds old; re-check before writing Done.
-  it("throws and writes no status when the branch is not merged", async () => {
+  it("throws and writes no status when the branch still has commits to merge", async () => {
     const d = deps();
-    d.isMerged.mockImplementation(async () => false);
+    d.nothingToMerge.mockImplementation(async () => false);
     await expect(resolveQaVerdict({ ticket: "RIC-110", arg: "mark-done" }, d))
       .rejects.toBeInstanceOf(QaVerdictError);
     expect(d.setIssueStatus).not.toHaveBeenCalled();
@@ -1186,7 +1252,7 @@ describe("resolveQaVerdict mark-done", () => {
   it("never asks the merge question on an approve", async () => {
     const d = deps();
     await resolveQaVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
-    expect(d.isMerged).not.toHaveBeenCalled();
+    expect(d.nothingToMerge).not.toHaveBeenCalled();
   });
 });
 ```
@@ -1195,7 +1261,7 @@ In `tests/server/verdictRoute.test.ts`, add a case in the file's existing style:
 
 ```ts
   it("mark-done moves the ticket to Done without merging", async () => {
-    h.isAlreadyMerged.mockResolvedValue(true);
+    h.hasNothingToMerge.mockResolvedValue(true);
     const res = await POST(req({ arg: "mark-done" }), params("RIC-110"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, result: { done: "marked-done" } });
@@ -1204,7 +1270,7 @@ In `tests/server/verdictRoute.test.ts`, add a case in the file's existing style:
   });
 ```
 
-Add `isAlreadyMerged: vi.fn(async () => true)` to that file's hoisted mock object and to its `vi.mock("@/server/merge", …)` factory, matching the existing shape.
+Add `hasNothingToMerge: vi.fn(async () => true)` to that file's hoisted mock object and a `vi.mock("@/server/ticketMergeState", () => ({ hasNothingToMerge: h.hasNothingToMerge }))`, matching the existing shape.
 
 - [ ] **Step 2: Run them and watch them fail**
 
@@ -1223,8 +1289,9 @@ export interface QaVerdictDeps {
   merge: (mode: MergeMode) => Promise<MergeOutcome>;
   setIssueStatus: (ticket: string, target: string) => Promise<void>;
   launchMergeFix: (detail: string, mode: MergeMode) => Promise<string>;
-  // Whether the ticket's branch is already in the default branch. Asked only by mark-done.
-  isMerged: () => Promise<boolean>;
+  // Whether an approve would have nothing to do — the branch already landed, or the work
+  // never took a branch of its own. Asked only by mark-done.
+  nothingToMerge: () => Promise<boolean>;
 }
 
 export type QaVerdictResult =
@@ -1239,10 +1306,10 @@ Add the branch at the top of `resolveQaVerdict`, before the mode is derived:
 ```ts
   const { ticket, arg } = input;
   if (arg === "mark-done") {
-    // Someone merged the branch outside Mojito, so there is nothing to run — only the board
-    // is behind. Re-check rather than trust the gate: the UI decided seconds ago, and writing
-    // Done for an unmerged branch would lose the ticket.
-    if (!(await deps.isMerged())) throw new QaVerdictError("branch is not merged");
+    // Nothing for a merge to do: someone landed the branch outside Mojito, or the work never
+    // took a branch. Either way only the board is behind. Re-check rather than trust the gate —
+    // it decided seconds ago, and writing Done over unmerged commits would strand them.
+    if (!(await deps.nothingToMerge())) throw new QaVerdictError("branch has unmerged commits");
     await deps.setIssueStatus(ticket, "Done");
     return { done: "marked-done" };
   }
@@ -1252,14 +1319,10 @@ Update the function's doc comment to name the third verdict.
 
 - [ ] **Step 4: Implement — the verdict route**
 
-Add `isAlreadyMerged` to the `@/server/merge` import and wire the dep next to `merge`:
+Import `hasNothingToMerge` from `@/server/ticketMergeState` and wire the dep next to `merge`:
 
 ```ts
-          isMerged: async () => {
-            const { worktree, repoRoot } = await resolveDirs();
-            if (!worktree || !repoRoot || worktree === repoRoot) return false;
-            return isAlreadyMerged({ worktree, repoRoot });
-          },
+          nothingToMerge: () => hasNothingToMerge(cfg.projectsPath, id, projectName),
 ```
 
 - [ ] **Step 5: Run the gate**
@@ -1285,7 +1348,7 @@ git commit -m "feat(qa): add the mark-done verdict for an already-merged branch"
 - Modify: `src/components/LaunchSheet.tsx`
 
 **Interfaces:**
-- Produces: `MergeState = "checking" | "merged" | "unmerged"`; `qaGateModel(state: MergeState): { approve: boolean; markDone: boolean; checking: boolean }`.
+- Produces: `MergeState = "checking" | "nothing-to-merge" | "mergeable"`; `qaGateModel(state: MergeState): { approve: boolean; markDone: boolean; checking: boolean }`.
 - Consumes: `GET /api/tickets/<id>/merge-state` (Task 9), the `mark-done` verdict (Task 10), `tmuxName` at To QA returning the work id (Task 7).
 
 - [ ] **Step 1: Write the failing test**
@@ -1301,13 +1364,14 @@ describe("qaGateModel", () => {
     expect(qaGateModel("checking")).toEqual({ approve: false, markDone: false, checking: true });
   });
 
-  // Re-running a merge that already happened is a no-op at best, so the approves go away.
-  it("offers only mark-done for an already-merged branch", () => {
-    expect(qaGateModel("merged")).toEqual({ approve: false, markDone: true, checking: false });
+  // Re-running a merge that already happened is a no-op at best, and a ticket that never took
+  // a branch has nothing to merge at all. Both leave the status write as the only action.
+  it("offers only mark-done when there is nothing to merge", () => {
+    expect(qaGateModel("nothing-to-merge")).toEqual({ approve: false, markDone: true, checking: false });
   });
 
-  it("offers the two approves for an unmerged branch", () => {
-    expect(qaGateModel("unmerged")).toEqual({ approve: true, markDone: false, checking: false });
+  it("offers the two approves for a branch with commits to land", () => {
+    expect(qaGateModel("mergeable")).toEqual({ approve: true, markDone: false, checking: false });
   });
 });
 ```
@@ -1320,14 +1384,14 @@ Expected: FAIL — module not found.
 - [ ] **Step 3: Implement — `src/lib/qaGate.ts`**
 
 ```ts
-// Which verdicts the To QA gate offers, given what git says about the branch. Pure so it can
-// be tested without a render harness, following terminalHeadModel and holdsSheetOpen.
-export type MergeState = "checking" | "merged" | "unmerged";
+// Which verdicts the To QA gate offers, given what the server says is left to merge. Pure so it
+// can be tested without a render harness, following terminalHeadModel and holdsSheetOpen.
+export type MergeState = "checking" | "nothing-to-merge" | "mergeable";
 
 export interface QaGateModel {
   /** The two approve buttons, which run the server-side merge. */
   approve: boolean;
-  /** The status-only verdict: the branch is already in the default branch. */
+  /** The status-only verdict: the branch already landed, or there is no branch. */
   markDone: boolean;
   /** No verdict can be submitted yet — the merge state is still being read. */
   checking: boolean;
@@ -1335,8 +1399,8 @@ export interface QaGateModel {
 
 export function qaGateModel(state: MergeState): QaGateModel {
   return {
-    approve: state === "unmerged",
-    markDone: state === "merged",
+    approve: state === "mergeable",
+    markDone: state === "nothing-to-merge",
     checking: state === "checking",
   };
 }
@@ -1363,13 +1427,13 @@ export default function QaVerdictButtons(
   // and the one that was clicked says what it is doing.
   const busy = pending !== null;
 
-  if (gate.checking) return <p className="hint">Checking whether the branch is already merged…</p>;
+  if (gate.checking) return <p className="hint">Checking what is left to merge…</p>;
 
   return (
     <div className="btns">
       {gate.markDone && (
         <button className="btn primary" disabled={busy} onClick={onMarkDone}>
-          {pending === "mark-done" ? "Marking Done…" : "Mark Done · already merged"}
+          {pending === "mark-done" ? "Marking Done…" : "Mark Done · nothing to merge"}
         </button>
       )}
       {gate.approve && (
@@ -1409,7 +1473,7 @@ Use `stageKey` in both `useState` initializers and in the re-seed `useEffect` in
 ```tsx
   const [verdictPending, setVerdictPending] = useState<"approve-local" | "approve-mr" | "mark-done" | null>(null);
   const [mergeState, setMergeState] = useState<MergeState>("checking");
-  // Ask git whether the branch already landed before offering to merge it. A failed or
+  // Ask the server whether anything is left to merge before offering to merge it. A failed or
   // unreachable check degrades to the ordinary approve buttons — never to a dead gate.
   useEffect(() => {
     if (!isToQa) return;
@@ -1418,10 +1482,10 @@ Use `stageKey` in both `useState` initializers and in the re-seed `useEffect` in
       try {
         const qs = ticket.project ? `?projectName=${encodeURIComponent(ticket.project)}` : "";
         const res = await apiFetch(token, `/api/tickets/${ticket.identifier}/merge-state${qs}`);
-        const merged = res.ok && (await res.json())?.merged === true;
-        if (live) setMergeState(merged ? "merged" : "unmerged");
+        const nothing = res.ok && (await res.json())?.nothingToMerge === true;
+        if (live) setMergeState(nothing ? "nothing-to-merge" : "mergeable");
       } catch {
-        if (live) setMergeState("unmerged");
+        if (live) setMergeState("mergeable");
       }
     })();
     return () => { live = false; };
@@ -1472,7 +1536,7 @@ Expected: PASS.
 
 Start the app (`npm run dev` or the project's usual command) and open a ticket at To QA:
 - With an unmerged branch: two approve buttons, plus "Open session" if its work session is live.
-- With a branch already merged into the default branch: only "Mark Done · already merged"; clicking it moves the ticket to Done and closes the sheet.
+- With a branch already merged into the default branch, and again with a ticket that has no worktree at all: only "Mark Done · nothing to merge"; clicking it moves the ticket to Done and closes the sheet.
 - With the work session killed (`tmux kill-session -t mojito-<ticket>-work`): the sheet offers "Start work session", the launch succeeds, and the ticket stays at To QA.
 
 - [ ] **Step 8: Commit**
@@ -1493,10 +1557,10 @@ The repo's own description of the lifecycle is now wrong in four places. It is d
 
 - [ ] **Step 1: Rewrite the affected bullets**
 
-- **Prompts bullet:** the work prompt no longer carries a phase sequence. State that it carries only the context file, the result file, and the worktree convention, and that the asset paragraph appears only when the launch downloaded something.
+- **Prompts bullet:** the work prompt no longer carries a phase sequence *or* a worktree rule. State that it carries only the two channels (context file, result file), that everything else — skills, design depth, whether the work takes a branch at all — is the session's call, and that the asset paragraph appears only when the launch downloaded something.
 - **Session context bullet (line ~23):** drop `rejectReason` from the JSON shape.
 - **Outcome channel bullet:** the result file is `{outcome: "ready-for-qa" | "merged"}` — no `notes`, no `blocked` — and it is written at the end of *every* round, not once.
-- **QA gate bullet (line ~32):** replace the reject clause. New text: approve runs the server-side rebase+merge (a Claude session only on conflict); a branch already merged outside Mojito offers `mark-done`, which writes Done and runs no git; there is no reject — a ticket that fails QA is reworked by typing into its still-live work session, and the ticket parks at To QA meanwhile.
+- **QA gate bullet (line ~32):** replace the reject clause. New text: approve runs the server-side rebase+merge (a Claude session only on conflict); when there is nothing to merge — the branch already landed, or the work never took one — the gate offers `mark-done` instead, which writes Done and runs no git; there is no reject — a ticket that fails QA is reworked by typing into its still-live work session, and the ticket parks at To QA meanwhile.
 - **Status model bullet:** note that the work session id `mojito-<ticket>-work` now also covers To QA, so a session relaunched at the gate takes its predecessor's id.
 
 - [ ] **Step 2: Verify the claims**
@@ -1524,10 +1588,10 @@ git commit -m "docs: describe the live-session QA loop"
 | 3. Result file shrinks | 1 |
 | 4. The work prompt | 3 |
 | 5. Relaunching at To QA | 7 (id), 11 (sheet, stage defaults) |
-| 6. Already-merged + mark-done | 8 (detection), 9 (endpoint), 10 (verdict), 11 (UI) |
+| 6. Nothing-to-merge + mark-done | 8 (git detection), 9 (`hasNothingToMerge` + endpoint), 10 (verdict), 11 (UI) |
 | Failure modes | 2 (rework loop), 8 (git failure → false), 10 (TOCTOU re-check) |
 | Tests | every task |
 
 No spec requirement is unassigned. "Approve while a rework round is in flight" is explicitly out of scope in the spec and has no task, by design.
 
-**Type consistency:** `QaArg` / `QA_ARGS` are narrowed in Task 5 and widened in Task 10 — the ordering is deliberate, and Task 10 restates both. `QaVerdictDeps` loses `launchRework` (Task 5) and gains `isMerged` (Task 10); the key-order assertions in `tests/server/qaVerdict.test.ts` are updated in both tasks. `buildWorkPrompt` takes `WorkPromptVars` from Task 3 onward; `buildMergeFixPrompt` keeps `MergeFixPromptVars` and is fed `baseVars` without `hasAssets`. `MergeState` and `QaGateModel` are defined once, in Task 11.
+**Type consistency:** `QaArg` / `QA_ARGS` are narrowed in Task 5 and widened in Task 10 — the ordering is deliberate, and Task 10 restates both. `QaVerdictDeps` loses `launchRework` (Task 5) and gains `nothingToMerge` (Task 10); the key-order assertions in `tests/server/qaVerdict.test.ts` are updated in both tasks. `isAlreadyMerged` (Task 8) answers only the git question and is called exclusively by `hasNothingToMerge` (Task 9), which is what the route and the verdict consume. `buildWorkPrompt` takes `WorkPromptVars` from Task 3 onward; `buildMergeFixPrompt` keeps `MergeFixPromptVars` and is fed `baseVars` without `hasAssets`. `MergeState` and `QaGateModel` are defined once, in Task 11.
