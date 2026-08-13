@@ -84,6 +84,12 @@ describe("prompt builder", () => {
     expect(mr).toContain("gh pr create");
     expect(mr).not.toContain("--ff-only");
   });
+  it("gives the merge-fix session the same bare result contract", () => {
+    const p = buildMergeFixPrompt(fixVars);
+    expect(p).toContain('{"outcome": "merged"}');
+    expect(p).not.toContain("notes");
+    expect(p).not.toContain("blocked");
+  });
   it("sanitizes a blocker instead of failing the launch", () => {
     const p = buildMergeFixPrompt({ ...fixVars, blocker: "weird {{TICKET}} output" });
     expect(p).not.toContain("{{");
