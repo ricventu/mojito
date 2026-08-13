@@ -1,4 +1,4 @@
-import { WORK_STATES } from "./statusModel.js";
+import { WORK_STATES, GATE_STATES } from "./statusModel.js";
 
 const TICKET_RE = /^([A-Z][A-Z0-9]*)-(\d+)$/;
 
@@ -19,12 +19,16 @@ export function statusSlug(status: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+// One id covers every status a work session can be launched from. Two reasons, both
+// load-bearing: a launch-time board move (Backlog/Todo -> In Progress) must not change the
+// session's tmux name mid-flight, and a session relaunched while the ticket sits at To QA
+// (its predecessor died) must take the id that predecessor had. Otherwise the duplicate
+// guard and the "open running session" lookup each see a different session for one ticket.
+const WORK_ID_STATES = [...WORK_STATES, ...GATE_STATES];
+
 export function tmuxName(ticket: string, status: string): string {
   validateTicket(ticket);
-  // The work states (Backlog/Todo/In Progress) share one session id: a launch-time board
-  // move (Backlog/Todo -> In Progress) must not change the session's tmux name mid-flight,
-  // or the duplicate guard and "open running session" lookup both miss the live session.
-  const slug = WORK_STATES.includes(status) ? "work" : statusSlug(status);
+  const slug = WORK_ID_STATES.includes(status) ? "work" : statusSlug(status);
   return `mojito-${ticket}-${slug}`;
 }
 

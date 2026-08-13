@@ -9,8 +9,8 @@ describe("sessionKey", () => {
   });
 
   it("builds a tmux-safe session name", () => {
-    expect(tmuxName("RIC-46", "To QA")).toBe("mojito-RIC-46-to-qa");
-    expect(tmuxName("RIC-46", "To QA")).not.toMatch(/[.:\s]/);
+    expect(tmuxName("RIC-46", "Done")).toBe("mojito-RIC-46-done");
+    expect(tmuxName("RIC-46", "Done")).not.toMatch(/[.:\s]/);
   });
 
   it("collapses every work state (Backlog/Todo/In Progress) to the same session id", () => {
@@ -22,9 +22,17 @@ describe("sessionKey", () => {
     expect(tmuxName("RIC-46", "In Progress")).toBe("mojito-RIC-46-work");
   });
 
-  it("keeps To QA on its own distinct session id", () => {
-    expect(tmuxName("RIC-46", "To QA")).toBe("mojito-RIC-46-to-qa");
-    expect(tmuxName("RIC-46", "To QA")).not.toBe(tmuxName("RIC-46", "In Progress"));
+  // A ticket parks at To QA while its work session stays alive. If that session dies, the
+  // relaunch has to take the id its predecessor had, or the duplicate guard and the
+  // "open running session" lookup would each see a different session for one ticket.
+  it("gives a To QA launch the same id as the work states", () => {
+    expect(tmuxName("RIC-46", "To QA")).toBe("mojito-RIC-46-work");
+    expect(tmuxName("RIC-46", "In Progress")).toBe("mojito-RIC-46-work");
+  });
+
+  it("still gives the conflict session an id of its own", () => {
+    expect(conflictSessionName("RIC-46")).toBe("mojito-RIC-46-conflict");
+    expect(conflictSessionName("RIC-46")).not.toBe(tmuxName("RIC-46", "To QA"));
   });
 
   it("parses an identifier", () => {
@@ -53,7 +61,7 @@ describe("conflictSessionName", () => {
   it("builds the conflict-fix session name for a ticket", () => {
     expect(conflictSessionName("RIC-120")).toBe("mojito-RIC-120-conflict");
   });
-  it("collides with neither the work session nor the To QA gate session", () => {
+  it("collides with neither the work session nor the To QA session (which shares the work id)", () => {
     expect(conflictSessionName("RIC-120")).not.toBe(tmuxName("RIC-120", "In Progress"));
     expect(conflictSessionName("RIC-120")).not.toBe(tmuxName("RIC-120", "To QA"));
   });
