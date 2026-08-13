@@ -1,14 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client";
+import { launchedSession } from "@/lib/launchedSession";
+import type { SessionMeta } from "@/server/types";
 
 const MODELS = ["opus", "sonnet", "fable"];
 const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 const GENERAL = "__general__";
 
 export default function NewSessionSheet(
-  { token, onClose, onLaunched }:
-  { token: string; onClose: () => void; onLaunched: () => void },
+  { token, onClose, onLaunched, onOpen }:
+  { token: string; onClose: () => void; onLaunched: () => void; onOpen: (s: SessionMeta) => void },
 ) {
   const [projects, setProjects] = useState<string[]>([]);
   const [project, setProject] = useState(GENERAL);
@@ -35,7 +37,13 @@ export default function NewSessionSheet(
     });
     if (!res.ok) { setErr(await res.text()); return; }
     onLaunched();
-    onClose();
+    // Land in the session that was just started rather than back on the list — same rule as
+    // LaunchSheet. An unreadable 201 body leaves nothing to open, so the sheet just closes.
+    let payload: unknown = null;
+    try { payload = await res.json(); } catch { /* fall through to onClose */ }
+    const opened = launchedSession(payload);
+    if (opened) onOpen(opened);
+    else onClose();
   };
 
   return (

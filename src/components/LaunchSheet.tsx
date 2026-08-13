@@ -11,6 +11,7 @@ import type { SessionMeta, TicketSummary } from "@/server/types";
 import { holdsSheetOpen, type HeldOutcome } from "@/lib/verdictOutcome";
 import { qaGateModel, type MergeState } from "@/lib/qaGate";
 import { qaSessionModel } from "@/lib/qaSession";
+import { launchedSession } from "@/lib/launchedSession";
 
 // Shared by all three launch handlers: the only part of their shape that would drift if
 // copied. A thrown fetch is the case that used to show the user nothing at all.
@@ -128,6 +129,19 @@ export default function LaunchSheet(
     onLaunched();
   };
 
+  // Every launch ends inside the session it just started: starting a session is a request to
+  // work in it, not to go back to the board. The 201 body is the registered session, so the
+  // terminal opens on it directly without waiting for the list to refetch. A body we cannot
+  // read (older server, rewritten response) falls back to the old behaviour — close the sheet.
+  const enter = async (res: Response) => {
+    onLaunched();
+    let payload: unknown = null;
+    try { payload = await res.json(); } catch { /* fall through to onClose */ }
+    const opened = launchedSession(payload);
+    if (opened) onOpen(opened);
+    else onClose();
+  };
+
   // Launch a claude session.
   const start = async () => {
     setErr(null);
@@ -143,8 +157,7 @@ export default function LaunchSheet(
       });
       if (res.status === 409) { setErr("A session for this ticket+status already exists."); return; }
       if (!res.ok) { setErr(await apiError(res, "launch failed")); return; }
-      onLaunched();
-      onClose();
+      await enter(res);
     } catch {
       setErr(LAUNCH_FAILED);
     } finally {
@@ -164,8 +177,7 @@ export default function LaunchSheet(
           projectName: ticket.project, title: ticket.title, labels: ticket.labels, model, effort }),
       });
       if (!res.ok) { setErr(await apiError(res, "launch failed")); return; }
-      onLaunched();
-      onClose();
+      await enter(res);
     } catch {
       setErr(LAUNCH_FAILED);
     } finally {
@@ -185,8 +197,7 @@ export default function LaunchSheet(
           projectName: ticket.project, title: ticket.title, labels: ticket.labels }),
       });
       if (!res.ok) { setErr(await apiError(res, "terminal failed")); return; }
-      onLaunched();
-      onClose();
+      await enter(res);
     } catch {
       setErr(LAUNCH_FAILED);
     } finally {

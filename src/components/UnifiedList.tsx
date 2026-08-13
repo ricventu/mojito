@@ -216,7 +216,8 @@ export default function UnifiedList(
         <NewTicketSheet token={token} onClose={() => setNewTicket(false)} onCreated={onLaunched} />
       )}
       {newSession && (
-        <NewSessionSheet token={token} onClose={() => setNewSession(false)} onLaunched={onChanged} />
+        <NewSessionSheet token={token} onClose={() => setNewSession(false)} onLaunched={onChanged}
+          onOpen={(s) => { setNewSession(false); onOpen(s); }} />
       )}
     </div>
   );
