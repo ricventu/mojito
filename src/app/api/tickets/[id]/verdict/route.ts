@@ -3,14 +3,13 @@ import { getConfig, getRegistry } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
 import { getIssueStatus, setIssueStatus, getIssueContent, type IssueContent } from "@/server/linear";
 import { launchMergeFixSession } from "@/server/launch";
-import { loadProjectMap, resolvePathForProject } from "@/server/projects";
-import { mergeTicketBranch, repoRootFromWorktree } from "@/server/merge";
+import { mergeTicketBranch } from "@/server/merge";
 import { resolveQaVerdict, QaVerdictError } from "@/server/qaVerdict";
 import { resolveTicketVerdict } from "@/server/ticketVerdict";
 import { tmuxName, conflictSessionName, validateTicket } from "@/server/sessionKey";
 import { defaultModelForStatus, defaultEffortForStatus } from "@/server/stageDefaults";
 import { supersedeSession } from "@/server/supersede";
-import { resolveTicketWorktree } from "@/server/ticketCwd";
+import { resolveTicketDirs } from "@/server/ticketDirs";
 import { closeSession, hasSession, newSession, pipePane } from "@/server/tmux";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -28,16 +27,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const tmuxDeps = { registry, stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
     projectsPath: cfg.projectsPath, hasSession, newSession, pipePane };
 
-  // The merge needs both sides of the ticket: the worktree holding the branch, and the
-  // project's main checkout that receives a local fast-forward. A ticket without its own
-  // worktree has no branch to merge. The main checkout comes from the project map when the
-  // project is mapped, and otherwise from git itself (repoRootFromWorktree) — asking the
-  // worktree beats guessing, and resolveTicketCwd would just hand back the worktree again.
-  const resolveDirs = async () => {
-    const worktree = resolveTicketWorktree(cfg.projectsPath, id, projectName);
-    const mapped = projectName ? resolvePathForProject(loadProjectMap(cfg.projectsPath), projectName) : null;
-    return { worktree, repoRoot: mapped ?? (worktree ? await repoRootFromWorktree(worktree) : null) };
-  };
+  const resolveDirs = () => resolveTicketDirs(cfg.projectsPath, id, projectName);
 
   const content = async (): Promise<IssueContent> => {
     try { return await getIssueContent(cfg.linearApiKey, id); } catch { return { description: "", attachments: [] }; }
