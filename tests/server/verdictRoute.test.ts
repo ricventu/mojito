@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
   resolveTicketCwd: vi.fn(() => "/code/mojito" as string | null),
   resolvePathForProject: vi.fn(() => "/code/mojito" as string | null),
   registryGet: vi.fn((_id: string) => undefined as unknown),
+  hasNothingToMerge: vi.fn(async () => true),
 }));
 
 vi.mock("@/server/linear", () => ({
@@ -42,6 +43,7 @@ vi.mock("@/server/launch", () => ({
   launchSession: h.launchSession, launchMergeFixSession: h.launchMergeFixSession,
 }));
 vi.mock("@/server/supersede", () => ({ supersedeSession: h.supersedeSession }));
+vi.mock("@/server/ticketMergeState", () => ({ hasNothingToMerge: h.hasNothingToMerge }));
 vi.mock("@/server/ticketCwd", () => ({
   resolveTicketWorktree: h.resolveTicketWorktree, resolveTicketCwd: h.resolveTicketCwd,
 }));
@@ -85,6 +87,7 @@ beforeEach(() => {
   h.resolvePathForProject.mockImplementation(() => "/code/mojito");
   h.repoRootFromWorktree.mockImplementation(async () => "/code/mojito");
   h.registryGet.mockImplementation(() => undefined);
+  h.hasNothingToMerge.mockImplementation(async () => true);
 });
 
 describe("/api/tickets/[id]/verdict", () => {
@@ -209,83 +212,27 @@ describe("/api/tickets/[id]/verdict", () => {
     expect(h.setIssueStatus).not.toHaveBeenCalled();
   });
 
-  it("reject moves the ticket to In Progress and launches rework carrying the reason", async () => {
-    const res = await POST(req({ arg: "reject", reason: "layout broken", projectName: "Mojito", title: "T" }), params());
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, result: { done: "rework-session" } });
-    expect(h.setIssueStatus).toHaveBeenCalledWith("k", "RIC-110", "In Progress");
-    expect(h.launchSession).toHaveBeenCalledWith(
-      expect.objectContaining({ ticket: "RIC-110", status: "In Progress", rejectReason: "layout broken",
-        description: "the ticket description", labels: [] }),
-      expect.anything(),
-    );
-    expect(h.mergeTicketBranch).not.toHaveBeenCalled();
-  });
-
-  it("reject launches the rework session BEFORE moving the board, so a failed launch keeps To QA", async () => {
-    const order: string[] = [];
-    h.launchSession.mockImplementation(async () => { order.push("launch"); return { ok: true, meta: {} }; });
-    h.setIssueStatus.mockImplementation(async () => { order.push("status"); });
-    await POST(req({ arg: "reject", reason: "broken", projectName: "Mojito", title: "T" }), params());
-    expect(order).toEqual(["launch", "status"]);
-  });
-
-  it("a failed rework launch leaves the board untouched", async () => {
-    h.launchSession.mockImplementation(async () => ({ ok: false, reason: "duplicate" }));
-    const res = await POST(req({ arg: "reject", reason: "broken", projectName: "Mojito", title: "T" }), params());
-    expect(res.status).toBe(422);
-    expect(h.setIssueStatus).not.toHaveBeenCalled();
-  });
-
-  it("reject also retires a stale conflict session for the ticket", async () => {
-    h.registryGet.mockImplementation((id: string) => ({ id }));
-    await POST(req({ arg: "reject", reason: "broken", projectName: "Mojito", title: "T" }), params());
-    expect(h.supersedeSession).toHaveBeenCalledWith("mojito-RIC-110-work", expect.anything());
-    expect(h.supersedeSession).toHaveBeenCalledWith("mojito-RIC-110-conflict", expect.anything());
-  });
-
-  it("reject never supersedes the rework session it just launched", async () => {
-    // A stale -work session exists: launchRework retires it before relaunching, and the
-    // post-verdict cleanup must not then kill the fresh session sharing that id.
-    h.registryGet.mockImplementation((id: string) => (id.endsWith("-work") ? { id } : undefined));
-    await POST(req({ arg: "reject", reason: "broken", projectName: "Mojito", title: "T" }), params());
-    expect(h.supersedeSession).toHaveBeenCalledTimes(1);
-    expect(h.supersedeSession).toHaveBeenCalledWith("mojito-RIC-110-work", expect.anything());
-  });
-
   it("a resolved approve retires the ticket's finished work session", async () => {
     h.registryGet.mockImplementation(() => ({ id: "mojito-RIC-110-work" }));
     await POST(req(approve), params());
     expect(h.supersedeSession).toHaveBeenCalledWith("mojito-RIC-110-work", expect.anything());
   });
 
-  it("400 when reject carries no reason, and nothing is launched", async () => {
-    const res = await POST(req({ arg: "reject", projectName: "Mojito", title: "T" }), params());
+  it("400s a reject body and touches neither git nor Linear", async () => {
+    const res = await POST(req({ arg: "reject", reason: "layout broken" }), params("RIC-110"));
     expect(res.status).toBe(400);
     expect(h.setIssueStatus).not.toHaveBeenCalled();
+    expect(h.mergeTicketBranch).not.toHaveBeenCalled();
     expect(h.launchSession).not.toHaveBeenCalled();
   });
 
-  it("launches rework with an empty description when Linear cannot be read", async () => {
-    h.getIssueContent.mockImplementation(async () => { throw new Error("Linear down"); });
-    const res = await POST(req({ arg: "reject", reason: "broken", projectName: "Mojito", title: "T" }), params());
+  it("mark-done moves the ticket to Done without merging", async () => {
+    h.hasNothingToMerge.mockResolvedValue(true);
+    const res = await POST(req({ arg: "mark-done" }), params("RIC-110"));
     expect(res.status).toBe(200);
-    expect(h.launchSession).toHaveBeenCalledWith(
-      expect.objectContaining({ description: "" }), expect.anything(),
-    );
-  });
-
-  it("hands the rework session the ticket's downloaded assets", async () => {
-    h.getIssueContent.mockImplementation(async () => ({
-      description: "![](https://uploads.linear.app/w/a/one.png)",
-      attachments: [{ title: "The PR", url: "https://github.com/x/y/pull/1" }],
-    }));
-    await POST(req({ arg: "reject", reason: "missed the edge case", projectName: "Mojito" }), params());
-    const passed = h.launchSession.mock.calls[0][0] as {
-      attachments: { title: string }[]; rejectReason: string;
-    };
-    expect(passed.rejectReason).toBe("missed the edge case");
-    expect(passed.attachments).toEqual([{ title: "The PR", url: "https://github.com/x/y/pull/1" }]);
+    expect(await res.json()).toEqual({ ok: true, result: { done: "marked-done" } });
+    expect(h.setIssueStatus).toHaveBeenCalledWith(expect.anything(), "RIC-110", "Done");
+    expect(h.mergeTicketBranch).not.toHaveBeenCalled();
   });
 
 });

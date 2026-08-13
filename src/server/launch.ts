@@ -26,7 +26,6 @@ export interface LaunchRequest {
   description: string;
   assets?: TicketAsset[];
   attachments?: TicketAttachment[];
-  rejectReason?: string;
 }
 
 export interface LaunchDeps {
@@ -87,13 +86,15 @@ export async function launchSession(
     description: req.description,
     ...(req.assets?.length ? { assets: req.assets } : {}),
     ...(req.attachments?.length ? { attachments: req.attachments } : {}),
-    ...(req.rejectReason ? { rejectReason: req.rejectReason } : {}),
   });
   clearSessionResult(deps.stateDir, id); // ids repeat per ticket+status: a stale result must not satisfy the new session's Stop hook
   const command = buildClaudeCommand(req, settingsPath, buildWorkPrompt({
     ticket: req.ticket,
     contextPath,
     resultPath: resultPath(deps.stateDir, id),
+    // Same condition that decides whether the keys land in the context file, so prompt and
+    // context can never disagree about what the session will find.
+    hasAssets: Boolean(req.assets?.length || req.attachments?.length),
   }));
   await deps.newSession(id, cwd, command);
   await deps.pipePane(id, logfilePath(deps.stateDir, id));

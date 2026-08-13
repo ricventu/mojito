@@ -1,4 +1,4 @@
-import { WORK_PROMPT_TEMPLATE } from "./prompts/work.js";
+import { WORK_PROMPT_TEMPLATE, ASSETS_PARAGRAPH } from "./prompts/work.js";
 import { MERGE_FIX_PROMPT_TEMPLATE, COMPLETE_STEP_LOCAL, COMPLETE_STEP_MR } from "./prompts/conflict.js";
 import type { MergeMode } from "./merge.js";
 
@@ -25,7 +25,17 @@ function render(template: string, vars: PromptVars): string {
     .replaceAll("{{RESULT_PATH}}", vars.resultPath);
 }
 
-export const buildWorkPrompt = (vars: PromptVars): string => render(WORK_PROMPT_TEMPLATE, vars);
+export interface WorkPromptVars extends PromptVars {
+  // Whether the launch context actually carries assets/attachments. False drops the whole
+  // paragraph describing them rather than telling the session about keys it will not find.
+  hasAssets: boolean;
+}
+
+export function buildWorkPrompt(vars: WorkPromptVars): string {
+  const { hasAssets, ...base } = vars;
+  return render(WORK_PROMPT_TEMPLATE, base)
+    .replaceAll("{{ASSETS_PARAGRAPH}}", hasAssets ? ASSETS_PARAGRAPH : "");
+}
 
 export function buildMergeFixPrompt(vars: MergeFixPromptVars): string {
   const { mergeMode, blocker, ...base } = vars;

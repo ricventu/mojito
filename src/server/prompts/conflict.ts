@@ -30,9 +30,10 @@ description) for what the branch was meant to do.
 5. Complete the merge: {{COMPLETE_STEP}}
 
 Result file — REQUIRED. As the very last action, write {{RESULT_PATH}} with
-exactly one JSON object: {"outcome": "merged", "notes": "<one line>"} once
-step 5 is done, or {"outcome": "blocked", "notes": "<one line: why>"} if the
-merge cannot be completed safely.`;
+exactly this JSON object: {"outcome": "merged"} once step 5 is done. It is the
+only signal Mojito has to move {{TICKET}} to Done. If the merge cannot be
+completed safely, do not write the file — say so and stop; your session stays
+open for the human.`;
 
 // Step-5 instruction per approved merge mode.
 export const COMPLETE_STEP_LOCAL =

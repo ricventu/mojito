@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { mergeTicketBranch, repoRootFromWorktree, type GitRun, type CliRun } from "@/server/merge";
+import { mergeTicketBranch, repoRootFromWorktree, isAlreadyMerged, isOnDefaultBranch, type GitRun, type CliRun } from "@/server/merge";
 
 const pexec = promisify(execFile);
 
@@ -326,5 +326,138 @@ describe("mergeTicketBranch (mr mode, faked run/runCli)", () => {
     expect(firstArgs.indexOf("rebase")).toBeGreaterThanOrEqual(0);
     expect(firstArgs.indexOf("push")).toBeGreaterThanOrEqual(0);
     expect(firstArgs.indexOf("rebase")).toBeLessThan(firstArgs.indexOf("push"));
+  });
+});
+
+// A scripted GitRun: `answers` maps the leading git subcommand+args (joined by a space) to
+// stdout; anything listed in `fails` throws, which is how git signals a false --is-ancestor.
+function scriptedRun(answers: Record<string, string>, fails: string[] = []): GitRun {
+  return async (args) => {
+    const key = args.join(" ");
+    if (fails.includes(key)) throw new Error(`exit 1: git ${key}`);
+    return { stdout: answers[key] ?? "", stderr: "" };
+  };
+}
+
+const BASE = {
+  "rev-parse --abbrev-ref HEAD": "ric-46",
+  remote: "origin",
+  "fetch --prune": "",
+  "symbolic-ref --short refs/remotes/origin/HEAD": "origin/main",
+};
+
+describe("isAlreadyMerged", () => {
+  it("is true when the branch is an ancestor of the default branch", async () => {
+    const merged = await isAlreadyMerged(
+      { worktree: "/w", repoRoot: "/r" },
+      scriptedRun({ ...BASE }),
+    );
+    expect(merged).toBe(true);
+  });
+
+  // A squash-merge rewrites the commits, so --is-ancestor says no; git cherry still
+  // recognises every patch as already upstream.
+  it("is true for a squash-merged branch (no + lines from git cherry)", async () => {
+    const merged = await isAlreadyMerged(
+      { worktree: "/w", repoRoot: "/r" },
+      scriptedRun({ ...BASE, "cherry origin/main ric-46": "- abc123\n- def456\n" },
+        ["merge-base --is-ancestor ric-46 origin/main"]),
+    );
+    expect(merged).toBe(true);
+  });
+
+  it("is false when git cherry still has commits to apply", async () => {
+    const merged = await isAlreadyMerged(
+      { worktree: "/w", repoRoot: "/r" },
+      scriptedRun({ ...BASE, "cherry origin/main ric-46": "- abc123\n+ def456\n" },
+        ["merge-base --is-ancestor ric-46 origin/main"]),
+    );
+    expect(merged).toBe(false);
+  });
+
+  it("is false on a detached HEAD", async () => {
+    const merged = await isAlreadyMerged(
+      { worktree: "/w", repoRoot: "/r" },
+      scriptedRun({ ...BASE, "rev-parse --abbrev-ref HEAD": "HEAD" }),
+    );
+    expect(merged).toBe(false);
+  });
+
+  // A broken check must degrade to "not merged", which is the path that still works.
+  it("is false when git fails outright", async () => {
+    const merged = await isAlreadyMerged(
+      { worktree: "/w", repoRoot: "/r" },
+      scriptedRun({}, ["rev-parse --abbrev-ref HEAD"]),
+    );
+    expect(merged).toBe(false);
+  });
+
+  it("compares against the local default branch when there is no remote", async () => {
+    const seen: string[][] = [];
+    const run: GitRun = async (args) => {
+      seen.push(args);
+      if (args[0] === "remote") return { stdout: "", stderr: "" };
+      if (args[0] === "rev-parse" && args[1] === "--abbrev-ref") return { stdout: "ric-46", stderr: "" };
+      if (args[0] === "symbolic-ref") throw new Error("no origin/HEAD");
+      return { stdout: "", stderr: "" };
+    };
+    expect(await isAlreadyMerged({ worktree: "/w", repoRoot: "/r" }, run)).toBe(true);
+    expect(seen.some((a) => a[0] === "fetch")).toBe(false);
+    expect(seen).toContainEqual(["merge-base", "--is-ancestor", "ric-46", "main"]);
+  });
+});
+
+describe("isOnDefaultBranch", () => {
+  it("is true when the checkout's HEAD is the default branch", async () => {
+    const on = await isOnDefaultBranch(
+      { checkout: "/w", repoRoot: "/r" },
+      scriptedRun({ ...BASE, "rev-parse --abbrev-ref HEAD": "main" }),
+    );
+    expect(on).toBe(true);
+  });
+
+  it("is false when the checkout is on a ticket branch", async () => {
+    const on = await isOnDefaultBranch({ checkout: "/w", repoRoot: "/r" }, scriptedRun({ ...BASE }));
+    expect(on).toBe(false);
+  });
+
+  it("is false on a detached HEAD", async () => {
+    const on = await isOnDefaultBranch(
+      { checkout: "/w", repoRoot: "/r" },
+      scriptedRun({ ...BASE, "rev-parse --abbrev-ref HEAD": "HEAD" }),
+    );
+    expect(on).toBe(false);
+  });
+
+  // Never asks the remote for its HEAD twice over: the local candidates answer when
+  // origin/HEAD is missing, which is the no-remote fixture case.
+  it("falls back to the local default branch when origin/HEAD is missing", async () => {
+    const on = await isOnDefaultBranch(
+      { checkout: "/w", repoRoot: "/r" },
+      scriptedRun({ "rev-parse --abbrev-ref HEAD": "main" }, ["symbolic-ref --short refs/remotes/origin/HEAD"]),
+    );
+    expect(on).toBe(true);
+  });
+
+  // A broken check must degrade to "not on the default branch", which routes the gate to
+  // the ordinary approve path rather than to the status-only Mark Done.
+  it("is false when the default branch cannot be determined", async () => {
+    const on = await isOnDefaultBranch(
+      { checkout: "/w", repoRoot: "/r" },
+      scriptedRun({ "rev-parse --abbrev-ref HEAD": "main" }, [
+        "symbolic-ref --short refs/remotes/origin/HEAD",
+        "rev-parse --verify refs/heads/main",
+        "rev-parse --verify refs/heads/master",
+      ]),
+    );
+    expect(on).toBe(false);
+  });
+
+  it("is false when git fails outright", async () => {
+    const on = await isOnDefaultBranch(
+      { checkout: "/w", repoRoot: "/r" },
+      scriptedRun({}, ["rev-parse --abbrev-ref HEAD"]),
+    );
+    expect(on).toBe(false);
   });
 });

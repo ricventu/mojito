@@ -7,7 +7,7 @@ describe("holdsSheetOpen", () => {
     ["undefined", undefined, false],
     ["a plain string", "ok", false],
     ["a merged result", { done: "merged", commit: "abc1234" }, false],
-    ["a rework-session result", { done: "rework-session" }, false],
+    ["the retired rework-session value", { done: "rework-session" }, false],
     ["mr-created without a url", { done: "mr-created" }, false],
     ["mr-created with a non-string url", { done: "mr-created", url: 42 }, false],
     ["mr-created with a url", { done: "mr-created", url: "https://git.example/mr/7" }, true],

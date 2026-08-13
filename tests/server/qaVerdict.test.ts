@@ -6,14 +6,14 @@ function deps(outcome: MergeOutcome = { status: "merged", commit: "abc1234" }) {
   return {
     merge: vi.fn(async () => outcome),
     setIssueStatus: vi.fn(async () => {}),
-    launchRework: vi.fn(async () => {}),
     launchMergeFix: vi.fn(async () => "mojito-RIC-110-conflict"),
+    nothingToMerge: vi.fn(async () => true),
   };
 }
 
 describe("QA_ARGS", () => {
   it("is the exact accepted verdict set", () => {
-    expect([...QA_ARGS]).toEqual(["approve-local", "approve-mr", "reject"]);
+    expect([...QA_ARGS]).toEqual(["approve-local", "approve-mr", "mark-done"]);
   });
 });
 
@@ -24,7 +24,6 @@ describe("resolveQaVerdict approve", () => {
     expect(d.merge).toHaveBeenCalledWith("local");
     expect(d.setIssueStatus).toHaveBeenCalledWith("RIC-110", "Done");
     expect(res).toEqual({ done: "merged", commit: "abc1234" });
-    expect(d.launchRework).not.toHaveBeenCalled();
     expect(d.launchMergeFix).not.toHaveBeenCalled();
   });
 
@@ -65,52 +64,36 @@ describe("resolveQaVerdict approve", () => {
   });
 });
 
-describe("resolveQaVerdict reject", () => {
-  it("launches rework with the trimmed reason, THEN moves the ticket to In Progress", async () => {
+describe("resolveQaVerdict deps", () => {
+  it("no longer exposes a rework dependency", async () => {
     const d = deps();
-    const order: string[] = [];
-    d.setIssueStatus.mockImplementation(async () => { order.push("status"); });
-    d.launchRework.mockImplementation(async () => { order.push("rework"); });
-    const res = await resolveQaVerdict({ ticket: "RIC-110", arg: "reject", reason: "  layout broken  " }, d);
-    expect(d.launchRework).toHaveBeenCalledWith("layout broken");
-    expect(d.setIssueStatus).toHaveBeenCalledWith("RIC-110", "In Progress");
-    // The reason lives only in the launched session's context file, so the status must move
-    // only once that session exists.
-    expect(order).toEqual(["rework", "status"]);
-    expect(res).toEqual({ done: "rework-session" });
+    await resolveQaVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
+    expect(Object.keys(d)).toEqual(["merge", "setIssueStatus", "launchMergeFix", "nothingToMerge"]);
   });
+});
 
-  it("a failed rework launch leaves the ticket at To QA so the reject can be retried", async () => {
+describe("resolveQaVerdict mark-done", () => {
+  it("writes Done and runs no git when there is nothing to merge", async () => {
     const d = deps();
-    d.launchRework.mockImplementation(async () => { throw new Error("duplicate session"); });
-    await expect(resolveQaVerdict({ ticket: "RIC-110", arg: "reject", reason: "layout broken" }, d))
-      .rejects.toThrow(/duplicate session/);
-    expect(d.setIssueStatus).not.toHaveBeenCalled();
-  });
-
-  it("never merges on reject", async () => {
-    const d = deps();
-    await resolveQaVerdict({ ticket: "RIC-110", arg: "reject", reason: "nope" }, d);
+    const res = await resolveQaVerdict({ ticket: "RIC-110", arg: "mark-done" }, d);
+    expect(res).toEqual({ done: "marked-done" });
+    expect(d.setIssueStatus).toHaveBeenCalledWith("RIC-110", "Done");
     expect(d.merge).not.toHaveBeenCalled();
+    expect(d.launchMergeFix).not.toHaveBeenCalled();
   });
 
-  it("a blank reason throws and touches nothing", async () => {
+  // The gate rendered from a check that may be seconds old; re-check before writing Done.
+  it("throws and writes no status when the branch still has commits to merge", async () => {
     const d = deps();
-    await expect(resolveQaVerdict({ ticket: "RIC-110", arg: "reject", reason: "   " }, d))
+    d.nothingToMerge.mockImplementation(async () => false);
+    await expect(resolveQaVerdict({ ticket: "RIC-110", arg: "mark-done" }, d))
       .rejects.toBeInstanceOf(QaVerdictError);
     expect(d.setIssueStatus).not.toHaveBeenCalled();
-    expect(d.launchRework).not.toHaveBeenCalled();
   });
 
-  it("a missing reason throws", async () => {
+  it("never asks the merge question on an approve", async () => {
     const d = deps();
-    await expect(resolveQaVerdict({ ticket: "RIC-110", arg: "reject" }, d))
-      .rejects.toBeInstanceOf(QaVerdictError);
-  });
-
-  it("exposes no comment dependency at all (the reason travels in the context file)", async () => {
-    const d = deps();
-    await resolveQaVerdict({ ticket: "RIC-110", arg: "reject", reason: "broken" }, d);
-    expect(Object.keys(d)).toEqual(["merge", "setIssueStatus", "launchRework", "launchMergeFix"]);
+    await resolveQaVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
+    expect(d.nothingToMerge).not.toHaveBeenCalled();
   });
 });

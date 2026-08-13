@@ -1,13 +1,13 @@
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
-// What a ticket session reports back at the end of its work. Written by the spawned
-// session (the launch prompt names this exact path); read by the Stop/SessionEnd hook.
-// "merged" is written only by the merge-fix session (an approved merge it completed
-// itself); work sessions report "ready-for-qa" or "blocked".
+// What a ticket session reports back at the end of a round. Written by the spawned session
+// (the launch prompt names this exact path); read by the Stop/SessionEnd hook. It exists only
+// to move the ticket's status: "ready-for-qa" (work sessions) moves it to To QA, "merged"
+// (only the merge-fix session, finishing an already-approved merge) moves it to Done. Anything
+// a session wants to *say* it says in its terminal, which stays open for the human at To QA.
 export interface SessionResult {
-  outcome: "ready-for-qa" | "merged" | "blocked";
-  notes?: string;
+  outcome: "ready-for-qa" | "merged";
 }
 
 export function resultPath(stateDir: string, id: string): string {
@@ -17,15 +17,13 @@ export function resultPath(stateDir: string, id: string): string {
 }
 
 // null on missing, unreadable, malformed, or unknown-outcome file — the caller treats
-// all of those as "the session reported nothing".
+// all of those as "the session reported nothing". Extra keys (e.g. a notes field from an
+// older prompt) are ignored rather than rejected.
 export function readSessionResult(stateDir: string, id: string): SessionResult | null {
   try {
-    const parsed = JSON.parse(readFileSync(resultPath(stateDir, id), "utf8")) as {
-      outcome?: unknown;
-      notes?: unknown;
-    };
-    if (parsed.outcome !== "ready-for-qa" && parsed.outcome !== "merged" && parsed.outcome !== "blocked") return null;
-    return { outcome: parsed.outcome, ...(typeof parsed.notes === "string" ? { notes: parsed.notes } : {}) };
+    const parsed = JSON.parse(readFileSync(resultPath(stateDir, id), "utf8")) as { outcome?: unknown };
+    if (parsed.outcome !== "ready-for-qa" && parsed.outcome !== "merged") return null;
+    return { outcome: parsed.outcome };
   } catch {
     return null;
   }

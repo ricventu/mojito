@@ -114,14 +114,6 @@ describe("launchSession", () => {
     });
   });
 
-  it("passes rejectReason through to the context file when present (QA rework)", async () => {
-    const { readFileSync } = await import("node:fs");
-    const d = deps();
-    await launchSession({ ...baseReq, rejectReason: "missed the edge case" }, d);
-    const p = join(dir, "context", "mojito-RIC-46-planned.json");
-    expect(JSON.parse(readFileSync(p, "utf8"))).toMatchObject({ rejectReason: "missed the edge case" });
-  });
-
   it("clears a stale result file before spawning, not merely by the time launchSession returns " +
     "(ids repeat per ticket+status: the new session's Stop hook must never see the old result)", async () => {
     const resultsDir = join(dir, "results");

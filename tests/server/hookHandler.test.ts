@@ -63,15 +63,15 @@ describe("handleHook — ticket sessions", () => {
     expect(moveToQa).not.toHaveBeenCalled();
   });
 
-  it("(c) Stop + result blocked is needs-input and never calls moveToQa", async () => {
+  it("(c) Stop + an unreadable result is needs-input and never calls moveToQa", async () => {
     const { registry } = seed();
     const bus = new EventBus();
     const moveToQa = vi.fn(noopMoveToQa);
     await handleHook("mojito-RIC-46-in-progress", "Stop", {
-      registry, bus, readResult: () => ({ outcome: "blocked" }), moveToQa, moveToDone: noopMoveToDone, clearResult: noopClearResult,
+      registry, bus, readResult: noResult, moveToQa, moveToDone: noopMoveToDone, clearResult: noopClearResult,
     });
-    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("needs-input");
     expect(moveToQa).not.toHaveBeenCalled();
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("needs-input");
   });
 
   it("(d) SessionEnd + no result is a failure", async () => {
@@ -137,7 +137,7 @@ describe("handleHook — ticket sessions", () => {
     const moveToDone = vi.fn(noopMoveToDone);
     const clearResult = vi.fn(noopClearResult);
     await handleHook("mojito-RIC-46-in-progress", "Stop", {
-      registry, bus, readResult: () => ({ outcome: "merged", notes: "ff onto main" }), moveToQa, moveToDone, clearResult,
+      registry, bus, readResult: () => ({ outcome: "merged" }), moveToQa, moveToDone, clearResult,
     });
     expect(moveToDone).toHaveBeenCalledTimes(1);
     expect(moveToDone).toHaveBeenCalledWith("RIC-46");
@@ -253,6 +253,29 @@ describe("handleHook — ticket sessions", () => {
     });
     expect(moveToQa).not.toHaveBeenCalled();
     expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("done");
+  });
+
+  // The QA rework loop: a session that reached To QA stays alive, the human types feedback into
+  // it, and the next round has to move the board again. This test pins the load-bearing mechanism:
+  // PostToolUse revives a "done" session back to "running", so the subsequent Stop hook can call
+  // moveToQa again. (The clearResult mechanism that prevents re-firing old files is tested separately.)
+  it("moves the ticket again on a later round (Stop -> PostToolUse -> Stop)", async () => {
+    const { registry } = seed();
+    const bus = new EventBus();
+    const moveToQa = vi.fn(noopMoveToQa);
+    const deps = {
+      registry, bus, readResult: () => ({ outcome: "ready-for-qa" }) as const,
+      moveToQa, moveToDone: noopMoveToDone, clearResult: noopClearResult,
+    };
+    await handleHook("mojito-RIC-46-in-progress", "Stop", deps);
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("done");
+
+    // The human replies; the session starts working again.
+    await handleHook("mojito-RIC-46-in-progress", "PostToolUse", deps);
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("running");
+
+    await handleHook("mojito-RIC-46-in-progress", "Stop", deps);
+    expect(moveToQa).toHaveBeenCalledTimes(2);
   });
 });
 

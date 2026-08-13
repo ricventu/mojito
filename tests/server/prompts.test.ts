@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { buildWorkPrompt, buildMergeFixPrompt } from "@/server/prompts";
 
-const vars = { ticket: "RIC-46", contextPath: "/state/context/s1.json", resultPath: "/state/results/s1.json" };
-const fixVars = { ...vars, mergeMode: "local" as const, blocker: "CONFLICT (content): src/a.ts" };
+const vars = { ticket: "RIC-46", contextPath: "/state/context/s1.json", resultPath: "/state/results/s1.json", hasAssets: true };
+const { hasAssets: _hasAssets, ...baseVars } = vars;
+const fixVars = { ...baseVars, mergeMode: "local" as const, blocker: "CONFLICT (content): src/a.ts" };
 
 // The prompts are hard-wrapped prose; assert on them without coupling to line breaks.
 const flat = (s: string) => s.replace(/\s+/g, " ");
@@ -60,6 +61,8 @@ describe("prompt builder", () => {
     );
     expect(work).toContain("because their URLs sit behind Linear's file auth");
     expect(work.match(/Linear/g)).toHaveLength(3);
+    // Without assets the paragraph is gone, and with it its single Linear mention.
+    expect(flat(buildWorkPrompt({ ...vars, hasAssets: false })).match(/Linear/g)).toHaveLength(2);
 
     // The merge-fix session gets its ticket data the same way and needs no Linear sentence
     // of its own, so its one mention is the opening line naming the branch's ticket.
@@ -81,6 +84,12 @@ describe("prompt builder", () => {
     expect(mr).toContain("gh pr create");
     expect(mr).not.toContain("--ff-only");
   });
+  it("gives the merge-fix session the same bare result contract", () => {
+    const p = buildMergeFixPrompt(fixVars);
+    expect(p).toContain('{"outcome": "merged"}');
+    expect(p).not.toContain("notes");
+    expect(p).not.toContain("blocked");
+  });
   it("sanitizes a blocker instead of failing the launch", () => {
     const p = buildMergeFixPrompt({ ...fixVars, blocker: "weird {{TICKET}} output" });
     expect(p).not.toContain("{{");
@@ -89,10 +98,30 @@ describe("prompt builder", () => {
   });
 
   it("tells the work session to read the assets Mojito downloaded", () => {
-    const p = buildWorkPrompt(vars);
+    const p = buildWorkPrompt({ ...vars, hasAssets: true });
     expect(p).toContain("localPath");
     expect(p).toContain("Read tool");
     expect(p).toContain("attachments");
+  });
+
+  // Most tickets carry nothing. Six lines about files that do not exist are pure cost, and
+  // they invite the session to go looking for context keys it does not have.
+  it("omits the asset paragraph — and leaves no gap — when there is nothing to read", () => {
+    const p = buildWorkPrompt({ ...vars, hasAssets: false });
+    expect(p).not.toContain("localPath");
+    expect(p).not.toContain("attachments");
+    expect(p).not.toContain("\n\n\n");
+  });
+
+  // The method is the session's business; the prompt carries only what a session cannot infer.
+  // That includes whether the work is worth a branch of its own — a one-line fix is not, and
+  // the QA gate answers "nothing to merge" for a ticket that never took one.
+  it("carries no rework branch, no blocked outcome, no notes field, and no worktree rule", () => {
+    const p = buildWorkPrompt(vars);
+    expect(p).not.toContain("rejectReason");
+    expect(p).not.toContain("blocked");
+    expect(p).not.toContain("notes");
+    expect(p).not.toContain("worktree");
   });
 
   it("leaves the merge-fix prompt free of the asset paragraph", () => {
