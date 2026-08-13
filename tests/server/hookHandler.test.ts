@@ -254,6 +254,30 @@ describe("handleHook — ticket sessions", () => {
     expect(moveToQa).not.toHaveBeenCalled();
     expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("done");
   });
+
+  // The QA rework loop: a session that reached To QA stays alive, the human types feedback into
+  // it, and the next round has to move the board again. Two things make that work and both are
+  // load-bearing — the session's own Write of the result file fires PostToolUse, which pulls it
+  // out of "done" before Stop arrives, and clearResult runs only on success so no round
+  // re-fires an old file.
+  it("moves the ticket again on a later round (Stop -> PostToolUse -> Stop)", async () => {
+    const { registry } = seed();
+    const bus = new EventBus();
+    const moveToQa = vi.fn(noopMoveToQa);
+    const deps = {
+      registry, bus, readResult: () => ({ outcome: "ready-for-qa" }) as const,
+      moveToQa, moveToDone: noopMoveToDone, clearResult: noopClearResult,
+    };
+    await handleHook("mojito-RIC-46-in-progress", "Stop", deps);
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("done");
+
+    // The human replies; the session starts working again.
+    await handleHook("mojito-RIC-46-in-progress", "PostToolUse", deps);
+    expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("running");
+
+    await handleHook("mojito-RIC-46-in-progress", "Stop", deps);
+    expect(moveToQa).toHaveBeenCalledTimes(2);
+  });
 });
 
 function seedCustom(over: Partial<SessionMeta> = {}): Registry {
