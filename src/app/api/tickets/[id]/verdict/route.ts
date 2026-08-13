@@ -6,6 +6,7 @@ import { launchMergeFixSession } from "@/server/launch";
 import { mergeTicketBranch } from "@/server/merge";
 import { resolveQaVerdict, QaVerdictError } from "@/server/qaVerdict";
 import { resolveTicketVerdict } from "@/server/ticketVerdict";
+import { hasNothingToMerge } from "@/server/ticketMergeState";
 import { tmuxName, conflictSessionName, validateTicket } from "@/server/sessionKey";
 import { defaultModelForStatus, defaultEffortForStatus } from "@/server/stageDefaults";
 import { supersedeSession } from "@/server/supersede";
@@ -50,6 +51,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             }
             return mergeTicketBranch({ worktree, repoRoot, mode });
           },
+          nothingToMerge: () => hasNothingToMerge(cfg.projectsPath, id, projectName),
           setIssueStatus: (t, s) => setIssueStatus(cfg.linearApiKey, t, s),
           launchMergeFix: async (detail, mode) => {
             const sid = conflictSessionName(id);

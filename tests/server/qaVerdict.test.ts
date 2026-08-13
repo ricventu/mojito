@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { resolveQaVerdict, QA_ARGS } from "@/server/qaVerdict";
+import { resolveQaVerdict, QaVerdictError, QA_ARGS } from "@/server/qaVerdict";
 import type { MergeOutcome } from "@/server/merge";
 
 function deps(outcome: MergeOutcome = { status: "merged", commit: "abc1234" }) {
@@ -7,12 +7,13 @@ function deps(outcome: MergeOutcome = { status: "merged", commit: "abc1234" }) {
     merge: vi.fn(async () => outcome),
     setIssueStatus: vi.fn(async () => {}),
     launchMergeFix: vi.fn(async () => "mojito-RIC-110-conflict"),
+    nothingToMerge: vi.fn(async () => true),
   };
 }
 
 describe("QA_ARGS", () => {
   it("is the exact accepted verdict set", () => {
-    expect([...QA_ARGS]).toEqual(["approve-local", "approve-mr"]);
+    expect([...QA_ARGS]).toEqual(["approve-local", "approve-mr", "mark-done"]);
   });
 });
 
@@ -67,6 +68,32 @@ describe("resolveQaVerdict deps", () => {
   it("no longer exposes a rework dependency", async () => {
     const d = deps();
     await resolveQaVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
-    expect(Object.keys(d)).toEqual(["merge", "setIssueStatus", "launchMergeFix"]);
+    expect(Object.keys(d)).toEqual(["merge", "setIssueStatus", "launchMergeFix", "nothingToMerge"]);
+  });
+});
+
+describe("resolveQaVerdict mark-done", () => {
+  it("writes Done and runs no git when there is nothing to merge", async () => {
+    const d = deps();
+    const res = await resolveQaVerdict({ ticket: "RIC-110", arg: "mark-done" }, d);
+    expect(res).toEqual({ done: "marked-done" });
+    expect(d.setIssueStatus).toHaveBeenCalledWith("RIC-110", "Done");
+    expect(d.merge).not.toHaveBeenCalled();
+    expect(d.launchMergeFix).not.toHaveBeenCalled();
+  });
+
+  // The gate rendered from a check that may be seconds old; re-check before writing Done.
+  it("throws and writes no status when the branch still has commits to merge", async () => {
+    const d = deps();
+    d.nothingToMerge.mockImplementation(async () => false);
+    await expect(resolveQaVerdict({ ticket: "RIC-110", arg: "mark-done" }, d))
+      .rejects.toBeInstanceOf(QaVerdictError);
+    expect(d.setIssueStatus).not.toHaveBeenCalled();
+  });
+
+  it("never asks the merge question on an approve", async () => {
+    const d = deps();
+    await resolveQaVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
+    expect(d.nothingToMerge).not.toHaveBeenCalled();
   });
 });

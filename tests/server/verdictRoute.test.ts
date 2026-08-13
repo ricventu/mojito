@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
   resolveTicketCwd: vi.fn(() => "/code/mojito" as string | null),
   resolvePathForProject: vi.fn(() => "/code/mojito" as string | null),
   registryGet: vi.fn((_id: string) => undefined as unknown),
+  hasNothingToMerge: vi.fn(async () => true),
 }));
 
 vi.mock("@/server/linear", () => ({
@@ -42,6 +43,7 @@ vi.mock("@/server/launch", () => ({
   launchSession: h.launchSession, launchMergeFixSession: h.launchMergeFixSession,
 }));
 vi.mock("@/server/supersede", () => ({ supersedeSession: h.supersedeSession }));
+vi.mock("@/server/ticketMergeState", () => ({ hasNothingToMerge: h.hasNothingToMerge }));
 vi.mock("@/server/ticketCwd", () => ({
   resolveTicketWorktree: h.resolveTicketWorktree, resolveTicketCwd: h.resolveTicketCwd,
 }));
@@ -85,6 +87,7 @@ beforeEach(() => {
   h.resolvePathForProject.mockImplementation(() => "/code/mojito");
   h.repoRootFromWorktree.mockImplementation(async () => "/code/mojito");
   h.registryGet.mockImplementation(() => undefined);
+  h.hasNothingToMerge.mockImplementation(async () => true);
 });
 
 describe("/api/tickets/[id]/verdict", () => {
@@ -221,6 +224,15 @@ describe("/api/tickets/[id]/verdict", () => {
     expect(h.setIssueStatus).not.toHaveBeenCalled();
     expect(h.mergeTicketBranch).not.toHaveBeenCalled();
     expect(h.launchSession).not.toHaveBeenCalled();
+  });
+
+  it("mark-done moves the ticket to Done without merging", async () => {
+    h.hasNothingToMerge.mockResolvedValue(true);
+    const res = await POST(req({ arg: "mark-done" }), params("RIC-110"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, result: { done: "marked-done" } });
+    expect(h.setIssueStatus).toHaveBeenCalledWith(expect.anything(), "RIC-110", "Done");
+    expect(h.mergeTicketBranch).not.toHaveBeenCalled();
   });
 
 });
