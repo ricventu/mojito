@@ -9,6 +9,7 @@ import StateBadge from "./StateBadge";
 import QaVerdictButtons from "./QaVerdictButtons";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 import { holdsSheetOpen, type HeldOutcome } from "@/lib/verdictOutcome";
+import { qaGateModel, type MergeState } from "@/lib/qaGate";
 
 // Shared by all three launch handlers: the only part of their shape that would drift if
 // copied. A thrown fetch is the case that used to show the user nothing at all.
@@ -19,20 +20,42 @@ export default function LaunchSheet(
   { token: string; ticket: TicketSummary; sessions: SessionMeta[]; onClose: () => void;
     onLaunched: () => void; onOpen: (s: SessionMeta) => void; onOpenDocs: () => void },
 ) {
+  const isToQa = ticket.statusName === "To QA";
+  // A To QA launch is a work session (Task 7 gives it the work id), so it takes the work
+  // profile rather than the app-wide fallback.
+  const stageKey = isToQa ? "In Progress" : ticket.statusName;
   const { defaults } = useStageDefaults(token);
   // Pre-fill the model + effort optimal for this ticket's stage (overridable via the selectors).
-  const [model, setModel] = useState<string>(() => resolveModel(ticket.statusName));
-  const [effort, setEffort] = useState<string>(() => resolveEffort(ticket.statusName));
+  const [model, setModel] = useState<string>(() => resolveModel(stageKey));
+  const [effort, setEffort] = useState<string>(() => resolveEffort(stageKey));
   const [touched, setTouched] = useState(false);
   // Re-seed both selectors from the effective (possibly user-edited) defaults once they load,
   // unless the user has already changed a selector this session.
   useEffect(() => {
     if (touched) return;
-    setModel(resolveModel(ticket.statusName, defaults));
-    setEffort(resolveEffort(ticket.statusName, defaults));
-  }, [defaults, ticket.statusName, touched]);
+    setModel(resolveModel(stageKey, defaults));
+    setEffort(resolveEffort(stageKey, defaults));
+  }, [defaults, stageKey, touched]);
   const [err, setErr] = useState<string | null>(null);
-  const [verdictPending, setVerdictPending] = useState<"approve-local" | "approve-mr" | null>(null);
+  const [verdictPending, setVerdictPending] = useState<"approve-local" | "approve-mr" | "mark-done" | null>(null);
+  const [mergeState, setMergeState] = useState<MergeState>("checking");
+  // Ask the server whether anything is left to merge before offering to merge it. A failed or
+  // unreachable check degrades to the ordinary approve buttons — never to a dead gate.
+  useEffect(() => {
+    if (!isToQa) return;
+    let live = true;
+    (async () => {
+      try {
+        const qs = ticket.project ? `?projectName=${encodeURIComponent(ticket.project)}` : "";
+        const res = await apiFetch(token, `/api/tickets/${ticket.identifier}/merge-state${qs}`);
+        const nothing = res.ok && (await res.json())?.nothingToMerge === true;
+        if (live) setMergeState(nothing ? "nothing-to-merge" : "mergeable");
+      } catch {
+        if (live) setMergeState("mergeable");
+      }
+    })();
+    return () => { live = false; };
+  }, [isToQa, token, ticket.identifier, ticket.project]);
   // One state for all three launch buttons, mirroring how a single verdictPending covers
   // the three verdict buttons. The ticket launch is the slow one: its POST runs a Linear
   // fetch and then downloads the ticket's assets before it answers, seconds during which
@@ -55,7 +78,7 @@ export default function LaunchSheet(
   // The To QA verdict is resolved server-side: approve merges (or opens an MR) with no
   // session at all, and only a merge conflict spawns one. projectName and title are sent
   // because the server needs them to locate the worktree and to seed a fix session.
-  const submitVerdict = async (arg: "approve-local" | "approve-mr") => {
+  const submitVerdict = async (arg: "approve-local" | "approve-mr" | "mark-done") => {
     setErr(null);
     setVerdictPending(arg);
     try {
@@ -166,8 +189,6 @@ export default function LaunchSheet(
     }
   };
 
-  const isToQa = ticket.statusName === "To QA";
-
   const selectors = (
     <div className="two">
       <label className="field"><span className="lbl">Model</span>
@@ -245,8 +266,24 @@ export default function LaunchSheet(
         {ticket.title && <p className="sheet-title">{ticket.title}</p>}
         {isToQa ? (
           <>
-            <QaVerdictButtons pending={verdictPending} onApprove={(a) => submitVerdict(a)} />
+            <QaVerdictButtons
+              pending={verdictPending}
+              gate={qaGateModel(mergeState)}
+              onApprove={(a) => submitVerdict(a)}
+              onMarkDone={() => submitVerdict("mark-done")}
+            />
             {err && <p className="err-text">{err}</p>}
+            {/* QA rework happens in the session that built the branch, so the sheet's job at
+                To QA is to get you into it — or to replace it if it died. */}
+            {existing ? (
+              <button className="btn ghost block" style={{ marginTop: 12 }} onClick={() => onOpen(existing)}>
+                Open session (<StateBadge state={existing.state} />)
+              </button>
+            ) : (
+              <button className="btn primary block" style={{ marginTop: 12 }} disabled={launchBusy} onClick={() => start()}>
+                {launching === "work" ? "Starting…" : "Start work session"}
+              </button>
+            )}
             {selectors}
             {customBtn}
           </>
