@@ -94,6 +94,9 @@ export async function launchSession(
     ticket: req.ticket,
     contextPath,
     resultPath: resultPath(deps.stateDir, id),
+    // Same condition that decides whether the keys land in the context file, so prompt and
+    // context can never disagree about what the session will find.
+    hasAssets: Boolean(req.assets?.length || req.attachments?.length),
   }));
   await deps.newSession(id, cwd, command);
   await deps.pipePane(id, logfilePath(deps.stateDir, id));
