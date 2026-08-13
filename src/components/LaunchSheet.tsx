@@ -32,7 +32,7 @@ export default function LaunchSheet(
     setEffort(resolveEffort(ticket.statusName, defaults));
   }, [defaults, ticket.statusName, touched]);
   const [err, setErr] = useState<string | null>(null);
-  const [verdictPending, setVerdictPending] = useState<"approve-local" | "approve-mr" | "reject" | null>(null);
+  const [verdictPending, setVerdictPending] = useState<"approve-local" | "approve-mr" | null>(null);
   // One state for all three launch buttons, mirroring how a single verdictPending covers
   // the three verdict buttons. The ticket launch is the slow one: its POST runs a Linear
   // fetch and then downloads the ticket's assets before it answers, seconds during which
@@ -52,20 +52,16 @@ export default function LaunchSheet(
   const existingActive = existing != null
     && (existing.state === "running" || existing.state === "needs-input" || existing.state === "starting");
 
-  // The To QA verdict is resolved server-side: approve merges (or opens an MR) with
-  // no session at all, and only reject (or a merge conflict) spawns one. projectName
-  // and title are sent because the server needs them to locate the worktree and to seed
-  // whatever session the verdict ends up launching.
-  const submitVerdict = async (arg: "approve-local" | "approve-mr" | "reject", reason?: string) => {
-    // The server-side rebase+merge takes 10s+; without a pending state the click looks
-    // like a no-op and closing the sheet aborts the request mid-merge.
+  // The To QA verdict is resolved server-side: approve merges (or opens an MR) with no
+  // session at all, and only a merge conflict spawns one. projectName and title are sent
+  // because the server needs them to locate the worktree and to seed a fix session.
+  const submitVerdict = async (arg: "approve-local" | "approve-mr") => {
     setErr(null);
     setVerdictPending(arg);
     try {
       const res = await apiFetch(token, `/api/tickets/${ticket.identifier}/verdict`, {
         method: "POST",
-        body: JSON.stringify({ arg, ...(reason === undefined ? {} : { reason }),
-          projectName: ticket.project, title: ticket.title }),
+        body: JSON.stringify({ arg, projectName: ticket.project, title: ticket.title }),
       });
       if (res.ok) {
         // Refresh either way: every verdict moves the board, launches a session, or both.
@@ -249,7 +245,7 @@ export default function LaunchSheet(
         {ticket.title && <p className="sheet-title">{ticket.title}</p>}
         {isToQa ? (
           <>
-            <QaVerdictButtons pending={verdictPending} onApprove={(a) => submitVerdict(a)} onReject={(reason) => submitVerdict("reject", reason)} />
+            <QaVerdictButtons pending={verdictPending} onApprove={(a) => submitVerdict(a)} />
             {err && <p className="err-text">{err}</p>}
             {selectors}
             {customBtn}
