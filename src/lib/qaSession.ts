@@ -5,9 +5,10 @@ export interface QaSessionModel {
   /** Open the work session — its scrollback is worth reading whether or not it still runs. */
   open: boolean;
   /**
-   * Start a fresh work session. Offered whenever nothing is alive to type into: registry
-   * entries are never dropped automatically, so a registered-but-dead session (killed pane,
-   * superseded by a conflict verdict) would otherwise leave the gate with no way forward.
+   * Start a fresh work session. Offered whenever nothing is alive to type into: a
+   * registered-but-dead session (killed pane, machine restarted) would otherwise leave the
+   * gate with no way forward. Starting never replaces a live session — if the tmux name is
+   * still held, the launch answers 409 and the user is told to kill it first.
    */
   start: boolean;
 }

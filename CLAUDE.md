@@ -43,6 +43,15 @@ Mojito owns the whole lifecycle — there is no external plugin:
   because a wrong `true` writes Done over unmerged commits. There is no reject:
   a ticket that fails QA is reworked by typing into its still-live work session, and the
   ticket parks at To QA meanwhile.
+- **Session lifetime**: Mojito never ends a session by itself. The only path that closes
+  one is an explicit user action — `DELETE /api/sessions/[id]` → `closeSession`, behind the
+  Kill button. Automatic paths (a QA verdict, a relaunch from the sheet) may drop only the
+  *registration* of a session whose tmux is already gone, via `retireDeadSession`
+  (`src/server/retireSession.ts`); a launch that finds the tmux name still held answers 409
+  and tells the user to kill it first. This replaced `supersedeSession`, which closed the
+  ticket's work session on every verdict — killing mid-turn the very session the gate's
+  rework loop depends on. `tests/server/retireSession.test.ts` and the "never closes a
+  session" case in `tests/server/verdictRoute.test.ts` fail if that comes back.
 - **Status model**: `src/server/statusModel.ts` is authoritative; `src/lib/status.ts`
   mirrors it for presentation and a sync-guard test ties them together. Work-phase
   sessions share a single tmux id `mojito-<ticket>-work` across Backlog/Todo/In

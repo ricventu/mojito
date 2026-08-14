@@ -18,7 +18,9 @@ const h = vi.hoisted(() => ({
   // Takes an (unused) param so mock.calls[0][0] indexes into a non-empty tuple below.
   launchSession: vi.fn(async (_req: unknown) => ({ ok: true, meta: {} }) as { ok: boolean; reason?: string }),
   launchMergeFixSession: vi.fn(async () => ({ ok: true, meta: {} }) as { ok: boolean; reason?: string }),
-  supersedeSession: vi.fn(async () => {}),
+  retireDeadSession: vi.fn(async () => true),
+  // Hoisted so the tests can assert the one thing the verdict must never do: close a session.
+  closeSession: vi.fn(async () => ({ closed: true, forced: false })),
   resolveTicketWorktree: vi.fn(() => "/code/mojito/.worktrees/ric-110" as string | null),
   resolveTicketCwd: vi.fn(() => "/code/mojito" as string | null),
   resolvePathForProject: vi.fn(() => "/code/mojito" as string | null),
@@ -42,7 +44,7 @@ vi.mock("@/server/merge", () => ({
 vi.mock("@/server/launch", () => ({
   launchSession: h.launchSession, launchMergeFixSession: h.launchMergeFixSession,
 }));
-vi.mock("@/server/supersede", () => ({ supersedeSession: h.supersedeSession }));
+vi.mock("@/server/retireSession", () => ({ retireDeadSession: h.retireDeadSession }));
 vi.mock("@/server/ticketMergeState", () => ({ hasNothingToMerge: h.hasNothingToMerge }));
 vi.mock("@/server/ticketCwd", () => ({
   resolveTicketWorktree: h.resolveTicketWorktree, resolveTicketCwd: h.resolveTicketCwd,
@@ -51,7 +53,7 @@ vi.mock("@/server/projects", () => ({
   loadProjectMap: () => ({}), resolvePathForProject: h.resolvePathForProject,
 }));
 vi.mock("@/server/tmux", () => ({
-  closeSession: vi.fn(async () => ({ closed: true, forced: false })),
+  closeSession: h.closeSession,
   hasSession: vi.fn(async () => false), newSession: vi.fn(async () => {}), pipePane: vi.fn(async () => {}),
 }));
 vi.mock("@/server/app", () => ({
@@ -88,6 +90,8 @@ beforeEach(() => {
   h.repoRootFromWorktree.mockImplementation(async () => "/code/mojito");
   h.registryGet.mockImplementation(() => undefined);
   h.hasNothingToMerge.mockImplementation(async () => true);
+  h.retireDeadSession.mockImplementation(async () => true);
+  h.closeSession.mockImplementation(async () => ({ closed: true, forced: false }));
 });
 
 describe("/api/tickets/[id]/verdict", () => {
@@ -212,10 +216,42 @@ describe("/api/tickets/[id]/verdict", () => {
     expect(h.setIssueStatus).not.toHaveBeenCalled();
   });
 
-  it("a resolved approve retires the ticket's finished work session", async () => {
+  it("a resolved approve retires the ticket's work session only if its tmux is gone", async () => {
     h.registryGet.mockImplementation(() => ({ id: "mojito-RIC-110-work" }));
     await POST(req(approve), params());
-    expect(h.supersedeSession).toHaveBeenCalledWith("mojito-RIC-110-work", expect.anything());
+    expect(h.retireDeadSession).toHaveBeenCalledWith("mojito-RIC-110-work", expect.anything());
+  });
+
+  // The rule: no verdict ever ends a session. A work session still alive at the gate is the
+  // rework channel, and killing it mid-turn is exactly what this route used to do.
+  it("never closes a session — on any verdict", async () => {
+    h.registryGet.mockImplementation(() => ({ id: "mojito-RIC-110-work" }));
+    await POST(req(approve), params());
+    await POST(req({ arg: "mark-done" }), params());
+    h.mergeTicketBranch.mockImplementation(async () => ({ status: "conflict", detail: "CONFLICT in a.ts" }));
+    await POST(req(approve), params());
+    expect(h.closeSession).not.toHaveBeenCalled();
+  });
+
+  // A fix session that is still alive is where the user is already working: hand it back
+  // rather than replacing it (which is only possible by killing it first).
+  it("a conflict hands back the live fix session instead of relaunching over it", async () => {
+    h.mergeTicketBranch.mockImplementation(async () => ({ status: "conflict", detail: "CONFLICT in a.ts" }));
+    h.launchMergeFixSession.mockImplementation(async () => ({ ok: false, reason: "duplicate" }));
+    const res = await POST(req(approve), params());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      ok: true, result: { done: "fix-session", sessionId: "mojito-RIC-110-conflict", detail: "CONFLICT in a.ts" },
+    });
+    expect(h.closeSession).not.toHaveBeenCalled();
+  });
+
+  it("422s when the merge-fix session fails to launch for any other reason", async () => {
+    h.mergeTicketBranch.mockImplementation(async () => ({ status: "conflict", detail: "CONFLICT in a.ts" }));
+    h.launchMergeFixSession.mockImplementation(async () => ({ ok: false, reason: "no-repo" }));
+    const res = await POST(req(approve), params());
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({ error: expect.stringContaining("no-repo") });
   });
 
   it("400s a reject body and touches neither git nor Linear", async () => {

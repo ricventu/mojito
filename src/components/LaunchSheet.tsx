@@ -12,6 +12,7 @@ import { holdsSheetOpen, type HeldOutcome } from "@/lib/verdictOutcome";
 import { qaGateModel, type MergeState } from "@/lib/qaGate";
 import { qaSessionModel } from "@/lib/qaSession";
 import { launchedSession } from "@/lib/launchedSession";
+import { isActiveSession } from "@/lib/activeSession";
 
 // Shared by all three launch handlers: the only part of their shape that would drift if
 // copied. A thrown fetch is the case that used to show the user nothing at all.
@@ -74,8 +75,8 @@ export default function LaunchSheet(
   const [assigning, setAssigning] = useState(false);
   const existingId = tmuxName(ticket.identifier, ticket.statusName);
   const existing = sessions.find((s) => s.id === existingId);
-  const existingActive = existing != null
-    && (existing.state === "running" || existing.state === "needs-input" || existing.state === "starting");
+  // The single active-state definition, not a fourth hand-copied list of states.
+  const existingActive = existing != null && isActiveSession(existing);
   // What the To QA branch offers for the work session: open it while it is registered, and
   // start a replacement whenever it is not alive. start() clears a dead registration first,
   // so both can be on screen at once.
@@ -147,15 +148,19 @@ export default function LaunchSheet(
     setErr(null);
     setLaunching("work");
     try {
-      // A finished session for this ticket+status keeps the same tmux name, so clear it first
-      // (kill + deregister) before relaunching, else the server rejects the launch as a duplicate.
-      if (existing) await apiFetch(token, `/api/sessions/${existing.id}`, { method: "DELETE" });
+      // No preemptive DELETE: this used to kill whatever held the ticket's tmux name so the
+      // relaunch could take it, which meant "Start" silently ended a session claude was still
+      // sitting in. Ending a session is the Kill button's job alone. A dead registration is no
+      // obstacle (launchSession overwrites it); only a LIVE tmux is, and that answers 409 below.
       const res = await apiFetch(token, "/api/sessions", {
         method: "POST",
         body: JSON.stringify({ ticket: ticket.identifier, status: ticket.statusName, model, effort,
           projectName: ticket.project, title: ticket.title, labels: ticket.labels }),
       });
-      if (res.status === 409) { setErr("A session for this ticket+status already exists."); return; }
+      if (res.status === 409) {
+        setErr("That session is still alive — open it, or kill it from its terminal, before starting a new one.");
+        return;
+      }
       if (!res.ok) { setErr(await apiError(res, "launch failed")); return; }
       await enter(res);
     } catch {

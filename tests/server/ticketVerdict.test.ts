@@ -6,18 +6,18 @@ function deps(over: Record<string, unknown> = {}) {
   return {
     getIssueStatus: vi.fn(async () => "To QA"),
     resolveVerdict: vi.fn(async () => ({ done: "merged", commit: "abc1234" }) as const),
-    supersedeStaleSession: vi.fn(async () => {}),
+    retireStaleSession: vi.fn(async () => {}),
     ...over,
   };
 }
 
 describe("resolveTicketVerdict", () => {
-  it("approve-local at To QA resolves the verdict, returns its result, then supersedes the stale session", async () => {
+  it("approve-local at To QA resolves the verdict, returns its result, then clears a stale session", async () => {
     const d = deps();
     const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
     expect(res).toEqual({ ok: true, result: { done: "merged", commit: "abc1234" } });
     expect(d.resolveVerdict).toHaveBeenCalledWith({ ticket: "RIC-110", arg: "approve-local" });
-    expect(d.supersedeStaleSession).toHaveBeenCalledWith("RIC-110");
+    expect(d.retireStaleSession).toHaveBeenCalledWith("RIC-110");
   });
 
   it("accepts approve-mr and passes the MR result through", async () => {
@@ -31,7 +31,7 @@ describe("resolveTicketVerdict", () => {
     const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
     expect(res).toEqual({ ok: false, code: 409, error: "ticket is not at To QA" });
     expect(d.resolveVerdict).not.toHaveBeenCalled();
-    expect(d.supersedeStaleSession).not.toHaveBeenCalled();
+    expect(d.retireStaleSession).not.toHaveBeenCalled();
   });
 
   it("returns 400 for an invalid arg without checking status", async () => {
@@ -54,17 +54,17 @@ describe("resolveTicketVerdict", () => {
     expect(d.getIssueStatus).not.toHaveBeenCalled();
   });
 
-  it("maps QaVerdictError to 400 and skips supersede", async () => {
+  it("maps QaVerdictError to 400 and skips the cleanup", async () => {
     const d = deps({ resolveVerdict: vi.fn(async () => { throw new QaVerdictError("no worktree for ticket"); }) });
     const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
     expect(res).toEqual({ ok: false, code: 400, error: "no worktree for ticket" });
-    expect(d.supersedeStaleSession).not.toHaveBeenCalled();
+    expect(d.retireStaleSession).not.toHaveBeenCalled();
   });
 
-  it("maps a generic error to 422 and skips supersede", async () => {
+  it("maps a generic error to 422 and skips the cleanup", async () => {
     const d = deps({ resolveVerdict: vi.fn(async () => { throw new Error("Linear down"); }) });
     const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
     expect(res).toEqual({ ok: false, code: 422, error: "Linear down" });
-    expect(d.supersedeStaleSession).not.toHaveBeenCalled();
+    expect(d.retireStaleSession).not.toHaveBeenCalled();
   });
 });

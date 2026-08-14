@@ -7,14 +7,19 @@ export type VerdictResult =
 export interface TicketVerdictDeps {
   getIssueStatus: (ticket: string) => Promise<string>;
   resolveVerdict: (input: { ticket: string; arg: QaArg }) => Promise<QaVerdictResult>;
-  supersedeStaleSession: (ticket: string) => Promise<void>;
+  /**
+   * Drops the ticket's work-session registration if its tmux is already gone. It never ends
+   * a live session: a verdict is not a reason to kill the session the user may still be
+   * typing into (see retireSession.ts).
+   */
+  retireStaleSession: (ticket: string) => Promise<void>;
 }
 
 /**
  * Resolve a To QA verdict keyed by ticket (no session required). Validates the arg and the
- * live status, delegates the merge/launch work to resolveVerdict, then retires the ticket's
- * now-finished work session. On any failure the stale-session cleanup is skipped so the
- * caller can retry.
+ * live status, delegates the merge/launch work to resolveVerdict, then clears the ticket's
+ * work session if it is already dead. On any failure that cleanup is skipped so the caller
+ * can retry.
  */
 export async function resolveTicketVerdict(
   input: { ticket: string; arg: string },
@@ -34,6 +39,6 @@ export async function resolveTicketVerdict(
     return { ok: false, code: e instanceof QaVerdictError ? 400 : 422, error };
   }
 
-  await deps.supersedeStaleSession(ticket);
+  await deps.retireStaleSession(ticket);
   return { ok: true, result };
 }

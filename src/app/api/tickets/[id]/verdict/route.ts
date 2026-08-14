@@ -9,9 +9,9 @@ import { resolveTicketVerdict } from "@/server/ticketVerdict";
 import { hasNothingToMerge } from "@/server/ticketMergeState";
 import { tmuxName, conflictSessionName, validateTicket } from "@/server/sessionKey";
 import { defaultModelForStatus, defaultEffortForStatus } from "@/server/stageDefaults";
-import { supersedeSession } from "@/server/supersede";
+import { retireDeadSession } from "@/server/retireSession";
 import { resolveTicketDirs } from "@/server/ticketDirs";
-import { closeSession, hasSession, newSession, pipePane } from "@/server/tmux";
+import { hasSession, newSession, pipePane } from "@/server/tmux";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const cfg = getConfig();
@@ -55,7 +55,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           setIssueStatus: (t, s) => setIssueStatus(cfg.linearApiKey, t, s),
           launchMergeFix: async (detail, mode) => {
             const sid = conflictSessionName(id);
-            if (registry.get(sid)) await supersedeSession(sid, { closeSession, registry });
+            // Clears a dead registration left by a previous fix session; a live one is left
+            // running, and the duplicate below hands it back rather than replacing it.
+            await retireDeadSession(sid, { hasSession, registry });
             const status = "In Progress";
             const res = await launchMergeFixSession(
               { ticket: id, projectName, title, description: (await content()).description,
@@ -63,13 +65,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                 mergeMode: mode, blocker: detail },
               tmuxDeps,
             );
-            if (!res.ok) throw new Error(`merge-fix session not launched: ${res.reason}`);
+            // "duplicate" means the fix session for this ticket is still alive — the user is
+            // already working in it. Hand that one back; replacing it would mean killing it.
+            if (!res.ok && res.reason !== "duplicate") {
+              throw new Error(`merge-fix session not launched: ${res.reason}`);
+            }
             return sid;
           },
         }),
-      supersedeStaleSession: async (t) => {
-        const sid = tmuxName(t, "In Progress");
-        if (registry.get(sid)) await supersedeSession(sid, { closeSession, registry });
+      retireStaleSession: async (t) => {
+        await retireDeadSession(tmuxName(t, "In Progress"), { hasSession, registry });
       },
     },
   );
