@@ -18,8 +18,12 @@ export function isActiveState(state: SessionState): boolean {
 
 /**
  * Whether a session is still alive — see isActiveState for the definition. Shared by
- * the Sessions filter, the Kill/Dismiss label and activeSessionLevel, each of which
- * used to spell the same four states out for itself.
+ * the Kill/Dismiss label and activeSessionLevel, each of which used to spell the same
+ * four states out for itself.
+ *
+ * Not what the Sessions filter keys on: "done" means the stage was handed off, not that
+ * the tmux is gone, so this would hide a To QA ticket's still-live work session. See
+ * buildUnifiedRows.
  */
 export function isActiveSession(s: SessionMeta): boolean {
   return isActiveState(s.state);

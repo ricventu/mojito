@@ -164,7 +164,7 @@ export default function UnifiedList(
       )}
       {noMatches && (
         <p className="empty">
-          {sessionsOnly ? "No active sessions." : "No matching tickets or sessions."}
+          {sessionsOnly ? "No sessions." : "No matching tickets or sessions."}
         </p>
       )}
       {projectSections.map((sec) => (

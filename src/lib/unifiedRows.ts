@@ -3,7 +3,6 @@ import { filterTickets, ticketStatuses, NO_PROJECT } from "@/lib/ticketFilter";
 import { filterSessions, sessionStatuses } from "@/lib/sessionFilter";
 import { orderSessions } from "@/lib/orderSessions";
 import { orderTickets } from "@/lib/orderTickets";
-import { isActiveSession } from "@/lib/activeSession";
 import { statusRank } from "@/lib/status";
 
 /** A ticket and the sessions that belong to it, rendered nested inside its card. */
@@ -58,10 +57,13 @@ export function buildUnifiedRows(
   });
   let looseSessions = filterSessions(sessions.filter((s) => !nested.has(s.id)), filter);
 
-  if (sessionsOnly) {
-    ticketRows = ticketRows.filter((r) => r.sessions.some(isActiveSession));
-    looseSessions = looseSessions.filter(isActiveSession);
-  }
+  // "Has a session", not "has a running session". The state cannot stand in for liveness
+  // here: a work session that handed its stage to QA sits at "done" while its tmux is
+  // still up — Mojito never ends a session, and that one is the rework channel the gate
+  // depends on — so keying on isActiveSession hid exactly the To QA tickets the filter
+  // exists to surface. A registration lasts as long as the session does; Kill, Dismiss
+  // and Clean up are what remove it, so having one is the honest criterion.
+  if (sessionsOnly) ticketRows = ticketRows.filter((r) => r.sessions.length > 0);
   return { ticketRows, looseSessions };
 }
 

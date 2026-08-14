@@ -182,7 +182,7 @@ describe("buildUnifiedRows", () => {
 });
 
 describe("buildUnifiedRows with sessionsOnly", () => {
-  it("drops tickets that have no active session", () => {
+  it("drops tickets that have no session at all", () => {
     const rows = buildUnifiedRows({
       tickets: [ticket({ identifier: "RIC-1" }), ticket({ identifier: "RIC-2" })],
       sessions: [session({ id: "a", ticket: "RIC-2", state: "running" })],
@@ -191,13 +191,25 @@ describe("buildUnifiedRows with sessionsOnly", () => {
     expect(rows.ticketRows.map((r) => r.ticket.identifier)).toEqual(["RIC-2"]);
   });
 
-  it("drops a ticket whose only session is finished", () => {
+  // The reason the filter cannot key on the state: a work session that handed its stage
+  // to QA sits at "done" with its tmux still up — it is the rework channel the gate
+  // depends on, so a To QA ticket must stay visible under the Sessions filter.
+  it("keeps a ticket whose only session is done", () => {
     const rows = buildUnifiedRows({
-      tickets: [ticket({ identifier: "RIC-1" })],
+      tickets: [ticket({ identifier: "RIC-1", statusName: "To QA" })],
       sessions: [session({ id: "a", ticket: "RIC-1", state: "done" })],
       filter: NO_FILTER, sessionsOnly: true,
     });
-    expect(rows.ticketRows).toEqual([]);
+    expect(rows.ticketRows.map((r) => r.ticket.identifier)).toEqual(["RIC-1"]);
+  });
+
+  it("keeps a ticket whose only session failed", () => {
+    const rows = buildUnifiedRows({
+      tickets: [ticket({ identifier: "RIC-1" })],
+      sessions: [session({ id: "a", ticket: "RIC-1", state: "failed" })],
+      filter: NO_FILTER, sessionsOnly: true,
+    });
+    expect(rows.ticketRows.map((r) => r.ticket.identifier)).toEqual(["RIC-1"]);
   });
 
   it("keeps a ticket whose only session needs input", () => {
@@ -209,7 +221,7 @@ describe("buildUnifiedRows with sessionsOnly", () => {
     expect(rows.ticketRows.map((r) => r.ticket.identifier)).toEqual(["RIC-1"]);
   });
 
-  it("keeps only active loose sessions", () => {
+  it("keeps loose sessions whatever their state", () => {
     const rows = buildUnifiedRows({
       tickets: [],
       sessions: [
@@ -218,7 +230,19 @@ describe("buildUnifiedRows with sessionsOnly", () => {
       ],
       filter: NO_FILTER, sessionsOnly: true,
     });
-    expect(rows.looseSessions.map((s) => s.id)).toEqual(["live"]);
+    expect(rows.looseSessions.map((s) => s.id)).toEqual(["live", "dead"]);
+  });
+
+  it("still narrows loose sessions by the other criteria", () => {
+    const rows = buildUnifiedRows({
+      tickets: [],
+      sessions: [
+        session({ id: "here", ticket: "", kind: "shell", state: "done", launchStatus: "", projectName: "Mojito" }),
+        session({ id: "elsewhere", ticket: "", kind: "shell", state: "done", launchStatus: "", projectName: "Other" }),
+      ],
+      filter: { query: "", project: "Mojito", status: null }, sessionsOnly: true,
+    });
+    expect(rows.looseSessions.map((s) => s.id)).toEqual(["here"]);
   });
 });
 
