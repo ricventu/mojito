@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mkdtempSync, statSync, existsSync, writeFileSync, readFileSync } from "node:fs";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mkdtempSync, mkdirSync, statSync, existsSync, writeFileSync, readFileSync, rmSync, realpathSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -7,6 +8,7 @@ import {
   launchMergeFixSession,
   buildShellCommand, launchShellSession,
   buildResolvePrompt, launchStackResolveSession,
+  defaultResolveCwd,
 } from "@/server/launch";
 import { Registry } from "@/server/registry";
 import type { SessionMeta } from "@/server/types";
@@ -27,7 +29,7 @@ function deps(over: Record<string, unknown> = {}) {
     hasSession: vi.fn(async () => false),
     newSession: vi.fn(async () => {}),
     pipePane: vi.fn(async () => {}),
-    resolveCwd: () => "/code/lime",
+    resolveCwd: () => ({ cwd: "/code/lime" }),
     nowIso: () => "2026-07-11T00:00:00.000Z",
     ...over,
   };
@@ -163,6 +165,35 @@ describe("launchSession", () => {
     expect("assets" in written).toBe(false);
     expect("attachments" in written).toBe(false);
   });
+
+  it("passes createWorktree/baseBranch and the ticket's title through to resolveCwd", async () => {
+    const resolveCwd = vi.fn(() => ({ cwd: "/code/lime" }));
+    const d = deps({ resolveCwd });
+    await launchSession({ ...baseReq, createWorktree: true, baseBranch: "main" }, d);
+    expect(resolveCwd).toHaveBeenCalledWith({
+      ticket: "RIC-46", projectName: "Lime", title: "Some ticket",
+      createWorktree: true, baseBranch: "main",
+    });
+  });
+
+  it("echoes a warning from resolveCwd as the first thing the session's terminal runs", async () => {
+    let command = "";
+    const d = deps({
+      resolveCwd: () => ({ cwd: "/code/lime", warning: "init-worktree.sh not found" }),
+      newSession: vi.fn(async (_n: string, _c: string, cmd: string) => { command = cmd; }),
+    });
+    await launchSession(baseReq, d);
+    expect(command.startsWith("echo ")).toBe(true);
+    expect(command).toContain("init-worktree.sh not found");
+    expect(command).toContain("; claude --model");
+  });
+
+  it("runs no echo prefix when resolveCwd reports no warning", async () => {
+    let command = "";
+    const d = deps({ newSession: vi.fn(async (_n: string, _c: string, cmd: string) => { command = cmd; }) });
+    await launchSession(baseReq, d);
+    expect(command.startsWith("claude --model")).toBe(true);
+  });
 });
 
 function customDeps(over: Record<string, unknown> = {}) {
@@ -172,7 +203,7 @@ function customDeps(over: Record<string, unknown> = {}) {
     hasSession: vi.fn(async () => false),
     newSession: vi.fn(async () => {}),
     pipePane: vi.fn(async () => {}),
-    resolveCwd: () => "/code/Lime/mojito/.worktrees/ricventu/ric-128-x",
+    resolveCwd: () => ({ cwd: "/code/Lime/mojito/.worktrees/ricventu/ric-128-x" }),
     nowIso: () => "2026-07-11T00:00:00.000Z",
     genId: () => "abc123",
     homeDir: () => "/home/me",
@@ -319,7 +350,7 @@ describe("launchCustomSession from a ticket (RIC-128)", () => {
     ticket: "RIC-128", status: "Todo", title: "Custom session from a ticket", labels: ["Feature"] };
 
   it("opens in the ticket's worktree and carries ticket/title/labels on the meta", async () => {
-    const d = customDeps({ resolveCwd: () => "/wt/ric-128" });
+    const d = customDeps({ resolveCwd: () => ({ cwd: "/wt/ric-128" }) });
     const res = await launchCustomSession(ticketReq, d);
     expect(res.ok).toBe(true);
     const meta = (res as { ok: true; meta: SessionMeta }).meta;
@@ -329,7 +360,7 @@ describe("launchCustomSession from a ticket (RIC-128)", () => {
   });
 
   it("writes NO launch-context file (a bare interactive session, human-driven)", async () => {
-    const d = customDeps({ resolveCwd: () => "/wt/ric-128" });
+    const d = customDeps({ resolveCwd: () => ({ cwd: "/wt/ric-128" }) });
     await launchCustomSession(ticketReq, d);
     expect(existsSync(join(dir, "context", "mojito-custom-ric-128-abc123.json"))).toBe(false);
     // Exact match: nothing precedes "claude" (no env-var prefix) and no slash command follows.
@@ -339,7 +370,7 @@ describe("launchCustomSession from a ticket (RIC-128)", () => {
   });
 
   it("falls back to the repo root when no worktree exists", async () => {
-    const d = customDeps({ resolveCwd: () => "/code/Lime/mojito" });
+    const d = customDeps({ resolveCwd: () => ({ cwd: "/code/Lime/mojito" }) });
     const res = await launchCustomSession(ticketReq, d);
     expect(res.ok).toBe(true);
     expect((res as { ok: true; meta: SessionMeta }).meta.cwd).toBe("/code/Lime/mojito");
@@ -349,6 +380,27 @@ describe("launchCustomSession from a ticket (RIC-128)", () => {
     const d = customDeps({ resolveCwd: () => null });
     const res = await launchCustomSession(ticketReq, d);
     expect(res).toMatchObject({ ok: false, reason: "no-repo" });
+  });
+
+  it("passes createWorktree/baseBranch through to resolveCwd", async () => {
+    const resolveCwd = vi.fn(() => ({ cwd: "/wt/ric-128" }));
+    const d = customDeps({ resolveCwd });
+    await launchCustomSession({ ...ticketReq, createWorktree: true, baseBranch: "main" }, d);
+    expect(resolveCwd).toHaveBeenCalledWith({
+      ticket: "RIC-128", projectName: "Mojito", title: "Custom session from a ticket",
+      createWorktree: true, baseBranch: "main",
+    });
+  });
+
+  it("echoes a resolveCwd warning before the claude command", async () => {
+    let command = "";
+    const d = customDeps({
+      resolveCwd: () => ({ cwd: "/wt/ric-128", warning: "setup script failed" }),
+      newSession: vi.fn(async (_n: string, _c: string, cmd: string) => { command = cmd; }),
+    });
+    await launchCustomSession(ticketReq, d);
+    expect(command.startsWith("echo ")).toBe(true);
+    expect(command).toContain("setup script failed");
   });
 });
 
@@ -412,7 +464,7 @@ describe("launchShellSession", () => {
   });
 
   it("a ticket-scoped shell opens in the worktree with ticket/title/labels and no context file", async () => {
-    const d = customDeps({ resolveCwd: () => "/wt/ric-155" });
+    const d = customDeps({ resolveCwd: () => ({ cwd: "/wt/ric-155" }) });
     const res = await launchShellSession(
       { projectName: "Mojito", ticket: "RIC-155", status: "Todo", title: "Avvio terminale", labels: ["Feature"] }, d);
     expect(res.ok).toBe(true);
@@ -434,6 +486,97 @@ describe("launchShellSession", () => {
     const d = customDeps({ resolveCwd: () => null });
     const res = await launchShellSession({ projectName: "Mojito", ticket: "RIC-155" }, d);
     expect(res).toMatchObject({ ok: false, reason: "no-repo" });
+  });
+
+  it("passes createWorktree/baseBranch through to resolveCwd for a ticket-scoped shell", async () => {
+    const resolveCwd = vi.fn(() => ({ cwd: "/wt/ric-155" }));
+    const d = customDeps({ resolveCwd });
+    await launchShellSession(
+      { projectName: "Mojito", ticket: "RIC-155", status: "Todo", title: "Avvio terminale",
+        createWorktree: true, baseBranch: "develop" }, d);
+    expect(resolveCwd).toHaveBeenCalledWith({
+      ticket: "RIC-155", projectName: "Mojito", title: "Avvio terminale",
+      createWorktree: true, baseBranch: "develop",
+    });
+  });
+
+  it("echoes a resolveCwd warning before the shell command", async () => {
+    let command = "";
+    const d = customDeps({
+      resolveCwd: () => ({ cwd: "/wt/ric-155", warning: "setup script failed" }),
+      newSession: vi.fn(async (_n: string, _c: string, cmd: string) => { command = cmd; }),
+    });
+    await launchShellSession({ projectName: "Mojito", ticket: "RIC-155" }, d);
+    expect(command.startsWith("echo ")).toBe(true);
+    expect(command).toContain("setup script failed");
+    expect(command).toContain("/bin/zsh -l");
+  });
+});
+
+function gitAvailable(): boolean {
+  try { execFileSync("git", ["--version"], { stdio: "ignore" }); return true; } catch { return false; }
+}
+const withGit = gitAvailable() ? describe : describe.skip;
+const SANDBOX_ENV = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" };
+function git(cwd: string, args: string[]): string {
+  return execFileSync("git", args, { cwd, encoding: "utf8", env: SANDBOX_ENV }).trim();
+}
+function configureRepo(repoDir: string): void {
+  git(repoDir, ["config", "user.email", "mojito-test@example.com"]);
+  git(repoDir, ["config", "user.name", "Mojito Test"]);
+  git(repoDir, ["config", "commit.gpgsign", "false"]);
+}
+
+withGit("defaultResolveCwd (real git, the wiring launchSession et al. use by default)", () => {
+  const roots: string[] = [];
+  afterEach(() => { for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true }); });
+
+  function makeRepo(): { repo: string; projectsPath: string } {
+    const root = mkdtempSync(join(tmpdir(), "mojito-resolvecwd-"));
+    roots.push(root);
+    const repo = join(root, "repo");
+    mkdirSync(repo);
+    git(repo, ["init", "-b", "main"]);
+    configureRepo(repo);
+    writeFileSync(join(repo, "base.txt"), "base\n");
+    git(repo, ["add", "-A"]);
+    git(repo, ["commit", "--no-gpg-sign", "-m", "init"]);
+    // git resolves symlinks when it reports a worktree's path (e.g. macOS /var -> /private/var);
+    // realpath here so string comparisons against defaultResolveCwd's own output line up.
+    const realRepo = realpathSync(repo);
+    const projectsPath = join(root, "projects.json");
+    writeFileSync(projectsPath, JSON.stringify({ RIC: realRepo }));
+    return { repo: realRepo, projectsPath };
+  }
+
+  it("resolves the repo root when no worktree exists and none is requested", async () => {
+    const { repo, projectsPath } = makeRepo();
+    const resolveCwd = defaultResolveCwd(projectsPath);
+    await expect(resolveCwd({ ticket: "RIC-1", projectName: "Mojito", title: "Some thing", createWorktree: false }))
+      .resolves.toEqual({ cwd: repo });
+  });
+
+  it("creates a slugged worktree off the given base branch when asked", async () => {
+    const { repo, projectsPath } = makeRepo();
+    const resolveCwd = defaultResolveCwd(projectsPath);
+    const res = await resolveCwd({ ticket: "RIC-1", projectName: "Mojito", title: "Some thing", createWorktree: true, baseBranch: "main" });
+    expect(res?.cwd).toBe(join(repo, ".claude", "worktrees", "RIC-1-some-thing"));
+    expect(existsSync(res!.cwd)).toBe(true);
+  });
+
+  it("resolves the already-created worktree on a later call instead of creating again", async () => {
+    const { projectsPath } = makeRepo();
+    const resolveCwd = defaultResolveCwd(projectsPath);
+    const opts = { ticket: "RIC-1", projectName: "Mojito", title: "Some thing", createWorktree: true, baseBranch: "main" };
+    const first = await resolveCwd(opts);
+    const second = await resolveCwd(opts);
+    expect(second).toEqual({ cwd: first!.cwd });
+  });
+
+  it("returns null when the ticket maps to no repo", async () => {
+    const { projectsPath } = makeRepo();
+    const resolveCwd = defaultResolveCwd(projectsPath);
+    await expect(resolveCwd({ ticket: "ZZZ-1", projectName: "Mojito", title: "x", createWorktree: false })).resolves.toBeNull();
   });
 });
 

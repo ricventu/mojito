@@ -56,6 +56,16 @@ function StackRowView({ row, token, onOpenLogs, refresh, selfUpdate }: {
       if (res.ok) onOpenLogs((await res.json()).meta as SessionMeta);
     } finally { setBusy(false); }
   };
+  // Opens a plain Claude session in the project root, guided prompt already seeded, to
+  // write scripts/init-worktree.sh together with the human — Mojito never guesses
+  // what a repo's worktrees need before a ticket session can start working in one.
+  const createWorktreeScript = async () => {
+    setBusy(true);
+    try {
+      const res = await apiFetch(token, `/api/stacks/${row.slug}/create-worktree-script`, { method: "POST" });
+      if (res.ok) onOpenLogs((await res.json()).meta as SessionMeta);
+    } finally { setBusy(false); }
+  };
 
   return (
     <div className="card">
@@ -81,6 +91,7 @@ function StackRowView({ row, token, onOpenLogs, refresh, selfUpdate }: {
           <button className="btn sm ghost" disabled={busy} onClick={pull}>Pull</button>
         )}
         <button className="btn sm ghost" disabled={busy} onClick={push}>Push</button>
+        <button className="btn sm ghost" disabled={busy} onClick={createWorktreeScript}>Create worktree script</button>
         {/* Mojito's own checkout has a post-merge hook that starts the deploy unit, so its
             Pull is the guarded /api/self-update flow (banner + health-poll + reload), not
             the raw stacks pull. Hidden entirely when MOJITO_SELF_UPDATE is off. */}

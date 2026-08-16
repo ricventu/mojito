@@ -138,6 +138,19 @@ describe("POST /api/sessions (ticket)", () => {
     expect(h.launchSession).not.toHaveBeenCalled();
   });
 
+  it("forwards createWorktree/baseBranch to launchSession", async () => {
+    await POST(req({ ...launch, createWorktree: true, baseBranch: "main" }));
+    const passed = h.launchSession.mock.calls[0][0] as { createWorktree: boolean; baseBranch: string };
+    expect(passed.createWorktree).toBe(true);
+    expect(passed.baseBranch).toBe("main");
+  });
+
+  it("defaults createWorktree to false when the request omits it", async () => {
+    await POST(req(launch));
+    const passed = h.launchSession.mock.calls[0][0] as { createWorktree: boolean };
+    expect(passed.createWorktree).toBe(false);
+  });
+
   // The board move is best-effort by design (the session is already running, so a failed
   // status write must not fail the request) — but silence made a stuck board look normal.
   it("still returns 201 and warns when the Backlog -> In Progress board move fails", async () => {

@@ -23,7 +23,8 @@ export async function POST(req: Request) {
       { projectName: body.projectName ?? null, model: body.model ?? "opus", effort: body.effort ?? "high",
         ...(typeof body.ticket === "string" && body.ticket
           ? { ticket: body.ticket, status: body.status ?? "", title: body.title ?? "",
-              labels: Array.isArray(body.labels) ? body.labels : [] }
+              labels: Array.isArray(body.labels) ? body.labels : [],
+              createWorktree: Boolean(body.createWorktree), baseBranch: body.baseBranch }
           : {}) },
       { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
         projectsPath: cfg.projectsPath, hasSession, newSession, pipePane },
@@ -36,7 +37,8 @@ export async function POST(req: Request) {
       { projectName: body.projectName ?? null,
         ...(typeof body.ticket === "string" && body.ticket
           ? { ticket: body.ticket, status: body.status ?? "", title: body.title ?? "",
-              labels: Array.isArray(body.labels) ? body.labels : [] }
+              labels: Array.isArray(body.labels) ? body.labels : [],
+              createWorktree: Boolean(body.createWorktree), baseBranch: body.baseBranch }
           : {}) },
       { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
         projectsPath: cfg.projectsPath, hasSession, newSession, pipePane },
@@ -71,7 +73,8 @@ export async function POST(req: Request) {
     { ticket: body.ticket, status: body.status, model: body.model ?? "opus", effort: body.effort ?? "high",
       projectName: body.projectName ?? null,
       title: body.title ?? "", labels: Array.isArray(body.labels) ? body.labels : [],
-      description: content.description, assets: prepared.assets, attachments: prepared.attachments },
+      description: content.description, assets: prepared.assets, attachments: prepared.attachments,
+      createWorktree: Boolean(body.createWorktree), baseBranch: body.baseBranch },
     { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token, projectsPath: cfg.projectsPath,
       hasSession, newSession, pipePane },
   );

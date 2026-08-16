@@ -42,6 +42,32 @@ export default function LaunchSheet(
   const [err, setErr] = useState<string | null>(null);
   const [verdictPending, setVerdictPending] = useState<"approve-local" | "approve-mr" | "mark-done" | null>(null);
   const [mergeState, setMergeState] = useState<MergeState>("checking");
+  // Whether the ticket already has a worktree, checked once per ticket. "loading" lets the
+  // launch buttons show immediately rather than flash in after the fetch — only a confirmed
+  // exists:false gates them behind the create-worktree question below.
+  const [wtStatus, setWtStatus] = useState<"loading" | { exists: boolean; branches: string[]; defaultBranch: string | null }>("loading");
+  const [wtAnswer, setWtAnswer] = useState<{ create: boolean; baseBranch: string } | null>(null);
+  useEffect(() => {
+    let live = true;
+    setWtStatus("loading");
+    setWtAnswer(null);
+    (async () => {
+      try {
+        const qs = new URLSearchParams({ title: ticket.title ?? "" });
+        if (ticket.project) qs.set("projectName", ticket.project);
+        const res = await apiFetch(token, `/api/tickets/${ticket.identifier}/worktree-status?${qs}`);
+        const data = res.ok ? await res.json() : null;
+        const status = data && typeof data.exists === "boolean" ? data : { exists: true, branches: [], defaultBranch: null };
+        if (live) setWtStatus(status);
+      } catch {
+        // Unreachable check degrades to "exists" — skip the question, same as before it existed.
+        if (live) setWtStatus({ exists: true, branches: [], defaultBranch: null });
+      }
+    })();
+    return () => { live = false; };
+  }, [token, ticket.identifier, ticket.project, ticket.title]);
+  const needsWorktreeChoice = wtStatus !== "loading" && !wtStatus.exists && wtAnswer === null;
+  const canLaunch = !needsWorktreeChoice;
   // Ask the server whether anything is left to merge before offering to merge it. A failed or
   // unreachable check degrades to the ordinary approve buttons — never to a dead gate.
   useEffect(() => {
@@ -155,7 +181,8 @@ export default function LaunchSheet(
       const res = await apiFetch(token, "/api/sessions", {
         method: "POST",
         body: JSON.stringify({ ticket: ticket.identifier, status: ticket.statusName, model, effort,
-          projectName: ticket.project, title: ticket.title, labels: ticket.labels }),
+          projectName: ticket.project, title: ticket.title, labels: ticket.labels,
+          createWorktree: wtAnswer?.create ?? false, baseBranch: wtAnswer?.baseBranch }),
       });
       if (res.status === 409) {
         setErr("That session is still alive — open it, or kill it from its terminal, before starting a new one.");
@@ -179,7 +206,8 @@ export default function LaunchSheet(
       const res = await apiFetch(token, "/api/sessions", {
         method: "POST",
         body: JSON.stringify({ kind: "custom", ticket: ticket.identifier, status: ticket.statusName,
-          projectName: ticket.project, title: ticket.title, labels: ticket.labels, model, effort }),
+          projectName: ticket.project, title: ticket.title, labels: ticket.labels, model, effort,
+          createWorktree: wtAnswer?.create ?? false, baseBranch: wtAnswer?.baseBranch }),
       });
       if (!res.ok) { setErr(await apiError(res, "launch failed")); return; }
       await enter(res);
@@ -199,7 +227,8 @@ export default function LaunchSheet(
       const res = await apiFetch(token, "/api/sessions", {
         method: "POST",
         body: JSON.stringify({ kind: "shell", ticket: ticket.identifier, status: ticket.statusName,
-          projectName: ticket.project, title: ticket.title, labels: ticket.labels }),
+          projectName: ticket.project, title: ticket.title, labels: ticket.labels,
+          createWorktree: wtAnswer?.create ?? false, baseBranch: wtAnswer?.baseBranch }),
       });
       if (!res.ok) { setErr(await apiError(res, "terminal failed")); return; }
       await enter(res);
@@ -230,6 +259,29 @@ export default function LaunchSheet(
       </button>
     </div>
   );
+  // Asked once per ticket, only when it has no worktree yet: replaces the launch buttons
+  // until answered, so a session never opens in a spot the human didn't choose. "No"
+  // launches into the repo root exactly like before this existed, and asks again next time
+  // (nothing was created); "Yes" pins a base branch that rides along with the launch.
+  const worktreeChoice = needsWorktreeChoice ? (
+    <div className="field" style={{ marginTop: 12 }}>
+      <span className="lbl">Create a worktree for this ticket?</span>
+      <div className="btns" style={{ marginTop: 4 }}>
+        <button className="btn sm ghost" onClick={() => setWtAnswer({ create: false, baseBranch: "" })}>No</button>
+        <button className="btn sm primary"
+          onClick={() => setWtAnswer({ create: true, baseBranch: wtStatus.defaultBranch ?? wtStatus.branches[0] ?? "" })}>
+          Yes
+        </button>
+      </div>
+    </div>
+  ) : null;
+  const baseBranchSelect = wtAnswer?.create && wtStatus !== "loading" ? (
+    <label className="field" style={{ marginTop: 12 }}><span className="lbl">Base branch</span>
+      <select value={wtAnswer.baseBranch} onChange={(e) => setWtAnswer({ create: true, baseBranch: e.target.value })}>
+        {wtStatus.branches.map((b) => <option key={b}>{b}</option>)}
+      </select>
+    </label>
+  ) : null;
 
   // The fix session is registered before the verdict responds, so the onLaunched()
   // refetch normally has it by the time this renders — but the prop update is a round trip
@@ -301,13 +353,15 @@ export default function LaunchSheet(
                 Open session (<StateBadge state={existing.state} />)
               </button>
             )}
-            {qaSession.start && (
+            {worktreeChoice}
+            {baseBranchSelect}
+            {qaSession.start && canLaunch && (
               <button className="btn primary block" style={{ marginTop: 12 }} disabled={launchBusy} onClick={() => start()}>
                 {launching === "work" ? "Starting…" : existing ? "Start new work session" : "Start work session"}
               </button>
             )}
             {selectors}
-            {customBtn}
+            {canLaunch && customBtn}
           </>
         ) : existingActive ? (
           <>
@@ -323,10 +377,14 @@ export default function LaunchSheet(
               </button>
             )}
             {selectors}
-            <button className="btn primary block" disabled={launchBusy} onClick={() => start()}>
-              {launching === "work" ? "Starting…" : existing ? "Start new session" : "Start session"}
-            </button>
-            {customBtn}
+            {worktreeChoice}
+            {baseBranchSelect}
+            {canLaunch && (
+              <button className="btn primary block" disabled={launchBusy} onClick={() => start()}>
+                {launching === "work" ? "Starting…" : existing ? "Start new session" : "Start session"}
+              </button>
+            )}
+            {canLaunch && customBtn}
           </>
         )}
         <button className="btn ghost block" style={{ marginTop: 12 }} disabled={assigning} onClick={toggleAssignee}>

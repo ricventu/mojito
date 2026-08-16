@@ -3,7 +3,7 @@ import { loadProjectMap, resolveRepoFromMap } from "./projects.js";
 import { resolveWorktree } from "./worktree.js";
 
 // The repo a ticket's project maps to, or null.
-function repoForTicket(projectsPath: string, ticket: string, projectName: string | null): string | null {
+export function repoForTicket(projectsPath: string, ticket: string, projectName: string | null): string | null {
   const { teamKey } = parseIdentifier(ticket);
   const repo = resolveRepoFromMap(loadProjectMap(projectsPath), teamKey, projectName);
   // entry.projects[projectName] can hand back the object's own prototype instead

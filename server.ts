@@ -4,6 +4,7 @@ import nextEnv from "@next/env";
 import { WebSocketServer } from "ws";
 import { getConfig, getRegistry, getBus } from "./src/server/app.js";
 import { listSessions } from "./src/server/tmux.js";
+import { adoptOrphanSessions } from "./src/server/adoptOrphans.js";
 import { tokenFromUrl } from "./src/server/auth.js";
 import { attachPty } from "./src/server/ptyGateway.js";
 import { attachEvents } from "./src/server/eventsWs.js";
@@ -33,8 +34,13 @@ async function main() {
   // getUpgradeHandler() must run after prepare() — Next throws otherwise.
   const upgradeHandle = app.getUpgradeHandler();
 
-  // Boot recovery: reconcile the registry with live tmux sessions.
-  getRegistry().recover(await listSessions("mojito-"));
+  // Boot recovery: reconcile the registry with live tmux sessions, both directions —
+  // a registered session whose tmux died (recover) and a live tmux with no registration
+  // at all (adopt: a Mojito process that died between spawning tmux and writing the
+  // sidecar leaves exactly this — alive, but invisible until a boot like this one).
+  const liveSessionNames = await listSessions("mojito-");
+  getRegistry().recover(liveSessionNames);
+  adoptOrphanSessions(getRegistry(), cfg.stateDir, cfg.projectsPath, liveSessionNames);
 
   const server = createServer((req, res) => handle(req, res));
   const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });

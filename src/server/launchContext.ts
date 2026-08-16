@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { TicketAsset, TicketAttachment } from "./ticketAssets.js";
 
@@ -28,4 +28,17 @@ export function writeLaunchContext(stateDir: string, id: string, ctx: LaunchCont
   writeFileSync(path, JSON.stringify(ctx, null, 2), { mode: 0o600 });
   chmodSync(path, 0o600); // mode on writeFileSync is ignored if the file pre-existed
   return path;
+}
+
+/**
+ * The context an earlier launchSession call wrote for this session id, if the file is
+ * still there. Used to reconstruct a ticket session's metadata when adopting an orphan
+ * (see adoptOrphans.ts) — null on anything missing or unreadable, never throws.
+ */
+export function readLaunchContext(stateDir: string, id: string): LaunchContext | null {
+  try {
+    return JSON.parse(readFileSync(join(stateDir, "context", `${id}.json`), "utf8"));
+  } catch {
+    return null;
+  }
 }

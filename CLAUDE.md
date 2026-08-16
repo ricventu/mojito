@@ -23,6 +23,21 @@ Mojito owns the whole lifecycle — there is no external plugin:
   confirms. `tests/server/prompts.test.ts` fails on either polarity creeping back. Nothing
   needs enforcing anyway — `setIssueStatus` writes the target state unconditionally, so
   Mojito's move is last-write-wins whatever the session did.
+- **Worktrees**: a ticket launch resolves its worktree first via the legacy branch-name
+  scan (`resolveWorktree`, any worktree whose branch carries the ticket id, wherever it
+  lives), then the fixed `.claude/worktrees/<ticket>-<slug>` path Mojito itself creates
+  (`worktree.ts`). When neither exists, the launch sheet — via
+  `GET /api/tickets/[id]/worktree-status` — asks the human whether to create one and from
+  which base branch; "no" opens in the repo root and asks again next launch, same as
+  before this existed. Creation (`createTicketWorktree`) is a plain `git worktree add`
+  Mojito runs itself, never delegated to the session — separate from the work prompt's
+  continued silence on branches (the "no worktree rule" above is about what the *prompt*
+  tells the session, not what Mojito does before spawning it). If the repo has
+  `scripts/init-worktree.sh`, Mojito runs it once inside the fresh worktree; if not,
+  or if either step fails, the launch is never blocked — a warning is echoed as the first
+  line of the session's own terminal instead. A project's Stacks panel has a "Create
+  worktree script" action that opens a plain Claude session in the project root to write
+  that script.
 - **Session context**: the launcher writes `<stateDir>/context/<id>.json`
   (`{identifier, statusName, title, project, labels, description, assets?, attachments?}`);
   the prompt embeds the path. It exists to save the session the tokens of

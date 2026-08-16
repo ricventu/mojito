@@ -6,7 +6,8 @@ import type { Effort, SessionMeta } from "./types.js";
 import { tmuxName, validateTicket, statusSlug, customSessionName, conflictSessionName, shellSessionName } from "./sessionKey.js";
 import { buildHookSettings } from "./hookSettings.js";
 import { loadProjectMap, resolvePathForProject } from "./projects.js";
-import { resolveTicketCwd } from "./ticketCwd.js";
+import { repoForTicket } from "./ticketCwd.js";
+import { findExistingTicketWorktree, createTicketWorktree } from "./worktree.js";
 import { logfilePath } from "./sidecar.js";
 import type { Registry } from "./registry.js";
 import { writeLaunchContext } from "./launchContext.js";
@@ -26,6 +27,19 @@ export interface LaunchRequest {
   description: string;
   assets?: TicketAsset[];
   attachments?: TicketAttachment[];
+  // Answer to the "create a worktree for this ticket?" prompt the launch sheet asks
+  // whenever the ticket has none yet — absent/false means resolve-or-repo-root, same as
+  // before this existed. baseBranch is required for createWorktree to take effect.
+  createWorktree?: boolean;
+  baseBranch?: string;
+}
+
+export interface ResolvedCwd {
+  cwd: string;
+  // Set when the worktree got created without its setup script (missing or failing), or
+  // creation itself failed and the launch fell back to the repo root — never blocks the
+  // launch, but the human should see it, so it rides into the session's own terminal.
+  warning?: string;
 }
 
 export interface LaunchDeps {
@@ -37,13 +51,36 @@ export interface LaunchDeps {
   hasSession: (name: string) => Promise<boolean>;
   newSession: (name: string, cwd: string, command: string) => Promise<void>;
   pipePane: (name: string, logfile: string) => Promise<void>;
-  resolveCwd?: (ticket: string, projectName: string | null) => string | null;
+  resolveCwd?: (req: {
+    ticket: string; projectName: string | null; title: string;
+    createWorktree: boolean; baseBranch?: string;
+  }) => ResolvedCwd | null | Promise<ResolvedCwd | null>;
   nowIso?: () => string;
 }
 
-function defaultResolveCwd(projectsPath: string) {
-  return (ticket: string, projectName: string | null): string | null =>
-    resolveTicketCwd(projectsPath, ticket, projectName);
+// The ticket's worktree if one exists already; otherwise the repo root, or — only when
+// asked (createWorktree + baseBranch both given) — a freshly created worktree. Creation
+// is best-effort: a failure at either git or the repo's own setup script surfaces as a
+// warning rather than blocking the launch. Async because creation can run the repo's own
+// (potentially slow) setup script — see createTicketWorktree's own comment for why that
+// must never block the event loop.
+export function defaultResolveCwd(projectsPath: string) {
+  return async (req: { ticket: string; projectName: string | null; title: string; createWorktree: boolean; baseBranch?: string }): Promise<ResolvedCwd | null> => {
+    const repo = repoForTicket(projectsPath, req.ticket, req.projectName);
+    if (!repo) return null;
+    const existing = findExistingTicketWorktree(repo, req.ticket, req.title);
+    if (existing) return { cwd: existing };
+    if (!req.createWorktree || !req.baseBranch) return { cwd: repo };
+    return createTicketWorktree(repo, req.ticket, req.title, req.baseBranch);
+  };
+}
+
+// Prepends a warning as an echoed line so it lands where the human is about to look —
+// the session's own terminal — without needing any new UI. No-op when there is none.
+function withWarning(command: string, warning?: string): string {
+  if (!warning) return command;
+  const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
+  return `echo ${q(`⚠️  ${warning}`)}; ${command}`;
 }
 
 export function buildClaudeCommand(
@@ -66,8 +103,10 @@ export async function launchSession(
   if (await deps.hasSession(id)) return { ok: false, reason: "duplicate", id };
 
   const resolveCwd = deps.resolveCwd ?? defaultResolveCwd(deps.projectsPath);
-  const cwd = resolveCwd(req.ticket, req.projectName);
-  if (!cwd) return { ok: false, reason: "no-repo" };
+  const resolved = await resolveCwd({ ticket: req.ticket, projectName: req.projectName, title: req.title,
+    createWorktree: Boolean(req.createWorktree), baseBranch: req.baseBranch });
+  if (!resolved) return { ok: false, reason: "no-repo" };
+  const { cwd, warning } = resolved;
 
   const settingsDir = join(deps.stateDir, "settings");
   mkdirSync(settingsDir, { recursive: true, mode: 0o700 });
@@ -96,7 +135,7 @@ export async function launchSession(
     // context can never disagree about what the session will find.
     hasAssets: Boolean(req.assets?.length || req.attachments?.length),
   }));
-  await deps.newSession(id, cwd, command);
+  await deps.newSession(id, cwd, withWarning(command, warning));
   await deps.pipePane(id, logfilePath(deps.stateDir, id));
 
   const meta: SessionMeta = {
@@ -129,6 +168,8 @@ export interface CustomLaunchRequest {
   title?: string;
   labels?: string[];
   prompt?: string;
+  createWorktree?: boolean;
+  baseBranch?: string;
 }
 
 export function buildCustomClaudeCommand(req: CustomLaunchRequest, settingsPath: string): string {
@@ -150,12 +191,15 @@ export async function launchCustomSession(
   // cwd + id + slug differ for a ticket-scoped launch vs a project-scoped one.
   let cwd: string;
   let slug: string;
+  let warning: string | undefined;
   if (req.ticket) {
     // Same resolver the ticket session uses: worktree if one exists for the ticket, else repo root.
     const resolveCwd = deps.resolveCwd ?? defaultResolveCwd(deps.projectsPath);
-    const resolved = resolveCwd(req.ticket, req.projectName);
+    const resolved = await resolveCwd({ ticket: req.ticket, projectName: req.projectName, title: req.title ?? "",
+      createWorktree: Boolean(req.createWorktree), baseBranch: req.baseBranch });
     if (!resolved) return { ok: false, reason: "no-repo" };
-    cwd = resolved;
+    cwd = resolved.cwd;
+    warning = resolved.warning;
     slug = statusSlug(req.ticket);
   } else if (req.projectName) {
     const path = resolvePathForProject(loadProjectMap(deps.projectsPath), req.projectName);
@@ -178,7 +222,7 @@ export async function launchCustomSession(
   // A custom session — ticket-scoped or project-scoped — is a bare interactive session
   // with a human driving it; it needs no machine-readable context file.
   const command = buildCustomClaudeCommand(req, settingsPath);
-  await deps.newSession(id, cwd, command);
+  await deps.newSession(id, cwd, withWarning(command, warning));
   await deps.pipePane(id, logfilePath(deps.stateDir, id));
 
   const title = req.ticket ? (req.title ?? basename(cwd)) : cwd === homeDir() ? "home" : basename(cwd);
@@ -230,9 +274,12 @@ export async function launchMergeFixSession(
 
   if (await deps.hasSession(id)) return { ok: false, reason: "duplicate", id };
 
+  // Never creates: the branch this session finishes merging is already approved and
+  // already has a worktree if it ever needed one. createWorktree stays false unconditionally.
   const resolveCwd = deps.resolveCwd ?? defaultResolveCwd(deps.projectsPath);
-  const cwd = resolveCwd(req.ticket, req.projectName);
-  if (!cwd) return { ok: false, reason: "no-repo" };
+  const resolved = await resolveCwd({ ticket: req.ticket, projectName: req.projectName, title: req.title, createWorktree: false });
+  if (!resolved) return { ok: false, reason: "no-repo" };
+  const { cwd } = resolved;
 
   const settingsDir = join(deps.stateDir, "settings");
   mkdirSync(settingsDir, { recursive: true, mode: 0o700 });
@@ -287,6 +334,8 @@ export interface ShellLaunchRequest {
   status?: string;
   title?: string;
   labels?: string[];
+  createWorktree?: boolean;
+  baseBranch?: string;
 }
 
 export function buildShellCommand(shell?: string): string {
@@ -309,11 +358,14 @@ export async function launchShellSession(
   // Same cwd/slug resolution as launchCustomSession.
   let cwd: string;
   let slug: string;
+  let warning: string | undefined;
   if (req.ticket) {
     const resolveCwd = deps.resolveCwd ?? defaultResolveCwd(deps.projectsPath);
-    const resolved = resolveCwd(req.ticket, req.projectName);
+    const resolved = await resolveCwd({ ticket: req.ticket, projectName: req.projectName, title: req.title ?? "",
+      createWorktree: Boolean(req.createWorktree), baseBranch: req.baseBranch });
     if (!resolved) return { ok: false, reason: "no-repo" };
-    cwd = resolved;
+    cwd = resolved.cwd;
+    warning = resolved.warning;
     slug = statusSlug(req.ticket);
   } else if (req.projectName) {
     const path = resolvePathForProject(loadProjectMap(deps.projectsPath), req.projectName);
@@ -329,7 +381,7 @@ export async function launchShellSession(
 
   // A plain shell writes no hook-settings file and no launch-context file.
   const command = buildShellCommand(shell());
-  await deps.newSession(id, cwd, command);
+  await deps.newSession(id, cwd, withWarning(command, warning));
   await deps.pipePane(id, logfilePath(deps.stateDir, id));
 
   const title = req.ticket ? (req.title ?? basename(cwd)) : cwd === homeDir() ? "home" : basename(cwd);
