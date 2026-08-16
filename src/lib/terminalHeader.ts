@@ -36,13 +36,20 @@ export function isActiveSession(state: SessionState): boolean {
   return isActiveState(state);
 }
 
-export function terminalHeadModel(session: SessionMeta): TerminalHeadModel {
+/**
+ * `liveStatus` is the ticket's current status from the polled ticket list (Linear is the
+ * source of truth — the ticket can move status by hand there, with no event Mojito sees),
+ * looked up by the caller and passed in. `launchStatus` on the session itself is only ever
+ * a launch-time snapshot (see SessionMeta) and is the fallback for when no live status is
+ * available: a custom/shell session, or a ticket that left the open list (e.g. Done).
+ */
+export function terminalHeadModel(session: SessionMeta, liveStatus?: string): TerminalHeadModel {
   const id = session.ticket?.trim() ?? "";
   const title = session.title?.trim() ?? "";
   const active = isActiveSession(session.state);
   return {
     id,
-    status: session.launchStatus?.trim() ?? "",
+    status: liveStatus?.trim() || session.launchStatus?.trim() || "",
     title,
     name: id || title || "this session",
     killLabel: active ? "Kill" : "Dismiss",

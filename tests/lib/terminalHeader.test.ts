@@ -68,6 +68,27 @@ describe("terminalHeadModel", () => {
   });
 });
 
+describe("terminalHeadModel: live status", () => {
+  // The header must never freeze a status on screen (RIC-203): launchStatus is a
+  // launch-time snapshot, but the ticket's real status can move afterwards — including
+  // by hand in Linear, which Mojito has no event for. A live status passed in from the
+  // polled ticket list always wins over the snapshot.
+  it("prefers a live status over the launch-time snapshot", () => {
+    const m = terminalHeadModel(base, "To QA");
+    expect(m.status).toBe("To QA");
+  });
+
+  it("falls back to the snapshot when no live status is available (ticket not in the open list, or a custom/shell session)", () => {
+    const m = terminalHeadModel(base, undefined);
+    expect(m.status).toBe("In Progress");
+  });
+
+  it("trims a live status the same way as the snapshot", () => {
+    const m = terminalHeadModel(base, "  Done  ");
+    expect(m.status).toBe("Done");
+  });
+});
+
 describe("kill button per state", () => {
   const expected: Record<SessionState, { killLabel: string; killDanger: boolean }> = {
     starting: { killLabel: "Kill", killDanger: true },

@@ -56,7 +56,7 @@ export default function Home() {
   // Refresh on leaving the terminal: dismiss/advance mutate server state, and a
   // dead session (tmux gone) emits no hook event to trigger a refresh on its own,
   // so without this its card would linger in the list after being deleted.
-  if (open) return <TerminalView token={token} session={open} onBack={() => { setOpen(null); refreshSessions(); }} />;
+  if (open) return <TerminalView token={token} session={open} tickets={tickets} onBack={() => { setOpen(null); refreshSessions(); }} />;
   // The overlay opened from a list replaces the page, since there is no terminal to keep alive here.
   if (docsFor) {
     return (

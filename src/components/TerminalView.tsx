@@ -24,10 +24,11 @@ import { terminalTabTitle } from "@/lib/terminalTabTitle";
 import { terminalHeadModel } from "@/lib/terminalHeader";
 import { readAsDataUrl } from "@/lib/readAsDataUrl";
 import { quoteArg } from "@/lib/quoteArg";
-import type { SessionMeta } from "@/server/types";
+import type { SessionMeta, TicketSummary } from "@/server/types";
 
 export default function TerminalView(
-  { token, session, onBack }: { token: string; session: SessionMeta; onBack: () => void },
+  { token, session, tickets, onBack }:
+  { token: string; session: SessionMeta; tickets: TicketSummary[]; onBack: () => void },
 ) {
   const holder = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -352,7 +353,12 @@ export default function TerminalView(
       setImgErr("image upload failed");
     }
   };
-  const head = terminalHeadModel(session);
+  // The ticket list is polled independently of this session (see useTickets in page.tsx)
+  // and is the live source of truth — Linear status can change by hand there, with no
+  // event Mojito sees, so the header must never freeze on the status the session launched
+  // with (RIC-203).
+  const liveStatus = tickets.find((t) => t.identifier === session.ticket)?.statusName;
+  const head = terminalHeadModel(session, liveStatus);
   const kill = async () => {
     const prompt = head.killDanger
       ? `Kill the running session for ${head.name}?`
