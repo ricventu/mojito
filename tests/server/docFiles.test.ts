@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, symlinkSync, utimesSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, symlinkSync, utimesSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, basename } from "node:path";
 import {
@@ -9,9 +9,14 @@ import {
 
 let root: string;
 let outside: string;
+// realpath'd, because resolveDocPath deliberately returns a *resolved* path — that symlink
+// resolution is what lets it reject an escape (see the symlink cases below). On macOS
+// tmpdir() is itself a symlink (/var/folders/… -> /private/var/folders/…), so a root built
+// by plain join() would have every expectation here disagree with the resolved path the
+// function correctly returns. Linux has no such symlink, which is why this only bit locally.
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), "mojito-docs-"));
-  outside = mkdtempSync(join(tmpdir(), "mojito-out-"));
+  root = realpathSync(mkdtempSync(join(tmpdir(), "mojito-docs-")));
+  outside = realpathSync(mkdtempSync(join(tmpdir(), "mojito-out-")));
 });
 afterEach(() => {
   rmSync(root, { recursive: true, force: true });
