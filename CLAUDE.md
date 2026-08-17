@@ -67,6 +67,25 @@ Mojito owns the whole lifecycle — there is no external plugin:
   ticket's work session on every verdict — killing mid-turn the very session the gate's
   rework loop depends on. `tests/server/retireSession.test.ts` and the "never closes a
   session" case in `tests/server/verdictRoute.test.ts` fail if that comes back.
+- **Child environment**: nothing Mojito spawns inherits `process.env` — every spawn goes
+  through `sanitizeEnv`/`spawnEnv` (`src/server/childEnv.ts`). Mojito's own environment is
+  not a neutral base: `npm start` runs `cross-env NODE_ENV=production`, adds npm's `npm_*`
+  block and prefixes PATH with Mojito's own `node_modules/.bin` chain, and `loadEnvConfig`
+  then layers `.env.local` (`LINEAR_API_KEY`, `MOJITO_TOKEN`) on top. All of it used to
+  reach the shell of every agent session (RIC-207), where the damage is silent and
+  destructive rather than cosmetic: under `NODE_ENV=production` a bare `pnpm install`
+  *deletes* a workspace's already-installed devDependencies and exits 0. Two layers, both
+  needed — the sanitized `env` on the spawn covers a tmux server Mojito itself starts, and
+  `tmuxEnvArgs` adds session-scoped `-e` overrides for what a *pre-existing* tmux server
+  still leaks globally (that server outlives Mojito and hands its global environment to
+  every session created afterwards). Overrides are emitted only for keys actually leaking,
+  so a clean server keeps them genuinely absent rather than pinned to `""`. `.env` keys are
+  not hardcoded anywhere: `registerEnvFileKeys` in `server.ts` diffs `process.env` across
+  the loader, so a credential added to `.env.local` later is scrubbed without anyone
+  remembering to update a list. Covered at both ends — pure unit tests in
+  `tests/server/childEnv.test.ts` and a real-tmux case in `tmux.integration.test.ts` that
+  asserts a pane sees neither `NODE_ENV` nor a leaked key. Deliberately *not* extended to
+  Mojito's own git/`gh`/`systemctl` calls, which no `NODE_ENV` branch touches.
 - **Status model**: `src/server/statusModel.ts` is authoritative; `src/lib/status.ts`
   mirrors it for presentation and a sync-guard test ties them together. Work-phase
   sessions share a single tmux id `mojito-<ticket>-work` across Backlog/Todo/In

@@ -1,6 +1,7 @@
 import { spawn as ptySpawn } from "node-pty";
 import type { WebSocket } from "ws";
 import { capturePane, hasSession } from "./tmux.js";
+import { sanitizeEnv } from "./childEnv.js";
 import { SESSION_GONE_CODE } from "../lib/ptyClose.js";
 
 export interface AttachDeps {
@@ -95,7 +96,9 @@ export function attachPty(ws: WebSocket, id: string, deps: Partial<AttachDeps> =
           cols,
           rows,
           cwd: process.env.HOME,
-          env: process.env as Record<string, string>,
+          // Not process.env: Mojito's own NODE_ENV/credentials must not reach the terminal
+          // the human is about to type into either (childEnv.ts).
+          env: sanitizeEnv(process.env),
         });
       } catch (err) {
         console.error("failed to attach pty:", err);

@@ -145,6 +145,28 @@ run("createTicketWorktree", () => {
     expect(marker).toBe(res.cwd);
   });
 
+  // RIC-207: Mojito runs this script itself, so it used to hand it Mojito's own
+  // NODE_ENV=production — under which the `pnpm install` a setup script typically does
+  // strips the fresh worktree's devDependencies and still exits 0.
+  it("runs the setup script without Mojito's own environment", async () => {
+    const repo = makeRepo(roots);
+    const scriptsDir = join(repo, "scripts");
+    mkdirSync(scriptsDir);
+    const script = join(scriptsDir, "init-worktree.sh");
+    writeFileSync(script, '#!/bin/sh\necho "node_env=[$NODE_ENV] leaked=[$LINEAR_API_KEY]" > env.txt\n');
+    chmodSync(script, 0o755);
+    git(repo, ["add", "-A"]);
+    git(repo, ["commit", "--no-gpg-sign", "-m", "add env-dumping setup script"]);
+
+    process.env.LINEAR_API_KEY = "lin_api_should_not_leak";
+    try {
+      const res = await createTicketWorktree(repo, "RIC-46", "Add thing", "main");
+      expect(readFileSync(join(res.cwd, "env.txt"), "utf8").trim()).toBe("node_env=[] leaked=[]");
+    } finally {
+      delete process.env.LINEAR_API_KEY;
+    }
+  });
+
   it("surfaces a warning (not a throw) when the setup script fails, keeping the worktree", async () => {
     const repo = makeRepo(roots);
     const scriptsDir = join(repo, "scripts");

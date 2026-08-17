@@ -8,6 +8,7 @@ import { adoptOrphanSessions } from "./src/server/adoptOrphans.js";
 import { tokenFromUrl } from "./src/server/auth.js";
 import { attachPty } from "./src/server/ptyGateway.js";
 import { attachEvents } from "./src/server/eventsWs.js";
+import { registerEnvFileKeys } from "./src/server/childEnv.js";
 import { startHeartbeat, markAlive } from "./src/server/heartbeat.js";
 
 // @next/env is CJS bundled via ncc, whose dynamically-defined named exports
@@ -24,7 +25,10 @@ const dev = process.env.NODE_ENV !== "production";
 
 // Custom servers bypass Next's CLI env loading, so load .env* files ourselves
 // (same files/precedence Next would use: .env.local, .env.development, etc).
-loadEnvConfig(process.cwd(), dev);
+// Wrapped so the keys this pulls in — MOJITO_TOKEN, LINEAR_API_KEY, whatever .env.local
+// grows next — are registered as Mojito's own and scrubbed from every spawned session
+// rather than handed to it (RIC-207, childEnv.ts).
+registerEnvFileKeys(() => loadEnvConfig(process.cwd(), dev));
 
 async function main() {
   const cfg = getConfig();

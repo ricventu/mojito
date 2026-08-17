@@ -3,6 +3,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { statusSlug } from "./sessionKey.js";
+import { spawnEnv } from "./childEnv.js";
 
 const pexecFile = promisify(execFile);
 
@@ -165,7 +166,9 @@ export async function createTicketWorktree(
     return { cwd: path, warning: "scripts/init-worktree.sh not found — worktree created without setup" };
   }
   try {
-    await pexecFile(script, [], { cwd: path, encoding: "utf8", timeout: scriptTimeoutMs });
+    // Never process.env: a setup script's whole job is installing dependencies, and Mojito's
+    // own NODE_ENV=production makes that *delete* the worktree's devDependencies (childEnv.ts).
+    await pexecFile(script, [], { cwd: path, encoding: "utf8", timeout: scriptTimeoutMs, env: spawnEnv() });
   } catch (e) {
     return { cwd: path, warning: `scripts/init-worktree.sh failed: ${detail(e)}` };
   }

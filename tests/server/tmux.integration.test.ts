@@ -1,5 +1,7 @@
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, afterAll, vi } from "vitest";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import * as tmux from "@/server/tmux";
 import { startStackSession, panesDead } from "@/server/tmux";
 
@@ -57,6 +59,31 @@ run("tmux control (requires tmux)", () => {
     expect((await panesDead(name)).trim()).toBe("1");
     await tmux.killSession(name);
     expect(await tmux.hasSession(name)).toBe(false);
+  });
+
+  // RIC-207 end to end, against a real tmux server: whatever that server's global
+  // environment holds, the pane a Mojito session runs in must not see Mojito's
+  // NODE_ENV=production (under which pnpm/npm strip a workspace's devDependencies) or the
+  // credentials Mojito loaded from its own .env.
+  it("gives a session's pane none of Mojito's own environment", async () => {
+    const name = "mojito-test-env-scrub";
+    const dump = join(mkdtempSync(join(tmpdir(), "mojito-env-")), "env.txt");
+    await tmux.killSession(name).catch(() => {});
+
+    // Next's type augmentation declares NODE_ENV read-only; this test's whole point is
+    // starting from the polluted environment `npm start` really gives the server.
+    const env = process.env as Record<string, string | undefined>;
+    env.NODE_ENV = "production";
+    env.LINEAR_API_KEY = "lin_api_should_not_leak";
+    try {
+      await tmux.newSession(name, tmpdir(), `sh -c 'printf "[%s][%s]" "$NODE_ENV" "$LINEAR_API_KEY" > ${dump}; sleep 5'`);
+      await vi.waitFor(() => expect(existsSync(dump)).toBe(true), { timeout: 5000 });
+      expect(readFileSync(dump, "utf8")).toBe("[][]");
+    } finally {
+      delete env.LINEAR_API_KEY;
+      delete env.NODE_ENV;
+      await tmux.killSession(name);
+    }
   });
 
   it("reports a live pane as not dead", async () => {

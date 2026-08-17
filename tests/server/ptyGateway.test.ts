@@ -44,6 +44,28 @@ describe("attachPty", () => {
     expect(ws.close).toHaveBeenCalledWith(SESSION_GONE_CODE, expect.any(String));
   });
 
+  // RIC-207: the pty is the parent of everything the human then types into the terminal,
+  // so it must not carry Mojito's own NODE_ENV / credentials either.
+  it("spawns the pty with Mojito's own environment scrubbed", async () => {
+    const ws = fakeWs();
+    const deps: Partial<AttachDeps> = {
+      hasSession: vi.fn(async () => true),
+      spawn: spawnStub(),
+      capturePane: vi.fn(async () => ""),
+    };
+    process.env.LINEAR_API_KEY = "lin_api_should_not_leak";
+    try {
+      attachPty(ws as never, "mojito-RIC-207-work", deps);
+      await vi.waitFor(() => expect(deps.spawn).toHaveBeenCalled());
+    } finally {
+      delete process.env.LINEAR_API_KEY;
+    }
+    const env = vi.mocked(deps.spawn!).mock.calls[0][2]!.env!;
+    expect(env).not.toHaveProperty("LINEAR_API_KEY");
+    expect(env).not.toHaveProperty("NODE_ENV");
+    expect(env.HOME).toBe(process.env.HOME);
+  });
+
   it("spawns tmux attach for a live session", async () => {
     const ws = fakeWs();
     const deps: Partial<AttachDeps> = {

@@ -1,5 +1,6 @@
 import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
+import { spawnEnv, tmuxEnvArgs, type EnvLike } from "./childEnv.js";
 
 const pexec = promisify(execFile);
 
@@ -29,24 +30,76 @@ export async function hasSession(name: string): Promise<boolean> {
 const STATUS_OFF = ["set-option", "-t", "@NAME@", "status", "off"];
 const statusOffFor = (name: string) => STATUS_OFF.map((a) => (a === "@NAME@" ? name : a));
 
-export async function newSession(name: string, cwd: string, command: string): Promise<void> {
-  await pexec("tmux", [
-    "new-session", "-d", "-s", name, "-c", cwd, command,
-    ";",
-    ...statusOffFor(name),
-  ]);
+// Mojito's own environment must not reach the shell of anything it spawns (see childEnv.ts
+// for what leaks and why it is destructive). Both layers matter: `env` cleans what a tmux
+// server *Mojito itself starts* copies into its global environment, and the `-e` overrides
+// shadow, session-scoped, whatever a pre-existing server still leaks.
+export interface SpawnDeps {
+  exec: (file: string, args: string[], opts: { env: NodeJS.ProcessEnv }) => Promise<unknown>;
+  globalEnv: () => Promise<Record<string, string>>;
+  env: () => EnvLike;
 }
 
-export async function startStackSession(name: string, cwd: string, command: string): Promise<void> {
+const defaultSpawnDeps: SpawnDeps = {
+  exec: (file, args, opts) => pexec(file, args, opts),
+  globalEnv: () => globalEnvironment(),
+  env: () => process.env,
+};
+
+// `tmux show-environment -g`, as a map. A variable tmux has been told to unset is printed
+// as "-NAME": not set, so it must not come back looking set.
+export function parseGlobalEnvironment(stdout: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of stdout.split("\n")) {
+    if (!line || line.startsWith("-")) continue;
+    const eq = line.indexOf("=");
+    if (eq === -1) continue;
+    out[line.slice(0, eq)] = line.slice(eq + 1);
+  }
+  return out;
+}
+
+// Empty when there is no tmux server yet — nothing running means nothing leaking, and the
+// server about to be started inherits the (already sanitized) client environment.
+export async function globalEnvironment(): Promise<Record<string, string>> {
+  try {
+    const { stdout } = await pexec("tmux", ["show-environment", "-g"], { env: spawnEnv() });
+    return parseGlobalEnvironment(stdout);
+  } catch {
+    return {};
+  }
+}
+
+export async function newSession(
+  name: string,
+  cwd: string,
+  command: string,
+  deps: Partial<SpawnDeps> = {},
+): Promise<void> {
+  const d = { ...defaultSpawnDeps, ...deps };
+  await d.exec("tmux", [
+    "new-session", "-d", "-s", name, ...tmuxEnvArgs(await d.globalEnv()), "-c", cwd, command,
+    ";",
+    ...statusOffFor(name),
+  ], { env: spawnEnv(d.env()) });
+}
+
+export async function startStackSession(
+  name: string,
+  cwd: string,
+  command: string,
+  deps: Partial<SpawnDeps> = {},
+): Promise<void> {
+  const d = { ...defaultSpawnDeps, ...deps };
   // Create the session and set remain-on-exit window-scoped in the SAME invocation,
   // so a pane that dies immediately is retained (status "crashed") instead of vanishing.
-  await pexec("tmux", [
-    "new-session", "-d", "-s", name, "-c", cwd, command,
+  await d.exec("tmux", [
+    "new-session", "-d", "-s", name, ...tmuxEnvArgs(await d.globalEnv()), "-c", cwd, command,
     ";",
     "set-option", "-w", "-t", name, "remain-on-exit", "on",
     ";",
     ...statusOffFor(name),
-  ]);
+  ], { env: spawnEnv(d.env()) });
 }
 
 export async function statusOption(name: string): Promise<string> {
