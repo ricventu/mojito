@@ -27,15 +27,25 @@ import { quoteArg } from "@/lib/quoteArg";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 
 export default function TerminalView(
-  { token, session, tickets, onBack }:
-  { token: string; session: SessionMeta; tickets: TicketSummary[]; onBack: () => void },
+  { token, session, tickets, docs, onOpenDocs, onSelectDoc, onBack }:
+  {
+    token: string;
+    session: SessionMeta;
+    tickets: TicketSummary[];
+    // The docs overlay is a url of its own (/session/<id>/docs), so the browser's Back
+    // closes it instead of leaving the terminal — and the terminal stays mounted
+    // underneath, because the page keeps rendering this view for that path.
+    docs: { doc: string | null } | null;
+    onOpenDocs: () => void;
+    onSelectDoc: (path: string) => void;
+    onBack: () => void;
+  },
 ) {
   const holder = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const [imgErr, setImgErr] = useState<string | null>(null);
-  const [docsOpen, setDocsOpen] = useState(false);
   // While the keyboard is up the visible band is worth ~13 rows; the single
   // header row costs roughly 2 of them, which is what leaves claude's TUI
   // without room for its input line (see keyboardInset.ts). Hide it until it
@@ -379,7 +389,7 @@ export default function TerminalView(
           {head.title && <span className="title">{head.title}</span>}
         </div>
         <div className="term-actions">
-          <button className="btn sm" aria-label="Documents" title="Documents" onClick={() => setDocsOpen(true)}>📄</button>
+          <button className="btn sm" aria-label="Documents" title="Documents" onClick={onOpenDocs}>📄</button>
           <StateBadge state={session.state} />
           <button
             className={`btn sm kill${head.killDanger ? " danger" : ""}`}
@@ -396,12 +406,14 @@ export default function TerminalView(
       <div ref={holder} className="term-body" />
       {imgErr && <div className="term-img-err err-text">{imgErr}</div>}
       <AccessoryBar onSend={send} onPasteText={(t) => termRef.current?.paste(t)} onPickImages={pickImages} />
-      {docsOpen && (
+      {docs && (
         <DocsView
           token={token}
           target={{ session: session.id }}
           label={session.ticket || session.title}
-          onClose={() => setDocsOpen(false)}
+          selected={docs.doc}
+          onSelect={onSelectDoc}
+          onBack={onBack}
         />
       )}
     </div>

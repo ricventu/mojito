@@ -1,0 +1,160 @@
+"use client";
+import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { useToken } from "@/lib/useToken";
+import { useAppLocation } from "@/lib/useAppLocation";
+import { useTickets } from "@/lib/useTickets";
+import { useSessions } from "@/lib/useSessions";
+import { useEvents } from "@/lib/useEvents";
+import { useSelfUpdate } from "@/lib/useSelfUpdate";
+import TokenGate from "@/components/TokenGate";
+import UnifiedList from "@/components/UnifiedList";
+import StacksPanel from "@/components/StacksPanel";
+import AlertLayer from "@/components/AlertLayer";
+import SettingsSheet from "@/components/SettingsSheet";
+import DocsView from "@/components/DocsView";
+import { tabTitle } from "@/lib/tabTitle";
+import type { AppView, ListFilters } from "@/lib/appLocation";
+import type { MojitoEvent } from "@/server/events";
+
+// xterm/xterm and its addons reference browser-only globals (e.g. `self`) at module
+// load time, which crashes Next.js's server-side prerender of this page. Loading
+// TerminalView with ssr:false keeps it out of the server bundle entirely.
+const TerminalView = dynamic(() => import("@/components/TerminalView"), { ssr: false });
+
+/** Where every in-app Back lands once there is nothing of ours left to go back to. */
+const LIST: AppView = { kind: "list" };
+
+// This page is the app's only route, mounted on an optional catch-all so that a
+// reload of /stacks or /session/<id> is served the same client bundle instead of a
+// 404 — see appLocation for the url grammar. Unrecognised paths parse as the list,
+// so a stale bookmark still lands somewhere real.
+export default function Home() {
+  const { token, setToken } = useToken();
+  const { location, navigate, replace, back } = useAppLocation();
+  const { view, filters } = location;
+  const [alerts, setAlerts] = useState<{ id: string; ticket: string; message: string }[]>([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const { tickets, refresh: refreshTickets } = useTickets(token);
+  const { sessions, loaded: sessionsLoaded, refresh: refreshSessions } = useSessions(token);
+  // Owned here — not by StacksPanel or SettingsSheet — so a deploy's health poll and
+  // "Deploying…" state survive switching tabs or opening a terminal, both of which
+  // unmount StacksPanel mid-deploy. Called unconditionally, above the token/terminal/docs
+  // early returns below, per the rules of hooks; the hook itself no-ops until a token exists.
+  const selfUpdate = useSelfUpdate(token);
+
+  // Go to another view, carrying the filters: they ride along on every path, so
+  // leaving the list for the stacks panel and coming back does not drop them.
+  const go = useCallback((next: AppView) => navigate({ view: next, filters }), [navigate, filters]);
+  const setFilters = useCallback(
+    (next: ListFilters, mode: "push" | "replace") =>
+      (mode === "push" ? navigate : replace)({ view, filters: next }),
+    [navigate, replace, view],
+  );
+
+  const onEvent = useCallback((e: MojitoEvent) => {
+    refreshSessions();
+    if (e.type === "session.alert") setAlerts((a) => [{ id: e.id, ticket: e.ticket, message: e.message }, ...a].slice(0, 20));
+  }, [refreshSessions]);
+  useEvents(token, onEvent);
+
+  // A terminal url whose session is gone — killed from another tab, swept, or simply
+  // stale in a bookmark. Correct the address bar rather than leave a blank page, and
+  // replace rather than push so Back does not walk straight into the dead url again.
+  const openSession = view.kind === "session"
+    ? sessions.find((s) => s.id === view.id) ?? null
+    : null;
+  const missingSession = view.kind === "session" && sessionsLoaded && openSession === null;
+  useEffect(() => {
+    if (missingSession) replace({ view: LIST, filters });
+  }, [missingSession, replace, filters]);
+
+  // Own the browser tab title on the client: the active tab when signed in, the
+  // app name on the token gate. Skipped while a terminal is open — TerminalView
+  // sets the ticket title and restores this one on close.
+  useEffect(() => {
+    if (view.kind === "session") return;
+    document.title = token ? tabTitle(view.kind) : "Mojito";
+  }, [view.kind, token]);
+
+  if (!token) return <TokenGate onSet={setToken} />;
+
+  if (view.kind === "session") {
+    // Nothing to draw until the session list has answered (see useSessions.loaded);
+    // an id that never resolves is corrected by the effect above.
+    if (!openSession) return null;
+    // One Back button for the whole stack, unwound one step at a time: an open
+    // document falls back to the document list, the list to the terminal, the
+    // terminal to the ticket list.
+    const fallback: AppView = view.docs?.doc != null
+      ? { kind: "session", id: view.id, docs: { doc: null } }
+      : view.docs != null ? { kind: "session", id: view.id, docs: null } : LIST;
+    return (
+      <TerminalView
+        token={token}
+        session={openSession}
+        tickets={tickets}
+        docs={view.docs}
+        onOpenDocs={() => go({ kind: "session", id: view.id, docs: { doc: null } })}
+        onSelectDoc={(doc) => go({ kind: "session", id: view.id, docs: { doc } })}
+        onBack={() => {
+          back({ view: fallback, filters });
+          // Refresh on leaving the terminal: dismiss/advance mutate server state, and a
+          // dead session (tmux gone) emits no hook event to trigger a refresh on its own,
+          // so without this its card would linger in the list after being deleted.
+          if (view.docs === null) refreshSessions();
+        }}
+      />
+    );
+  }
+
+  // The overlay opened from a list replaces the page, since there is no terminal to keep alive here.
+  if (view.kind === "docs") {
+    const target = view.target;
+    // The label is derived, never carried in the url: a ticket's is its identifier,
+    // which is already in the path, and a session's comes from the session list —
+    // falling back to the id while that is still loading, or if it is gone.
+    const session = "session" in target ? sessions.find((s) => s.id === target.session) : undefined;
+    const label = "ticket" in target
+      ? target.ticket
+      : session?.ticket || session?.title || target.session;
+    return (
+      <DocsView
+        token={token}
+        target={target}
+        label={label}
+        selected={view.doc}
+        onSelect={(doc) => go({ ...view, doc })}
+        onBack={() => back({ view: view.doc !== null ? { ...view, doc: null } : LIST, filters })}
+      />
+    );
+  }
+
+  const needsInput = sessions.filter((s) => s.state === "needs-input").length;
+  const openTerminal = (id: string) => go({ kind: "session", id, docs: null });
+
+  return (
+    <div style={{ paddingBottom: 64 }}>
+      <AlertLayer alerts={alerts} onOpen={openTerminal} onClear={() => setAlerts([])} />
+      {settingsOpen && <SettingsSheet token={token} onClose={() => setSettingsOpen(false)} selfUpdate={selfUpdate} />}
+      {view.kind === "stacks"
+        ? <StacksPanel token={token} onOpenLogs={(s) => openTerminal(s.id)} selfUpdate={selfUpdate} />
+        : <UnifiedList token={token} tickets={tickets} sessions={sessions}
+            filters={filters} onFilters={setFilters}
+            onLaunched={() => { refreshSessions(); refreshTickets(); }}
+            onChanged={refreshSessions}
+            onOpen={(s) => openTerminal(s.id)}
+            onOpenTicketDocs={(t) => go({ kind: "docs", target: { ticket: t.identifier, project: t.project }, doc: null })}
+            onOpenSessionDocs={(s) => go({ kind: "docs", target: { session: s.id }, doc: null })} />}
+      {/* Anything that is not "stacks" is the unified list, so an unrecognised path
+          lands somewhere real. */}
+      <nav className="nav">
+        <button className={`tab${view.kind !== "stacks" ? " active" : ""}`} onClick={() => go(LIST)}>
+          Tickets{needsInput ? <span className="count">{needsInput}</span> : null}
+        </button>
+        <button className={`tab${view.kind === "stacks" ? " active" : ""}`} onClick={() => go({ kind: "stacks" })}>Stacks</button>
+        <button className="tab settings" aria-label="Settings" onClick={() => setSettingsOpen(true)}>⚙</button>
+      </nav>
+    </div>
+  );
+}

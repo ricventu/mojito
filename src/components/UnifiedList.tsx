@@ -7,6 +7,7 @@ import NewSessionSheet from "./NewSessionSheet";
 import FilterBar from "./FilterBar";
 import ActiveFilters from "./ActiveFilters";
 import { activeFilters, type FilterKey } from "@/lib/activeFilters";
+import { NO_FILTERS, type ListFilters } from "@/lib/appLocation";
 import TicketCard from "./TicketCard";
 import SessionCard from "./SessionCard";
 import StatusBadge from "./StatusBadge";
@@ -15,7 +16,6 @@ import { sessionStatus } from "@/lib/sessionFilter";
 import { groupByStatus } from "@/lib/groupByStatus";
 import { orderSessions } from "@/lib/orderSessions";
 import { isActiveSession } from "@/lib/activeSession";
-import { usePersistedState } from "@/lib/usePersistedState";
 import {
   buildUnifiedRows, groupByProject, mergedProjects, mergedStatuses, orderTicketRows,
 } from "@/lib/unifiedRows";
@@ -25,10 +25,15 @@ import type { SessionMeta, TicketSummary } from "@/server/types";
 const NO_TICKET = "No ticket";
 
 export default function UnifiedList(
-  { token, tickets, sessions, onLaunched, onChanged, onOpen, onOpenTicketDocs, onOpenSessionDocs }: {
+  {
+    token, tickets, sessions, filters, onFilters,
+    onLaunched, onChanged, onOpen, onOpenTicketDocs, onOpenSessionDocs,
+  }: {
     token: string;
     tickets: TicketSummary[];
     sessions: SessionMeta[];
+    filters: ListFilters;
+    onFilters: (f: ListFilters, mode: "push" | "replace") => void;
     onLaunched: () => void;
     onChanged: () => void;
     onOpen: (s: SessionMeta) => void;
@@ -40,30 +45,24 @@ export default function UnifiedList(
   const [newTicket, setNewTicket] = useState(false);
   const [newSession, setNewSession] = useState(false);
 
-  // One set of filter keys for the merged list. The old mojito-tickets-* and
-  // mojito-sessions-* keys are abandoned, so filters reset once after the update.
-  const [query, setQuery] = usePersistedState("mojito-list-q", "");
-  const [projectRaw, setProjectRaw] = usePersistedState("mojito-list-project", "");
-  const project = projectRaw === "" ? null : projectRaw;
-  const setProject = (p: string | null) => setProjectRaw(p ?? "");
-  const [statusRaw, setStatusRaw] = usePersistedState("mojito-list-status", "");
-  const status = statusRaw === "" ? null : statusRaw;
-  const setStatus = (s: string | null) => setStatusRaw(s ?? "");
-  // Default off: the landing view is the whole board. With off as the baseline, "narrows
-  // the list" and "deviates from the default" become the same thing, which is what lets
-  // activeFilters treat Mine like every other filter instead of special-casing the one
-  // that would otherwise put a chip in the sticky bar on every single visit.
-  // `=== "1"` rather than `!== "0"`: with an off default, an unrecognised stored value
-  // should read as off. usePersistedState only writes when the toggle is used, so a
-  // browser that never touched it has no stored value at all and reaches this default,
-  // while one that did keeps its stored choice — explicit beats default.
-  const [mineRaw, setMineRaw] = usePersistedState("mojito-list-mine", "0");
-  const mine = mineRaw === "1";
-  const setMine = (v: boolean) => setMineRaw(v ? "1" : "0");
-  // Default off: the full board is the landing view.
-  const [sessionsRaw, setSessionsRaw] = usePersistedState("mojito-list-sessions", "0");
-  const sessionsOnly = sessionsRaw === "1";
-  const setSessionsOnly = (v: boolean) => setSessionsRaw(v ? "1" : "0");
+  // The filters live in the url (see appLocation), not in this component and not in
+  // localStorage: that is what gives every browser tab its own set, keeps them across
+  // a reload, and puts each change in the browser's history. Every default is off /
+  // empty, so "narrows the list" and "deviates from the default" are the same thing —
+  // which is what lets activeFilters treat Mine like every other filter instead of
+  // special-casing the one that would otherwise put a chip in the sticky bar on every
+  // single visit, and what keeps the unfiltered board a bare `/`.
+  const { query, project, status, mine, sessionsOnly } = filters;
+  const setFilter = <K extends keyof ListFilters>(key: K, value: ListFilters[K]) =>
+    onFilters({ ...filters, [key]: value }, "push");
+  // Replace, not push: a pushed entry per keystroke would leave Back retyping the
+  // query one character at a time. The chips and toggles below are discrete choices,
+  // so each of those is worth its own entry.
+  const setQuery = (v: string) => onFilters({ ...filters, query: v }, "replace");
+  const setProject = (p: string | null) => setFilter("project", p);
+  const setStatus = (s: string | null) => setFilter("status", s);
+  const setMine = (v: boolean) => setFilter("mine", v);
+  const setSessionsOnly = (v: boolean) => setFilter("sessionsOnly", v);
 
   // Mine is a scope, applied before everything else so the chips below describe only
   // the tickets that can actually appear.
@@ -85,7 +84,7 @@ export default function UnifiedList(
     [ticketRows, looseSessions],
   );
 
-  const filters = useMemo(
+  const chips = useMemo(
     () => activeFilters({ query, project, status, mine, sessionsOnly }),
     [query, project, status, mine, sessionsOnly],
   );
@@ -95,7 +94,7 @@ export default function UnifiedList(
     // entry, so a new filter fails to compile here instead of silently no-op'ing when
     // its chip is tapped.
     const clear: Record<FilterKey, () => void> = {
-      query: () => setQuery(""),
+      query: () => setFilter("query", ""),
       project: () => setProject(null),
       status: () => setStatus(null),
       mine: () => setMine(false),
@@ -104,13 +103,9 @@ export default function UnifiedList(
     clear[key]();
   };
 
-  const clearAllFilters = () => {
-    setQuery("");
-    setProject(null);
-    setStatus(null);
-    setMine(false);
-    setSessionsOnly(false);
-  };
+  // One call, not five setters: each would be its own history entry, leaving Back to
+  // walk the filters on again one at a time.
+  const clearAllFilters = () => onFilters(NO_FILTERS, "push");
 
   const dismiss = async (s: SessionMeta) => {
     const label = s.ticket || s.title;
@@ -160,7 +155,7 @@ export default function UnifiedList(
       {/* Guarded by !empty for the same reason FilterBar is: with no tickets and no
           sessions at all there is nothing for a filter to be hiding. */}
       {!empty && (
-        <ActiveFilters filters={filters} onClear={clearFilter} onClearAll={clearAllFilters} />
+        <ActiveFilters filters={chips} onClear={clearFilter} onClearAll={clearAllFilters} />
       )}
       {noMatches && (
         <p className="empty">

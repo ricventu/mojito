@@ -3,7 +3,7 @@ import { tabTitle } from "@/lib/tabTitle";
 
 describe("tabTitle", () => {
   it("titles the unified tickets tab", () => {
-    expect(tabTitle("tickets")).toBe("Tickets — Mojito");
+    expect(tabTitle("list")).toBe("Tickets — Mojito");
   });
 
   it("titles the stacks tab", () => {
@@ -15,9 +15,9 @@ describe("tabTitle", () => {
     expect(tabTitle("whatever")).toBe("Tickets — Mojito");
   });
 
-  // A browser that stored "sessions" before the views merged must land on the unified
-  // list, which is what page.tsx renders for every value that is not "stacks".
-  it("gives a stored 'sessions' tab the tickets title", () => {
-    expect(tabTitle("sessions")).toBe("Tickets — Mojito");
+  // The docs overlay opened from the list keeps the list's title, which is what
+  // page.tsx renders for every view kind that is not "stacks".
+  it("gives the docs overlay the tickets title", () => {
+    expect(tabTitle("docs")).toBe("Tickets — Mojito");
   });
 });

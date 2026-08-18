@@ -1,3 +1,5 @@
+import type { ListFilters } from "./appLocation";
+
 /** Identifies which of the unified list's five filters an entry came from. */
 export type FilterKey = "query" | "project" | "status" | "mine" | "sessions";
 
@@ -5,15 +7,6 @@ export type FilterKey = "query" | "project" | "status" | "mine" | "sessions";
 export interface ActiveFilter {
   key: FilterKey;
   label: string;
-}
-
-/** The unified list's filter values, exactly as UnifiedList holds them. */
-export interface FilterState {
-  query: string;
-  project: string | null;
-  status: string | null;
-  mine: boolean;
-  sessionsOnly: boolean;
 }
 
 /**
@@ -26,11 +19,11 @@ export interface FilterState {
  * `query` is a bare string, so emptiness is how it says "unset" — trimmed, to match
  * filterTickets and filterSessions, which both narrow on `query.trim()`. `project` and
  * `status` are `string | null`, where only `null` says it: `""` is a value like any
- * other. UnifiedList maps its persisted `""` to `null` before calling here, so the two
- * conventions never meet.
+ * other. parseLocation already reads an absent *or* empty `project`/`status` parameter
+ * as `null`, so the two conventions never meet.
  */
 export function activeFilters(
-  { query, project, status, mine, sessionsOnly }: FilterState,
+  { query, project, status, mine, sessionsOnly }: ListFilters,
 ): ActiveFilter[] {
   const active: ActiveFilter[] = [];
   const trimmed = query.trim();

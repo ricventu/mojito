@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { activeFilters, type FilterState } from "@/lib/activeFilters";
+import { activeFilters } from "@/lib/activeFilters";
+import type { ListFilters } from "@/lib/appLocation";
 
 // Every filter off — the landing state once Mine defaults off (Task 3). Each test
 // overrides only the filter it is about.
-function state(p: Partial<FilterState> = {}): FilterState {
+function state(p: Partial<ListFilters> = {}): ListFilters {
   return { query: "", project: null, status: null, mine: false, sessionsOnly: false, ...p };
 }
 

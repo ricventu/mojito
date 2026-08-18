@@ -92,6 +92,25 @@ Mojito owns the whole lifecycle — there is no external plugin:
   Progress/To QA (see `tmuxName` in `src/server/sessionKey.ts`), so a session relaunched
   while the ticket sits at the gate takes its predecessor's id; the conflict session is
   `mojito-<ticket>-conflict`.
+- **Client url state**: the address bar is the single source of truth for which view is
+  open and how the list is filtered (RIC-204). `src/lib/appLocation.ts` is the pure
+  codec — `parseLocation`/`formatLocation` over `/`, `/stacks`, `/session/<id>`,
+  `/session/<id>/docs`, `/docs/ticket/<id>`, `/docs/session/<id>` plus the five filter
+  params — and `useAppLocation` is the only `window.history` glue, so everything
+  testable stays testable in the node-only vitest setup (no jsdom, no RTL; same split
+  as `resolveInitialToken` ÷ `useToken`). The five `mojito-list-*` localStorage keys and
+  `mojito-tab` are gone, along with `usePersistedState` itself: localStorage is shared
+  between browser tabs, which is exactly what made two tabs unable to hold two filter
+  sets. Consequences worth knowing: filters are serialized on *every* path, so leaving
+  the list for the stacks panel and coming back does not drop them; defaults are
+  omitted, so the unfiltered board is a bare `/` (and the PWA's `start_url` therefore
+  always opens clean); typing in the filter box replaces the entry instead of pushing
+  one per keystroke; and the page lives at `src/app/[[...view]]/page.tsx`, an optional
+  catch-all, which is what makes a hard reload of `/stacks` serve the app instead of a
+  404 — `/api/*` and `public/` still win as the more specific routes. In-app Back
+  buttons step through real history when the previous entry is ours, tracked as a depth
+  counter in `history.state` (`src/lib/navDepth.ts`), and fall back to a url otherwise,
+  so a link opened straight into a terminal never backs out of Mojito.
 - **Projects map**: `~/.config/mojito/projects.json` (Linear team key → project name →
   repo path), resolved by `resolveProjectsPath` in `src/server/config.ts`: env
   `MOJITO_PROJECTS` → `~/.config/mojito/projects.json`.

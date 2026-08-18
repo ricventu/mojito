@@ -9,10 +9,20 @@ import { relativeTime } from "@/lib/relativeTime";
 const MarkdownDoc = dynamic(() => import("./MarkdownDoc"), { ssr: false });
 
 export default function DocsView(
-  { token, target, label, onClose }:
-  { token: string; target: DocsTarget; label: string; onClose: () => void },
+  { token, target, label, selected, onSelect, onBack }:
+  {
+    token: string;
+    target: DocsTarget;
+    label: string;
+    // Which document is open lives in the url, so Back walks list → document → out
+    // and a link to one document can be shared. Hence controlled from the outside,
+    // and hence a single onBack rather than a separate onClose: both of this header's
+    // back steps are history steps now, and only the caller knows where each lands.
+    selected: string | null;
+    onSelect: (path: string) => void;
+    onBack: () => void;
+  },
 ) {
-  const [selected, setSelected] = useState<string | null>(null);
   // Two independent counters, not one shared: bumping the list's ↻ must not
   // re-fetch an open document (and vice versa) — the two refreshes are
   // separate user intents even though they share one button glyph.
@@ -25,7 +35,7 @@ export default function DocsView(
   return (
     <div className="docs-root">
       <header className="docs-head">
-        <button className="back" aria-label="Back" onClick={() => (selected ? setSelected(null) : onClose())}>‹</button>
+        <button className="back" aria-label="Back" onClick={onBack}>‹</button>
         <span className="name">{selected ? (current?.name ?? selected) : `${label} · docs`}</span>
         <span className="grow" />
         <button
@@ -43,7 +53,7 @@ export default function DocsView(
         : files === null ? <p className="empty">Loading…</p>
         : files.length === 0 ? <p className="empty">No documents yet.</p>
         : files.map((f) => (
-          <button key={f.path} className="docs-item" onClick={() => setSelected(f.path)}>
+          <button key={f.path} className="docs-item" onClick={() => onSelect(f.path)}>
             <div className="name">{f.name}</div>
             <div className="meta">{f.source} · {relativeTime(f.mtime)}</div>
           </button>
