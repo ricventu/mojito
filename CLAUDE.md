@@ -117,7 +117,14 @@ Mojito owns the whole lifecycle — there is no external plugin:
   always opens clean); typing in the filter box replaces the entry instead of pushing
   one per keystroke; and the page lives at `src/app/[[...view]]/page.tsx`, an optional
   catch-all, which is what makes a hard reload of `/stacks` serve the app instead of a
-  404 — `/api/*` and `public/` still win as the more specific routes. In-app Back
+  404 — `/api/*` and `public/` still win as the more specific routes. That catch-all
+  also matches `/ws/pty` and `/ws/events`, which is what `claimUpgrades`
+  (`src/server/nextUpgrade.ts`) exists for: Next attaches an `upgrade` listener of its
+  own on the first request it handles and ends any socket whose path its router
+  matches — it leaves *unmatched* paths alone precisely so a custom WS server can have
+  them, which is why the websockets were fine before the catch-all and black after it.
+  Every terminal came up empty and every live update stopped, and the client's 1.5s
+  reconnect loop turned that into the pty leak `ptyGateway` now guards against. In-app Back
   buttons step through real history when the previous entry is ours, tracked as a depth
   counter in `history.state` (`src/lib/navDepth.ts`), and fall back to a url otherwise,
   so a link opened straight into a terminal never backs out of Mojito.

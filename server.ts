@@ -1,4 +1,5 @@
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage } from "node:http";
+import type { Duplex } from "node:stream";
 import next from "next";
 import nextEnv from "@next/env";
 import { WebSocketServer } from "ws";
@@ -10,6 +11,7 @@ import { attachPty } from "./src/server/ptyGateway.js";
 import { attachEvents } from "./src/server/eventsWs.js";
 import { registerEnvFileKeys } from "./src/server/childEnv.js";
 import { startHeartbeat, markAlive } from "./src/server/heartbeat.js";
+import { claimUpgrades, dropForeignUpgradeListeners } from "./src/server/nextUpgrade.js";
 
 // @next/env is CJS bundled via ncc, whose dynamically-defined named exports
 // aren't visible to Node's cjs-module-lexer — import the default and
@@ -37,6 +39,10 @@ async function main() {
   await app.prepare();
   // getUpgradeHandler() must run after prepare() — Next throws otherwise.
   const upgradeHandle = app.getUpgradeHandler();
+  // Before the first request reaches Next: it would otherwise attach an `upgrade`
+  // listener of its own and end the sockets this server has already upgraded, because
+  // the page's optional catch-all route matches /ws/pty too. See nextUpgrade.ts.
+  const claimed = claimUpgrades(app);
 
   // Boot recovery: reconcile the registry with live tmux sessions, both directions —
   // a registered session whose tmux died (recover) and a live tmux with no registration
@@ -56,7 +62,14 @@ async function main() {
   const stopHeartbeat = startHeartbeat(wss);
   server.on("close", stopHeartbeat);
 
-  server.on("upgrade", (req, socket, head) => {
+  const onUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+    // The fallback for a Next release that renames the internal claimUpgrades uses:
+    // strip whatever attached itself behind our back, so at most the socket that
+    // raced it is lost instead of every socket from here on.
+    if (!claimed) {
+      const dropped = dropForeignUpgradeListeners(server, onUpgrade);
+      if (dropped) console.error(`dropped ${dropped} foreign upgrade listener(s) — see nextUpgrade.ts`);
+    }
     try {
       const url = req.url ?? "";
       const path = url.split("?")[0];
@@ -94,7 +107,8 @@ async function main() {
         /* already destroyed */
       }
     }
-  });
+  };
+  server.on("upgrade", onUpgrade);
 
   server.listen(cfg.port, "0.0.0.0", () => {
     console.log(`Mojito on http://0.0.0.0:${cfg.port}`);
