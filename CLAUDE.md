@@ -32,12 +32,20 @@ Mojito owns the whole lifecycle — there is no external plugin:
   issue *itself* through the Linear MCP. It is a plain custom session — no ticket, no
   launch context, no result file — because the issue it creates is the whole outcome;
   Sonnet at medium effort is inlined there, since no status names this work. Ticket copy
-  goes out in Italian whatever the note was written in. This is the one deliberate
-  exception to the silence above: `prompts/intake.ts` is the only prompt that mentions
-  Linear on purpose, which is why the RIC-184 guard in `tests/server/prompts.test.ts`
-  runs over the work and merge-fix prompts only. Nothing needs a confirmation step — the
-  MCP write raises Claude Code's own permission prompt, and the sheet lands the human in
-  that terminal (201 answers with the session meta) so they see it.
+  goes out in Italian whatever the note was written in, and the session labels the issue
+  with exactly one of Linear's `Bug`/`Improvement`/`Feature` (the names are the team's own
+  capitalization, passed to the MCP verbatim) instead of announcing its nature in a
+  description heading — RIC-223. Priority is deliberately left alone: the prompt says
+  nothing about it, so a note that does not raise urgency does not get a guessed one.
+  The images half of the prompt is interpolated only when the draft carries urls
+  (`INTAKE_IMAGES_PARAGRAPH`, same pattern as the work prompt's asset paragraph), so an
+  imageless note is never sent embedding an empty array or leaving a bare attachments
+  heading behind. This is the one deliberate exception to the silence above:
+  `prompts/intake.ts` is the only prompt that mentions Linear on purpose, which is why the
+  RIC-184 guard in `tests/server/prompts.test.ts` runs over the work and merge-fix prompts
+  only. Nothing needs a confirmation step — the MCP write raises Claude Code's own
+  permission prompt, and the sheet lands the human in that terminal (201 answers with the
+  session meta) so they see it.
 - **Worktrees**: a ticket launch resolves its worktree first via the legacy branch-name
   scan (`resolveWorktree`, any worktree whose branch carries the ticket id, wherever it
   lives), then the fixed `.claude/worktrees/<ticket>-<slug>` path Mojito itself creates

@@ -646,7 +646,9 @@ describe("launchIntakeSession", () => {
     };
   }
 
-  const intakeReq = { projectName: "Mojito", teamKey: "RIC", draftPath: "/state/drafts/ab12cd.json" };
+  const intakeReq = {
+    projectName: "Mojito", teamKey: "RIC", draftPath: "/state/drafts/ab12cd.json", hasImages: true,
+  };
 
   it("opens the project's repo on sonnet at medium effort, seeded with the intake prompt", async () => {
     const d = intakeDeps();
@@ -663,6 +665,17 @@ describe("launchIntakeSession", () => {
     const d = intakeDeps();
     const res = await launchIntakeSession({ ...intakeReq, projectName: null }, d);
     expect((res as { ok: true; meta: SessionMeta }).meta.cwd).toBe("/home/me");
+  });
+
+  // RIC-223. The images half of the prompt hangs off the draft, so an imageless note must
+  // reach the session with no mention of images at all.
+  it("seeds the images instruction only when the draft carries images", async () => {
+    const withImages = intakeDeps();
+    await launchIntakeSession(intakeReq, withImages);
+    expect(withImages.newSession.mock.calls[0][2]).toContain("imageUrls");
+    const without = intakeDeps();
+    await launchIntakeSession({ ...intakeReq, hasImages: false }, without);
+    expect(without.newSession.mock.calls[0][2]).not.toContain("imageUrls");
   });
 
   it("refuses a project that maps to no repository", async () => {

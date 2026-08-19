@@ -129,7 +129,9 @@ describe("prompt builder", () => {
   });
 });
 
-const intakeVars = { draftPath: "/state/drafts/ab12cd.json", teamKey: "RIC", projectName: "Mojito" };
+const intakeVars = {
+  draftPath: "/state/drafts/ab12cd.json", teamKey: "RIC", projectName: "Mojito", hasImages: true,
+};
 
 // The intake session is the one session Mojito spawns that writes Linear itself: it exists
 // to create the issue, so there is no ticket for Mojito to create on its behalf and no
@@ -166,7 +168,37 @@ describe("intake prompt", () => {
   // The images are already on Linear (the API key is server-side), so the session embeds
   // rather than uploads — telling it otherwise sends it looking for local files.
   it("tells the session the images are already uploaded", () => {
-    expect(flat(buildIntakePrompt(intakeVars))).toContain("imageUrls");
+    const p = flat(buildIntakePrompt(intakeVars));
+    expect(p).toContain("imageUrls");
+    expect(p).toContain("![](url)");
+  });
+
+  // RIC-223. A note with no images gets no images paragraph at all: the draft's
+  // `imageUrls` is an empty array, and a session told to embed them either hunts for
+  // something that is not there or leaves an empty attachments heading in the ticket.
+  it("drops the images paragraph when the note carries none", () => {
+    const p = flat(buildIntakePrompt({ ...intakeVars, hasImages: false }));
+    expect(p).not.toContain("imageUrls");
+    expect(p).not.toContain("![](url)");
+    expect(p).not.toContain("{{");
+    // The draft is still read — only the images half of it goes away.
+    expect(p).toContain("/state/drafts/ab12cd.json");
+    expect(p).toContain("brief");
+  });
+
+  // RIC-223. What the ticket *is* belongs in a label, not in a heading that repeats it.
+  // The three names are Linear's own, capitalized as the team has them, since the session
+  // passes them to the MCP verbatim.
+  it("asks for exactly one of the three Linear labels", () => {
+    const p = flat(buildIntakePrompt(intakeVars));
+    expect(p).toContain("`Bug`");
+    expect(p).toContain("`Improvement`");
+    expect(p).toContain("`Feature`");
+    expect(p).toMatch(/exactly one/);
+  });
+
+  it("bans the label's name as a heading in the description", () => {
+    expect(flat(buildIntakePrompt(intakeVars))).toMatch(/no .*heading|do not .*heading/);
   });
 
   // Project names come from projects.json, not from Mojito: a stray "{{" in one is a

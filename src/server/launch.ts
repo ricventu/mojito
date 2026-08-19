@@ -441,6 +441,9 @@ export interface IntakeLaunchRequest {
   // note and the image urls Mojito already uploaded, neither of which belongs on a
   // command line. The prompt names this path; the session reads it.
   draftPath: string;
+  // Whether that draft carries images. The prompt's images paragraph hangs off it, so a
+  // note with no attachments is never told to embed any (RIC-223).
+  hasImages: boolean;
 }
 
 /**
@@ -456,6 +459,7 @@ export async function launchIntakeSession(
 ): Promise<{ ok: true; meta: SessionMeta } | { ok: false; reason: "no-repo" }> {
   const prompt = buildIntakePrompt({
     draftPath: req.draftPath, teamKey: req.teamKey, projectName: req.projectName,
+    hasImages: req.hasImages,
   });
   return launchCustomSession(
     { projectName: req.projectName, model: "sonnet", effort: "medium", prompt },

@@ -1,6 +1,6 @@
 import { WORK_PROMPT_TEMPLATE, ASSETS_PARAGRAPH } from "./prompts/work.js";
 import { MERGE_FIX_PROMPT_TEMPLATE, COMPLETE_STEP_LOCAL, COMPLETE_STEP_MR } from "./prompts/conflict.js";
-import { INTAKE_PROMPT_TEMPLATE } from "./prompts/intake.js";
+import { INTAKE_PROMPT_TEMPLATE, INTAKE_IMAGES_PARAGRAPH } from "./prompts/intake.js";
 import type { MergeMode } from "./merge.js";
 
 export interface PromptVars {
@@ -51,6 +51,9 @@ export interface IntakePromptVars {
   teamKey: string;
   // null = the "General" choice in the sheet: a team, but no Linear project.
   projectName: string | null;
+  // Whether the draft carries any image url. False drops the whole images paragraph
+  // rather than pointing the session at an empty array (RIC-223).
+  hasImages: boolean;
 }
 
 // Neutralized rather than rejected, unlike the work prompt's vars: the team key and the
@@ -65,5 +68,6 @@ export function buildIntakePrompt(vars: IntakePromptVars): string {
   return INTAKE_PROMPT_TEMPLATE
     .replaceAll("{{DRAFT_PATH}}", defuse(vars.draftPath))
     .replaceAll("{{TEAM_KEY}}", defuse(vars.teamKey))
-    .replaceAll("{{PROJECT_CLAUSE}}", clause);
+    .replaceAll("{{PROJECT_CLAUSE}}", clause)
+    .replaceAll("{{IMAGES_PARAGRAPH}}", vars.hasImages ? INTAKE_IMAGES_PARAGRAPH : "");
 }

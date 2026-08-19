@@ -46,7 +46,7 @@ export async function POST(req: Request) {
   }
   const draftPath = writeTicketDraft(cfg.stateDir, { brief, teamKey, projectName, imageUrls });
   const res = await launchIntakeSession(
-    { projectName, teamKey, draftPath },
+    { projectName, teamKey, draftPath, hasImages: imageUrls.length > 0 },
     { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
       projectsPath: cfg.projectsPath, hasSession, newSession, pipePane },
   );
