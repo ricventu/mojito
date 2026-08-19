@@ -12,7 +12,7 @@ import { NO_FILTERS, type ListFilters } from "@/lib/appLocation";
 import TicketCard from "./TicketCard";
 import SessionCard from "./SessionCard";
 import StatusBadge from "./StatusBadge";
-import { mineOnly } from "@/lib/ticketFilter";
+import { mineOnly, liveStatuses } from "@/lib/ticketFilter";
 import { sessionStatus } from "@/lib/sessionFilter";
 import { groupByStatus } from "@/lib/groupByStatus";
 import { orderSessions } from "@/lib/orderSessions";
@@ -68,14 +68,17 @@ export default function UnifiedList(
   // Mine is a scope, applied before everything else so the chips below describe only
   // the tickets that can actually appear.
   const scoped = useMemo(() => mineOnly(tickets, mine), [tickets, mine]);
+  // Built from the unscoped list on purpose (see liveStatuses): a session's own
+  // launchStatus is frozen at launch, and Mine must not decide which status it reports.
+  const live = useMemo(() => liveStatuses(tickets), [tickets]);
   const projects = useMemo(() => mergedProjects(scoped, sessions), [scoped, sessions]);
-  const statuses = useMemo(() => mergedStatuses(scoped, sessions), [scoped, sessions]);
+  const statuses = useMemo(() => mergedStatuses(scoped, sessions, live), [scoped, sessions, live]);
 
   const { ticketRows, looseSessions } = useMemo(
     () => buildUnifiedRows({
-      tickets: scoped, sessions, filter: { query, project, status }, sessionsOnly,
+      tickets: scoped, sessions, filter: { query, project, status }, sessionsOnly, live,
     }),
-    [scoped, sessions, query, project, status, sessionsOnly],
+    [scoped, sessions, query, project, status, sessionsOnly, live],
   );
 
   // Bucket both kinds by project — see groupByProject for the encounter-order and
@@ -188,7 +191,7 @@ export default function UnifiedList(
           {sec.sessions.length > 0 && (
             <>
               <div className="substatus"><span className="sub-label">{NO_TICKET}</span></div>
-              {groupByStatus(sec.sessions, sessionStatus).map((group) => (
+              {groupByStatus(sec.sessions, (s) => sessionStatus(s, live)).map((group) => (
                 <div key={group.status}>
                   {group.status && <div className="substatus"><StatusBadge status={group.status} /></div>}
                   {orderSessions(group.items).map((s) => (

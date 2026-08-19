@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { NO_PROJECT, ticketStatuses, filterTickets, mineOnly, showsMineMarker } from "@/lib/ticketFilter";
+import {
+  NO_PROJECT, ticketStatuses, filterTickets, mineOnly, showsMineMarker, liveStatuses,
+} from "@/lib/ticketFilter";
 import type { TicketSummary } from "@/server/types";
 
 function ticket(p: Partial<TicketSummary>): TicketSummary {
@@ -127,5 +129,21 @@ describe("filterTickets", () => {
     const out = filterTickets(tickets, { query: "gamma", project: NO_PROJECT, status: "Todo" });
     expect(out.map((t) => t.identifier)).toEqual(["RIC-3"]);
     expect(filterTickets(tickets, { query: "gamma", project: "Mojito", status: "Todo" })).toEqual([]);
+  });
+});
+
+describe("liveStatuses", () => {
+  it("returns an empty map for no tickets", () => {
+    expect(liveStatuses([]).size).toBe(0);
+  });
+
+  it("maps each identifier to the ticket's current status", () => {
+    const map = liveStatuses([
+      ticket({ identifier: "RIC-1", statusName: "To QA" }),
+      ticket({ identifier: "RIC-2", statusName: "In Progress" }),
+    ]);
+    expect(map.get("RIC-1")).toBe("To QA");
+    expect(map.get("RIC-2")).toBe("In Progress");
+    expect(map.get("RIC-3")).toBeUndefined();
   });
 });

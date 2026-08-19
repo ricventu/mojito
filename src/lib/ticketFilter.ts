@@ -56,3 +56,18 @@ export function filterTickets(
       .some((v) => v.toLowerCase().includes(q));
   });
 }
+
+/**
+ * A session's `launchStatus` is frozen at launch and never rewritten, so it goes stale
+ * the moment Mojito moves the ticket on. This map — identifier → the ticket's current
+ * status — is what lets the list read a session's status off its ticket instead.
+ *
+ * Build it from the *unscoped* ticket list: Mine is a scope over what the list shows,
+ * not over what a status resolves to, so a ticket scoped out must still be able to
+ * answer for its own sessions.
+ */
+export type LiveStatuses = ReadonlyMap<string, string>;
+
+export function liveStatuses(tickets: TicketSummary[]): LiveStatuses {
+  return new Map(tickets.map((t) => [t.identifier, t.statusName]));
+}

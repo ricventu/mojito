@@ -130,3 +130,32 @@ describe("filterSessions", () => {
     expect(filterSessions(bare, { query: "nope", project: null, status: null })).toEqual([]);
   });
 });
+
+describe("live ticket statuses", () => {
+  const live = new Map([["RIC-1", "To QA"]]);
+
+  it("reads a ticket session's status off its ticket, not off the stale launchStatus", () => {
+    expect(sessionStatus(session({ ticket: "RIC-1", launchStatus: "Todo" }), live)).toBe("To QA");
+  });
+
+  it("falls back to launchStatus when the ticket is not among the known ones", () => {
+    expect(sessionStatus(session({ ticket: "RIC-9", launchStatus: "Todo" }), live)).toBe("Todo");
+  });
+
+  it("leaves custom and shell sessions in their synthetic buckets", () => {
+    expect(sessionStatus(session({ kind: "custom", ticket: "RIC-1" }), live)).toBe(CUSTOM_STATUS);
+    expect(sessionStatus(session({ kind: "shell", ticket: "RIC-1" }), live)).toBe(TERMINAL_STATUS);
+  });
+
+  it("derives the status chips from the live status", () => {
+    const sessions = [session({ ticket: "RIC-1", launchStatus: "Todo" })];
+    expect(sessionStatuses(sessions, live)).toEqual(["To QA"]);
+  });
+
+  it("drops a session whose launch status matches the filter but whose ticket has moved on", () => {
+    const sessions = [session({ id: "a", ticket: "RIC-1", launchStatus: "Todo" })];
+    expect(filterSessions(sessions, { query: "", project: null, status: "Todo" }, live)).toEqual([]);
+    expect(filterSessions(sessions, { query: "", project: null, status: "To QA" }, live).map((s) => s.id))
+      .toEqual(["a"]);
+  });
+});

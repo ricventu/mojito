@@ -3,6 +3,7 @@ import {
   buildUnifiedRows, groupByProject, orderTicketRows, mergedStatuses, mergedProjects,
   type TicketRow,
 } from "@/lib/unifiedRows";
+import { liveStatuses } from "@/lib/ticketFilter";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 
 function ticket(p: Partial<TicketSummary>): TicketSummary {
@@ -362,5 +363,37 @@ describe("groupByProject", () => {
     groupByProject(ticketRows, looseSessions);
     expect(ticketRows).toHaveLength(1);
     expect(looseSessions).toHaveLength(1);
+  });
+});
+
+describe("live ticket statuses", () => {
+  // The RIC-218 case: the ticket moved to To QA, its session still says Todo. Under a
+  // Todo status chip the ticket dropped out of `visible` while the session matched on
+  // its stale launch status, so it surfaced alone in the "No ticket" group.
+  it("does not orphan a session whose ticket moved past the filtered status", () => {
+    const tickets = [ticket({ identifier: "RIC-218", statusName: "To QA" })];
+    const sessions = [session({ id: "a", ticket: "RIC-218", launchStatus: "Todo" })];
+    const rows = buildUnifiedRows({
+      tickets, sessions, filter: { query: "", project: null, status: "Todo" },
+      sessionsOnly: false, live: liveStatuses(tickets),
+    });
+    expect(rows.ticketRows).toEqual([]);
+    expect(rows.looseSessions).toEqual([]);
+  });
+
+  it("keeps that session in the loose group under the ticket's current status", () => {
+    const tickets = [ticket({ identifier: "RIC-218", statusName: "To QA", assignedToMe: false })];
+    const sessions = [session({ id: "a", ticket: "RIC-218", launchStatus: "Todo" })];
+    const rows = buildUnifiedRows({
+      tickets: [], sessions, filter: { query: "", project: null, status: "To QA" },
+      sessionsOnly: false, live: liveStatuses(tickets),
+    });
+    expect(rows.looseSessions.map((s) => s.id)).toEqual(["a"]);
+  });
+
+  it("derives the merged status chips from the ticket's current status", () => {
+    const tickets = [ticket({ identifier: "RIC-218", statusName: "To QA" })];
+    const sessions = [session({ ticket: "RIC-218", launchStatus: "Todo" })];
+    expect(mergedStatuses(tickets, sessions, liveStatuses(tickets))).toEqual(["To QA"]);
   });
 });

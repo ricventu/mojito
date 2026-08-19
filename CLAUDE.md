@@ -116,7 +116,14 @@ Mojito owns the whole lifecycle — there is no external plugin:
   sessions share a single tmux id `mojito-<ticket>-work` across Backlog/Todo/In
   Progress/To QA (see `tmuxName` in `src/server/sessionKey.ts`), so a session relaunched
   while the ticket sits at the gate takes its predecessor's id; the conflict session is
-  `mojito-<ticket>-conflict`.
+  `mojito-<ticket>-conflict`. A session's `launchStatus` is written once at launch and
+  never rewritten, so the list never filters or groups a session on it while its ticket
+  can answer: `liveStatuses` (`src/lib/ticketFilter.ts`) maps identifier → current status
+  off the *unscoped* ticket list, and `sessionStatus`/`filterSessions`/`mergedStatuses`
+  take it. Without that, a status chip manufactured orphans — a Todo chip dropped a
+  ticket already at To QA while keeping its session, which then had nothing to nest under
+  and surfaced alone in "No ticket". `launchStatus` stays the fallback for a session whose
+  ticket was never fetched or is gone, which is the case the loose group exists for.
 - **Client url state**: the address bar is the single source of truth for which view is
   open and how the list is filtered (RIC-204). `src/lib/appLocation.ts` is the pure
   codec — `parseLocation`/`formatLocation` over `/`, `/stacks`, `/session/<id>`,

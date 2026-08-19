@@ -1,5 +1,5 @@
 import type { SessionMeta, TicketSummary } from "@/server/types";
-import { filterTickets, ticketStatuses, NO_PROJECT } from "@/lib/ticketFilter";
+import { filterTickets, ticketStatuses, NO_PROJECT, type LiveStatuses } from "@/lib/ticketFilter";
 import { filterSessions, sessionStatuses } from "@/lib/sessionFilter";
 import { orderSessions } from "@/lib/orderSessions";
 import { orderTickets } from "@/lib/orderTickets";
@@ -39,13 +39,20 @@ export interface UnifiedFilter {
  * own fields, exactly as the old session list narrowed it. Neutralising the query here
  * would mean searching for one ticket dumped every other ticket's sessions into
  * "No ticket".
+ *
+ * `live` (build it with liveStatuses over the *unscoped* ticket list) is what keeps the
+ * status chip from manufacturing orphans: without it a session is judged on the status
+ * it was launched from, so a Todo chip kept the session of a ticket already at To QA and
+ * dropped the ticket itself — the session then had nothing to nest under and showed up
+ * alone under "No ticket". With it both sides answer for the same status.
  */
 export function buildUnifiedRows(
-  { tickets, sessions, filter, sessionsOnly }: {
+  { tickets, sessions, filter, sessionsOnly, live }: {
     tickets: TicketSummary[];
     sessions: SessionMeta[];
     filter: UnifiedFilter;
     sessionsOnly: boolean;
+    live?: LiveStatuses;
   },
 ): UnifiedRows {
   const visible = filterTickets(tickets, filter);
@@ -55,7 +62,7 @@ export function buildUnifiedRows(
     for (const s of own) nested.add(s.id);
     return { ticket, sessions: orderSessions(own) };
   });
-  let looseSessions = filterSessions(sessions.filter((s) => !nested.has(s.id)), filter);
+  let looseSessions = filterSessions(sessions.filter((s) => !nested.has(s.id)), filter, live);
 
   // "Has a session", not "has a running session". The state cannot stand in for liveness
   // here: a work session that handed its stage to QA sits at "done" while its tmux is
@@ -87,8 +94,12 @@ export function orderTicketRows(rows: TicketRow[]): TicketRow[] {
  * toggling Mine must never leave a chip that matches nothing. Sessions are not scoped
  * by Mine, so the full list comes in.
  */
-export function mergedStatuses(tickets: TicketSummary[], sessions: SessionMeta[]): string[] {
-  const all = new Set([...ticketStatuses(tickets), ...sessionStatuses(sessions)]);
+export function mergedStatuses(
+  tickets: TicketSummary[],
+  sessions: SessionMeta[],
+  live?: LiveStatuses,
+): string[] {
+  const all = new Set([...ticketStatuses(tickets), ...sessionStatuses(sessions, live)]);
   return Array.from(all)
     .filter((v) => v !== "")
     .sort((a, b) => {
