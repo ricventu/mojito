@@ -33,9 +33,11 @@ Mojito owns the whole lifecycle — there is no external plugin:
   launch context, no result file — because the issue it creates is the whole outcome;
   Sonnet at medium effort is inlined there, since no status names this work. Ticket copy
   goes out in Italian whatever the note was written in, and the session labels the issue
-  with exactly one of Linear's `Bug`/`Improvement`/`Feature` (the names are the team's own
+  with one of Linear's `Bug`/`Improvement`/`Feature` (the names are the team's own
   capitalization, passed to the MCP verbatim) instead of announcing its nature in a
-  description heading — RIC-223. Priority is deliberately left alone: the prompt says
+  description heading — RIC-223. The label is offered, never demanded: at most one, and
+  none when none of the three fits, since a prompt that insists gets whichever is least
+  wrong. Priority is deliberately left alone: the prompt says
   nothing about it, so a note that does not raise urgency does not get a guessed one.
   The images half of the prompt is interpolated only when the draft carries urls
   (`INTAKE_IMAGES_PARAGRAPH`, same pattern as the work prompt's asset paragraph), so an

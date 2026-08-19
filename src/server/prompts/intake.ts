@@ -2,7 +2,9 @@
 // typed into Mojito's New-ticket sheet, so it is the one prompt that talks about Linear
 // on purpose (RIC-184 governs the work and merge-fix prompts, which have a ticket already
 // and nothing to create). Mojito cannot create the issue itself here — the title, the
-// description and the label are exactly what the session is being asked to produce.
+// description and the label are exactly what the session is being asked to produce. The
+// label is offered, not demanded: a note that is none of the three leaves it off rather
+// than being forced into the closest one.
 //
 // Everything the note does not say stays unsaid: no requirements invented, no solution
 // designed, no repository read. A vague note comes back as a question in the terminal,
@@ -20,8 +22,9 @@ not go reading the repository — the note is all there is. Then give it a title
 specific, no ticket id. Title and description both go in Italian, whatever language the
 note itself is written in.
 
-Label it with exactly one of \`Bug\`, \`Improvement\`, \`Feature\` — whichever the note
-actually describes. The label is where that goes, so the description gets no heading
+If the note plainly is one of \`Bug\`, \`Improvement\`, \`Feature\`, label it with that one:
+never more than one, and no label at all when none of the three fits — a ticket without a
+label is fine. A label is also where that belongs, so the description gets no heading
 naming it: a bug report opens with the problem, not with a "Bug" title.
 
 {{IMAGES_PARAGRAPH}}Create the issue with the Linear MCP, on team {{TEAM_KEY}},

@@ -189,12 +189,19 @@ describe("intake prompt", () => {
   // RIC-223. What the ticket *is* belongs in a label, not in a heading that repeats it.
   // The three names are Linear's own, capitalized as the team has them, since the session
   // passes them to the MCP verbatim.
-  it("asks for exactly one of the three Linear labels", () => {
+  it("offers the three Linear labels", () => {
     const p = flat(buildIntakePrompt(intakeVars));
     expect(p).toContain("`Bug`");
     expect(p).toContain("`Improvement`");
     expect(p).toContain("`Feature`");
-    expect(p).toMatch(/exactly one/);
+  });
+
+  // A label is optional: none of the three fitting is a normal outcome, and a prompt that
+  // demands one gets a note labelled by whichever is least wrong.
+  it("leaves the label optional and caps it at one", () => {
+    const p = flat(buildIntakePrompt(intakeVars));
+    expect(p).toContain("no label at all");
+    expect(p).toContain("never more than one");
   });
 
   it("bans the label's name as a heading in the description", () => {
