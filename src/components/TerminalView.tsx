@@ -13,6 +13,7 @@ import AccessoryBar from "./AccessoryBar";
 import DocsView from "./DocsView";
 import StateBadge from "./StateBadge";
 import { apiFetch } from "@/lib/client";
+import { dismissSession } from "@/lib/dismissSession";
 import { computeTouchScroll, wheelSequences } from "@/lib/touchScroll";
 import { SESSION_GONE_CODE } from "@/lib/ptyClose";
 import { termRootStyle, isKeyboardOpen } from "@/lib/keyboardInset";
@@ -374,7 +375,13 @@ export default function TerminalView(
       ? `Kill the running session for ${head.name}?`
       : `Dismiss the session for ${head.name}?`;
     if (!confirm(prompt)) return;
-    await apiFetch(token, `/api/sessions/${session.id}`, { method: "DELETE" });
+    const err = await dismissSession(token, session.id);
+    // Stay put when the server kept the session: this terminal is where the human
+    // can watch what claude is still doing and quit it by hand.
+    if (err) {
+      alert(err);
+      return;
+    }
     onBack();
   };
 

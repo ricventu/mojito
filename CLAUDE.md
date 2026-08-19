@@ -67,6 +67,16 @@ Mojito owns the whole lifecycle — there is no external plugin:
   ticket's work session on every verdict — killing mid-turn the very session the gate's
   rework loop depends on. `tests/server/retireSession.test.ts` and the "never closes a
   session" case in `tests/server/verdictRoute.test.ts` fail if that comes back.
+  `closeSession` asks and never forces: Ctrl-C, then Ctrl-D *re-sent on every poll* —
+  claude answers the first one with "Press Ctrl-D again to exit", so a single EOF left
+  it running until the wait was up and the session was then torn down under a live
+  claude, losing whatever it had not written out. There is no `kill-session` fallback
+  at all now: a session claude will not leave answers 409 and keeps its tmux, its
+  registration and its card, and both call sites surface that refusal
+  (`src/lib/dismissSession.ts`) rather than swallowing the status, which used to make a
+  refused dismiss look exactly like a successful one. The real-tmux cases in
+  `tmux.integration.test.ts` cover both halves — a process that wants a second Ctrl-D,
+  and one that ignores every signal.
 - **Child environment**: nothing Mojito spawns inherits `process.env` — every spawn goes
   through `sanitizeEnv`/`spawnEnv` (`src/server/childEnv.ts`). Mojito's own environment is
   not a neutral base: `npm start` runs `cross-env NODE_ENV=production`, adds npm's `npm_*`

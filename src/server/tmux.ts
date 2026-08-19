@@ -188,33 +188,40 @@ export async function sendKeys(name: string, keys: string): Promise<void> {
 export interface CloseDeps {
   hasSession: (name: string) => Promise<boolean>;
   sendKeys: (name: string, keys: string) => Promise<void>;
-  killSession: (name: string) => Promise<void>;
   sleep: (ms: number) => Promise<void>;
   now: () => number;
 }
 
 /**
- * Gracefully shut down the claude process in a tmux session so it flushes its
- * state, rather than tearing the session down with SIGHUP. Sends Ctrl+C (to
- * interrupt any in-flight task) followed by Ctrl+D (EOF), which is claude's
- * clean-exit signal; when claude exits the session auto-closes. Falls back to
- * kill-session only if the process is still alive after `timeoutMs`.
+ * Ask the claude process in a tmux session to exit, and report whether it did.
+ *
+ * Sends Ctrl+C (to interrupt any in-flight task) and then Ctrl+D, claude's
+ * clean-exit signal — and keeps re-sending Ctrl+D while it waits, because claude
+ * answers the first one with "Press Ctrl-D again to exit" and stays up until the
+ * second arrives. Sending EOF once and then only watching is what left claude
+ * running until the wait was up.
+ *
+ * There is no force path. When claude exits, its tmux session ends on its own and
+ * this returns `{ closed: true }`; a session claude will not leave is reported as
+ * `{ closed: false }` and left exactly as it was — tmux, registration and card —
+ * for the human to deal with. Killing the session out from under a live claude
+ * loses whatever it had not written out yet, which is the one thing a "dismiss"
+ * must never do.
  */
 export async function closeSession(
   name: string,
   deps: Partial<CloseDeps> = {},
   timeoutMs = 10000,
   pollMs = 250,
-): Promise<{ closed: boolean; forced: boolean }> {
+): Promise<{ closed: boolean }> {
   const d: CloseDeps = {
     hasSession,
     sendKeys,
-    killSession,
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
     now: () => Date.now(),
     ...deps,
   };
-  if (!(await d.hasSession(name))) return { closed: true, forced: false };
+  if (!(await d.hasSession(name))) return { closed: true };
   // Best-effort signals: the pane can disappear between keystrokes (C-c alone may
   // end the process), which makes a follow-up send-keys throw "can't find pane".
   // Swallow that — the poll below is the source of truth for whether it closed.
@@ -222,13 +229,13 @@ export async function closeSession(
   await d.sendKeys(name, "C-d").catch(() => {});
   const start = d.now();
   while (await d.hasSession(name)) {
-    if (d.now() - start >= timeoutMs) {
-      await d.killSession(name);
-      return { closed: true, forced: true };
-    }
+    if (d.now() - start >= timeoutMs) return { closed: false };
     await d.sleep(pollMs);
+    // The confirmation press. Harmless where one Ctrl-D was already enough: the
+    // session is gone by now and send-keys just fails into the catch.
+    await d.sendKeys(name, "C-d").catch(() => {});
   }
-  return { closed: true, forced: false };
+  return { closed: true };
 }
 
 export async function listSessions(prefix: string): Promise<string[]> {

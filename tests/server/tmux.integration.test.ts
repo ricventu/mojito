@@ -44,8 +44,35 @@ run("tmux control (requires tmux)", () => {
     expect(await tmux.hasSession(CLOSE_NAME)).toBe(true);
     // C-c interrupts sleep, the session command exits, and tmux tears the session down.
     const res = await tmux.closeSession(CLOSE_NAME, {}, 8000, 100);
-    expect(res).toEqual({ closed: true, forced: false });
+    expect(res).toEqual({ closed: true });
     expect(await tmux.hasSession(CLOSE_NAME)).toBe(false);
+  });
+
+  it("keeps sending Ctrl-D to a process that wants a second one", async () => {
+    // claude ignores Ctrl-C as an exit and answers the first Ctrl-D with "Press
+    // Ctrl-D again to exit". A shell that traps SIGINT and reads twice behaves the
+    // same way, and against the old one-shot EOF it survived the whole wait.
+    const name = "mojito-test-ric-1-two-eof";
+    await tmux.killSession(name).catch(() => {});
+    await tmux.newSession(name, tmpdir(), `bash -c 'trap "" INT; read -r a; read -r b'`);
+    expect(await tmux.hasSession(name)).toBe(true);
+
+    const res = await tmux.closeSession(name, {}, 8000, 100);
+    expect(res).toEqual({ closed: true });
+    expect(await tmux.hasSession(name)).toBe(false);
+  });
+
+  it("never force-kills: a process that ignores both signals keeps its session", async () => {
+    // The one thing a dismiss must not do is tear tmux down under a live claude —
+    // whatever it had not written out yet goes with it. Report, and leave it alone.
+    const name = "mojito-test-ric-1-stubborn";
+    await tmux.killSession(name).catch(() => {});
+    await tmux.newSession(name, tmpdir(), `bash -c 'trap "" INT; while :; do sleep 1; done'`);
+
+    const res = await tmux.closeSession(name, {}, 600, 100);
+    expect(res).toEqual({ closed: false });
+    expect(await tmux.hasSession(name)).toBe(true);
+    await tmux.killSession(name);
   });
 
   it("retains a crashed pane via remain-on-exit and reports pane_dead", async () => {

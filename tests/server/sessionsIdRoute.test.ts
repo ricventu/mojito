@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // vi.mock is hoisted above the imports, so every spy has to be hoisted with it.
 const h = vi.hoisted(() => ({
-  closeSession: vi.fn(async () => ({ closed: true, forced: false })),
+  closeSession: vi.fn(async () => ({ closed: true })),
   removeSidecar: vi.fn(() => {}),
   cleanupPastedImages: vi.fn(() => {}),
   clearTicketAssets: vi.fn(() => {}),
@@ -33,6 +33,9 @@ const params = (id = "mojito-RIC-46-work") => ({ params: Promise.resolve({ id })
 beforeEach(() => {
   vi.clearAllMocks();
   h.registryGet.mockImplementation(() => undefined);
+  // clearAllMocks wipes the calls, not the implementations: restore the default
+  // "claude exited" so a case that overrides it cannot leak into the next one.
+  h.closeSession.mockImplementation(async () => ({ closed: true }));
 });
 
 describe("DELETE /api/sessions/[id]", () => {
@@ -55,6 +58,21 @@ describe("DELETE /api/sessions/[id]", () => {
     h.clearTicketAssets.mockImplementation(() => { throw new Error("disk error"); });
     const res = await DELETE(req(), params("mojito-RIC-46-work"));
     expect(res.status).toBe(204);
+  });
+
+  it("keeps a session claude would not leave, and says so", async () => {
+    // No force path anywhere (see closeSession): a session whose claude is still
+    // running keeps its tmux, so removing the registration here would strand it —
+    // alive, still holding the tmux name, and invisible to Mojito.
+    h.closeSession.mockImplementation(async () => ({ closed: false }));
+    const res = await DELETE(req(), params("mojito-RIC-46-work"));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: expect.any(String) });
+    expect(h.registryRemove).not.toHaveBeenCalled();
+    expect(h.removeSidecar).not.toHaveBeenCalled();
+    expect(h.clearTicketAssets).not.toHaveBeenCalled();
+    expect(h.cleanupPastedImages).not.toHaveBeenCalled();
   });
 
   it("cleans up pasted images too when the session has a known cwd", async () => {

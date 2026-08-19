@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { apiFetch } from "@/lib/client";
+import { dismissSession } from "@/lib/dismissSession";
 import LaunchSheet from "./LaunchSheet";
 import NewTicketSheet from "./NewTicketSheet";
 import NewSessionSheet from "./NewSessionSheet";
@@ -113,7 +114,11 @@ export default function UnifiedList(
       ? `Kill the running session for ${label}?`
       : `Dismiss the session for ${label}?`;
     if (!confirm(prompt)) return;
-    await apiFetch(token, `/api/sessions/${s.id}`, { method: "DELETE" });
+    // A refusal has to be said out loud: the server keeps a session whose claude is
+    // still running, so an ignored status left the card sitting there with no reason
+    // given — which reads as a dead button.
+    const err = await dismissSession(token, s.id);
+    if (err) alert(err);
     onChanged();
   };
 
