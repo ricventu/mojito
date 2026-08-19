@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getConfig, getRegistry } from "@/server/app";
+import { getConfig, getRegistry, getBus } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
 import { getIssueStatus, setIssueStatus, getIssueContent, type IssueContent } from "@/server/linear";
 import { launchMergeFixSession } from "@/server/launch";
@@ -26,7 +26,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const registry = getRegistry();
   const tmuxDeps = { registry, stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
-    projectsPath: cfg.projectsPath, hasSession, newSession, pipePane };
+    projectsPath: cfg.projectsPath, hasSession, newSession, pipePane, bus: getBus() };
 
   const resolveDirs = () => resolveTicketDirs(cfg.projectsPath, id, projectName);
 

@@ -60,6 +60,8 @@ vi.mock("@/server/app", () => ({
   getConfig: () => ({ token: "test-token", linearApiKey: "k", stateDir: "/state", port: 4711,
     projectsPath: "/projects.json" }),
   getRegistry: () => ({ get: h.registryGet }),
+  // The launchers arm the startup-stall watch off this bus (startupStall.ts).
+  getBus: () => ({ emit: () => {}, subscribe: () => () => {} }),
 }));
 
 import { POST } from "@/app/api/tickets/[id]/verdict/route";

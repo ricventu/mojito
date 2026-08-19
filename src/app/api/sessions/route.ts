@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getConfig, getRegistry } from "@/server/app";
+import { getConfig, getRegistry, getBus } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
 import { launchSession, launchCustomSession, launchShellSession } from "@/server/launch";
 import { getIssueContent, downloadLinearAsset, setIssueStatus, type IssueContent } from "@/server/linear";
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
               createWorktree: Boolean(body.createWorktree), baseBranch: body.baseBranch }
           : {}) },
       { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
-        projectsPath: cfg.projectsPath, hasSession, newSession, pipePane },
+        projectsPath: cfg.projectsPath, hasSession, newSession, pipePane, bus: getBus() },
     );
     if (!res.ok) return NextResponse.json({ error: res.reason }, { status: 422 });
     return NextResponse.json(res.meta, { status: 201 });
@@ -76,7 +76,7 @@ export async function POST(req: Request) {
       description: content.description, assets: prepared.assets, attachments: prepared.attachments,
       createWorktree: Boolean(body.createWorktree), baseBranch: body.baseBranch },
     { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token, projectsPath: cfg.projectsPath,
-      hasSession, newSession, pipePane },
+      hasSession, newSession, pipePane, bus: getBus() },
   );
   if (!res.ok) {
     const status = res.reason === "duplicate" ? 409 : 422;

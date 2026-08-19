@@ -103,6 +103,24 @@ Mojito owns the whole lifecycle — there is no external plugin:
   because a wrong `true` writes Done over unmerged commits. There is no reject:
   a ticket that fails QA is reworked by typing into its still-live work session, and the
   ticket parks at To QA meanwhile.
+- **Startup stall**: every state Mojito shows comes from a Claude Code hook, and the first
+  of them (SessionStart) only fires once claude has booted — so anything that blocks it
+  *before* boot leaves no hook at all and the session pinned at its launch-time "starting"
+  (RIC-222). The blocker in practice is the workspace-trust prompt: a "General" custom
+  session runs in the home directory, whose trust answer Claude Code does not persist, so
+  it hit that prompt on *every* launch and never left "starting" once. Worktrees are fine —
+  trust is inherited from the parent repo — and there is no CLI flag to pre-trust an
+  interactive session, so the fix is not to avoid the prompt but to stop lying about it:
+  `watchStartupStall` (`src/server/startupStall.ts`), armed by every launcher that
+  registers at "starting", flips a session still there after `STALL_GRACE_MS` to
+  needs-input with an alert — the same "open this terminal and answer it" signal a
+  permission prompt raises. It needs the bus (the client refetches the session list only
+  on an event, and a stalled launch emits none of its own), which is why `bus` rides on
+  `LaunchDeps`; a caller without one simply has no watch. Two cases it deliberately leaves
+  alone: a session a hook has already spoken for, and one whose tmux is gone — that
+  belongs to `Registry.recover`/`sweepOrphans`, which drop it rather than badge it. A late
+  SessionStart maps straight back to running, so a merely slow boot self-corrects. A shell
+  session arms nothing: it fires no hooks ever, which is why it launches at "running".
 - **Session lifetime**: Mojito never ends a session by itself. The only path that closes
   one is an explicit user action — `DELETE /api/sessions/[id]` → `closeSession`, behind the
   Kill button. Automatic paths (a QA verdict, a relaunch from the sheet) may drop only the

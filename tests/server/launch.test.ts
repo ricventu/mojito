@@ -12,6 +12,7 @@ import {
   defaultResolveCwd,
 } from "@/server/launch";
 import { Registry } from "@/server/registry";
+import { EventBus } from "@/server/events";
 import type { SessionMeta } from "@/server/types";
 
 let dir: string;
@@ -681,5 +682,72 @@ describe("launchIntakeSession", () => {
   it("refuses a project that maps to no repository", async () => {
     const res = await launchIntakeSession({ ...intakeReq, projectName: "Ghost" }, intakeDeps());
     expect(res).toMatchObject({ ok: false, reason: "no-repo" });
+  });
+});
+
+// RIC-222: a session's state comes only from Claude Code hooks, and none of them fires
+// while claude is blocked before boot (the workspace-trust prompt). Every launcher that
+// registers a session at "starting" therefore arms the startup-stall watch, which flips
+// such a launch to needs-input — the honest state for a terminal waiting on a human.
+describe("startup-stall watch (RIC-222)", () => {
+  // hasSession answers the launchers' duplicate check first (no session yet), then the
+  // watch's own liveness probe once the grace period is up (tmux alive, claude silent).
+  function stallDeps<T>(base: (over: Record<string, unknown>) => T) {
+    let launched = false;
+    const armed: { ms: number; fn: () => void }[] = [];
+    const events: string[] = [];
+    const bus = new EventBus();
+    bus.subscribe((e) => events.push(e.type));
+    const d = base({
+      bus,
+      hasSession: vi.fn(async () => launched),
+      newSession: vi.fn(async () => { launched = true; }),
+      scheduleStall: (fn: () => void, ms: number) => { armed.push({ fn, ms }); },
+    });
+    return { d, armed, events };
+  }
+
+  it("a ticket launch arms it, and a silent claude becomes needs-input", async () => {
+    const { d, armed, events } = stallDeps(deps);
+    const res = await launchSession(baseReq, d);
+    const { id } = (res as { ok: true; meta: SessionMeta }).meta;
+    expect(armed).toHaveLength(1);
+    expect(d.registry.get(id)?.state).toBe("starting");
+
+    await armed[0].fn();
+
+    expect(d.registry.get(id)?.state).toBe("needs-input");
+    expect(events).toEqual(["session.state", "session.alert"]);
+  });
+
+  it("a custom launch arms it — the kind the bug was reported on", async () => {
+    const { d, armed } = stallDeps(customDeps);
+    const res = await launchCustomSession({ projectName: null, model: "opus", effort: "high" }, d);
+    const { id } = (res as { ok: true; meta: SessionMeta }).meta;
+    expect(armed).toHaveLength(1);
+
+    await armed[0].fn();
+
+    expect(d.registry.get(id)?.state).toBe("needs-input");
+  });
+
+  it("a merge-fix launch arms it", async () => {
+    const { d, armed } = stallDeps(deps);
+    const res = await launchMergeFixSession(baseConflictReq, d);
+    const { id } = (res as { ok: true; meta: SessionMeta }).meta;
+    expect(armed).toHaveLength(1);
+
+    await armed[0].fn();
+
+    expect(d.registry.get(id)?.state).toBe("needs-input");
+  });
+
+  // A shell fires no hooks at all, which is why it launches at "running" rather than
+  // "starting" — there is no stall to watch for, and nothing to ask the human.
+  it("a shell launch arms nothing", async () => {
+    const { d, armed } = stallDeps(customDeps);
+    const res = await launchShellSession({ projectName: null }, d);
+    expect((res as { ok: true; meta: SessionMeta }).meta.state).toBe("running");
+    expect(armed).toHaveLength(0);
   });
 });

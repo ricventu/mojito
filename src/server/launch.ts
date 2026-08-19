@@ -15,6 +15,7 @@ import { buildWorkPrompt, buildMergeFixPrompt, buildIntakePrompt } from "./promp
 import type { MergeMode } from "./merge.js";
 import { resultPath, clearSessionResult } from "./sessionResult.js";
 import type { TicketAsset, TicketAttachment } from "./ticketAssets.js";
+import { watchStartupStall, type StallDeps } from "./startupStall.js";
 
 export interface LaunchRequest {
   ticket: string;
@@ -42,7 +43,11 @@ export interface ResolvedCwd {
   warning?: string;
 }
 
-export interface LaunchDeps {
+// `bus`, `stallGraceMs` and `scheduleStall` are the startup-stall watch's own deps
+// (startupStall.ts): every launcher below that registers a session at "starting" arms it,
+// so a launch no hook ever speaks for stops claiming to be booting. Optional because the
+// watch is inert without a bus — a caller with no client to notify simply has no watch.
+export interface LaunchDeps extends Pick<StallDeps, "bus" | "stallGraceMs" | "scheduleStall"> {
   registry: Registry;
   stateDir: string;
   port: number;
@@ -153,6 +158,7 @@ export async function launchSession(
     labels: req.labels,
   };
   deps.registry.upsert(meta);
+  watchStartupStall(meta.id, deps); // no hook ever speaks for a claude blocked before boot (RIC-222)
   return { ok: true, meta };
 }
 
@@ -241,6 +247,7 @@ export async function launchCustomSession(
     labels: req.ticket ? (req.labels ?? []) : [],
   };
   deps.registry.upsert(meta);
+  watchStartupStall(meta.id, deps); // no hook ever speaks for a claude blocked before boot (RIC-222)
   return { ok: true, meta };
 }
 
@@ -323,6 +330,7 @@ export async function launchMergeFixSession(
     labels: [],
   };
   deps.registry.upsert(meta);
+  watchStartupStall(meta.id, deps); // no hook ever speaks for a claude blocked before boot (RIC-222)
   return { ok: true, meta };
 }
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getConfig, getRegistry } from "@/server/app";
+import { getConfig, getRegistry, getBus } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
 import { resolveStack, currentBranch } from "@/server/projectStack";
 import { launchStackResolveSession } from "@/server/launch";
@@ -15,7 +15,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const res = await launchStackResolveSession(
     { projectName: target.project, branch },
     { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
-      projectsPath: cfg.projectsPath, hasSession, newSession, pipePane },
+      projectsPath: cfg.projectsPath, hasSession, newSession, pipePane, bus: getBus() },
   );
   if (!res.ok) return NextResponse.json({ error: res.reason }, { status: 422 });
   return NextResponse.json({ meta: res.meta }, { status: 201 });

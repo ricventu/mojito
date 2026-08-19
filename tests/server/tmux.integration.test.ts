@@ -4,6 +4,9 @@ import { join } from "node:path";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import * as tmux from "@/server/tmux";
 import { startStackSession, panesDead } from "@/server/tmux";
+import { watchStartupStall } from "@/server/startupStall";
+import { Registry } from "@/server/registry";
+import { EventBus } from "@/server/events";
 
 const run = tmux.tmuxAvailable() ? describe : describe.skip;
 const NAME = "mojito-test-ric-1-integration";
@@ -120,5 +123,41 @@ run("tmux control (requires tmux)", () => {
     await new Promise((r) => setTimeout(r, 200));
     expect((await panesDead(name)).trim()).toBe("0");
     await tmux.killSession(name);
+  });
+
+  // RIC-222 in the shape it really has: a tmux session that is alive but whose claude
+  // never boots (blocked on the workspace-trust prompt) fires no hook at all, so nothing
+  // would ever move the session off "starting". `sleep` stands in for that claude —
+  // equally alive, equally silent — and the watch is run against the real tmux probe and
+  // the real setTimeout, not a stubbed pair.
+  it("moves a live but silent session off 'starting' (RIC-222)", async () => {
+    const name = "mojito-test-stall";
+    const stateDir = mkdtempSync(join(tmpdir(), "mojito-stall-"));
+    const registry = new Registry(stateDir);
+    const bus = new EventBus();
+    const seen: string[] = [];
+    bus.subscribe((e) => seen.push(e.type));
+    const meta = {
+      kind: "custom" as const, id: name, ticket: "", launchStatus: "", model: "opus",
+      effort: "high" as const, state: "starting" as const, cwd: tmpdir(),
+      createdAt: "2026-08-19T16:20:44.878Z", title: "home", labels: [],
+    };
+    await tmux.killSession(name).catch(() => {});
+    await tmux.newSession(name, tmpdir(), "sleep 30");
+    try {
+      registry.upsert(meta);
+      watchStartupStall(name, { registry, bus, hasSession: tmux.hasSession, stallGraceMs: 50 });
+      await vi.waitFor(() => expect(registry.get(name)?.state).toBe("needs-input"), { timeout: 3000 });
+      expect(seen).toEqual(["session.state", "session.alert"]);
+    } finally {
+      await tmux.killSession(name);
+    }
+
+    // Same silence, but the tmux is gone: a dead session is recover/sweep's to report,
+    // never a request for the human's attention.
+    registry.upsert(meta);
+    watchStartupStall(name, { registry, bus, hasSession: tmux.hasSession, stallGraceMs: 50 });
+    await new Promise((r) => setTimeout(r, 400));
+    expect(registry.get(name)?.state).toBe("starting");
   });
 });

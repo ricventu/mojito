@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getConfig, getRegistry } from "@/server/app";
+import { getConfig, getRegistry, getBus } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
 import { listOpenIssues, uploadImage } from "@/server/linear";
 import { validateImages } from "@/server/imageUpload";
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
   const res = await launchIntakeSession(
     { projectName, teamKey, draftPath, hasImages: imageUrls.length > 0 },
     { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
-      projectsPath: cfg.projectsPath, hasSession, newSession, pipePane },
+      projectsPath: cfg.projectsPath, hasSession, newSession, pipePane, bus: getBus() },
   );
   if (!res.ok) return NextResponse.json({ error: res.reason }, { status: 422 });
   return NextResponse.json(res.meta, { status: 201 });
