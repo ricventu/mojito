@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/client";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES, MAX_IMAGES } from "@/lib/imageConstants";
 import { readAsDataUrl } from "@/lib/readAsDataUrl";
+import { launchedSession } from "@/lib/launchedSession";
+import type { SessionMeta } from "@/server/types";
 
 const GENERAL = "__general__";
 
@@ -16,12 +18,11 @@ function newImageId(): string {
 }
 
 export default function NewTicketSheet(
-  { token, onClose, onCreated }:
-  { token: string; onClose: () => void; onCreated: () => void },
+  { token, onClose, onCreated, onOpen }:
+  { token: string; onClose: () => void; onCreated: () => void; onOpen: (s: SessionMeta) => void },
 ) {
   const [projects, setProjects] = useState<string[]>([]);
   const [project, setProject] = useState(GENERAL);
-  const [title, setTitle] = useState("");
   const [brief, setBrief] = useState("");
   const [images, setImages] = useState<PendingImage[]>([]);
   const [err, setErr] = useState<string | null>(null);
@@ -88,14 +89,21 @@ export default function NewTicketSheet(
       const res = await apiFetch(token, "/api/tickets", {
         method: "POST",
         body: JSON.stringify({
-          title: title.trim(), brief: brief.trim(),
+          brief: brief.trim(),
           projectName: project === GENERAL ? null : project,
           images: images.map(({ name, type, dataUrl }) => ({ name, type, dataUrl })),
         }),
       });
       if (!res.ok) { setErr(await res.text()); return; }
       onCreated();
-      onClose();
+      // The issue does not exist yet: the intake session writes it, and it asks for
+      // permission before the Linear write. Land in its terminal — same rule as the other
+      // sheets — so that prompt is on screen instead of behind the list.
+      let payload: unknown = null;
+      try { payload = await res.json(); } catch { /* fall through to onClose */ }
+      const opened = launchedSession(payload);
+      if (opened) onOpen(opened);
+      else onClose();
     } finally {
       setIsSubmitting(false);
     }
@@ -110,12 +118,9 @@ export default function NewTicketSheet(
             <option value={GENERAL}>General (home)</option>
             {projects.map((p) => <option key={p} value={p}>{p}</option>)}
           </select></label>
-        <label className="field"><span className="lbl">Title</span>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ticket title" />
-        </label>
-        <label className="field"><span className="lbl">Description</span>
-          <textarea rows={5} value={brief} onChange={(e) => setBrief(e.target.value)} onPaste={onPaste}
-            placeholder="Describe the ticket — this becomes the issue description. Paste or drop images." />
+        <label className="field"><span className="lbl">Note</span>
+          <textarea rows={6} value={brief} onChange={(e) => setBrief(e.target.value)} onPaste={onPaste}
+            placeholder="Jot the ticket down — a Claude session cleans it up and titles it. Paste or drop images." />
         </label>
         <div className="img-row">
           <button type="button" className="btn sm" onClick={() => fileInput.current?.click()}>Add image</button>
@@ -133,7 +138,7 @@ export default function NewTicketSheet(
             ))}
           </div>
         )}
-        <button className="btn primary block" disabled={!title.trim() || isSubmitting} onClick={create}>Create ticket</button>
+        <button className="btn primary block" disabled={!brief.trim() || isSubmitting} onClick={create}>Create ticket</button>
         {err && <p className="err-text">{err}</p>}
       </div>
     </div>

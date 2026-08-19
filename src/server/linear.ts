@@ -201,56 +201,6 @@ export async function downloadLinearAsset(
   return { bytes, contentType };
 }
 
-export async function createIssue(
-  apiKey: string,
-  input: { teamKey: string; title: string; description: string; projectName: string | null },
-  fetchImpl: typeof fetch = fetch,
-): Promise<{ identifier: string }> {
-  const teams = await query<{ teams: { nodes: { id: string; key: string }[] } }>(
-    apiKey,
-    {
-      query: `query ($key: String!) { teams(filter: { key: { eq: $key } }, first: 1) { nodes { id key } } }`,
-      variables: { key: input.teamKey },
-    },
-    fetchImpl,
-  );
-  const team = teams.teams.nodes[0];
-  if (!team) throw new Error(`team not found: ${input.teamKey}`);
-
-  // An unknown project name degrades to "no project" rather than failing the creation.
-  let projectId: string | undefined;
-  if (input.projectName) {
-    const projects = await query<{ projects: { nodes: { id: string; name: string }[] } }>(
-      apiKey,
-      {
-        query: `query ($name: String!) { projects(filter: { name: { eq: $name } }, first: 1) { nodes { id name } } }`,
-        variables: { name: input.projectName },
-      },
-      fetchImpl,
-    );
-    projectId = projects.projects.nodes[0]?.id;
-  }
-
-  const created = await query<{ issueCreate: { success: boolean; issue?: { identifier?: string } } }>(
-    apiKey,
-    {
-      query: `mutation ($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { identifier } } }`,
-      variables: {
-        input: {
-          teamId: team.id,
-          title: input.title,
-          description: input.description,
-          ...(projectId ? { projectId } : {}),
-        },
-      },
-    },
-    fetchImpl,
-  );
-  const identifier = created.issueCreate.issue?.identifier;
-  if (!created.issueCreate.success || !identifier) throw new Error("Linear issueCreate failed");
-  return { identifier };
-}
-
 export async function setIssueStatus(
   apiKey: string,
   identifier: string,

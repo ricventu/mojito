@@ -213,7 +213,8 @@ export default function UnifiedList(
           onOpenDocs={() => { setPicked(null); onOpenTicketDocs(picked); }} />
       )}
       {newTicket && (
-        <NewTicketSheet token={token} onClose={() => setNewTicket(false)} onCreated={onLaunched} />
+        <NewTicketSheet token={token} onClose={() => setNewTicket(false)} onCreated={onLaunched}
+          onOpen={(s) => { setNewTicket(false); onOpen(s); }} />
       )}
       {newSession && (
         <NewSessionSheet token={token} onClose={() => setNewSession(false)} onLaunched={onChanged}

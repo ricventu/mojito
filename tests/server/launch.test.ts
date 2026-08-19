@@ -8,6 +8,7 @@ import {
   launchMergeFixSession,
   buildShellCommand, launchShellSession,
   buildResolvePrompt, launchStackResolveSession,
+  launchIntakeSession,
   defaultResolveCwd,
 } from "@/server/launch";
 import { Registry } from "@/server/registry";
@@ -623,5 +624,49 @@ describe("launchStackResolveSession", () => {
     }
     // Command carries the seeded prompt as the final quoted arg, and no client string.
     expect(command).toMatch(/claude --model .* --effort .* --settings .* '.*force-push.*'/s);
+  });
+});
+
+// The intake session (New-ticket sheet): a custom session whose whole job is to turn the
+// human's rough note into a Linear issue, so it carries no ticket and reports nothing back
+// to Mojito — the issue it creates is the result.
+describe("launchIntakeSession", () => {
+  function intakeDeps(over: Record<string, unknown> = {}) {
+    const projectsPath = join(dir, "projects.json");
+    writeFileSync(projectsPath, JSON.stringify({ RIC: { projects: { Mojito: "/code/mojito" } } }));
+    return {
+      registry: new Registry(dir), stateDir: dir, port: 4711, token: "t", projectsPath,
+      hasSession: vi.fn(async () => false),
+      newSession: vi.fn(async (_name: string, _cwd: string, _command: string) => {}),
+      pipePane: vi.fn(async () => {}),
+      genId: () => "abc123",
+      homeDir: () => "/home/me",
+      nowIso: () => "2026-08-19T00:00:00.000Z",
+      ...over,
+    };
+  }
+
+  const intakeReq = { projectName: "Mojito", teamKey: "RIC", draftPath: "/state/drafts/ab12cd.json" };
+
+  it("opens the project's repo on sonnet at medium effort, seeded with the intake prompt", async () => {
+    const d = intakeDeps();
+    const res = await launchIntakeSession(intakeReq, d);
+    expect(res.ok).toBe(true);
+    const meta = (res as { ok: true; meta: SessionMeta }).meta;
+    expect(meta).toMatchObject({ kind: "custom", ticket: "", cwd: "/code/mojito", model: "sonnet", effort: "medium" });
+    const command = d.newSession.mock.calls[0][2];
+    expect(command).toContain("--model 'sonnet' --effort 'medium'");
+    expect(command).toContain("/state/drafts/ab12cd.json");
+  });
+
+  it("opens in the home directory for a General ticket", async () => {
+    const d = intakeDeps();
+    const res = await launchIntakeSession({ ...intakeReq, projectName: null }, d);
+    expect((res as { ok: true; meta: SessionMeta }).meta.cwd).toBe("/home/me");
+  });
+
+  it("refuses a project that maps to no repository", async () => {
+    const res = await launchIntakeSession({ ...intakeReq, projectName: "Ghost" }, intakeDeps());
+    expect(res).toMatchObject({ ok: false, reason: "no-repo" });
   });
 });

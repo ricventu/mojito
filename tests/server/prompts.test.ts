@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildWorkPrompt, buildMergeFixPrompt } from "@/server/prompts";
+import { buildWorkPrompt, buildMergeFixPrompt, buildIntakePrompt } from "@/server/prompts";
 
 const vars = { ticket: "RIC-46", contextPath: "/state/context/s1.json", resultPath: "/state/results/s1.json", hasAssets: true };
 const { hasAssets: _hasAssets, ...baseVars } = vars;
@@ -126,5 +126,54 @@ describe("prompt builder", () => {
 
   it("leaves the merge-fix prompt free of the asset paragraph", () => {
     expect(buildMergeFixPrompt(fixVars)).not.toContain("localPath");
+  });
+});
+
+const intakeVars = { draftPath: "/state/drafts/ab12cd.json", teamKey: "RIC", projectName: "Mojito" };
+
+// The intake session is the one session Mojito spawns that writes Linear itself: it exists
+// to create the issue, so there is no ticket for Mojito to create on its behalf and no
+// result file to report through. That makes it the deliberate exception to RIC-184's
+// silence — an exception scoped to this prompt alone, which is why the guards above run
+// over the work and merge-fix prompts only.
+describe("intake prompt", () => {
+  it("interpolates the draft path, the team and the project", () => {
+    const p = buildIntakePrompt(intakeVars);
+    expect(p).toContain("/state/drafts/ab12cd.json");
+    expect(p).toContain("RIC");
+    expect(p).toContain("Mojito");
+    expect(p).not.toContain("{{");
+  });
+
+  // "General" in the sheet means the ticket belongs to a team but to no project. The
+  // session must be told that plainly, or it invents one to fill the blank.
+  it("says the issue has no project when the draft carries none", () => {
+    const p = flat(buildIntakePrompt({ ...intakeVars, projectName: null }));
+    expect(p).toContain("no project");
+    expect(p).not.toContain("{{");
+  });
+
+  it("asks for the ticket copy in Italian", () => {
+    expect(flat(buildIntakePrompt(intakeVars))).toContain("in Italian");
+  });
+
+  it("has the session create the issue itself through the Linear MCP", () => {
+    const p = flat(buildIntakePrompt(intakeVars));
+    expect(p).toContain("Linear MCP");
+    expect(p).not.toContain("outcome"); // no result file: creating the issue IS the outcome
+  });
+
+  // The images are already on Linear (the API key is server-side), so the session embeds
+  // rather than uploads — telling it otherwise sends it looking for local files.
+  it("tells the session the images are already uploaded", () => {
+    expect(flat(buildIntakePrompt(intakeVars))).toContain("imageUrls");
+  });
+
+  // Project names come from projects.json, not from Mojito: a stray "{{" in one is a
+  // config typo, and a typo must not leave a live placeholder in the prompt (nor, as the
+  // work prompt does, fail the launch — there is no ticket yet to fall back to).
+  it("sanitizes a placeholder-looking project name instead of failing", () => {
+    const p = buildIntakePrompt({ ...intakeVars, projectName: "{{TEAM_KEY}}" });
+    expect(p).not.toContain("{{");
   });
 });

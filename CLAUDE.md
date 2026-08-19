@@ -14,15 +14,30 @@ Mojito owns the whole lifecycle — there is no external plugin:
   and whether the work takes a branch at all is the session's call, same as a hand-started
   session. The asset paragraph (`src/server/prompts/work.ts`) is interpolated only when
   the launch actually downloaded something.
-- **Linear**: `src/server/linear.ts` is a direct GraphQL client. Mojito writes issue
-  creation, status transitions, and assignee — never comments. **The prompts say nothing
-  about Linear to the spawned session** (RIC-184) — no ban, no permission. It used to ban
+- **Linear**: `src/server/linear.ts` is a direct GraphQL client. Mojito writes status
+  transitions and assignee — never comments, and no longer issue creation (see **New
+  ticket** below; `createIssue` is gone). **The prompts say nothing about Linear to the
+  spawned session** (RIC-184) — no ban, no permission. It used to ban
   Linear outright, which killed the follow-up tickets that surface mid-session; an explicit
   permission was tried next and was worse, since it had sessions opening tickets without
   asking. With no instruction the session behaves like any other: it proposes, the user
   confirms. `tests/server/prompts.test.ts` fails on either polarity creeping back. Nothing
   needs enforcing anyway — `setIssueStatus` writes the target state unconditionally, so
   Mojito's move is last-write-wins whatever the session did.
+- **New ticket**: the sheet takes a note and images, not a title — `POST /api/tickets`
+  uploads the images to Linear itself (the API key never leaves the server, and those
+  URLs sit behind Linear's file auth), writes the raw note plus the resulting URLs to
+  `<stateDir>/drafts/<random>.json` (`ticketDraft.ts`), and launches an **intake session**
+  (`launchIntakeSession`) that reads that draft, rewrites it, titles it, and creates the
+  issue *itself* through the Linear MCP. It is a plain custom session — no ticket, no
+  launch context, no result file — because the issue it creates is the whole outcome;
+  Sonnet at medium effort is inlined there, since no status names this work. Ticket copy
+  goes out in Italian whatever the note was written in. This is the one deliberate
+  exception to the silence above: `prompts/intake.ts` is the only prompt that mentions
+  Linear on purpose, which is why the RIC-184 guard in `tests/server/prompts.test.ts`
+  runs over the work and merge-fix prompts only. Nothing needs a confirmation step — the
+  MCP write raises Claude Code's own permission prompt, and the sheet lands the human in
+  that terminal (201 answers with the session meta) so they see it.
 - **Worktrees**: a ticket launch resolves its worktree first via the legacy branch-name
   scan (`resolveWorktree`, any worktree whose branch carries the ticket id, wherever it
   lives), then the fixed `.claude/worktrees/<ticket>-<slug>` path Mojito itself creates

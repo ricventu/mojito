@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
-import { getConfig } from "@/server/app";
+import { getConfig, getRegistry } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
-import { listOpenIssues, createIssue, uploadImage } from "@/server/linear";
+import { listOpenIssues, uploadImage } from "@/server/linear";
 import { validateImages } from "@/server/imageUpload";
+import { launchIntakeSession } from "@/server/launch";
+import { writeTicketDraft } from "@/server/ticketDraft";
 import { loadProjectMap, teamKeyForProject } from "@/server/projects";
+import { hasSession, newSession, pipePane } from "@/server/tmux";
 
 export async function GET(req: Request) {
   const cfg = getConfig();
@@ -15,31 +18,38 @@ export async function GET(req: Request) {
   }
 }
 
+/**
+ * New ticket. Mojito no longer creates the issue: it prepares the draft and hands it to an
+ * intake session, which writes the title and the description and creates the issue itself
+ * through the Linear MCP (see launchIntakeSession). What stays server-side is the part the
+ * session cannot do — the images, since LINEAR_API_KEY never leaves this process. The 201
+ * body is that session's meta, so the client can land straight in its terminal, where the
+ * MCP write asks for permission.
+ */
 export async function POST(req: Request) {
   const cfg = getConfig();
   if (!tokenFromHeaders(req.headers, cfg.token)) return new NextResponse("unauthorized", { status: 401 });
   let body;
   try { body = await req.json(); } catch { return new NextResponse("bad json", { status: 400 }); }
-  const title = typeof body.title === "string" ? body.title.trim() : "";
   const brief = typeof body.brief === "string" ? body.brief.trim() : "";
-  if (!title) return NextResponse.json({ error: "empty title" }, { status: 400 });
+  if (!brief) return NextResponse.json({ error: "empty brief" }, { status: 400 });
   const parsed = validateImages(body.images);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+  const projectName = body.projectName ?? null;
+  const teamKey = teamKeyForProject(loadProjectMap(cfg.projectsPath), projectName);
+  if (!teamKey) return NextResponse.json({ error: "no team configured" }, { status: 422 });
   let imageUrls: string[];
   try {
     imageUrls = await Promise.all(parsed.files.map((f) => uploadImage(cfg.linearApiKey, f)));
   } catch {
     return NextResponse.json({ error: "image upload failed" }, { status: 502 });
   }
-  const teamKey = teamKeyForProject(loadProjectMap(cfg.projectsPath), body.projectName ?? null);
-  if (!teamKey) return NextResponse.json({ error: "no team configured" }, { status: 422 });
-  const description = imageUrls.length ? `${brief}\n\n${imageUrls.map((u) => `![](${u})`).join("\n")}` : brief;
-  try {
-    const created = await createIssue(cfg.linearApiKey, {
-      teamKey, title, description, projectName: body.projectName ?? null,
-    });
-    return NextResponse.json(created, { status: 201 });
-  } catch {
-    return NextResponse.json({ error: "issue creation failed" }, { status: 502 });
-  }
+  const draftPath = writeTicketDraft(cfg.stateDir, { brief, teamKey, projectName, imageUrls });
+  const res = await launchIntakeSession(
+    { projectName, teamKey, draftPath },
+    { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
+      projectsPath: cfg.projectsPath, hasSession, newSession, pipePane },
+  );
+  if (!res.ok) return NextResponse.json({ error: res.reason }, { status: 422 });
+  return NextResponse.json(res.meta, { status: 201 });
 }

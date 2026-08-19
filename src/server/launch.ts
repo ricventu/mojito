@@ -11,7 +11,7 @@ import { findExistingTicketWorktree, createTicketWorktree } from "./worktree.js"
 import { logfilePath } from "./sidecar.js";
 import type { Registry } from "./registry.js";
 import { writeLaunchContext } from "./launchContext.js";
-import { buildWorkPrompt, buildMergeFixPrompt } from "./prompts.js";
+import { buildWorkPrompt, buildMergeFixPrompt, buildIntakePrompt } from "./prompts.js";
 import type { MergeMode } from "./merge.js";
 import { resultPath, clearSessionResult } from "./sessionResult.js";
 import type { TicketAsset, TicketAttachment } from "./ticketAssets.js";
@@ -432,4 +432,33 @@ export async function launchStackResolveSession(
   const effort: Effort = "xhigh";
   const prompt = buildResolvePrompt(req.projectName, repo, req.branch);
   return launchCustomSession({ projectName: req.projectName, model, effort, prompt }, deps);
+}
+
+export interface IntakeLaunchRequest {
+  projectName: string | null;
+  teamKey: string;
+  // Written by the route before the launch (writeTicketDraft): it holds the human's raw
+  // note and the image urls Mojito already uploaded, neither of which belongs on a
+  // command line. The prompt names this path; the session reads it.
+  draftPath: string;
+}
+
+/**
+ * Launch the session that turns a New-ticket draft into a Linear issue. A custom session
+ * — no ticket, no launch context, no result file — because at this point there is no
+ * ticket: the session creates it through the Linear MCP and that is the end of its job.
+ * Sonnet at medium effort is inlined rather than resolved through BUILTIN_STAGE_DEFAULTS:
+ * this is a rewrite of one paragraph, not work on a ticket, and no status names it.
+ */
+export async function launchIntakeSession(
+  req: IntakeLaunchRequest,
+  deps: LaunchDeps & { genId?: () => string; homeDir?: () => string },
+): Promise<{ ok: true; meta: SessionMeta } | { ok: false; reason: "no-repo" }> {
+  const prompt = buildIntakePrompt({
+    draftPath: req.draftPath, teamKey: req.teamKey, projectName: req.projectName,
+  });
+  return launchCustomSession(
+    { projectName: req.projectName, model: "sonnet", effort: "medium", prompt },
+    deps,
+  );
 }

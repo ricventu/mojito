@@ -1,5 +1,6 @@
 import { WORK_PROMPT_TEMPLATE, ASSETS_PARAGRAPH } from "./prompts/work.js";
 import { MERGE_FIX_PROMPT_TEMPLATE, COMPLETE_STEP_LOCAL, COMPLETE_STEP_MR } from "./prompts/conflict.js";
+import { INTAKE_PROMPT_TEMPLATE } from "./prompts/intake.js";
 import type { MergeMode } from "./merge.js";
 
 export interface PromptVars {
@@ -43,4 +44,26 @@ export function buildMergeFixPrompt(vars: MergeFixPromptVars): string {
   return render(MERGE_FIX_PROMPT_TEMPLATE, base)
     .replaceAll("{{COMPLETE_STEP}}", mergeMode === "local" ? COMPLETE_STEP_LOCAL : COMPLETE_STEP_MR)
     .replaceAll("{{BLOCKER}}", safeBlocker);
+}
+
+export interface IntakePromptVars {
+  draftPath: string;
+  teamKey: string;
+  // null = the "General" choice in the sheet: a team, but no Linear project.
+  projectName: string | null;
+}
+
+// Neutralized rather than rejected, unlike the work prompt's vars: the team key and the
+// project name come out of projects.json, and a typo in a config file must not be able to
+// fail a ticket the human has already written.
+const defuse = (s: string) => s.replaceAll("{{", "{ {");
+
+export function buildIntakePrompt(vars: IntakePromptVars): string {
+  const clause = vars.projectName
+    ? `in project "${defuse(vars.projectName)}"`
+    : "with no project (the sheet's \"General\" choice)";
+  return INTAKE_PROMPT_TEMPLATE
+    .replaceAll("{{DRAFT_PATH}}", defuse(vars.draftPath))
+    .replaceAll("{{TEAM_KEY}}", defuse(vars.teamKey))
+    .replaceAll("{{PROJECT_CLAUSE}}", clause);
 }

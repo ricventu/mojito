@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { listOpenIssues, getIssueStatus, getIssueRef, setIssueStatus, setIssueAssignee, uploadImage, getIssueContent, createIssue, downloadLinearAsset } from "@/server/linear";
+import { listOpenIssues, getIssueStatus, getIssueRef, setIssueStatus, setIssueAssignee, uploadImage, getIssueContent, downloadLinearAsset } from "@/server/linear";
 
 function fakeFetch(payload: unknown) {
   return vi.fn(async () => ({ ok: true, json: async () => ({ data: payload }) })) as unknown as typeof fetch;
@@ -200,33 +200,6 @@ describe("getIssueContent", () => {
     const body = (impl as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string;
     expect(body).toContain("description");
     expect(body).toContain("attachments(first: 25)");
-  });
-});
-
-describe("createIssue", () => {
-  it("resolves team and project, then creates", async () => {
-    const { impl, calls } = fakeFetchWithCalls([
-      { teams: { nodes: [{ id: "team-1", key: "RIC" }] } },
-      { projects: { nodes: [{ id: "proj-1", name: "Mojito" }] } },
-      { issueCreate: { success: true, issue: { identifier: "RIC-200" } } },
-    ]);
-    const res = await createIssue("key", { teamKey: "RIC", title: "T", description: "D", projectName: "Mojito" }, impl);
-    expect(res.identifier).toBe("RIC-200");
-    expect(calls[2].body).toContain("proj-1");
-  });
-  it("creates without a project when projectName is null", async () => {
-    const { impl, calls } = fakeFetchWithCalls([
-      { teams: { nodes: [{ id: "team-1", key: "RIC" }] } },
-      { issueCreate: { success: true, issue: { identifier: "RIC-201" } } },
-    ]);
-    const res = await createIssue("key", { teamKey: "RIC", title: "T", description: "D", projectName: null }, impl);
-    expect(res.identifier).toBe("RIC-201");
-    expect(calls).toHaveLength(2);
-  });
-  it("throws when the team is unknown", async () => {
-    const { impl } = fakeFetchWithCalls([{ teams: { nodes: [] } }]);
-    await expect(createIssue("key", { teamKey: "XX", title: "T", description: "D", projectName: null }, impl))
-      .rejects.toThrow("team not found: XX");
   });
 });
 
