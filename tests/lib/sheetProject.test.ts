@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { knownProject, newTicketProject } from "@/lib/newTicketProject";
+import { knownProject, newTicketProject } from "@/lib/sheetProject";
 import { NO_FILTERS, type AppView, type ListFilters } from "@/lib/appLocation";
 import type { SessionMeta } from "@/server/types";
 

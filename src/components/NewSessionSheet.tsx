@@ -1,33 +1,32 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiFetch } from "@/lib/client";
 import { launchedSession } from "@/lib/launchedSession";
+import { GENERAL, useProjectPicker } from "@/lib/useProjectPicker";
 import type { SessionMeta } from "@/server/types";
 
 const MODELS = ["opus", "sonnet", "fable"];
 const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
-const GENERAL = "__general__";
 
 export default function NewSessionSheet(
-  { token, onClose, onLaunched, onOpen }:
-  { token: string; onClose: () => void; onLaunched: () => void; onOpen: (s: SessionMeta) => void },
+  { token, defaultProject, onClose, onLaunched, onOpen }:
+  {
+    token: string;
+    // The board's active project chip — a session started while looking at one project
+    // is for that project (RIC-224). `null` is General (home).
+    defaultProject: string | null;
+    onClose: () => void;
+    onLaunched: () => void;
+    onOpen: (s: SessionMeta) => void;
+  },
 ) {
-  const [projects, setProjects] = useState<string[]>([]);
-  const [project, setProject] = useState(GENERAL);
+  const { projects, project, setProject, projectName } = useProjectPicker(token, defaultProject);
   const [mode, setMode] = useState<"claude" | "terminal">("claude");
   const [model, setModel] = useState("opus");
   const [effort, setEffort] = useState("high");
   const [err, setErr] = useState<string | null>(null);
 
-  useEffect(() => {
-    apiFetch(token, "/api/projects")
-      .then((r) => (r.ok ? r.json() : { projects: [] }))
-      .then((d: { projects: string[] }) => setProjects(d.projects))
-      .catch(() => setProjects([]));
-  }, [token]);
-
   const start = async () => {
-    const projectName = project === GENERAL ? null : project;
     const body = mode === "terminal"
       ? { kind: "shell", projectName }
       : { kind: "custom", projectName, model, effort };

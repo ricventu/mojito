@@ -56,12 +56,18 @@ Mojito owns the whole lifecycle — there is no external plugin:
   reserved tab a url closes it instead of leaving an `about:blank` behind. The sheet
   itself is owned by `page.tsx`, not by `UnifiedList`, and rendered into every branch —
   the action is on the terminal header too (`.term-actions`), where the list is not
-  mounted. Which project it opens on is `newTicketProject`: the open session's own
-  project on a terminal (a ticket jotted down while watching a session almost always
-  belongs to that repo), otherwise whatever project chip the board is filtered on;
-  `knownProject` resolves a name `projects.json` has since dropped back to General,
-  because a `<select>` on a value with no `<option>` renders blank and submits whatever
-  the browser fell back to.
+  mounted. Which project it opens on is `newTicketProject` (`src/lib/sheetProject.ts`):
+  the open session's own project on a terminal (a ticket jotted down while watching a
+  session almost always belongs to that repo), otherwise whatever project chip the board
+  is filtered on. **New session** pre-selects that same chip — it is only reachable from
+  the list, so it takes `filters.project` directly. Both sheets share the Project field
+  through `useProjectPicker`, the glue half of the usual split (cf. `useToken` ÷
+  `resolveInitialToken`): the rule lives in `knownProject`, which resolves a name
+  `projects.json` has since dropped back to General, because a `<select>` on a value with
+  no `<option>` renders blank and submits whatever the browser fell back to. An *empty*
+  project list reads as "not loaded yet", not "none exist" — /api/projects answers a
+  render after the sheet opens, and resolving against that first empty pass would throw
+  every pre-selection away.
 - **Worktrees**: a ticket launch resolves its worktree first via the legacy branch-name
   scan (`resolveWorktree`, any worktree whose branch carries the ticket id, wherever it
   lives), then the fixed `.claude/worktrees/<ticket>-<slug>` path Mojito itself creates

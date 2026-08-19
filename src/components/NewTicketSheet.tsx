@@ -1,14 +1,12 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { apiFetch } from "@/lib/client";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES, MAX_IMAGES } from "@/lib/imageConstants";
 import { readAsDataUrl } from "@/lib/readAsDataUrl";
 import { launchedSession } from "@/lib/launchedSession";
 import { sessionUrl } from "@/lib/appLocation";
-import { knownProject } from "@/lib/newTicketProject";
+import { GENERAL, useProjectPicker } from "@/lib/useProjectPicker";
 import type { SessionMeta } from "@/server/types";
-
-const GENERAL = "__general__";
 
 interface PendingImage { id: string; name: string; type: string; dataUrl: string; }
 
@@ -31,27 +29,12 @@ export default function NewTicketSheet(
     onOpen: (s: SessionMeta) => void;
   },
 ) {
-  const [projects, setProjects] = useState<string[]>([]);
-  const [project, setProject] = useState(defaultProject ?? GENERAL);
+  const { projects, project, setProject, projectName } = useProjectPicker(token, defaultProject);
   const [brief, setBrief] = useState("");
   const [images, setImages] = useState<PendingImage[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    apiFetch(token, "/api/projects")
-      .then((r) => (r.ok ? r.json() : { projects: [] }))
-      .then((d: { projects: string[] }) => {
-        setProjects(d.projects);
-        // The pre-selection is made before this list exists, and it can name a project
-        // projects.json no longer has — a `<select>` on a value with no `<option>`
-        // renders blank, so resolve it back to General instead. Applied to the live
-        // value, not to `defaultProject`, so it cannot undo a choice made meanwhile.
-        setProject((p) => (p === GENERAL ? p : knownProject(p, d.projects) ?? GENERAL));
-      })
-      .catch(() => setProjects([]));
-  }, [token]);
 
   const addFiles = async (files: File[]) => {
     setErr(null);
@@ -113,7 +96,7 @@ export default function NewTicketSheet(
         method: "POST",
         body: JSON.stringify({
           brief: brief.trim(),
-          projectName: project === GENERAL ? null : project,
+          projectName,
           images: images.map(({ name, type, dataUrl }) => ({ name, type, dataUrl })),
         }),
       });

@@ -217,7 +217,8 @@ export default function UnifiedList(
           onOpenDocs={() => { setPicked(null); onOpenTicketDocs(picked); }} />
       )}
       {newSession && (
-        <NewSessionSheet token={token} onClose={() => setNewSession(false)} onLaunched={onChanged}
+        <NewSessionSheet token={token} defaultProject={project}
+          onClose={() => setNewSession(false)} onLaunched={onChanged}
           onOpen={(s) => { setNewSession(false); onOpen(s); }} />
       )}
     </div>

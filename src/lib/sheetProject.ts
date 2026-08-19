@@ -2,7 +2,8 @@ import type { AppView, ListFilters } from "./appLocation";
 import type { SessionMeta } from "@/server/types";
 
 /**
- * Which project the New ticket sheet opens on.
+ * Which project the New ticket sheet opens on. (New session takes the board's project
+ * filter directly — it is only reachable from the list.)
  *
  * The action sits in the terminal header as well as on the board (RIC-224), and a
  * ticket jotted down while watching a session almost always belongs to that session's

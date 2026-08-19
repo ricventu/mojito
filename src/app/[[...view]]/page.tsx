@@ -16,7 +16,7 @@ import NewTicketSheet from "@/components/NewTicketSheet";
 import DocsView from "@/components/DocsView";
 import { tabTitle } from "@/lib/tabTitle";
 import { withSession } from "@/lib/launchedSession";
-import { newTicketProject } from "@/lib/newTicketProject";
+import { newTicketProject } from "@/lib/sheetProject";
 import type { AppView, ListFilters } from "@/lib/appLocation";
 import type { SessionMeta } from "@/server/types";
 import type { MojitoEvent } from "@/server/events";
