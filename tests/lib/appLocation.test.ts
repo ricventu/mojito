@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  formatLocation, NO_FILTERS, parseLocation, type AppLocation,
+  formatLocation, NO_FILTERS, parseLocation, sessionUrl, type AppLocation,
 } from "@/lib/appLocation";
 
 const list = (filters: Partial<typeof NO_FILTERS> = {}): AppLocation => ({
@@ -150,5 +150,25 @@ describe("round trip", () => {
       const [pathname, search] = url.split("?");
       expect(parseLocation(pathname, search ? `?${search}` : ""), url).toEqual(loc);
     }
+  });
+});
+
+describe("sessionUrl", () => {
+  it("is the bare terminal path, with no filters carried along", () => {
+    expect(sessionUrl("mojito-RIC-224-work")).toBe("/session/mojito-RIC-224-work");
+  });
+
+  it("encodes the id, like every other path this module writes", () => {
+    expect(sessionUrl("a/b c")).toBe("/session/a%2Fb%20c");
+  });
+
+  // It addresses a *new browser tab*, which has no history and no filter state of its
+  // own: anything but a clean url would hand that tab a board narrowed by whatever the
+  // opener happened to be filtering on.
+  it("parses back to that session with the default filters", () => {
+    expect(parseLocation(sessionUrl("s1"), "")).toEqual({
+      view: { kind: "session", id: "s1", docs: null },
+      filters: NO_FILTERS,
+    });
   });
 });

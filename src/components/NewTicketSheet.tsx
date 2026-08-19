@@ -4,6 +4,8 @@ import { apiFetch } from "@/lib/client";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES, MAX_IMAGES } from "@/lib/imageConstants";
 import { readAsDataUrl } from "@/lib/readAsDataUrl";
 import { launchedSession } from "@/lib/launchedSession";
+import { sessionUrl } from "@/lib/appLocation";
+import { knownProject } from "@/lib/newTicketProject";
 import type { SessionMeta } from "@/server/types";
 
 const GENERAL = "__general__";
@@ -18,11 +20,19 @@ function newImageId(): string {
 }
 
 export default function NewTicketSheet(
-  { token, onClose, onCreated, onOpen }:
-  { token: string; onClose: () => void; onCreated: () => void; onOpen: (s: SessionMeta) => void },
+  { token, defaultProject, onClose, onCreated, onOpen }:
+  {
+    token: string;
+    // Which project the sheet opens on — see newTicketProject. `null` is General (home).
+    defaultProject: string | null;
+    onClose: () => void;
+    onCreated: () => void;
+    // The fallback for when the browser refused the new tab; see `create`.
+    onOpen: (s: SessionMeta) => void;
+  },
 ) {
   const [projects, setProjects] = useState<string[]>([]);
-  const [project, setProject] = useState(GENERAL);
+  const [project, setProject] = useState(defaultProject ?? GENERAL);
   const [brief, setBrief] = useState("");
   const [images, setImages] = useState<PendingImage[]>([]);
   const [err, setErr] = useState<string | null>(null);
@@ -32,7 +42,14 @@ export default function NewTicketSheet(
   useEffect(() => {
     apiFetch(token, "/api/projects")
       .then((r) => (r.ok ? r.json() : { projects: [] }))
-      .then((d: { projects: string[] }) => setProjects(d.projects))
+      .then((d: { projects: string[] }) => {
+        setProjects(d.projects);
+        // The pre-selection is made before this list exists, and it can name a project
+        // projects.json no longer has — a `<select>` on a value with no `<option>`
+        // renders blank, so resolve it back to General instead. Applied to the live
+        // value, not to `defaultProject`, so it cannot undo a choice made meanwhile.
+        setProject((p) => (p === GENERAL ? p : knownProject(p, d.projects) ?? GENERAL));
+      })
       .catch(() => setProjects([]));
   }, [token]);
 
@@ -85,6 +102,12 @@ export default function NewTicketSheet(
     if (isSubmitting) return;
     setErr(null);
     setIsSubmitting(true);
+    // Reserved on the click itself, before the first await: a window.open that runs
+    // after one is a popup as far as the browser is concerned and gets blocked. `null`
+    // means it was blocked anyway (or blocked pre-emptively), which the paths below
+    // treat as "no second tab" rather than as a failure.
+    const tab = window.open("", "_blank");
+    let handedOff = false;
     try {
       const res = await apiFetch(token, "/api/tickets", {
         method: "POST",
@@ -97,14 +120,28 @@ export default function NewTicketSheet(
       if (!res.ok) { setErr(await res.text()); return; }
       onCreated();
       // The issue does not exist yet: the intake session writes it, and it asks for
-      // permission before the Linear write. Land in its terminal — same rule as the other
-      // sheets — so that prompt is on screen instead of behind the list.
+      // permission before the Linear write, so its terminal has to be on screen rather
+      // than behind the list. It goes in a *new browser tab* (RIC-224) — the tab that
+      // opened the sheet stays where it was, which is the point of an action reachable
+      // from any page: jotting a ticket down must not cost you the session you were
+      // watching.
       let payload: unknown = null;
       try { payload = await res.json(); } catch { /* fall through to onClose */ }
       const opened = launchedSession(payload);
-      if (opened) onOpen(opened);
-      else onClose();
+      if (!opened) { onClose(); return; }
+      // A refused popup is not a reason to lose the permission prompt: fall back to
+      // the in-place navigation this sheet did before there was a second tab.
+      if (tab) {
+        handedOff = true;
+        tab.location.replace(sessionUrl(opened.id));
+        onClose();
+      } else {
+        onOpen(opened);
+      }
     } finally {
+      // Anything that did not hand the reserved tab a url leaves it sitting on
+      // about:blank — an error, a body without an id, a throwing fetch.
+      if (!handedOff) tab?.close();
       setIsSubmitting(false);
     }
   };

@@ -131,3 +131,14 @@ export function formatLocation({ view, filters }: AppLocation): string {
   const query = params.toString();
   return query === "" ? viewPath(view) : `${viewPath(view)}?${query}`;
 }
+
+/**
+ * The url of a session's terminal, clean of filters.
+ *
+ * For the one navigation that does not go through the history glue: opening a session
+ * in a *new browser tab*, which starts with no location of its own, so the opener's
+ * filters have no business travelling with it.
+ */
+export function sessionUrl(id: string): string {
+  return formatLocation({ view: { kind: "session", id, docs: null }, filters: NO_FILTERS });
+}

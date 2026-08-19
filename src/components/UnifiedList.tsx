@@ -3,7 +3,6 @@ import { useMemo, useState } from "react";
 import { apiFetch } from "@/lib/client";
 import { dismissSession } from "@/lib/dismissSession";
 import LaunchSheet from "./LaunchSheet";
-import NewTicketSheet from "./NewTicketSheet";
 import NewSessionSheet from "./NewSessionSheet";
 import FilterBar from "./FilterBar";
 import ActiveFilters from "./ActiveFilters";
@@ -28,7 +27,7 @@ const NO_TICKET = "No ticket";
 export default function UnifiedList(
   {
     token, tickets, sessions, filters, onFilters,
-    onLaunched, onChanged, onOpen, onOpenTicketDocs, onOpenSessionDocs,
+    onLaunched, onChanged, onNewTicket, onOpen, onOpenTicketDocs, onOpenSessionDocs,
   }: {
     token: string;
     tickets: TicketSummary[];
@@ -37,13 +36,15 @@ export default function UnifiedList(
     onFilters: (f: ListFilters, mode: "push" | "replace") => void;
     onLaunched: () => void;
     onChanged: () => void;
+    // Owned by the page, not here: the same sheet is reachable from the terminal
+    // header, which this component is not on screen for (RIC-224).
+    onNewTicket: () => void;
     onOpen: (s: SessionMeta) => void;
     onOpenTicketDocs: (t: TicketSummary) => void;
     onOpenSessionDocs: (s: SessionMeta) => void;
   },
 ) {
   const [picked, setPicked] = useState<TicketSummary | null>(null);
-  const [newTicket, setNewTicket] = useState(false);
   const [newSession, setNewSession] = useState(false);
 
   // The filters live in the url (see appLocation), not in this component and not in
@@ -139,7 +140,7 @@ export default function UnifiedList(
       {empty && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <p className="empty">Nothing here yet.</p>
-          <button className="btn primary block" onClick={() => setNewTicket(true)}>+ New ticket</button>
+          <button className="btn primary block" onClick={onNewTicket}>+ New ticket</button>
           <button className="btn ghost block" onClick={() => setNewSession(true)}>New session</button>
         </div>
       )}
@@ -153,7 +154,7 @@ export default function UnifiedList(
           placeholder="Filter tickets and sessions…"
           action={
             <>
-              <button className="btn primary sm" onClick={() => setNewTicket(true)}>+ Ticket</button>
+              <button className="btn primary sm" onClick={onNewTicket}>+ Ticket</button>
               <button className="btn ghost sm" onClick={() => setNewSession(true)}>+ Session</button>
               <button className="btn ghost sm" onClick={cleanup}>Clean up</button>
             </>
@@ -214,10 +215,6 @@ export default function UnifiedList(
           onClose={() => setPicked(null)} onLaunched={onLaunched}
           onOpen={(s) => { setPicked(null); onOpen(s); }}
           onOpenDocs={() => { setPicked(null); onOpenTicketDocs(picked); }} />
-      )}
-      {newTicket && (
-        <NewTicketSheet token={token} onClose={() => setNewTicket(false)} onCreated={onLaunched}
-          onOpen={(s) => { setNewTicket(false); onOpen(s); }} />
       )}
       {newSession && (
         <NewSessionSheet token={token} onClose={() => setNewSession(false)} onLaunched={onChanged}

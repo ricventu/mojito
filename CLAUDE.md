@@ -47,7 +47,21 @@ Mojito owns the whole lifecycle — there is no external plugin:
   RIC-184 guard in `tests/server/prompts.test.ts` runs over the work and merge-fix prompts
   only. Nothing needs a confirmation step — the MCP write raises Claude Code's own
   permission prompt, and the sheet lands the human in that terminal (201 answers with the
-  session meta) so they see it.
+  session meta) so they see it — in a **new browser tab** since RIC-224, so that jotting a
+  ticket down never costs you the page you were on. The tab is reserved with a
+  `window.open("", "_blank")` on the click itself, *before* the POST: a window.open that
+  runs after an `await` is a popup as far as the browser is concerned and gets blocked.
+  A `null` handle (blocked anyway) falls back to the in-place navigation the sheet did
+  before, rather than dropping the permission prompt; any path that never hands the
+  reserved tab a url closes it instead of leaving an `about:blank` behind. The sheet
+  itself is owned by `page.tsx`, not by `UnifiedList`, and rendered into every branch —
+  the action is on the terminal header too (`.term-actions`), where the list is not
+  mounted. Which project it opens on is `newTicketProject`: the open session's own
+  project on a terminal (a ticket jotted down while watching a session almost always
+  belongs to that repo), otherwise whatever project chip the board is filtered on;
+  `knownProject` resolves a name `projects.json` has since dropped back to General,
+  because a `<select>` on a value with no `<option>` renders blank and submits whatever
+  the browser fell back to.
 - **Worktrees**: a ticket launch resolves its worktree first via the legacy branch-name
   scan (`resolveWorktree`, any worktree whose branch carries the ticket id, wherever it
   lives), then the fixed `.claude/worktrees/<ticket>-<slug>` path Mojito itself creates

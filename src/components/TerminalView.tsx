@@ -28,7 +28,7 @@ import { quoteArg } from "@/lib/quoteArg";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 
 export default function TerminalView(
-  { token, session, tickets, docs, onOpenDocs, onSelectDoc, onBack }:
+  { token, session, tickets, docs, onNewTicket, onOpenDocs, onSelectDoc, onBack }:
   {
     token: string;
     session: SessionMeta;
@@ -37,6 +37,9 @@ export default function TerminalView(
     // closes it instead of leaving the terminal — and the terminal stays mounted
     // underneath, because the page keeps rendering this view for that path.
     docs: { doc: string | null } | null;
+    // The New ticket sheet is the page's, not this component's: it has to be reachable
+    // from here too (RIC-224), and it opens pre-set to this session's project.
+    onNewTicket: () => void;
     onOpenDocs: () => void;
     onSelectDoc: (path: string) => void;
     onBack: () => void;
@@ -396,6 +399,7 @@ export default function TerminalView(
           {head.title && <span className="title">{head.title}</span>}
         </div>
         <div className="term-actions">
+          <button className="btn sm" aria-label="New ticket" title="New ticket" onClick={onNewTicket}>+</button>
           <button className="btn sm" aria-label="Documents" title="Documents" onClick={onOpenDocs}>📄</button>
           <StateBadge state={session.state} />
           <button

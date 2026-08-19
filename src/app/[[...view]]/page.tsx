@@ -12,9 +12,11 @@ import UnifiedList from "@/components/UnifiedList";
 import StacksPanel from "@/components/StacksPanel";
 import AlertLayer from "@/components/AlertLayer";
 import SettingsSheet from "@/components/SettingsSheet";
+import NewTicketSheet from "@/components/NewTicketSheet";
 import DocsView from "@/components/DocsView";
 import { tabTitle } from "@/lib/tabTitle";
 import { withSession } from "@/lib/launchedSession";
+import { newTicketProject } from "@/lib/newTicketProject";
 import type { AppView, ListFilters } from "@/lib/appLocation";
 import type { SessionMeta } from "@/server/types";
 import type { MojitoEvent } from "@/server/events";
@@ -37,6 +39,7 @@ export default function Home() {
   const { view, filters } = location;
   const [alerts, setAlerts] = useState<{ id: string; ticket: string; message: string }[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [newTicketOpen, setNewTicketOpen] = useState(false);
   const { tickets, refresh: refreshTickets } = useTickets(token);
   const { sessions, setSessions, loaded: sessionsLoaded, refresh: refreshSessions } = useSessions(token);
   // Owned here — not by StacksPanel or SettingsSheet — so a deploy's health poll and
@@ -81,6 +84,30 @@ export default function Home() {
 
   if (!token) return <TokenGate onSet={setToken} />;
 
+  const openTerminal = (id: string) => go({ kind: "session", id, docs: null });
+  // Opening a session we were handed the meta for — a launch that just answered, or a
+  // stack that was just started. Seed the list with it first: its refresh is still in
+  // flight, and an unknown /session/<id> corrects itself back to the board (see
+  // missingSession above) before the terminal would ever mount.
+  const openLaunched = (s: SessionMeta) => {
+    setSessions((prev) => withSession(prev, s));
+    openTerminal(s.id);
+  };
+
+  // Owned here rather than by the list, because the action that opens it is on the
+  // terminal header too (RIC-224) and the list is not mounted there. It is rendered
+  // into every branch below for the same reason. Which project it opens on depends on
+  // where it was opened from — see newTicketProject.
+  const newTicketSheet = newTicketOpen && (
+    <NewTicketSheet
+      token={token}
+      defaultProject={newTicketProject(view, filters, openSession)}
+      onClose={() => setNewTicketOpen(false)}
+      onCreated={() => { refreshSessions(); refreshTickets(); }}
+      onOpen={(s) => { setNewTicketOpen(false); openLaunched(s); }}
+    />
+  );
+
   if (view.kind === "session") {
     // Nothing to draw until the session list has answered (see useSessions.loaded);
     // an id that never resolves is corrected by the effect above.
@@ -92,11 +119,13 @@ export default function Home() {
       ? { kind: "session", id: view.id, docs: { doc: null } }
       : view.docs != null ? { kind: "session", id: view.id, docs: null } : LIST;
     return (
+      <>
       <TerminalView
         token={token}
         session={openSession}
         tickets={tickets}
         docs={view.docs}
+        onNewTicket={() => setNewTicketOpen(true)}
         onOpenDocs={() => go({ kind: "session", id: view.id, docs: { doc: null } })}
         onSelectDoc={(doc) => go({ kind: "session", id: view.id, docs: { doc } })}
         onBack={() => {
@@ -107,6 +136,8 @@ export default function Home() {
           if (view.docs === null) refreshSessions();
         }}
       />
+      {newTicketSheet}
+      </>
     );
   }
 
@@ -121,6 +152,7 @@ export default function Home() {
       ? target.ticket
       : session?.ticket || session?.title || target.session;
     return (
+      <>
       <DocsView
         token={token}
         target={target}
@@ -129,30 +161,25 @@ export default function Home() {
         onSelect={(doc) => go({ ...view, doc })}
         onBack={() => back({ view: view.doc !== null ? { ...view, doc: null } : LIST, filters })}
       />
+      {newTicketSheet}
+      </>
     );
   }
 
   const needsInput = sessions.filter((s) => s.state === "needs-input").length;
-  const openTerminal = (id: string) => go({ kind: "session", id, docs: null });
-  // Opening a session we were handed the meta for — a launch that just answered, or a
-  // stack that was just started. Seed the list with it first: its refresh is still in
-  // flight, and an unknown /session/<id> corrects itself back to the board (see
-  // missingSession above) before the terminal would ever mount.
-  const openLaunched = (s: SessionMeta) => {
-    setSessions((prev) => withSession(prev, s));
-    openTerminal(s.id);
-  };
 
   return (
     <div style={{ paddingBottom: 64 }}>
       <AlertLayer alerts={alerts} onOpen={openTerminal} onClear={() => setAlerts([])} />
       {settingsOpen && <SettingsSheet token={token} onClose={() => setSettingsOpen(false)} selfUpdate={selfUpdate} />}
+      {newTicketSheet}
       {view.kind === "stacks"
         ? <StacksPanel token={token} onOpenLogs={openLaunched} selfUpdate={selfUpdate} />
         : <UnifiedList token={token} tickets={tickets} sessions={sessions}
             filters={filters} onFilters={setFilters}
             onLaunched={() => { refreshSessions(); refreshTickets(); }}
             onChanged={refreshSessions}
+            onNewTicket={() => setNewTicketOpen(true)}
             onOpen={openLaunched}
             onOpenTicketDocs={(t) => go({ kind: "docs", target: { ticket: t.identifier, project: t.project }, doc: null })}
             onOpenSessionDocs={(s) => go({ kind: "docs", target: { session: s.id }, doc: null })} />}
