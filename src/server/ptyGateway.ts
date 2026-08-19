@@ -64,7 +64,13 @@ export function attachPty(ws: WebSocket, id: string, deps: Partial<AttachDeps> =
     }
   });
 
+  // Set by the close handler below and read before the spawn: a socket can close
+  // while the session check is still in flight, and the handler cannot kill a pty
+  // that does not exist yet (see the guard in the .then()).
+  let socketClosed = false;
+
   ws.on("close", () => {
+    socketClosed = true;
     try {
       pty?.kill();
     } catch {
@@ -80,6 +86,14 @@ export function attachPty(ws: WebSocket, id: string, deps: Partial<AttachDeps> =
   // the client stops.
   d.hasSession(id)
     .then((alive) => {
+      // The client is already gone: attaching now would spawn a `tmux attach-session`
+      // nobody owns — `ws.on("close")` has run, and it had no pty to kill. Every such
+      // orphan holds one of the machine's ptys (macOS caps them at kern.tty.ptmx_max,
+      // 511), and the client reconnects every 1.5s, so a socket that keeps closing in
+      // this window exhausts the whole machine within minutes: no terminal anywhere
+      // can open, and the server can no longer even fork `tmux has-session`.
+      if (socketClosed) return;
+
       if (!alive) {
         try {
           ws.send(`\r\nsession ${id} has ended\r\n`);

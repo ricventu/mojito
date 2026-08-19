@@ -124,6 +124,45 @@ describe("attachPty", () => {
     expect(ws.send.mock.calls.map((c) => c[0])).toEqual(["history\r\n", "LIVE"]);
   });
 
+  it("never spawns a pty for a socket that closed while the session check was in flight", async () => {
+    // The leak that took the whole machine down: `ws.on("close")` kills the pty, but
+    // the pty only exists after the async hasSession check resolves. A socket that
+    // closed inside that window left a live `tmux attach-session` with no owner and
+    // nothing left to kill it. The client's 1.5s reconnect loop then produced one
+    // orphan per attempt until macOS ran out of ptys (kern.tty.ptmx_max, 511 here) —
+    // at which point no terminal anywhere could open and the server could no longer
+    // even fork `tmux has-session`.
+    const ws = fakeWs();
+    let alive!: (v: boolean) => void;
+    const deps: Partial<AttachDeps> = {
+      hasSession: vi.fn(() => new Promise<boolean>((res) => { alive = res; })),
+      spawn: spawnStub(),
+      capturePane: vi.fn(async () => ""),
+    };
+    attachPty(ws as never, "mojito-RIC-46-work", deps);
+
+    ws.emit("close");
+    alive(true);
+    await vi.waitFor(() => expect(deps.hasSession).toHaveBeenCalled());
+
+    expect(deps.spawn).not.toHaveBeenCalled();
+  });
+
+  it("kills a pty whose socket closed", async () => {
+    const ws = fakeWs();
+    const pty = fakePty();
+    const deps: Partial<AttachDeps> = {
+      hasSession: vi.fn(async () => true),
+      spawn: vi.fn(() => pty) as unknown as AttachDeps["spawn"],
+      capturePane: vi.fn(async () => ""),
+    };
+    attachPty(ws as never, "mojito-RIC-46-work", deps);
+    await vi.waitFor(() => expect(deps.spawn).toHaveBeenCalled());
+
+    ws.emit("close");
+    expect(pty.kill).toHaveBeenCalled();
+  });
+
   it("rejects a missing id without checking tmux", () => {
     const ws = fakeWs();
     const deps: Partial<AttachDeps> = { hasSession: vi.fn(async () => true), spawn: spawnStub() };
