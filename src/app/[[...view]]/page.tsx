@@ -14,7 +14,9 @@ import AlertLayer from "@/components/AlertLayer";
 import SettingsSheet from "@/components/SettingsSheet";
 import DocsView from "@/components/DocsView";
 import { tabTitle } from "@/lib/tabTitle";
+import { withSession } from "@/lib/launchedSession";
 import type { AppView, ListFilters } from "@/lib/appLocation";
+import type { SessionMeta } from "@/server/types";
 import type { MojitoEvent } from "@/server/events";
 
 // xterm/xterm and its addons reference browser-only globals (e.g. `self`) at module
@@ -36,7 +38,7 @@ export default function Home() {
   const [alerts, setAlerts] = useState<{ id: string; ticket: string; message: string }[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { tickets, refresh: refreshTickets } = useTickets(token);
-  const { sessions, loaded: sessionsLoaded, refresh: refreshSessions } = useSessions(token);
+  const { sessions, setSessions, loaded: sessionsLoaded, refresh: refreshSessions } = useSessions(token);
   // Owned here — not by StacksPanel or SettingsSheet — so a deploy's health poll and
   // "Deploying…" state survive switching tabs or opening a terminal, both of which
   // unmount StacksPanel mid-deploy. Called unconditionally, above the token/terminal/docs
@@ -132,18 +134,26 @@ export default function Home() {
 
   const needsInput = sessions.filter((s) => s.state === "needs-input").length;
   const openTerminal = (id: string) => go({ kind: "session", id, docs: null });
+  // Opening a session we were handed the meta for — a launch that just answered, or a
+  // stack that was just started. Seed the list with it first: its refresh is still in
+  // flight, and an unknown /session/<id> corrects itself back to the board (see
+  // missingSession above) before the terminal would ever mount.
+  const openLaunched = (s: SessionMeta) => {
+    setSessions((prev) => withSession(prev, s));
+    openTerminal(s.id);
+  };
 
   return (
     <div style={{ paddingBottom: 64 }}>
       <AlertLayer alerts={alerts} onOpen={openTerminal} onClear={() => setAlerts([])} />
       {settingsOpen && <SettingsSheet token={token} onClose={() => setSettingsOpen(false)} selfUpdate={selfUpdate} />}
       {view.kind === "stacks"
-        ? <StacksPanel token={token} onOpenLogs={(s) => openTerminal(s.id)} selfUpdate={selfUpdate} />
+        ? <StacksPanel token={token} onOpenLogs={openLaunched} selfUpdate={selfUpdate} />
         : <UnifiedList token={token} tickets={tickets} sessions={sessions}
             filters={filters} onFilters={setFilters}
             onLaunched={() => { refreshSessions(); refreshTickets(); }}
             onChanged={refreshSessions}
-            onOpen={(s) => openTerminal(s.id)}
+            onOpen={openLaunched}
             onOpenTicketDocs={(t) => go({ kind: "docs", target: { ticket: t.identifier, project: t.project }, doc: null })}
             onOpenSessionDocs={(s) => go({ kind: "docs", target: { session: s.id }, doc: null })} />}
       {/* Anything that is not "stacks" is the unified list, so an unrecognised path

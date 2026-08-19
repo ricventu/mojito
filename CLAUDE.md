@@ -124,7 +124,9 @@ Mojito owns the whole lifecycle — there is no external plugin:
   matches — it leaves *unmatched* paths alone precisely so a custom WS server can have
   them, which is why the websockets were fine before the catch-all and black after it.
   Every terminal came up empty and every live update stopped, and the client's 1.5s
-  reconnect loop turned that into the pty leak `ptyGateway` now guards against. In-app Back
+  reconnect loop turned that into the pty leak `ptyGateway` now guards against. A
+  launch also seeds its answer into the session list before navigating (`withSession`),
+  since an unknown `/session/<id>` corrects itself back to the board. In-app Back
   buttons step through real history when the previous entry is ours, tracked as a depth
   counter in `history.state` (`src/lib/navDepth.ts`), and fall back to a url otherwise,
   so a link opened straight into a terminal never backs out of Mojito.
