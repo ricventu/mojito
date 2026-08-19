@@ -17,11 +17,15 @@ export const LAUNCHABLE_STATUSES: string[] = ["Backlog", "Todo", "In Progress"];
 
 // Built-in seed defaults. Model cost/capability order is fable > opus > sonnet; fable is the
 // premium model (~2x opus) and is never a default — it stays opt-in via the UI.
-// One work session covers design through review; design quality dominates, so xhigh.
+// One work session covers design through review, so the model stays opus — but effort is
+// where a work session's tokens actually go, and xhigh on every launch spent them on the
+// routine tickets too. high is the seed; xhigh and max stay one tap away in the launch
+// sheet for the ticket that earns them, and in Settings for anyone who wants them back as
+// the default. Same value as FALLBACK below, which is what an unlisted status already got.
 export const BUILTIN_STAGE_DEFAULTS: StageDefaults = {
-  Backlog: { model: "opus", effort: "xhigh" },
-  Todo: { model: "opus", effort: "xhigh" },
-  "In Progress": { model: "opus", effort: "xhigh" },
+  Backlog: { model: "opus", effort: "high" },
+  Todo: { model: "opus", effort: "high" },
+  "In Progress": { model: "opus", effort: "high" },
 };
 
 // App-wide fallback for any status outside the table.

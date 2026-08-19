@@ -32,8 +32,8 @@ describe("no file present", () => {
   it("readOverrides is empty and effective equals the built-ins", () => {
     expect(readOverrides()).toEqual({});
     expect(defaultModelForStatus("In Progress")).toBe("opus");
-    expect(defaultEffortForStatus("In Progress")).toBe("xhigh");
-    expect(defaultEffortForStatus("Todo")).toBe("xhigh");
+    expect(defaultEffortForStatus("In Progress")).toBe("high");
+    expect(defaultEffortForStatus("Todo")).toBe("high");
   });
 });
 

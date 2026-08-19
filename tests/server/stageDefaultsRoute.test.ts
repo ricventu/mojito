@@ -35,8 +35,8 @@ describe("GET /api/config/stage-defaults", () => {
     const res = await GET(req("GET"));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body["In Progress"]).toEqual({ model: "opus", effort: "xhigh" });
-    expect(body["Todo"]).toEqual({ model: "opus", effort: "xhigh" });
+    expect(body["In Progress"]).toEqual({ model: "opus", effort: "high" });
+    expect(body["Todo"]).toEqual({ model: "opus", effort: "high" });
   });
 });
 

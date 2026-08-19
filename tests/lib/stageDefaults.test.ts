@@ -7,19 +7,19 @@ import {
 import { WORK_STATES } from "@/server/statusModel";
 
 describe("built-in seed defaults", () => {
-  it("reserves fable (never a default) and uses opus/xhigh for every work status", () => {
+  it("reserves fable (never a default) and uses opus/high for every work status", () => {
     const models = LAUNCHABLE_STATUSES.map((s) => BUILTIN_STAGE_DEFAULTS[s].model);
     expect(models).not.toContain("fable");
-    expect(BUILTIN_STAGE_DEFAULTS["Backlog"]).toEqual({ model: "opus", effort: "xhigh" });
-    expect(BUILTIN_STAGE_DEFAULTS["Todo"]).toEqual({ model: "opus", effort: "xhigh" });
-    expect(BUILTIN_STAGE_DEFAULTS["In Progress"]).toEqual({ model: "opus", effort: "xhigh" });
+    expect(BUILTIN_STAGE_DEFAULTS["Backlog"]).toEqual({ model: "opus", effort: "high" });
+    expect(BUILTIN_STAGE_DEFAULTS["Todo"]).toEqual({ model: "opus", effort: "high" });
+    expect(BUILTIN_STAGE_DEFAULTS["In Progress"]).toEqual({ model: "opus", effort: "high" });
   });
 });
 
 describe("resolvers", () => {
   it("returns the built-in when there is no override", () => {
     expect(resolveModel("In Progress")).toBe("opus");
-    expect(resolveEffort("In Progress")).toBe("xhigh");
+    expect(resolveEffort("In Progress")).toBe("high");
   });
   it("prefers an override over the built-in", () => {
     const ov = { "In Progress": { model: "fable", effort: "max" as const } };
@@ -37,7 +37,7 @@ describe("mergeEffective", () => {
     const eff = mergeEffective({ "In Progress": { model: "opus", effort: "medium" } });
     expect(Object.keys(eff).sort()).toEqual([...LAUNCHABLE_STATUSES].sort());
     expect(eff["In Progress"]).toEqual({ model: "opus", effort: "medium" });
-    expect(eff["Todo"]).toEqual({ model: "opus", effort: "xhigh" });
+    expect(eff["Todo"]).toEqual({ model: "opus", effort: "high" });
   });
 });
 
