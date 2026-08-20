@@ -224,7 +224,10 @@ Mojito owns the whole lifecycle — there is no external plugin:
   four controls do not fit (`.filter-actions` is a wrapping flex row, the select
   `flex: 1 1 100%` below 560px) the select keeps a line of its own and the buttons
   split the next one, rather than shrinking the one control whose whole job is
-  naming the selected projects.
+  naming the selected projects. On the shared line the buttons are label-width
+  (`flex: 0 1 auto`) at their own `.btn.sm` height and the select takes the slack:
+  stretched to a quarter of the toolbar each they were the loudest thing on the
+  board. On their own line they stay `flex: 1 1 0` — there the width is a tap target.
 - **UI kit**: the selects are shadcn/ui sources under `src/components/ui`
   (`select`, `popover`, `command`, plus `combobox` and `choice`, the two app-level
   shapes: searchable — single or multi — and a short fixed list). They are the only
