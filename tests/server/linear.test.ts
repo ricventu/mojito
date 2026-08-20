@@ -18,6 +18,7 @@ describe("linear client", () => {
           {
             identifier: "RIC-46",
             title: "Do thing",
+            url: "https://linear.app/acme/issue/RIC-46/do-thing",
             state: { name: "In Progress", type: "started" },
             project: { name: "Lime" },
             labels: { nodes: [{ name: "bug" }] },
@@ -30,12 +31,21 @@ describe("linear client", () => {
     expect(items[0]).toEqual({
       identifier: "RIC-46",
       title: "Do thing",
+      url: "https://linear.app/acme/issue/RIC-46/do-thing",
       statusName: "In Progress",
       statusType: "started",
       project: "Lime",
       labels: ["bug"],
       assignedToMe: true,
     });
+  });
+
+  // The header links the ticket id to this url and renders plain text without one, so
+  // an issue the API answers without it has to map to "" rather than undefined.
+  it("maps a missing url to an empty string", async () => {
+    const f = fakeFetch({ issues: { nodes: [{ identifier: "RIC-2", state: { name: "Todo" } }] } });
+    const items = await listOpenIssues("k", f);
+    expect(items[0].url).toBe("");
   });
 
   it("marks unassigned issues and issues assigned to others as not mine", async () => {

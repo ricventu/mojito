@@ -375,7 +375,19 @@ button.chip:active { transform: scale(.96); }
 
 .term-actions { display: flex; align-items: center; gap: 8px; flex: none; }
 .term-actions .btn.sm { flex: none; }
+/* Warp / VS Code are anchors, not buttons (see openInApp.ts): they need the two things
+   a <button> gets for free — no UA underline, and a flex box to centre the glyph in. */
+.term-actions a.btn { display: inline-flex; align-items: center; font-family: var(--mono); text-decoration: none; }
 .term-head .kill .glyph { display: none; }
+
+/* The ticket id opens the issue on Linear. Lime and underlined at rest rather than on
+   hover: the header is a touch target as much as a pointer one, and a phone never
+   hovers — an affordance that only appears under a cursor is no affordance at all. */
+.term-ident a.id {
+  color: var(--accent); text-decoration: underline; text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.term-ident a.id:hover { text-decoration-color: var(--accent); }
 
 /* Phone: shed the labels whose meaning is already carried by colour, or by the
    card the user tapped to get here, so the title keeps as much width as it can. */
@@ -389,6 +401,9 @@ button.chip:active { transform: scale(.96); }
   .term-head .kill .lbl { display: none; }
   .term-head .kill .glyph { display: inline; }
   .term-head .kill { padding: 7px 10px; font-size: 13px; line-height: 1; }
+  /* Warp and VS Code go: a phone has no handler for either scheme, so the taps end in
+     an OS error at best, and the two glyphs cost the title the width it needs here. */
+  .term-actions a.btn { display: none; }
 }
 .acc { display: flex; gap: 6px; overflow-x: auto; padding: 8px; border-top: 1px solid var(--border); background: var(--surface); }
 .acc .k { flex: none; padding: 10px 12px; border-radius: 8px; background: var(--surface-hi);

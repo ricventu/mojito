@@ -8,6 +8,7 @@ function ticket(p: Partial<TicketSummary>): TicketSummary {
   return {
     identifier: "RIC-1",
     title: "Title",
+    url: "",
     statusName: "Todo",
     statusType: "unstarted",
     project: "Mojito",

@@ -371,8 +371,10 @@ export default function TerminalView(
   // and is the live source of truth — Linear status can change by hand there, with no
   // event Mojito sees, so the header must never freeze on the status the session launched
   // with (RIC-203).
-  const liveStatus = tickets.find((t) => t.identifier === session.ticket)?.statusName;
-  const head = terminalHeadModel(session, liveStatus);
+  // The whole ticket, not just its status: the header also links the id to the issue's
+  // own Linear url, which only the polled list carries (see terminalHeadModel).
+  const live = tickets.find((t) => t.identifier === session.ticket);
+  const head = terminalHeadModel(session, live);
   const kill = async () => {
     const prompt = head.killDanger
       ? `Kill the running session for ${head.name}?`
@@ -394,11 +396,42 @@ export default function TerminalView(
       <header className="term-head">
         <button className="back" aria-label="Back" onClick={onBack}>‹</button>
         <div className="term-ident">
-          {head.id && <span className="id">{head.id}</span>}
+          {/* The id is the ticket's name here, so it is what opens the issue on Linear —
+              a new tab, since leaving the terminal would drop the pty socket. Plain text
+              when there is no url to link to (a custom session, or a ticket that has
+              left the open list). */}
+          {head.id && (head.ticketUrl
+            ? (
+              <a
+                className="id"
+                href={head.ticketUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`Open ${head.id} in Linear`}
+              >
+                {head.id}
+              </a>
+            )
+            : <span className="id">{head.id}</span>)}
           {head.status && <span className="status">{head.status}</span>}
           {head.title && <span className="title">{head.title}</span>}
         </div>
         <div className="term-actions">
+          {/* Open the directory this session runs in — its worktree, or the repo root —
+              in Warp or VS Code. Anchors, not buttons: the browser hands a warp:// /
+              vscode:// url to the OS itself, so there is nothing for Mojito to spawn
+              (see openInApp.ts). They do nothing from a phone, which no page can know
+              in advance, so they are rendered wherever there is a path at all. */}
+          {head.warp && (
+            <a className="btn sm" href={head.warp} aria-label="Open in Warp" title="Open in Warp">
+              &gt;_
+            </a>
+          )}
+          {head.vscode && (
+            <a className="btn sm" href={head.vscode} aria-label="Open in VS Code" title="Open in VS Code">
+              &lt;/&gt;
+            </a>
+          )}
           <button className="btn sm" aria-label="New ticket" title="New ticket" onClick={onNewTicket}>+</button>
           <button className="btn sm" aria-label="Documents" title="Documents" onClick={onOpenDocs}>📄</button>
           <StateBadge state={session.state} />

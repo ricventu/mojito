@@ -174,6 +174,24 @@ Mojito owns the whole lifecycle — there is no external plugin:
   ticket already at To QA while keeping its session, which then had nothing to nest under
   and surfaced alone in "No ticket". `launchStatus` stays the fallback for a session whose
   ticket was never fetched or is gone, which is the case the loose group exists for.
+- **Terminal header**: `terminalHeadModel` (`src/lib/terminalHeader.ts`) is everything the
+  header renders, and it takes the session's *live ticket* — the whole `TicketSummary`
+  from the polled list, not just its status — because two of the three things it shows
+  are only there: the current status (`launchStatus` is a launch-time snapshot) and the
+  issue's `url`, which the ticket id links to. `TicketSummary.url` comes straight from
+  Linear's API (`issue.url`), never built from a workspace slug Mojito would have to
+  learn and keep; a ticket that has left the open list — Done, or a custom session —
+  simply renders its id as plain text. The header also carries two "open this directory
+  elsewhere" actions: Warp (`warp://action/new_tab?path=…`) and VS Code
+  (`vscode://file/…/`, trailing slash = folder), both pointed at `session.cwd` — the
+  worktree when the ticket has one, the repo root otherwise. They are anchors handing a
+  url to the OS, not a server-side `open -a`: no endpoint and no child process, and the
+  machine with Warp and VS Code on it is the machine the browser runs on. `openInApp.ts`
+  builds them, refuses anything not absolute (a relative path resolves against whatever
+  the *receiving* app considers current) and answers `""` for "no link", which is how the
+  header decides not to render the action. Both are hidden below 480px: a phone has no
+  handler for either scheme, so the tap ends in an OS error, and the two glyphs cost the
+  title width it needs there.
 - **Client url state**: the address bar is the single source of truth for which view is
   open and how the list is filtered (RIC-204). `src/lib/appLocation.ts` is the pure
   codec — `parseLocation`/`formatLocation` over `/`, `/stacks`, `/session/<id>`,

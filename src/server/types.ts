@@ -33,6 +33,8 @@ export interface SessionMeta {
 export interface TicketSummary {
   identifier: string;
   title: string;
+  /** The issue's own Linear url, straight from the API — the header links the ticket id to it. */
+  url: string;
   statusName: string;
   statusType: string;    // triage | backlog | unstarted | started | completed | canceled
   project: string | null;

@@ -25,6 +25,9 @@ describe("terminalHeadModel", () => {
       name: "RIC-174",
       killLabel: "Kill",
       killDanger: true,
+      ticketUrl: "",
+      warp: "warp://action/new_tab?path=%2Fhome%2Fmojito%2Fcode%2Fmojito",
+      vscode: "vscode://file/home/mojito/code/mojito/",
     });
   });
 
@@ -45,6 +48,9 @@ describe("terminalHeadModel", () => {
     expect(m).toEqual({
       id: "", status: "", title: "", name: "this session",
       killLabel: "Kill", killDanger: true,
+      ticketUrl: "",
+      warp: "warp://action/new_tab?path=%2Fhome%2Fmojito%2Fcode%2Fmojito",
+      vscode: "vscode://file/home/mojito/code/mojito/",
     });
   });
 
@@ -74,7 +80,7 @@ describe("terminalHeadModel: live status", () => {
   // by hand in Linear, which Mojito has no event for. A live status passed in from the
   // polled ticket list always wins over the snapshot.
   it("prefers a live status over the launch-time snapshot", () => {
-    const m = terminalHeadModel(base, "To QA");
+    const m = terminalHeadModel(base, { statusName: "To QA" });
     expect(m.status).toBe("To QA");
   });
 
@@ -84,8 +90,54 @@ describe("terminalHeadModel: live status", () => {
   });
 
   it("trims a live status the same way as the snapshot", () => {
-    const m = terminalHeadModel(base, "  Done  ");
+    const m = terminalHeadModel(base, { statusName: "  Done  " });
     expect(m.status).toBe("Done");
+  });
+});
+
+describe("terminalHeadModel: the ticket's Linear url", () => {
+  // Only the polled ticket list has it, so a session whose ticket is not in it — a
+  // custom session, or a ticket already Done — renders its id as plain text. Mojito
+  // has no workspace slug to build a url from, and a guessed one is worse than none.
+  it("carries the url of the live ticket", () => {
+    const m = terminalHeadModel(base, { statusName: "Todo", url: "https://linear.app/acme/issue/RIC-174" });
+    expect(m.ticketUrl).toBe("https://linear.app/acme/issue/RIC-174");
+  });
+
+  it("is empty with no live ticket", () => {
+    expect(terminalHeadModel(base).ticketUrl).toBe("");
+  });
+
+  it("is empty when the live ticket has no url (a legacy cached list)", () => {
+    expect(terminalHeadModel(base, { statusName: "Todo" }).ticketUrl).toBe("");
+  });
+
+  it("trims a padded url", () => {
+    const m = terminalHeadModel(base, { url: "  https://linear.app/acme/issue/RIC-174  " });
+    expect(m.ticketUrl).toBe("https://linear.app/acme/issue/RIC-174");
+  });
+});
+
+describe("terminalHeadModel: open elsewhere", () => {
+  it("points Warp and VS Code at the session's own cwd — a worktree included", () => {
+    const wt = "/home/mojito/code/mojito/.claude/worktrees/RIC-174-header";
+    const m = terminalHeadModel({ ...base, cwd: wt });
+    expect(m.warp).toBe(`warp://action/new_tab?path=${encodeURIComponent(wt)}`);
+    expect(m.vscode).toBe(`vscode://file${wt}/`);
+  });
+
+  it("has no links for a session with no usable path, so the header can skip them", () => {
+    const m = terminalHeadModel({ ...base, cwd: "" });
+    expect(m.warp).toBe("");
+    expect(m.vscode).toBe("");
+  });
+
+  it("tolerates a legacy sidecar with no cwd field", () => {
+    const legacy = { ...base } as Partial<SessionMeta>;
+    delete legacy.cwd;
+    const m = terminalHeadModel(legacy as SessionMeta);
+    expect(m.warp).toBe("");
+    expect(m.vscode).toBe("");
   });
 });
 

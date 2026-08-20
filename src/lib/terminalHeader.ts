@@ -1,4 +1,5 @@
 import { isActiveState } from "@/lib/activeSession";
+import { vscodeUrl, warpUrl } from "@/lib/openInApp";
 import type { SessionMeta, SessionState } from "@/server/types";
 
 /**
@@ -18,6 +19,9 @@ export interface TerminalHeadModel {
   name: string;       // best human label for the kill confirm: id, else title, else a generic
   killLabel: string;  // "Kill" while the session can still be interrupted, else "Dismiss"
   killDanger: boolean;
+  ticketUrl: string;  // the issue on Linear, or "" — see the `live` parameter below
+  warp: string;       // warp:// link to the session's cwd, or "" when there is no absolute one
+  vscode: string;     // vscode:// link to the same directory
 }
 
 /**
@@ -37,22 +41,35 @@ export function isActiveSession(state: SessionState): boolean {
 }
 
 /**
- * `liveStatus` is the ticket's current status from the polled ticket list (Linear is the
- * source of truth — the ticket can move status by hand there, with no event Mojito sees),
- * looked up by the caller and passed in. `launchStatus` on the session itself is only ever
- * a launch-time snapshot (see SessionMeta) and is the fallback for when no live status is
- * available: a custom/shell session, or a ticket that left the open list (e.g. Done).
+ * `live` is this session's ticket as the polled ticket list currently has it, looked up
+ * by the caller and passed in whole — Linear is the source of truth, and the ticket can
+ * move status (or be edited) by hand there with no event Mojito sees. It carries two
+ * things the sidecar cannot: the current status, which wins over the launch-time
+ * snapshot `launchStatus` (see SessionMeta), and the issue's own url, which is what the
+ * header's ticket id links to. Absent for a custom/shell session and for a ticket that
+ * has left the open list (e.g. Done) — then the status falls back to the snapshot and
+ * the id renders as plain text, since Mojito has no url to guess from.
+ *
+ * A `TicketSummary` satisfies the parameter as-is; it is spelled out structurally so
+ * this module keeps depending on nothing but what it reads.
  */
-export function terminalHeadModel(session: SessionMeta, liveStatus?: string): TerminalHeadModel {
+export function terminalHeadModel(
+  session: SessionMeta,
+  live?: { statusName?: string; url?: string },
+): TerminalHeadModel {
   const id = session.ticket?.trim() ?? "";
   const title = session.title?.trim() ?? "";
   const active = isActiveSession(session.state);
+  const cwd = session.cwd ?? "";
   return {
     id,
-    status: liveStatus?.trim() || session.launchStatus?.trim() || "",
+    status: live?.statusName?.trim() || session.launchStatus?.trim() || "",
     title,
     name: id || title || "this session",
     killLabel: active ? "Kill" : "Dismiss",
     killDanger: active,
+    ticketUrl: live?.url?.trim() ?? "",
+    warp: warpUrl(cwd),
+    vscode: vscodeUrl(cwd),
   };
 }

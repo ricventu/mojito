@@ -6,6 +6,7 @@ const ENDPOINT = "https://api.linear.app/graphql";
 interface IssueNode {
   identifier?: string;
   title?: string;
+  url?: string;
   state?: { name?: string; type?: string };
   project?: { name?: string } | null;
   labels?: { nodes?: { name: string }[] };
@@ -28,6 +29,9 @@ function mapIssueNode(node: IssueNode): TicketSummary {
   return {
     identifier: node.identifier ?? "",
     title: node.title ?? "",
+    // Asked of the API rather than built from a workspace slug Mojito would have to
+    // learn and keep: Linear hands out the canonical url per issue.
+    url: node.url ?? "",
     statusName: node.state?.name ?? "",
     statusType: node.state?.type ?? "",
     project: node.project?.name ?? null,
@@ -47,7 +51,7 @@ export async function listOpenIssues(apiKey: string, fetchImpl: typeof fetch = f
           state: { type: { nin: ["completed", "canceled"] } }
         }, first: 100) {
           nodes {
-            identifier title state { name type } project { name }
+            identifier title url state { name type } project { name }
             labels { nodes { name } } assignee { isMe }
           }
         }
