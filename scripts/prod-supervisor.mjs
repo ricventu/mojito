@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 // Health-check + rebuild supervisor for the Mojito PRODUCTION build.
 //
-// Same conveniences as scripts/dev-supervisor.sh (auto-restart on a wedge,
-// picks up source changes) but the app is served from an optimized
-// `next build` instead of Next's dev server, so page loads and renders are
-// fast. Invoked by `make prod`, which wraps it in `caffeinate` and prints the
-// reachable URLs.
+// One `next build`, then the resulting server (`npm start`) is kept alive: the
+// app is served from an optimized build, never from Next's dev server, so page
+// loads and renders are fast. Invoked by `make prod`, which wraps it in
+// `caffeinate` and prints the reachable URLs.
 //
-// Two loops run over one child process (`npm start`):
+// One loop runs over one child process (`npm start`):
 //
 //   health   poll /api/health every POLL_INTERVAL_MS; after MAX_FAILURES
 //            consecutive failures, restart the server (no rebuild — a wedge
@@ -15,25 +14,30 @@
 //            BEFORE the server was ever seen responding is not a failure:
 //            boot takes a moment.
 //
-//   rebuild  watch the sources; on change, typecheck → stop → build → start.
-//            The typecheck runs FIRST, while the old server is still serving:
-//            a typo therefore costs nothing, instead of taking the server
-//            down for a build that was doomed anyway. Only once it passes do
-//            we stop the server, so the rebuild window is genuine downtime
-//            (~build duration) rather than the server serving a half-written
-//            `.next`.
+// Editing a file rebuilds NOTHING. There is no source watcher: a rebuild takes
+// the app down for its whole duration, and a supervisor whose contract is
+// "restart when it stops answering" has no business also taking the server down
+// because someone saved a file — least of all in the checkout Mojito's own
+// sessions are working in, where writes are constant. A source change reaches
+// production only when asked for.
 //
-// The rebuild cycle is also reachable on demand: SIGUSR2 runs it even when nothing
-// changed. That is what Mojito's "Pull & deploy" button signals on macOS (it finds
-// us through the pid we write to .prod-supervisor.pid), standing in for the systemd
-// deploy unit the Linux box uses. SIGUSR2 rather than SIGHUP because Node exits on
-// an unhandled SIGHUP: handling it would turn closing this terminal into a rebuild.
-//
-// Written in JS rather than bash (unlike the dev supervisor) because the file
-// watching needs `fs.watch({recursive})` — macOS has no `fswatch` by default.
+// Asking for it is SIGUSR2, which runs npm install → stop → build → start, every
+// time and in that order. The install is unconditional because a pull can bring a
+// lockfile change and nothing here would otherwise notice; on an unchanged tree it
+// costs seconds. It runs while the old server is still serving, so a lockfile the
+// registry cannot satisfy costs nothing instead of taking the server down for a build
+// that was doomed anyway. There is no typecheck step: `next build` type-checks the
+// tree itself, and a deploy has nothing to do with a tree that does not compile —
+// that belongs to whoever is editing it, before they deploy. Only once it passes do we stop the server, so the rebuild window is
+// genuine downtime (~build duration) rather than the server serving a
+// half-written `.next`. That signal is what Mojito's "Pull & deploy" button
+// sends on macOS (it finds us through the pid we write to
+// .prod-supervisor.pid), standing in for the systemd deploy unit the Linux box
+// uses. SIGUSR2 rather than SIGHUP because Node exits on an unhandled SIGHUP:
+// handling it would turn closing this terminal into a rebuild.
 
 import { spawn } from "node:child_process";
-import { unlinkSync, watch, writeFileSync } from "node:fs";
+import { unlinkSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const PORT = process.env.MOJITO_PORT || "4711";
@@ -44,10 +48,6 @@ const HEALTH_URL = `http://127.0.0.1:${PORT}/api/health`;
 const POLL_INTERVAL_MS = 5_000;
 const HEALTH_TIMEOUT_MS = 5_000;
 const MAX_FAILURES = 3;
-// Coalesce a burst of writes (a save-all, a `git pull`, a branch switch) into
-// one rebuild. Long-ish because a rebuild is expensive and takes the server
-// down — better to wait than to build twice.
-const DEBOUNCE_MS = 1_500;
 const KILL_GRACE_MS = 5_000;
 const RESPAWN_DELAY_MS = 2_000;
 // A `.next` that cannot boot at all would otherwise respawn forever.
@@ -56,25 +56,6 @@ const MAX_CRASHES = 3;
 // in src/server/selfUpdate.ts. Relative to the repo root we chdir into below.
 const PID_FILE = ".prod-supervisor.pid";
 
-// Root-level files worth a rebuild, watched via the (non-recursive) root
-// watcher rather than individually: editors replace files by rename, which
-// detaches a per-file fs.watch from the new inode.
-const ROOT_FILES = new Set([
-  "server.ts",
-  "next.config.mjs",
-  "tailwind.config.ts",
-  "postcss.config.mjs",
-  "package.json",
-  "tsconfig.json",
-]);
-const SOURCE_EXT = /\.(?:ts|tsx|js|jsx|mjs|cjs|css|json)$/;
-
-// public/ is deliberately NOT watched: Next serves it straight from disk at
-// runtime, so an asset change needs no rebuild.
-const WATCH_TARGETS = [
-  { path: ".", recursive: false, wanted: (f) => ROOT_FILES.has(f) },
-  { path: "src", recursive: true, wanted: (f) => SOURCE_EXT.test(f) },
-];
 
 // Run from the repo root regardless of where we were invoked from.
 process.chdir(fileURLToPath(new URL("..", import.meta.url)));
@@ -84,7 +65,7 @@ const log = (msg) => console.log(`[prod-supervisor] ${msg}`);
 /** @type {import("node:child_process").ChildProcess | null} */
 let server = null;
 /** @type {import("node:child_process").ChildProcess | null} */
-let oneShot = null; // the in-flight `npm run typecheck` / `npm run build`
+let oneShot = null; // the in-flight `npm install` / `npm run build`
 /** @type {"serving" | "rebuilding" | "down"} */
 let state = "down";
 let seenUp = false;
@@ -95,9 +76,7 @@ let shuttingDown = false;
 let polling = false; // guards overlapping health polls
 let rebuilding = false;
 let pendingRebuild = false;
-let rebuildTimer = null;
 let pollTimer = null;
-const watchers = [];
 
 // --- child process plumbing -------------------------------------------------
 
@@ -231,16 +210,25 @@ async function poll() {
   }
 }
 
-// --- rebuild loop -----------------------------------------------------------
+// --- rebuild, on request only ------------------------------------------------
 
 async function rebuildCycle() {
-  // Typecheck while the old server is still up: a broken tree costs no downtime.
-  if ((await runOnce(["run", "typecheck"], "change detected — typechecking")) !== 0) {
-    log("typecheck FAILED — keeping the current build live, nothing rebuilt.");
+  // Dependencies first, every time: a pull can bring a lockfile change, and nothing else
+  // in this process watches for one. On an unchanged tree `npm install` is a no-op of a
+  // few seconds — cheap next to a build whose dependencies are missing. The server keeps
+  // serving through it (the install is not what takes the app down, the build is), but the
+  // health watchdog is held off: npm rewriting node_modules under a live server can make
+  // it briefly unhealthy, and restarting it mid-install is pure harm.
+  const watchdogState = state;
+  state = "rebuilding";
+  const installed = await runOnce(["install"], "installing dependencies");
+  state = watchdogState;
+  if (installed !== 0) {
+    log("npm install FAILED — keeping the current build live, nothing rebuilt.");
     return;
   }
   state = "rebuilding";
-  log("typecheck OK — stopping the server for the rebuild (the app is DOWN until it finishes)");
+  log("stopping the server for the rebuild (the app is DOWN until it finishes)");
   await stopServer();
   if ((await runOnce(["run", "build"], "building")) !== 0) {
     log("build FAILED — bringing the server back on whatever is in .next; expect errors until you fix it.");
@@ -266,35 +254,13 @@ async function triggerRebuild() {
   }
 }
 
-function startWatchers() {
-  for (const { path, recursive, wanted } of WATCH_TARGETS) {
-    try {
-      const w = watch(path, { recursive }, (_event, filename) => {
-        if (!filename) return;
-        // Recursive watches report a path relative to the watched root.
-        const base = filename.split("/").pop() ?? filename;
-        if (!wanted(recursive ? filename : base)) return;
-        clearTimeout(rebuildTimer);
-        rebuildTimer = setTimeout(() => void triggerRebuild(), DEBOUNCE_MS);
-      });
-      w.on("error", (err) => console.error(`[prod-supervisor] watcher on ${path} failed:`, err));
-      watchers.push(w);
-    } catch (err) {
-      console.error(`[prod-supervisor] cannot watch ${path} — no auto-rebuild from it:`, err);
-    }
-  }
-  log(`watching ${WATCH_TARGETS.map((t) => t.path).join(", ")} — a change triggers typecheck + rebuild`);
-}
-
 // --- lifecycle --------------------------------------------------------------
 
 async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
   log(`${signal} — shutting down`);
-  clearTimeout(rebuildTimer);
   clearInterval(pollTimer);
-  for (const w of watchers) w.close();
   // Leave no pid claiming to listen. A SIGKILL still can, hence the liveness probe
   // on the reading side.
   try {
@@ -313,6 +279,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 
 // Only after the initial build: before it there is no server for anyone to ask, and
 // triggerRebuild() would race that build (its `rebuilding` guard is not held during it).
+// This is now the ONLY way a rebuild ever happens.
 function acceptRebuildSignals() {
   try {
     writeFileSync(PID_FILE, `${process.pid}\n`);
@@ -336,7 +303,7 @@ async function main() {
   }
   acceptRebuildSignals();
   await startServer();
-  startWatchers();
+  log("no source watcher — a file change rebuilds nothing; restarts happen only on a failed health check");
   pollTimer = setInterval(() => void poll(), POLL_INTERVAL_MS);
 }
 

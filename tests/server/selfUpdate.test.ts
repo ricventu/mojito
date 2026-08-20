@@ -127,13 +127,15 @@ describe("runSelfUpdate deploy trigger", () => {
     expect(calls).toBe(1);
   });
 
-  it("does NOT trigger the deploy on a real update (the post-merge hook handles it)", async () => {
+  // A real update deploys too: on macOS the prod supervisor watches no files (a pulled
+  // commit triggers nothing by itself), and this checkout has no post-merge hook at all.
+  it("triggers the deploy on a real update as well", async () => {
     let calls = 0;
     await runSelfUpdate(
       async () => ({ status: "updated", from: "a", to: "b" }),
       async () => { calls += 1; },
     );
-    expect(calls).toBe(0);
+    expect(calls).toBe(1);
   });
 
   it("does not trigger the deploy when the pull fails", async () => {

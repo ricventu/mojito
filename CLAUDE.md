@@ -293,6 +293,32 @@ Mojito owns the whole lifecycle — there is no external plugin:
   `next dev` **writes a managed block into `CLAUDE.md`** itself
   (`<!-- BEGIN:nextjs-agent-rules -->`); it is committed because Next re-adds it on
   every dev run, and `agentRules: false` in the config is the way to opt out.
+- **Running it**: `make prod` is the way — one `next build`, then that build served
+  under `scripts/prod-supervisor.mjs`, which polls `/api/health` and restarts the
+  server after 3 consecutive failures. It watches no files: a rebuild takes the app
+  down for its whole duration, and this is the checkout Mojito's own sessions write
+  in, so "someone saved a file" is not a deploy trigger. A source change goes live
+  only when asked — SIGUSR2 to the pid in `.prod-supervisor.pid`, which is what the
+  "Pull & deploy" button sends (`src/server/selfUpdate.ts`). That cycle is
+  `npm install` → stop → build → start, every time: the install is unconditional
+  because a pull can bring a lockfile change and nothing in the supervisor watches for
+  one, and on an unchanged tree it costs seconds — cheap next to serving a build whose
+  dependencies are missing. Conditioning it was tried and dropped: neither "the manifests
+  moved" (content hash) nor "the pulled commits touched them" (git diff) is worth the
+  machinery when the answer is almost always yes and a needless install costs seconds.
+  The install runs with the old server still up (a lockfile the registry cannot satisfy
+  therefore aborts the cycle with the current build still live), and it is the only step
+  the watchdog is held off for, since npm rewriting `node_modules` under the live server
+  can make it briefly unhealthy and a restart there is pure harm. A **typecheck** step
+  used to precede the stop, to spend a doomed deploy's failure before the downtime rather
+  than after; it is gone — `next build` type-checks anyway, so it bought ordering, not
+  safety, and a tree that does not compile is the editor's problem, not the deploy's. `runSelfUpdate`
+  therefore signals on **every** outcome, up-to-date or updated: with no watcher, a pull
+  that brings commits triggers nothing by itself, and this checkout has no post-merge
+  hook (that is the Linux box's trigger). Double-triggering on Linux is free — systemd
+  coalesces a `start` on an active unit, `triggerRebuild()` coalesces a second SIGUSR2.
+  `make start` (dev server + `scripts/dev-supervisor.sh`, HMR, `tsx watch`) is the
+  other option and is unchanged.
 - **xterm 6**: a clean bump. Nothing Mojito uses was touched by the 6.0 removals
   (`windowsMode`, `fastScrollModifier`, the canvas renderer, `overviewRulerWidth`), and
   the viewport/scrollbar rewrite is invisible here because `globals.css` only ever

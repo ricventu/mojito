@@ -50,8 +50,7 @@ export async function signalProdSupervisor(
 // Start the rebuild+restart without blocking, so this request can return its
 // response before the server it triggers is torn down. On Linux that is the SAME
 // systemd unit (stop -> npm ci -> build -> start) the post-merge git hook starts on a
-// real merge; on the Mac it is the prod supervisor, which its own fs watcher would
-// have driven had the pull brought commits.
+// real merge; on the Mac it is the prod supervisor's SIGUSR2 cycle.
 export async function triggerDeploy(): Promise<void> {
   if (process.platform === "darwin") return signalProdSupervisor();
   await pexec("systemctl", ["--user", "start", "--no-block", "mojito-deploy.service"]);
@@ -69,11 +68,13 @@ export function runSelfUpdate(
   inflight = (async () => {
     try {
       const res = await pull();
-      // A real merge fires the post-merge git hook, which runs the deploy. When
-      // already up to date no merge happens and no hook fires — so trigger the
-      // deploy explicitly. "Pull & deploy" must always rebuild and restart, even
-      // when there is nothing new to pull.
-      if (res.status === "up-to-date") await deploy();
+      // Unconditionally, whatever the pull did: "Pull & deploy" must always rebuild and
+      // restart. Nothing else will. The Mac's prod supervisor no longer watches files, so
+      // a pull that brings commits produces no rebuild of its own; only on Linux does a
+      // real merge also fire the post-merge hook, and that overlap costs nothing — systemd
+      // coalesces a `start` on an already-active unit, and the supervisor's triggerRebuild()
+      // coalesces a second SIGUSR2 into at most one extra cycle.
+      await deploy();
       return res;
     } finally {
       inflight = null;

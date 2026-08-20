@@ -36,7 +36,7 @@ SHOW_URLS = Q=""; if [ -n "$$TOKEN" ]; then Q="/?token=$$TOKEN"; fi; \
 help:
 	@echo "Targets:"
 	@echo "  make start    dev server (Mac kept awake), prints every URL: local, Wi-Fi, Tailscale"
-	@echo "  make prod     same conveniences as start, but serves an optimized next build"
+	@echo "  make prod     next build, then serve it under a health supervisor (no rebuild on change)"
 	@echo "  make restart  prod deploy: next build, then restart $(SERVICE) (systemd --user) + health check"
 
 ## start: dev server, Mac kept awake via caffeinate; prints every reachable URL
@@ -50,15 +50,16 @@ start:
 	export MOJITO_PORT="$$PORT"; \
 	exec caffeinate -is ./scripts/dev-supervisor.sh
 
-## prod: everything `make start` gives you — caffeinate, the URL banner, a health
-## supervisor and auto-pickup of source changes — but serving an optimized
-## `next build` instead of the dev server, so the GUI is fast. The trade-off vs
-## `start`: no HMR. A source change triggers typecheck + full rebuild, and the app
-## is down for the length of that build (see scripts/prod-supervisor.mjs).
+## prod: one `next build`, then that build is served under the health supervisor —
+## caffeinate and the URL banner as in `start`, but never Next's dev server, so the
+## GUI is fast. Editing a file rebuilds nothing: the supervisor restarts the server
+## only when /api/health stops answering. A source change goes live when you ask for
+## it — Mojito's "Pull & deploy" button, or SIGUSR2 to the pid in
+## .prod-supervisor.pid (see scripts/prod-supervisor.mjs).
 prod:
 	@$(LOAD_ENV); \
 	$(SHOW_URLS); \
-	echo "  (production build — Mac kept awake, rebuilds on change, Ctrl-C to stop)"; \
+	echo "  (production build — Mac kept awake, no rebuild on change, Ctrl-C to stop)"; \
 	echo ""; \
 	export MOJITO_PORT="$$PORT"; \
 	exec caffeinate -is node ./scripts/prod-supervisor.mjs
