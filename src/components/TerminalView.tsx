@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { WebglAddon } from "@xterm/addon-webgl";
 // xterm's stylesheet is pulled in globally from src/app/globals.css, NOT with an
 // `import "@xterm/xterm/css/xterm.css"` here: a node_modules CSS import inside
 // this `ssr: false` dynamic chunk makes `next build` emit a stray
@@ -23,6 +24,7 @@ import { termRootStyle, isKeyboardOpen } from "@/lib/keyboardInset";
 import { terminalOptions } from "@/lib/terminalOptions";
 import { urlLinkProvider } from "@/lib/terminalLinkProvider";
 import { isUsableGeometry } from "@/lib/terminalFit";
+import { attachWebglRenderer } from "@/lib/terminalRenderer";
 import { keepSettling } from "@/lib/viewportSettle";
 import { terminalTabTitle } from "@/lib/terminalTabTitle";
 import { terminalHeadModel } from "@/lib/terminalHeader";
@@ -90,6 +92,14 @@ export default function TerminalView(
         }),
       );
       term.open(holder.current!);
+      // Draw on the GPU rather than the DOM — tmux repainting claude's TUI is the
+      // DOM renderer's worst case. Placed after `term.open` so the addon activates
+      // straight away against the screen element it puts its canvas in, rather
+      // than through the `onWillOpen` deferral it would otherwise take. It falls
+      // back to the DOM renderer on its own if WebGL2 is missing or the context is
+      // lost for good; `terminalRenderer.ts` is where that lives, and it never
+      // throws out here — the rest of this mount depends on being reached.
+      const detachWebgl = attachWebglRenderer(term, () => new WebglAddon());
       fit.fit();
       termRef.current = term;
 
@@ -236,6 +246,7 @@ export default function TerminalView(
         clearTimeout(settle);
         onData.dispose();
         links.dispose();
+        detachWebgl();
         window.removeEventListener("resize", onResize);
         if (vv) {
           vv.removeEventListener("resize", applyViewport);

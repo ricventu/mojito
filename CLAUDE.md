@@ -297,6 +297,31 @@ Mojito owns the whole lifecycle — there is no external plugin:
   (`windowsMode`, `fastScrollModifier`, the canvas renderer, `overviewRulerWidth`), and
   the viewport/scrollbar rewrite is invisible here because `globals.css` only ever
   styles the `.xterm` root, never xterm's internals.
+- **Terminal renderer**: the browser terminal draws on the GPU via
+  `@xterm/addon-webgl` (RIC-239) — the DOM renderer's worst case is exactly
+  Mojito's, tmux repainting claude's full-screen TUI, where every changed cell is
+  DOM work. The addon is the only one of xterm 6's that was adopted; the rest were
+  evaluated and rejected in RIC-227. `attachWebglRenderer`
+  (`src/lib/terminalRenderer.ts`) is the whole of it, and it exists for the
+  **fallback**, not the load: Safari drops a WebGL context when the tab goes to the
+  background — a phone in a pocket, the same scenario `startHeartbeat` is for — and
+  an unhandled loss leaves the terminal **black** rather than degrading. Two facts
+  read off the addon's source rather than assumed: `dispose()` *is* the fallback
+  (`activate` registers a disposable that calls
+  `renderService.setRenderer(core._createRenderer())`, so the DOM renderer comes
+  back with the buffer intact), and `onContextLoss` is **not** `webglcontextlost` —
+  the renderer `preventDefault()`s that and waits 3s for `webglcontextrestored`, so
+  a context the browser gives back never reaches us and `onContextLoss` means "gone
+  for good". Hence the fall back to DOM is permanent: re-loading a context that was
+  refused once only flips the terminal between renderers. Loading is allowed to
+  fail silently (the constructor throws on Safari < 16, `activate` throws without
+  WebGL2) because this runs partway through the mount — an escaping throw would
+  take the socket, the resize handlers and the touch scroll with it and leave a
+  dead terminal where a DOM-rendered one would have worked. Costs ~29KB gzipped,
+  and only on the `ssr:false` terminal chunk, which the board never loads.
+  `globals.css` is untouched, and `touchScroll` still measures `term.element` (the
+  `.xterm` root) — the WebGL canvas goes inside `.xterm-screen`, so the row-height
+  maths is unchanged.
 
 ## Tests
 
