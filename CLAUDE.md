@@ -286,6 +286,16 @@ Mojito owns the whole lifecycle — there is no external plugin:
   (auto-mode never falls back), so the config now carries `turbopack: {}` and no webpack
   block. `--webpack` / `next({ dev, webpack: true })` remain the documented escape hatch
   if Turbopack ever blocks a change.
+- **`next dev` is unreachable from a phone**, which matters because Mojito is a
+  phone-first app and its own tickets ask for measurements taken there. Next 16 blocks
+  cross-origin `/_next/*` dev resources for any host but `localhost`, so loading the dev
+  server over the LAN — or even `127.0.0.1` — 403s every JS chunk. React then never
+  hydrates, and the failure wears a **completely misleading face**: the token gate
+  renders (it is server HTML) but its Save button is inert, so it looks like the token
+  is being rejected rather than like the app never booted. `allowedDevOrigins: ['<lan-ip>']`
+  in `next.config.mjs` lifts it, but for anything performance-related use
+  `npm run build && npm start` instead — production has no such restriction, and a dev
+  build's rendering is not what you want to benchmark anyway.
 - Two Next 16 behaviours worth knowing: `next dev` writes to `.next/dev` (covered by the
   `.next/` ignore) and takes a **lockfile** there, so only one dev server per checkout —
   a stale lock from a hard-killed process is detected by pid and taken over, which is
