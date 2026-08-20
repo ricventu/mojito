@@ -216,6 +216,15 @@ Mojito owns the whole lifecycle — there is no external plugin:
   non-empty set as OR — and `activeFilters` reports the whole set as one chip, since
   removing one project is what the select itself is for and a per-project ✕ would need
   `FilterKey` to carry a value. The status chips stay chips: five values that never grow.
+  The select's place in the toolbar is the top row, beside the three actions
+  (RIC-226): the toolbar reads project select + `+ Ticket`/`+ Session`/`Clean up`,
+  then the status chips, then the text field, then the sticky active-filter badges.
+  The search box used to lead, which spent the first row on the control of last
+  resort — project and status are one tap each — and pushed the actions down. Where
+  four controls do not fit (`.filter-actions` is a wrapping flex row, the select
+  `flex: 1 1 100%` below 560px) the select keeps a line of its own and the buttons
+  split the next one, rather than shrinking the one control whose whole job is
+  naming the selected projects.
 - **UI kit**: the selects are shadcn/ui sources under `src/components/ui`
   (`select`, `popover`, `command`, plus `combobox` and `choice`, the two app-level
   shapes: searchable — single or multi — and a short fixed list). They are the only
