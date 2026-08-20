@@ -89,9 +89,11 @@ export function Combobox(
  * A multi-value select with a search field: every selected value narrows, none means
  * no narrowing at all (see multiSelectSummary).
  *
- * Selecting does not close the panel — the whole point of a multi-select is a run of
- * choices — so the way out is the same tap outside that a single one uses, plus the
- * clear row that appears once something is selected.
+ * Picking closes the panel, same as the single-value one: a run of choices is the
+ * theoretical case, one project is the real one, and a panel left open over the board
+ * after a pick reads as "the tap didn't land". Selecting several means reopening —
+ * cheap, and the trigger shows the set meanwhile. The clear row closes too; it is a
+ * choice made through the same panel.
  */
 export function MultiCombobox(
   { options, values, onChange, label, emptyState, searchLabel = "Search…", emptyLabel = "No match.", clearLabel }: {
@@ -120,7 +122,7 @@ export function MultiCombobox(
       <PopoverContent className={PANEL}>
         <Panel search={searchLabel} empty={emptyLabel}>
           {options.map((o) => (
-            <CommandItem key={o.value} value={o.label} onSelect={() => toggle(o.value)}>
+            <CommandItem key={o.value} value={o.label} onSelect={() => { toggle(o.value); setOpen(false); }}>
               <Check
                 className={cn("h-4 w-4 shrink-0 text-brand", values.includes(o.value) ? "opacity-100" : "opacity-0")}
               />
@@ -134,7 +136,7 @@ export function MultiCombobox(
           <button
             type="button"
             className="w-full border-t border-input px-3 py-2 text-left text-sm text-muted-foreground hover:text-foreground"
-            onClick={() => onChange([])}
+            onClick={() => { onChange([]); setOpen(false); }}
           >
             {clearLabel}
           </button>
