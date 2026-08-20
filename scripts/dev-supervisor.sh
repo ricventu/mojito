@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Health-check supervisor for the Mojito dev server.
 #
-# Runs `pnpm dev` in its own process group and polls /api/health every
+# Runs `npm run dev` in its own process group and polls /api/health every
 # POLL_INTERVAL seconds. After MAX_FAILURES consecutive failures (a 5xx, or
 # no response after the server was first seen responding) it kills the whole
 # process group and respawns it. This recovers the "merge in the main
@@ -24,7 +24,7 @@ KILL_GRACE=5
 
 DEV_PID=""
 
-# Kill the dev server's whole process group (pnpm -> tsx -> node), TERM first,
+# Kill the dev server's whole process group (npm -> tsx -> node), TERM first,
 # KILL after KILL_GRACE seconds — an orphaned node child would keep holding
 # the port and every respawn would die on EADDRINUSE.
 kill_dev() {
@@ -64,7 +64,7 @@ snooze() {
 trap 'echo "[supervisor] shutting down"; kill_dev; exit 0' INT TERM
 
 while true; do
-  pnpm dev &
+  npm run dev &
   DEV_PID=$!
   echo "[supervisor] dev server started (pid $DEV_PID)"
 
