@@ -16,15 +16,21 @@
   },
   "dependencies": {
     "@next/env": "^15.5.20",
+    "@radix-ui/react-popover": "^1.1.23",
+    "@radix-ui/react-select": "^2.3.7",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "cross-env": "^7.0.3",
+    "lucide-react": "^1.33.0",
     "next": "^15.0.0",
     "node-pty": "^1.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "tailwind-merge": "^3.6.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
@@ -34,6 +40,7 @@
     "autoprefixer": "^10.4.0",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
+    "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.16.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"

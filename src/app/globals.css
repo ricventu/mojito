@@ -37,6 +37,22 @@
   --pink: #e06cc4;   --pink-bg: #2c1826;   /* custom sessions (non-lifecycle) */
   --term: #b5d334;   --term-bg: #26290f;   /* shell/terminal sessions (non-lifecycle) */
 
+  /* ---- shadcn bridge ----
+     The components under src/components/ui are shadcn sources, styled in Tailwind
+     utilities whose colour names (popover, accent, input, ring …) tailwind.config.ts
+     maps onto these variables. Defining them here — in terms of the tokens above — is
+     what makes a pasted-in shadcn component look like Mojito instead of like shadcn's
+     default grey. `--ui-*` and not shadcn's bare names because Mojito already owns
+     `--accent` as its brand lime, whereas shadcn means "subtle hover" by it. */
+  --ui-bg: var(--surface-hi);        /* control surface: matches the native inputs above */
+  --ui-fg: var(--text);
+  --ui-popover: var(--surface-hi);   /* raised over a sheet's --surface and the page's --bg alike */
+  --ui-border: var(--border-hi);
+  --ui-ring: var(--accent);
+  --ui-hover: color-mix(in srgb, var(--accent) 12%, var(--surface-hi));
+  --ui-muted: var(--surface);
+  --ui-muted-fg: var(--text-dim);
+
   --r: 12px;
   --r-sm: 9px;
   --shadow: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 6px 20px -8px rgba(0, 0, 0, .7);
@@ -138,6 +154,12 @@ label { color: var(--text); }
 /* The Sessions toggle leads the status row but belongs to a different axis than the
    status chips beside it — extra space keeps the two from reading as one group. */
 .filter-chips .chip.lead { margin-right: 14px; }
+
+/* The project filter's own row (RIC-225). Its own row and not .filter-top's, because
+   the select is full width: a phone has no room for it beside the search field, and
+   sharing .filter-chips' horizontal scroll would put a popover trigger inside a
+   scroller. Same vertical rhythm as the chip row it replaced. */
+.filter-select { padding: 10px 0 2px; }
 
 /* ---- Chips (labels / meta) ---- */
 .chip {

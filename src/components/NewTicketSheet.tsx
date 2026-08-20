@@ -5,7 +5,9 @@ import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES, MAX_IMAGES } from "@/lib/imageCon
 import { readAsDataUrl } from "@/lib/readAsDataUrl";
 import { launchedSession } from "@/lib/launchedSession";
 import { sessionUrl } from "@/lib/appLocation";
-import { GENERAL, useProjectPicker } from "@/lib/useProjectPicker";
+import { useProjectPicker } from "@/lib/useProjectPicker";
+import { projectOptions } from "@/lib/projectOptions";
+import { Combobox } from "./ui/combobox";
 import type { SessionMeta } from "@/server/types";
 
 interface PendingImage { id: string; name: string; type: string; dataUrl: string; }
@@ -133,11 +135,11 @@ export default function NewTicketSheet(
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()} onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
         <h3>New ticket</h3>
-        <label className="field"><span className="lbl">Project</span>
-          <select value={project} onChange={(e) => setProject(e.target.value)}>
-            <option value={GENERAL}>General (home)</option>
-            {projects.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select></label>
+        {/* A div, not a label — the field is a button now; see NewSessionSheet. */}
+        <div className="field"><span className="lbl">Project</span>
+          <Combobox options={projectOptions(projects)} value={project} onChange={setProject}
+            label="Project" searchLabel="Search projects…" emptyLabel="No project matches." />
+        </div>
         <label className="field"><span className="lbl">Note</span>
           <textarea rows={6} value={brief} onChange={(e) => setBrief(e.target.value)} onPaste={onPaste}
             placeholder="Jot the ticket down — a Claude session cleans it up and titles it. Paste or drop images." />

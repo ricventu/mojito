@@ -19,7 +19,8 @@ export interface UnifiedRows {
 
 export interface UnifiedFilter {
   query: string;
-  project: string | null;
+  /** The selected projects; empty is every project — see ListFilters. */
+  project: string[];
   status: string | null;
 }
 
@@ -109,14 +110,27 @@ export function mergedStatuses(
 }
 
 /**
- * Distinct project names across tickets and sessions, with NO_PROJECT for either
- * side's blanks.
+ * The project filter's options: every configured project, plus the ones the tickets
+ * and sessions on screen actually name, with NO_PROJECT for either side's blanks.
+ *
+ * `configured` is projects.json's list (see /api/projects) and is why the filter is not
+ * derived from the board alone (RIC-225): a project whose every ticket is closed — or
+ * which has no ticket yet at all — had no chip and so could not be filtered *to*, even
+ * though the same project is selectable in every launch sheet. The board's own names
+ * still come in on top of it, since a ticket can name a project the map has since
+ * dropped and dropping its option would silently widen the filter.
  *
  * `tickets` is the mine-scoped list, same as mergedStatuses: sessions are not scoped
- * by Mine, so the full list comes in.
+ * by Mine, so the full list comes in. `configured` is not scoped by anything — it is
+ * what exists, not what is on screen.
  */
-export function mergedProjects(tickets: TicketSummary[], sessions: SessionMeta[]): string[] {
+export function mergedProjects(
+  tickets: TicketSummary[],
+  sessions: SessionMeta[],
+  configured: readonly string[] = [],
+): string[] {
   return Array.from(new Set([
+    ...configured,
     ...tickets.map((t) => t.project ?? NO_PROJECT),
     ...sessions.map((s) => s.projectName ?? NO_PROJECT),
   ])).sort();

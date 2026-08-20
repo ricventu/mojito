@@ -6,6 +6,7 @@ import { resolveEffort, resolveModel, MODELS, EFFORTS } from "@/lib/stageDefault
 import { useStageDefaults } from "@/lib/useStageDefaults";
 import { tmuxName } from "@/server/sessionKey";
 import StateBadge from "./StateBadge";
+import { Choice } from "./ui/choice";
 import QaVerdictButtons from "./QaVerdictButtons";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 import { holdsSheetOpen, type HeldOutcome } from "@/lib/verdictOutcome";
@@ -239,12 +240,16 @@ export default function LaunchSheet(
     }
   };
 
+  // Divs, not labels: the fields are buttons now (see ui/choice), which a <label>
+  // cannot be the label of.
   const selectors = (
     <div className="two">
-      <label className="field"><span className="lbl">Model</span>
-        <select value={model} onChange={(e) => { setModel(e.target.value); setTouched(true); }}>{MODELS.map((m) => <option key={m}>{m}</option>)}</select></label>
-      <label className="field"><span className="lbl">Effort</span>
-        <select value={effort} onChange={(e) => { setEffort(e.target.value); setTouched(true); }}>{EFFORTS.map((x) => <option key={x}>{x}</option>)}</select></label>
+      <div className="field"><span className="lbl">Model</span>
+        <Choice label="Model" value={model} options={MODELS}
+          onChange={(v) => { setModel(v); setTouched(true); }} /></div>
+      <div className="field"><span className="lbl">Effort</span>
+        <Choice label="Effort" value={effort} options={EFFORTS}
+          onChange={(v) => { setEffort(v); setTouched(true); }} /></div>
     </div>
   );
   // One tap per action: a bare Claude session or a plain terminal in the ticket's
@@ -276,11 +281,10 @@ export default function LaunchSheet(
     </div>
   ) : null;
   const baseBranchSelect = wtAnswer?.create && wtStatus !== "loading" ? (
-    <label className="field" style={{ marginTop: 12 }}><span className="lbl">Base branch</span>
-      <select value={wtAnswer.baseBranch} onChange={(e) => setWtAnswer({ create: true, baseBranch: e.target.value })}>
-        {wtStatus.branches.map((b) => <option key={b}>{b}</option>)}
-      </select>
-    </label>
+    <div className="field" style={{ marginTop: 12 }}><span className="lbl">Base branch</span>
+      <Choice label="Base branch" value={wtAnswer.baseBranch} options={wtStatus.branches}
+        onChange={(v) => setWtAnswer({ create: true, baseBranch: v })} />
+    </div>
   ) : null;
 
   // The fix session is registered before the verdict responds, so the onLaunched()

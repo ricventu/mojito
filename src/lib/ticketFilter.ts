@@ -38,7 +38,8 @@ export function ticketStatuses(tickets: TicketSummary[]): string[] {
 
 export interface TicketFilter {
   query: string;
-  project: string | null;
+  /** The selected projects; empty is every project — see ListFilters. */
+  project: string[];
   status: string | null;
 }
 
@@ -49,7 +50,7 @@ export function filterTickets(
 ): TicketSummary[] {
   const q = query.trim().toLowerCase();
   return tickets.filter((t) => {
-    if (project !== null && (t.project ?? NO_PROJECT) !== project) return false;
+    if (project.length > 0 && !project.includes(t.project ?? NO_PROJECT)) return false;
     if (status !== null && t.statusName !== status) return false;
     if (!q) return true;
     return [t.identifier, t.title, t.statusName, ...t.labels]

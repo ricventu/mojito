@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useStageDefaults } from "@/lib/useStageDefaults";
+import { Choice } from "./ui/choice";
 import type { SelfUpdate } from "@/lib/useSelfUpdate";
 import { MODELS, EFFORTS, STAGE_DEFAULT_ROWS, resolveModel, resolveEffort, minimalOverrides, type StageDefaults } from "@/lib/stageDefaults";
 
@@ -63,16 +64,15 @@ export default function SettingsSheet({ token, onClose, selfUpdate }: {
           return (
             <div key={row.label}>
               <div className="two" style={{ alignItems: "flex-end" }}>
-                <label className="field"><span className="lbl">{row.label}</span>
-                  <select value={cur.model} onChange={(e) => setRow(row.statuses, { model: e.target.value })}>
-                    {MODELS.map((m) => <option key={m}>{m}</option>)}
-                  </select>
-                </label>
-                <label className="field"><span className="lbl">Effort</span>
-                  <select value={cur.effort} onChange={(e) => setRow(row.statuses, { effort: e.target.value })}>
-                    {EFFORTS.map((x) => <option key={x}>{x}</option>)}
-                  </select>
-                </label>
+                {/* Divs, not labels: the fields are buttons now (see ui/choice). */}
+                <div className="field"><span className="lbl">{row.label}</span>
+                  <Choice label={`${row.label} model`} value={cur.model} options={MODELS}
+                    onChange={(v) => setRow(row.statuses, { model: v })} />
+                </div>
+                <div className="field"><span className="lbl">Effort</span>
+                  <Choice label={`${row.label} effort`} value={cur.effort} options={EFFORTS}
+                    onChange={(v) => setRow(row.statuses, { effort: v })} />
+                </div>
               </div>
             </div>
           );

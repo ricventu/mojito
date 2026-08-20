@@ -1,15 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
-import { apiFetch } from "./client";
+import { useProjects } from "./useProjects";
 import { knownProject } from "./sheetProject";
-
-/** The `<select>` value standing for "no project": the user's home directory. */
-export const GENERAL = "__general__";
+import { GENERAL } from "./projectOptions";
 
 /**
  * The Project field shared by the New ticket and New session sheets: the option list
- * from /api/projects, and the selection — pre-set to `defaultProject` (see
- * newTicketProject for where that comes from).
+ * from /api/projects (see useProjects), and the selection — pre-set to `defaultProject`
+ * (see newTicketProject for where that comes from).
  *
  * The glue half of the split this repo keeps everywhere (cf. useToken ÷
  * resolveInitialToken): the rule about which pre-selection survives lives in
@@ -17,21 +15,15 @@ export const GENERAL = "__general__";
  * and the state live here.
  */
 export function useProjectPicker(token: string, defaultProject: string | null) {
-  const [projects, setProjects] = useState<string[]>([]);
+  const projects = useProjects(token);
   const [project, setProject] = useState(defaultProject ?? GENERAL);
 
+  // The pre-selection is made a render before the list exists, and it can name a
+  // project projects.json no longer has. Applied to the live value rather than to
+  // `defaultProject`, so it cannot undo a choice the user made meanwhile.
   useEffect(() => {
-    apiFetch(token, "/api/projects")
-      .then((r) => (r.ok ? r.json() : { projects: [] }))
-      .then((d: { projects: string[] }) => {
-        setProjects(d.projects);
-        // The pre-selection is made a render before this list exists, and it can name a
-        // project projects.json no longer has. Applied to the live value rather than to
-        // `defaultProject`, so it cannot undo a choice the user made meanwhile.
-        setProject((p) => (p === GENERAL ? p : knownProject(p, d.projects) ?? GENERAL));
-      })
-      .catch(() => setProjects([]));
-  }, [token]);
+    setProject((p) => (p === GENERAL ? p : knownProject(p, projects) ?? GENERAL));
+  }, [projects]);
 
   return { projects, project, setProject, projectName: project === GENERAL ? null : project };
 }

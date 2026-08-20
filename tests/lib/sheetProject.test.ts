@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { knownProject, newTicketProject } from "@/lib/sheetProject";
+import { knownProject, newTicketProject, soleProject } from "@/lib/sheetProject";
 import { NO_FILTERS, type AppView, type ListFilters } from "@/lib/appLocation";
 import type { SessionMeta } from "@/server/types";
 
@@ -31,11 +31,11 @@ describe("newTicketProject", () => {
   });
 
   it("beats the project filter with the session's own project", () => {
-    expect(newTicketProject(SESSION, filters({ project: "Other" }), session("Mojito"))).toBe("Mojito");
+    expect(newTicketProject(SESSION, filters({ project: ["Other"] }), session("Mojito"))).toBe("Mojito");
   });
 
   it("falls back to no project when the session carries none", () => {
-    expect(newTicketProject(SESSION, filters({ project: "Other" }), session(null))).toBeNull();
+    expect(newTicketProject(SESSION, filters({ project: ["Other"] }), session(null))).toBeNull();
     expect(newTicketProject(SESSION, filters(), session(undefined))).toBeNull();
     expect(newTicketProject(SESSION, filters(), session("  "))).toBeNull();
   });
@@ -43,11 +43,16 @@ describe("newTicketProject", () => {
   // The session list is polled: a terminal url whose session has not arrived yet
   // renders nothing, but the value must still be defined rather than throw.
   it("falls back to no project when the session is not loaded yet", () => {
-    expect(newTicketProject(SESSION, filters({ project: "Other" }), null)).toBeNull();
+    expect(newTicketProject(SESSION, filters({ project: ["Other"] }), null)).toBeNull();
   });
 
   it("takes the active project filter on the list", () => {
-    expect(newTicketProject(LIST, filters({ project: "Mojito" }), null)).toBe("Mojito");
+    expect(newTicketProject(LIST, filters({ project: ["Mojito"] }), null)).toBe("Mojito");
+  });
+
+  // The filter holds a set since RIC-225, and one field cannot honour two projects.
+  it("is null when the board is filtered on several projects", () => {
+    expect(newTicketProject(LIST, filters({ project: ["Mojito", "Fornace"] }), null)).toBeNull();
   });
 
   it("is null on an unfiltered list", () => {
@@ -57,12 +62,23 @@ describe("newTicketProject", () => {
   // Filters ride along on every path (see formatLocation), so the chip the user left
   // on the board still describes what they are looking at over on Stacks or in a doc.
   it("takes the project filter on the other non-session views too", () => {
-    expect(newTicketProject({ kind: "stacks" }, filters({ project: "Mojito" }), null)).toBe("Mojito");
+    expect(newTicketProject({ kind: "stacks" }, filters({ project: ["Mojito"] }), null)).toBe("Mojito");
     expect(newTicketProject(
       { kind: "docs", target: { ticket: "RIC-1", project: null }, doc: null },
-      filters({ project: "Mojito" }),
+      filters({ project: ["Mojito"] }),
       null,
     )).toBe("Mojito");
+  });
+});
+
+describe("soleProject", () => {
+  it("is the one selected project", () => {
+    expect(soleProject(["Mojito"])).toBe("Mojito");
+  });
+
+  it("is null for none and for several, the two cases a single field cannot express", () => {
+    expect(soleProject([])).toBeNull();
+    expect(soleProject(["Mojito", "Fornace"])).toBeNull();
   });
 });
 
@@ -73,8 +89,8 @@ describe("knownProject", () => {
     expect(knownProject("Mojito", projects)).toBe("Mojito");
   });
 
-  // A session can name a project that is no longer in projects.json; a <select> whose
-  // value matches no <option> renders blank and posts whatever the browser picked.
+  // A session can name a project that is no longer in projects.json; a select whose
+  // value matches no option shows nothing and posts whatever it fell back to.
   it("drops a project that is not on the list", () => {
     expect(knownProject("Gone", projects)).toBeNull();
   });

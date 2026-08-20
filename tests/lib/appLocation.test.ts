@@ -20,8 +20,18 @@ describe("parseLocation", () => {
   it("reads every filter out of the query", () => {
     const { filters } = parseLocation("/", "?q=filtri&project=Mojito&status=In+Progress&mine=1&sessions=1");
     expect(filters).toEqual({
-      query: "filtri", project: "Mojito", status: "In Progress", mine: true, sessionsOnly: true,
+      query: "filtri", project: ["Mojito"], status: "In Progress", mine: true, sessionsOnly: true,
     });
+  });
+
+  it("reads a repeated project parameter as the whole selection, in url order", () => {
+    expect(parseLocation("/", "?project=Mojito&project=Fornace").filters.project)
+      .toEqual(["Mojito", "Fornace"]);
+  });
+
+  it("drops a duplicated project, so a hand-edited url cannot double an option", () => {
+    expect(parseLocation("/", "?project=Mojito&project=Mojito").filters.project)
+      .toEqual(["Mojito"]);
   });
 
   it("reads filters on a non-list path, so switching tabs cannot drop them", () => {
@@ -30,8 +40,12 @@ describe("parseLocation", () => {
 
   it("treats an empty project or status as unset, matching the activeFilters convention", () => {
     const { filters } = parseLocation("/", "?project=&status=");
-    expect(filters.project).toBeNull();
+    expect(filters.project).toEqual([]);
     expect(filters.status).toBeNull();
+  });
+
+  it("keeps the projects it can read when one of them is blank", () => {
+    expect(parseLocation("/", "?project=Mojito&project=").filters.project).toEqual(["Mojito"]);
   });
 
   it("reads the toggles as on only for an explicit 1", () => {
@@ -66,7 +80,7 @@ describe("parseLocation", () => {
   it("keeps the docs target project separate from the project filter", () => {
     const { view, filters } = parseLocation("/docs/ticket/RIC-204", "?docProject=Mojito&project=Other");
     expect(view).toEqual({ kind: "docs", target: { ticket: "RIC-204", project: "Mojito" }, doc: null });
-    expect(filters.project).toBe("Other");
+    expect(filters.project).toEqual(["Other"]);
   });
 
   it("reads a session docs path", () => {
@@ -97,8 +111,13 @@ describe("formatLocation", () => {
 
   it("writes the filters in a stable order", () => {
     expect(formatLocation(list({
-      query: "filtri", project: "Mojito", status: "In Progress", mine: true, sessionsOnly: true,
+      query: "filtri", project: ["Mojito"], status: "In Progress", mine: true, sessionsOnly: true,
     }))).toBe("/?q=filtri&project=Mojito&status=In+Progress&mine=1&sessions=1");
+  });
+
+  it("writes one project parameter per selection, so a name may hold any separator", () => {
+    expect(formatLocation(list({ project: ["Mojito", "A, B"] })))
+      .toBe("/?project=Mojito&project=A%2C+B");
   });
 
   it("carries the filters onto other views", () => {
@@ -134,7 +153,8 @@ describe("formatLocation", () => {
 describe("round trip", () => {
   const cases: AppLocation[] = [
     list(),
-    list({ query: "a&b=c", project: "My Project", status: "To QA", mine: true, sessionsOnly: true }),
+    list({ query: "a&b=c", project: ["My Project"], status: "To QA", mine: true, sessionsOnly: true }),
+    list({ project: ["Mojito", "A, B", "No project"] }),
     { view: { kind: "stacks" }, filters: { ...NO_FILTERS, status: "In Progress" } },
     { view: { kind: "session", id: "mojito-RIC-204-work", docs: null }, filters: { ...NO_FILTERS, mine: true } },
     { view: { kind: "session", id: "s1", docs: { doc: null } }, filters: NO_FILTERS },

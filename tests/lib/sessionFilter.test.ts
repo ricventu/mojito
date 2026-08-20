@@ -79,12 +79,12 @@ describe("filterSessions", () => {
   ];
 
   it("returns all sessions when no criteria are active", () => {
-    const out = filterSessions(sessions, { query: "", project: null, status: null });
+    const out = filterSessions(sessions, { query: "", project: [], status: null });
     expect(out.map((s) => s.id)).toEqual(["a", "b", "c"]);
   });
 
   it("filters by status", () => {
-    const out = filterSessions(sessions, { query: "", project: null, status: "In Progress" });
+    const out = filterSessions(sessions, { query: "", project: [], status: "In Progress" });
     expect(out.map((s) => s.id)).toEqual(["a", "c"]);
   });
 
@@ -93,7 +93,7 @@ describe("filterSessions", () => {
       ...sessions,
       session({ id: "d", kind: "custom", launchStatus: "", ticket: "", projectName: "Mojito", title: "Custom one" }),
     ];
-    const out = filterSessions(withCustom, { query: "", project: null, status: CUSTOM_STATUS });
+    const out = filterSessions(withCustom, { query: "", project: [], status: CUSTOM_STATUS });
     expect(out.map((s) => s.id)).toEqual(["d"]);
   });
 
@@ -102,32 +102,37 @@ describe("filterSessions", () => {
       ...sessions,
       session({ id: "e", kind: "shell", launchStatus: "", ticket: "", projectName: "Mojito", title: "Terminal one" }),
     ];
-    const out = filterSessions(withShell, { query: "", project: null, status: TERMINAL_STATUS });
+    const out = filterSessions(withShell, { query: "", project: [], status: TERMINAL_STATUS });
     expect(out.map((s) => s.id)).toEqual(["e"]);
   });
 
   it("filters by project, using the NO_PROJECT sentinel for projectless sessions", () => {
-    const out = filterSessions(sessions, { query: "", project: NO_PROJECT, status: null });
+    const out = filterSessions(sessions, { query: "", project: [NO_PROJECT], status: null });
     expect(out.map((s) => s.id)).toEqual(["c"]);
   });
 
+  it("keeps a session in any of several selected projects", () => {
+    const out = filterSessions(sessions, { query: "", project: ["Lime", NO_PROJECT], status: null });
+    expect(out.map((s) => s.id)).toEqual(["b", "c"]);
+  });
+
   it("filters by query across ticket, title, status, model and message", () => {
-    expect(filterSessions(sessions, { query: "beta", project: null, status: null }).map((s) => s.id)).toEqual(["b"]);
-    expect(filterSessions(sessions, { query: "ric-3", project: null, status: null }).map((s) => s.id)).toEqual(["c"]);
-    expect(filterSessions(sessions, { query: "to qa", project: null, status: null }).map((s) => s.id)).toEqual(["b"]);
+    expect(filterSessions(sessions, { query: "beta", project: [], status: null }).map((s) => s.id)).toEqual(["b"]);
+    expect(filterSessions(sessions, { query: "ric-3", project: [], status: null }).map((s) => s.id)).toEqual(["c"]);
+    expect(filterSessions(sessions, { query: "to qa", project: [], status: null }).map((s) => s.id)).toEqual(["b"]);
   });
 
   it("combines criteria with AND semantics", () => {
     // status matches a & c, project narrows to Mojito → only a
-    const out = filterSessions(sessions, { query: "", project: "Mojito", status: "In Progress" });
+    const out = filterSessions(sessions, { query: "", project: ["Mojito"], status: "In Progress" });
     expect(out.map((s) => s.id)).toEqual(["a"]);
     // no session is both To QA and in Mojito
-    expect(filterSessions(sessions, { query: "", project: "Mojito", status: "To QA" })).toEqual([]);
+    expect(filterSessions(sessions, { query: "", project: ["Mojito"], status: "To QA" })).toEqual([]);
   });
 
   it("does not throw on sessions missing optional fields", () => {
     const bare = [session({ id: "x", message: undefined })];
-    expect(filterSessions(bare, { query: "nope", project: null, status: null })).toEqual([]);
+    expect(filterSessions(bare, { query: "nope", project: [], status: null })).toEqual([]);
   });
 });
 
@@ -154,8 +159,8 @@ describe("live ticket statuses", () => {
 
   it("drops a session whose launch status matches the filter but whose ticket has moved on", () => {
     const sessions = [session({ id: "a", ticket: "RIC-1", launchStatus: "Todo" })];
-    expect(filterSessions(sessions, { query: "", project: null, status: "Todo" }, live)).toEqual([]);
-    expect(filterSessions(sessions, { query: "", project: null, status: "To QA" }, live).map((s) => s.id))
+    expect(filterSessions(sessions, { query: "", project: [], status: "Todo" }, live)).toEqual([]);
+    expect(filterSessions(sessions, { query: "", project: [], status: "To QA" }, live).map((s) => s.id))
       .toEqual(["a"]);
   });
 });

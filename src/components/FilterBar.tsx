@@ -1,4 +1,5 @@
 "use client";
+import { MultiCombobox } from "./ui/combobox";
 
 export default function FilterBar(
   { query, onQuery, projects, active, onProject, statuses, activeStatus, onStatus,
@@ -7,8 +8,8 @@ export default function FilterBar(
     query: string;
     onQuery: (q: string) => void;
     projects: string[];
-    active: string | null;
-    onProject: (p: string | null) => void;
+    active: string[];
+    onProject: (p: string[]) => void;
     statuses?: string[];
     activeStatus?: string | null;
     onStatus?: (s: string | null) => void;
@@ -38,12 +39,23 @@ export default function FilterBar(
           .filter-top does not wrap — a third button there would squeeze the search
           field down to nothing on a phone. */}
       {action && <div className="filter-actions">{action}</div>}
-      {(projects.length > 0 || active !== null) && (
-        <div className="filter-chips">
-          <button className={`chip toggle${active === null ? " on" : ""}`} onClick={() => onProject(null)}>All</button>
-          {projects.map((p) => (
-            <button key={p} className={`chip toggle${active === p ? " on" : ""}`} onClick={() => onProject(p)}>{p}</button>
-          ))}
+      {/* A select, not a chip row (RIC-225): the options are now every configured
+          project rather than only the ones with an open ticket, which is more names
+          than a horizontally scrolling row can show — and it takes several at once,
+          which chips cannot express at all. Statuses stay chips: there are five of
+          them and they never grow. */}
+      {(projects.length > 0 || active.length > 0) && (
+        <div className="filter-select">
+          <MultiCombobox
+            options={projects.map((p) => ({ value: p, label: p }))}
+            values={active}
+            onChange={onProject}
+            label="Filter by project"
+            emptyState="All projects"
+            searchLabel="Search projects…"
+            emptyLabel="No project matches."
+            clearLabel="Show all projects"
+          />
         </div>
       )}
       {(hasStatuses || onMine || onSessionsOnly) && (

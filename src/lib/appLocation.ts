@@ -2,13 +2,18 @@ import type { DocsTarget } from "./useDocs";
 
 /**
  * The unified list's five filter values — the shape activeFilters reads, and the
- * one half of the app state this module serializes. `query` says "unset" with `""`,
- * while `project` and `status` say it with `null`, because `""` is a project name
- * like any other.
+ * one half of the app state this module serializes. `query` says "unset" with `""`
+ * and `project` with `[]`, while `status` says it with `null`, because `""` is a
+ * status name like any other.
+ *
+ * `project` is a set, not one name: the toolbar's project filter is a multi-select
+ * (RIC-225), so "Mojito and Fornace, nothing else" is a state the url has to be able
+ * to hold. Empty means every project, which is also what makes the clean board a
+ * bare `/`.
  */
 export interface ListFilters {
   query: string;
-  project: string | null;
+  project: string[];
   status: string | null;
   mine: boolean;
   sessionsOnly: boolean;
@@ -17,7 +22,7 @@ export interface ListFilters {
 /** Every filter at its default: the whole board, nothing narrowed. */
 export const NO_FILTERS: ListFilters = {
   query: "",
-  project: null,
+  project: [],
   status: null,
   mine: false,
   sessionsOnly: false,
@@ -53,7 +58,7 @@ function segments(pathname: string): string[] {
 function readFilters(params: URLSearchParams): ListFilters {
   return {
     query: params.get("q") ?? "",
-    project: named(params, "project"),
+    project: selected(params, "project"),
     status: named(params, "status"),
     // `=== "1"` rather than a truthiness check, so an unrecognised value reads as
     // off — same rule the localStorage-backed toggles used before the URL owned them.
@@ -82,6 +87,16 @@ function readView(pathname: string, params: URLSearchParams): AppView {
   // Anything unrecognised is the list, so a stale bookmark or a hand-typed path
   // lands somewhere real instead of on a blank page.
   return { kind: "list" };
+}
+
+/**
+ * A repeated query value read as a set, in url order and without duplicates: the
+ * multi-select project filter serializes as one `project=` parameter per selection,
+ * so `?project=Mojito&project=Fornace` is the pair and no parameter at all is "every
+ * project". Blanks are dropped for the same reason `named` drops them.
+ */
+function selected(params: URLSearchParams, key: string): string[] {
+  return Array.from(new Set(params.getAll(key).filter((v) => v !== "")));
 }
 
 /** A `string | null` query value, where `""` reads as absent — see ListFilters. */
@@ -119,7 +134,9 @@ function viewPath(view: AppView): string {
 export function formatLocation({ view, filters }: AppLocation): string {
   const params = new URLSearchParams();
   if (filters.query !== "") params.set("q", filters.query);
-  if (filters.project !== null) params.set("project", filters.project);
+  // One parameter per project rather than a joined list: a project name is free text
+  // and could hold whatever separator was picked.
+  for (const project of filters.project) params.append("project", project);
   if (filters.status !== null) params.set("status", filters.status);
   if (filters.mine) params.set("mine", "1");
   if (filters.sessionsOnly) params.set("sessions", "1");

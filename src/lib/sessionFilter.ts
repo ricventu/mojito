@@ -44,7 +44,8 @@ export function sessionStatuses(sessions: SessionMeta[], live?: LiveStatuses): s
 
 export interface SessionFilter {
   query: string;
-  project: string | null;
+  /** The selected projects; empty is every project — see ListFilters. */
+  project: string[];
   status: string | null;
 }
 
@@ -56,7 +57,7 @@ export function filterSessions(
 ): SessionMeta[] {
   const q = query.trim().toLowerCase();
   return sessions.filter((s) => {
-    if (project !== null && (s.projectName ?? NO_PROJECT) !== project) return false;
+    if (project.length > 0 && !project.includes(s.projectName ?? NO_PROJECT)) return false;
     if (status !== null && sessionStatus(s, live) !== status) return false;
     if (!q) return true;
     return [s.ticket, s.launchStatus, s.model, s.message, s.title]

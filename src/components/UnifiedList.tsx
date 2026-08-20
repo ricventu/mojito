@@ -12,6 +12,8 @@ import TicketCard from "./TicketCard";
 import SessionCard from "./SessionCard";
 import StatusBadge from "./StatusBadge";
 import { mineOnly, liveStatuses } from "@/lib/ticketFilter";
+import { useProjects } from "@/lib/useProjects";
+import { soleProject } from "@/lib/sheetProject";
 import { sessionStatus } from "@/lib/sessionFilter";
 import { groupByStatus } from "@/lib/groupByStatus";
 import { orderSessions } from "@/lib/orderSessions";
@@ -61,7 +63,7 @@ export default function UnifiedList(
   // query one character at a time. The chips and toggles below are discrete choices,
   // so each of those is worth its own entry.
   const setQuery = (v: string) => onFilters({ ...filters, query: v }, "replace");
-  const setProject = (p: string | null) => setFilter("project", p);
+  const setProject = (p: string[]) => setFilter("project", p);
   const setStatus = (s: string | null) => setFilter("status", s);
   const setMine = (v: boolean) => setFilter("mine", v);
   const setSessionsOnly = (v: boolean) => setFilter("sessionsOnly", v);
@@ -72,7 +74,13 @@ export default function UnifiedList(
   // Built from the unscoped list on purpose (see liveStatuses): a session's own
   // launchStatus is frozen at launch, and Mine must not decide which status it reports.
   const live = useMemo(() => liveStatuses(tickets), [tickets]);
-  const projects = useMemo(() => mergedProjects(scoped, sessions), [scoped, sessions]);
+  // The filter offers every configured project, not just the ones the board happens to
+  // name (RIC-225) — see mergedProjects.
+  const configured = useProjects(token);
+  const projects = useMemo(
+    () => mergedProjects(scoped, sessions, configured),
+    [scoped, sessions, configured],
+  );
   const statuses = useMemo(() => mergedStatuses(scoped, sessions, live), [scoped, sessions, live]);
 
   const { ticketRows, looseSessions } = useMemo(
@@ -100,7 +108,7 @@ export default function UnifiedList(
     // its chip is tapped.
     const clear: Record<FilterKey, () => void> = {
       query: () => setFilter("query", ""),
-      project: () => setProject(null),
+      project: () => setProject([]),
       status: () => setStatus(null),
       mine: () => setMine(false),
       sessions: () => setSessionsOnly(false),
@@ -217,7 +225,7 @@ export default function UnifiedList(
           onOpenDocs={() => { setPicked(null); onOpenTicketDocs(picked); }} />
       )}
       {newSession && (
-        <NewSessionSheet token={token} defaultProject={project}
+        <NewSessionSheet token={token} defaultProject={soleProject(project)}
           onClose={() => setNewSession(false)} onLaunched={onChanged}
           onOpen={(s) => { setNewSession(false); onOpen(s); }} />
       )}

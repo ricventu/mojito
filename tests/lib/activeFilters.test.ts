@@ -5,7 +5,7 @@ import type { ListFilters } from "@/lib/appLocation";
 // Every filter off — the landing state once Mine defaults off (Task 3). Each test
 // overrides only the filter it is about.
 function state(p: Partial<ListFilters> = {}): ListFilters {
-  return { query: "", project: null, status: null, mine: false, sessionsOnly: false, ...p };
+  return { query: "", project: [], status: null, mine: false, sessionsOnly: false, ...p };
 }
 
 describe("activeFilters", () => {
@@ -22,13 +22,18 @@ describe("activeFilters", () => {
   });
 
   it("reports a project under its own name", () => {
-    expect(activeFilters(state({ project: "Mojito" })))
+    expect(activeFilters(state({ project: ["Mojito"] })))
       .toEqual([{ key: "project", label: "Mojito" }]);
   });
 
-  it("labels the No project sentinel as-is, since it is the chip's own value", () => {
-    expect(activeFilters(state({ project: "No project" })))
+  it("labels the No project sentinel as-is, since it is the filter's own value", () => {
+    expect(activeFilters(state({ project: ["No project"] })))
       .toEqual([{ key: "project", label: "No project" }]);
+  });
+
+  it("reports several projects as one chip, in selection order", () => {
+    expect(activeFilters(state({ project: ["Mojito", "Fornace"] })))
+      .toEqual([{ key: "project", label: "Mojito, Fornace" }]);
   });
 
   it("reports a status under its own name", () => {
@@ -45,8 +50,8 @@ describe("activeFilters", () => {
       .toEqual([{ key: "sessions", label: "Sessions" }]);
   });
 
-  it("counts an empty-string project or status as set, since only null is unset", () => {
-    expect(activeFilters(state({ project: "", status: "" }))).toEqual([
+  it("counts an empty-string project or status as set, since only [] and null are unset", () => {
+    expect(activeFilters(state({ project: [""], status: "" }))).toEqual([
       { key: "project", label: "" },
       { key: "status", label: "" },
     ]);
@@ -54,7 +59,7 @@ describe("activeFilters", () => {
 
   it("orders every filter query-first, so the one that scrolls away leads", () => {
     const all = state({
-      query: "182", project: "Mojito", status: "To QA", mine: true, sessionsOnly: true,
+      query: "182", project: ["Mojito"], status: "To QA", mine: true, sessionsOnly: true,
     });
     expect(activeFilters(all).map((f) => f.key))
       .toEqual(["query", "project", "status", "mine", "sessions"]);

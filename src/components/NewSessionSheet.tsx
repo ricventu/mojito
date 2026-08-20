@@ -2,7 +2,10 @@
 import { useState } from "react";
 import { apiFetch } from "@/lib/client";
 import { launchedSession } from "@/lib/launchedSession";
-import { GENERAL, useProjectPicker } from "@/lib/useProjectPicker";
+import { useProjectPicker } from "@/lib/useProjectPicker";
+import { projectOptions } from "@/lib/projectOptions";
+import { Combobox } from "./ui/combobox";
+import { Choice } from "./ui/choice";
 import type { SessionMeta } from "@/server/types";
 
 const MODELS = ["opus", "sonnet", "fable"];
@@ -12,8 +15,10 @@ export default function NewSessionSheet(
   { token, defaultProject, onClose, onLaunched, onOpen }:
   {
     token: string;
-    // The board's active project chip — a session started while looking at one project
-    // is for that project (RIC-224). `null` is General (home).
+    // The project the board is filtered on, when its multi-select names exactly one
+    // (see soleProject) — a session started while looking at one project is for that
+    // project (RIC-224). `null` is General (home), and also what several projects
+    // resolve to, since one field cannot honour them all.
     defaultProject: string | null;
     onClose: () => void;
     onLaunched: () => void;
@@ -53,17 +58,18 @@ export default function NewSessionSheet(
           <button className={`btn ${mode === "claude" ? "primary" : "ghost"}`} onClick={() => setMode("claude")}>Claude</button>
           <button className={`btn ${mode === "terminal" ? "primary" : "ghost"}`} onClick={() => setMode("terminal")}>Terminal</button>
         </div>
-        <label className="field"><span className="lbl">Project</span>
-          <select value={project} onChange={(e) => setProject(e.target.value)}>
-            <option value={GENERAL}>General (home)</option>
-            {projects.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select></label>
+        {/* A div, not a label: the field is a button now (see ui/combobox), and a
+            <button> is not a labelable control — the trigger carries its own name. */}
+        <div className="field"><span className="lbl">Project</span>
+          <Combobox options={projectOptions(projects)} value={project} onChange={setProject}
+            label="Project" searchLabel="Search projects…" emptyLabel="No project matches." />
+        </div>
         {mode === "claude" && (
           <div className="two">
-            <label className="field"><span className="lbl">Model</span>
-              <select value={model} onChange={(e) => setModel(e.target.value)}>{MODELS.map((m) => <option key={m}>{m}</option>)}</select></label>
-            <label className="field"><span className="lbl">Effort</span>
-              <select value={effort} onChange={(e) => setEffort(e.target.value)}>{EFFORTS.map((x) => <option key={x}>{x}</option>)}</select></label>
+            <div className="field"><span className="lbl">Model</span>
+              <Choice label="Model" value={model} onChange={setModel} options={MODELS} /></div>
+            <div className="field"><span className="lbl">Effort</span>
+              <Choice label="Effort" value={effort} onChange={setEffort} options={EFFORTS} /></div>
           </div>
         )}
         <button className="btn primary block" onClick={start}>{mode === "terminal" ? "Start terminal" : "Start session"}</button>

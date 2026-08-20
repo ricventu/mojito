@@ -3,7 +3,7 @@ import type { SessionMeta } from "@/server/types";
 
 /**
  * Which project the New ticket sheet opens on. (New session takes the board's project
- * filter directly — it is only reachable from the list.)
+ * filter directly — it is only reachable from the list — through the same soleProject.)
  *
  * The action sits in the terminal header as well as on the board (RIC-224), and a
  * ticket jotted down while watching a session almost always belongs to that session's
@@ -21,7 +21,19 @@ export function newTicketProject(
   // be open before its meta has arrived — and a sidecar written before projectName
   // existed leaves it undefined at runtime despite the type.
   if (view.kind === "session") return session?.projectName?.trim() || null;
-  return filters.project;
+  return soleProject(filters.project);
+}
+
+/**
+ * The one project a multi-select filter names, or null when it names none or several.
+ *
+ * A sheet's Project field holds exactly one value, so a board filtered on three
+ * projects has no answer to give it (RIC-225) — and picking one of the three would put
+ * the ticket, or the session's cwd, in a repo the human never pointed at. "General
+ * (home)" is the honest default there, and it is one tap from the right one.
+ */
+export function soleProject(projects: readonly string[]): string | null {
+  return projects.length === 1 ? projects[0] : null;
 }
 
 /**

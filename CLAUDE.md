@@ -58,16 +58,18 @@ Mojito owns the whole lifecycle — there is no external plugin:
   the action is on the terminal header too (`.term-actions`), where the list is not
   mounted. Which project it opens on is `newTicketProject` (`src/lib/sheetProject.ts`):
   the open session's own project on a terminal (a ticket jotted down while watching a
-  session almost always belongs to that repo), otherwise whatever project chip the board
-  is filtered on. **New session** pre-selects that same chip — it is only reachable from
-  the list, so it takes `filters.project` directly. Both sheets share the Project field
+  session almost always belongs to that repo), otherwise the project the board is
+  filtered on — `soleProject`, i.e. only when the filter names exactly one, since the
+  filter holds a set since RIC-225 and one field cannot honour two. **New session**
+  pre-selects the same way — it is only reachable from the list, so it takes
+  `filters.project` through that same `soleProject`. Both sheets share the Project field
   through `useProjectPicker`, the glue half of the usual split (cf. `useToken` ÷
   `resolveInitialToken`): the rule lives in `knownProject`, which resolves a name
-  `projects.json` has since dropped back to General, because a `<select>` on a value with
-  no `<option>` renders blank and submits whatever the browser fell back to. An *empty*
-  project list reads as "not loaded yet", not "none exist" — /api/projects answers a
-  render after the sheet opens, and resolving against that first empty pass would throw
-  every pre-selection away.
+  `projects.json` has since dropped back to General, because a select on a value with no
+  option shows nothing and submits whatever it fell back to. An *empty* project list
+  reads as "not loaded yet", not "none exist" — /api/projects answers a render after the
+  sheet opens, and resolving against that first empty pass would throw every
+  pre-selection away.
 - **Worktrees**: a ticket launch resolves its worktree first via the legacy branch-name
   scan (`resolveWorktree`, any worktree whose branch carries the ticket id, wherever it
   lives), then the fixed `.claude/worktrees/<ticket>-<slug>` path Mojito itself creates
@@ -176,8 +178,10 @@ Mojito owns the whole lifecycle — there is no external plugin:
   open and how the list is filtered (RIC-204). `src/lib/appLocation.ts` is the pure
   codec — `parseLocation`/`formatLocation` over `/`, `/stacks`, `/session/<id>`,
   `/session/<id>/docs`, `/docs/ticket/<id>`, `/docs/session/<id>` plus the five filter
-  params — and `useAppLocation` is the only `window.history` glue, so everything
-  testable stays testable in the node-only vitest setup (no jsdom, no RTL; same split
+  params (`project` repeats — one parameter per selected project, since a project name
+  is free text and could hold whatever separator a joined list picked) — and
+  `useAppLocation` is the only `window.history` glue, so everything testable stays
+  testable in the node-only vitest setup (no jsdom, no RTL; same split
   as `resolveInitialToken` ÷ `useToken`). The five `mojito-list-*` localStorage keys and
   `mojito-tab` are gone, along with `usePersistedState` itself: localStorage is shared
   between browser tabs, which is exactly what made two tabs unable to hold two filter
@@ -200,6 +204,33 @@ Mojito owns the whole lifecycle — there is no external plugin:
   buttons step through real history when the previous entry is ours, tracked as a depth
   counter in `history.state` (`src/lib/navDepth.ts`), and fall back to a url otherwise,
   so a link opened straight into a terminal never backs out of Mojito.
+- **Project filter**: the board's project filter offers *every configured project*, not
+  only the ones its open tickets name (RIC-225) — `mergedProjects` unions
+  `/api/projects` (`useProjects`) with the names the tickets and sessions on screen
+  carry, so a project whose tickets are all closed is still reachable, and a ticket
+  naming a project the map has dropped does not silently lose its option. It is a
+  multi-select with a search box rather than a chip row: the list is now as long as
+  projects.json, which a horizontally scrolling row cannot show, and "these two
+  projects" is a state chips cannot express at all. So `ListFilters.project` is a
+  `string[]` where `[]` means every project — `filterTickets`/`filterSessions` treat a
+  non-empty set as OR — and `activeFilters` reports the whole set as one chip, since
+  removing one project is what the select itself is for and a per-project ✕ would need
+  `FilterKey` to carry a value. The status chips stay chips: five values that never grow.
+- **UI kit**: the selects are shadcn/ui sources under `src/components/ui`
+  (`select`, `popover`, `command`, plus `combobox` and `choice`, the two app-level
+  shapes: searchable — single or multi — and a short fixed list). They are the only
+  Tailwind in the app; everything else is the hand-written CSS in `globals.css`. Pasted
+  in essentially unedited and bridged rather than restyled: `tailwind.config.ts` maps the
+  colour names shadcn asks for (`popover`, `accent`, `input`, `ring` …) onto `--ui-*`
+  variables that `globals.css` defines in terms of Mojito's own tokens, which is why a
+  regenerated component comes out looking like Mojito. `--ui-*` and not shadcn's bare
+  names because Mojito already owns `--accent` as its brand lime where shadcn means
+  "subtle hover" by it. Two things bite when editing them: the popovers portal to
+  `<body>`, so they need `z-[200]` to clear the sheets (100) and the docs overlay (120),
+  and they must be `modal` — a non-modal popover lets its dismissing tap through to
+  `.sheet-backdrop`, which closes the whole sheet. Overriding a `globals.css` element
+  rule (`input:focus`) takes a `focus:` variant, not a plain utility: element +
+  pseudo-class outranks a bare class.
 - **Projects map**: `~/.config/mojito/projects.json` (Linear team key → project name →
   repo path), resolved by `resolveProjectsPath` in `src/server/config.ts`: env
   `MOJITO_PROJECTS` → `~/.config/mojito/projects.json`.
