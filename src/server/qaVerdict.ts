@@ -1,4 +1,4 @@
-import type { MergeMode, MergeOutcome } from "./merge.js";
+import type { MergeMode, MergeOutcome } from "./merge";
 
 export type QaArg = "approve-local" | "approve-mr" | "mark-done";
 export const QA_ARGS: readonly QaArg[] = ["approve-local", "approve-mr", "mark-done"];

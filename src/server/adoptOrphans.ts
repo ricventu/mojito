@@ -1,7 +1,7 @@
-import type { Registry } from "./registry.js";
-import type { SessionMeta } from "./types.js";
-import { readLaunchContext } from "./launchContext.js";
-import { resolveTicketCwd } from "./ticketCwd.js";
+import type { Registry } from "./registry";
+import type { SessionMeta } from "./types";
+import { readLaunchContext } from "./launchContext";
+import { resolveTicketCwd } from "./ticketCwd";
 
 export interface AdoptOrphansDeps {
   readContext?: (stateDir: string, id: string) => ReturnType<typeof readLaunchContext>;

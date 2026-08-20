@@ -3,15 +3,15 @@ import type { Duplex } from "node:stream";
 import next from "next";
 import nextEnv from "@next/env";
 import { WebSocketServer } from "ws";
-import { getConfig, getRegistry, getBus } from "./src/server/app.js";
-import { listSessions } from "./src/server/tmux.js";
-import { adoptOrphanSessions } from "./src/server/adoptOrphans.js";
-import { tokenFromUrl } from "./src/server/auth.js";
-import { attachPty } from "./src/server/ptyGateway.js";
-import { attachEvents } from "./src/server/eventsWs.js";
-import { registerEnvFileKeys } from "./src/server/childEnv.js";
-import { startHeartbeat, markAlive } from "./src/server/heartbeat.js";
-import { claimUpgrades, dropForeignUpgradeListeners } from "./src/server/nextUpgrade.js";
+import { getConfig, getRegistry, getBus } from "./src/server/app";
+import { listSessions } from "./src/server/tmux";
+import { adoptOrphanSessions } from "./src/server/adoptOrphans";
+import { tokenFromUrl } from "./src/server/auth";
+import { attachPty } from "./src/server/ptyGateway";
+import { attachEvents } from "./src/server/eventsWs";
+import { registerEnvFileKeys } from "./src/server/childEnv";
+import { startHeartbeat, markAlive } from "./src/server/heartbeat";
+import { claimUpgrades, dropForeignUpgradeListeners, nextUpgradeHandler } from "./src/server/nextUpgrade";
 
 // @next/env is CJS bundled via ncc, whose dynamically-defined named exports
 // aren't visible to Node's cjs-module-lexer — import the default and
@@ -37,8 +37,9 @@ async function main() {
   const app = next({ dev });
   const handle = app.getRequestHandler();
   await app.prepare();
-  // getUpgradeHandler() must run after prepare() — Next throws otherwise.
-  const upgradeHandle = app.getUpgradeHandler();
+  // Must run after prepare() — Next throws otherwise. Not getUpgradeHandler(): in dev
+  // that one resolves to a no-op and takes Fast Refresh with it (see nextUpgrade.ts).
+  const upgradeHandle = nextUpgradeHandler(app);
   // Before the first request reaches Next: it would otherwise attach an `upgrade`
   // listener of its own and end the sockets this server has already upgraded, because
   // the page's optional catch-all route matches /ws/pty too. See nextUpgrade.ts.
@@ -73,8 +74,9 @@ async function main() {
     try {
       const url = req.url ?? "";
       const path = url.split("?")[0];
-      // Next's dev Fast Refresh connects over its own WebSocket
-      // (/_next/webpack-hmr). A custom server must hand Next's internal upgrade
+      // Next's dev Fast Refresh connects over its own WebSocket (/_next/hmr — it was
+      // /_next/webpack-hmr before Next 16; both sit under /_next, which is why the
+      // rename costs nothing here). A custom server must hand Next's internal upgrade
       // requests back to Next, or HMR never connects and the browser stops
       // receiving hot updates while the server runs. These are Next-internal and
       // carry no Mojito token, so route them before the token gate. In production

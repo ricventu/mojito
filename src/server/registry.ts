@@ -1,5 +1,5 @@
-import type { SessionMeta } from "./types.js";
-import { listSidecars, readSidecar, writeSidecar, removeSidecar } from "./sidecar.js";
+import type { SessionMeta } from "./types";
+import { listSidecars, readSidecar, writeSidecar, removeSidecar } from "./sidecar";
 
 export class Registry {
   private map = new Map<string, SessionMeta>();

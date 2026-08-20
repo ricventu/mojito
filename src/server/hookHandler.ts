@@ -1,8 +1,8 @@
-import type { HookEventName, SessionMeta } from "./types.js";
-import type { Registry } from "./registry.js";
-import type { EventBus } from "./events.js";
-import type { SessionResult } from "./sessionResult.js";
-import { mapHook, mapCustomHook } from "./hookMap.js";
+import type { HookEventName, SessionMeta } from "./types";
+import type { Registry } from "./registry";
+import type { EventBus } from "./events";
+import type { SessionResult } from "./sessionResult";
+import { mapHook, mapCustomHook } from "./hookMap";
 
 export interface HookDeps {
   registry: Registry;

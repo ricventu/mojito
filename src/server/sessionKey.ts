@@ -1,4 +1,4 @@
-import { WORK_STATES, GATE_STATES } from "./statusModel.js";
+import { WORK_STATES, GATE_STATES } from "./statusModel";
 
 const TICKET_RE = /^([A-Z][A-Z0-9]*)-(\d+)$/;
 

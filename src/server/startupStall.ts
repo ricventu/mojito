@@ -1,5 +1,5 @@
-import type { Registry } from "./registry.js";
-import type { EventBus } from "./events.js";
+import type { Registry } from "./registry";
+import type { EventBus } from "./events";
 
 /**
  * How long a launch may sit at "starting" before Mojito stops believing it is merely booting.

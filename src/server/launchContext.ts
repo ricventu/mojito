@@ -1,6 +1,6 @@
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { TicketAsset, TicketAttachment } from "./ticketAssets.js";
+import type { TicketAsset, TicketAttachment } from "./ticketAssets";
 
 export interface LaunchContext {
   identifier: string;

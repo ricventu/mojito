@@ -1,6 +1,6 @@
-import { loadProjectMap, resolvePathForProject } from "./projects.js";
-import { repoRootFromWorktree } from "./merge.js";
-import { resolveTicketWorktree } from "./ticketCwd.js";
+import { loadProjectMap, resolvePathForProject } from "./projects";
+import { repoRootFromWorktree } from "./merge";
+import { resolveTicketWorktree } from "./ticketCwd";
 
 export interface TicketDirs {
   worktree: string | null;

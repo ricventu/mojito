@@ -1,4 +1,4 @@
-import { QaVerdictError, QA_ARGS, type QaArg, type QaVerdictResult } from "./qaVerdict.js";
+import { QaVerdictError, QA_ARGS, type QaArg, type QaVerdictResult } from "./qaVerdict";
 
 export type VerdictResult =
   | { ok: true; result: QaVerdictResult }

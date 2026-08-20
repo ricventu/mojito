@@ -1,5 +1,5 @@
-import { parseIdentifier } from "./sessionKey.js";
-import type { TicketSummary } from "./types.js";
+import { parseIdentifier } from "./sessionKey";
+import type { TicketSummary } from "./types";
 
 const ENDPOINT = "https://api.linear.app/graphql";
 

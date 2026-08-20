@@ -1,6 +1,6 @@
-import { repoForTicket } from "./ticketCwd.js";
-import { findExistingTicketWorktree, listLocalBranches } from "./worktree.js";
-import { detectDefaultBranch } from "./merge.js";
+import { repoForTicket } from "./ticketCwd";
+import { findExistingTicketWorktree, listLocalBranches } from "./worktree";
+import { detectDefaultBranch } from "./merge";
 
 export interface TicketWorktreeStatus {
   exists: boolean;

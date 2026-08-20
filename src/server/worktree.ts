@@ -2,8 +2,8 @@ import { execFile, execFileSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { statusSlug } from "./sessionKey.js";
-import { spawnEnv } from "./childEnv.js";
+import { statusSlug } from "./sessionKey";
+import { spawnEnv } from "./childEnv";
 
 const pexecFile = promisify(execFile);
 

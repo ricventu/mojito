@@ -1,4 +1,4 @@
-import type { Registry } from "./registry.js";
+import type { Registry } from "./registry";
 
 export interface RetireDeps {
   hasSession: (name: string) => Promise<boolean>;

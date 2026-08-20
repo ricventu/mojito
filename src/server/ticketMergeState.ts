@@ -1,5 +1,5 @@
-import { isAlreadyMerged, isOnDefaultBranch } from "./merge.js";
-import { resolveTicketDirs } from "./ticketDirs.js";
+import { isAlreadyMerged, isOnDefaultBranch } from "./merge";
+import { resolveTicketDirs } from "./ticketDirs";
 
 export interface MergeStateDeps {
   resolveTicketDirs: typeof resolveTicketDirs;

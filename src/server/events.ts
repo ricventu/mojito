@@ -1,4 +1,4 @@
-import type { SessionState } from "./types.js";
+import type { SessionState } from "./types";
 
 export type MojitoEvent =
   | { type: "session.state"; id: string; state: SessionState }

@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { AppConfig } from "./types.js";
+import type { AppConfig } from "./types";
 
 /**
  * Resolve the projects map path, in precedence order:

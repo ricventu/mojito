@@ -1,7 +1,7 @@
-import { WORK_PROMPT_TEMPLATE, ASSETS_PARAGRAPH } from "./prompts/work.js";
-import { MERGE_FIX_PROMPT_TEMPLATE, COMPLETE_STEP_LOCAL, COMPLETE_STEP_MR } from "./prompts/conflict.js";
-import { INTAKE_PROMPT_TEMPLATE, INTAKE_IMAGES_PARAGRAPH } from "./prompts/intake.js";
-import type { MergeMode } from "./merge.js";
+import { WORK_PROMPT_TEMPLATE, ASSETS_PARAGRAPH } from "./prompts/work";
+import { MERGE_FIX_PROMPT_TEMPLATE, COMPLETE_STEP_LOCAL, COMPLETE_STEP_MR } from "./prompts/conflict";
+import { INTAKE_PROMPT_TEMPLATE, INTAKE_IMAGES_PARAGRAPH } from "./prompts/intake";
+import type { MergeMode } from "./merge";
 
 export interface PromptVars {
   ticket: string;

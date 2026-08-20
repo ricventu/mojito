@@ -2,16 +2,16 @@ import { statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { listMappedProjects, loadProjectMap, type ProjectMap } from "./projects.js";
-import { statusSlug, stackSessionName } from "./sessionKey.js";
-import { listAllPanes as tmuxListAllPanes, startStackSession, stopStackSession, type PaneInfo } from "./tmux.js";
-import { ffPull, FfPullError, type FfPullResult, type GitRun } from "./ffPull.js";
-import { gitPush, GitPushError, type GitPushResult } from "./gitPush.js";
+import { listMappedProjects, loadProjectMap, type ProjectMap } from "./projects";
+import { statusSlug, stackSessionName } from "./sessionKey";
+import { listAllPanes as tmuxListAllPanes, startStackSession, stopStackSession, type PaneInfo } from "./tmux";
+import { ffPull, FfPullError, type FfPullResult, type GitRun } from "./ffPull";
+import { gitPush, GitPushError, type GitPushResult } from "./gitPush";
 import type { StackRow, StackStatus } from "@/lib/stacks";
 
 const pexec = promisify(execFile);
 
-export type { PaneInfo } from "./tmux.js";
+export type { PaneInfo } from "./tmux";
 
 export interface StackDeps {
   projectsPath: string;

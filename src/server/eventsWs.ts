@@ -1,5 +1,5 @@
 import type { WebSocket } from "ws";
-import type { EventBus } from "./events.js";
+import type { EventBus } from "./events";
 
 export function attachEvents(ws: WebSocket, bus: EventBus): void {
   ws.on("error", (err) => {

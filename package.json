@@ -15,16 +15,16 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@next/env": "^15.5.20",
+    "@next/env": "^16.3.1",
     "@radix-ui/react-popover": "^1.1.23",
     "@radix-ui/react-select": "^2.3.7",
-    "@xterm/addon-fit": "^0.10.0",
-    "@xterm/xterm": "^5.5.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "cross-env": "^7.0.3",
     "lucide-react": "^1.33.0",
-    "next": "^15.0.0",
+    "next": "^16.3.1",
     "node-pty": "^1.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -46,6 +46,6 @@
     "vitest": "^2.0.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.9"
   }
 }

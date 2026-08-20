@@ -1,4 +1,4 @@
-import type { HookEventName } from "./types.js";
+import type { HookEventName } from "./types";
 
 const EVENTS: HookEventName[] = ["SessionStart", "UserPromptSubmit", "PermissionRequest", "Notification", "PostToolUse", "Stop", "SessionEnd"];
 

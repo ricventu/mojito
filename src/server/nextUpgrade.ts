@@ -1,4 +1,5 @@
-import type { Server } from "node:http";
+import type { IncomingMessage, Server } from "node:http";
+import type { Duplex } from "node:stream";
 
 /**
  * Keeping Mojito's WebSockets away from Next's own upgrade handling.
@@ -40,6 +41,37 @@ export function claimUpgrades(app: unknown): boolean {
   if (typeof setup !== "function") return false;
   (setup as (customServer?: unknown, req?: unknown) => void).call(app);
   return true;
+}
+
+/** What an upgrade listener is handed, named once so the two shapes below agree. */
+type UpgradeHandler = (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
+
+/**
+ * The handler to give Next its *own* upgrades — the `/_next` sockets Mojito routes
+ * back to it, Fast Refresh's among them.
+ *
+ * Not `app.getUpgradeHandler()`, which is the public method and the wrong one: on
+ * `NextCustomServer` — the class `next()` hands back, dev and prod alike — it reads
+ * `this.server.getUpgradeHandler()`, i.e. the *inner* NextNodeServer, whose
+ * `handleUpgrade` is a documented no-op ("the web server does not support web sockets,
+ * it's only used for HMR in development"). So every socket handed to it is simply
+ * dropped, and in dev the browser's HMR client retries forever.
+ * Next's own `setupWebSocketHandler` — the listener `claimUpgrades` suppresses — does
+ * not use that method either: it calls the `upgradeHandler` *getter*, which is the
+ * router server's handler, the only one that answers `/_next/hmr`. So that is what we
+ * take, falling back to the public method when it is gone.
+ *
+ * This was already broken before Next 16 and cost Fast Refresh silently: the getter
+ * and the method have disagreed since at least Next 15, and the path also moved
+ * (`/_next/webpack-hmr` → `/_next/hmr`), so nothing pointed at it. Both are inside
+ * `/_next`, which is what `server.ts` routes on, so the rename needed no change there.
+ */
+export function nextUpgradeHandler(app: {
+  getUpgradeHandler(): UpgradeHandler;
+}): UpgradeHandler {
+  const internal = (app as { upgradeHandler?: unknown }).upgradeHandler;
+  if (typeof internal === "function") return internal.bind(app) as UpgradeHandler;
+  return app.getUpgradeHandler();
 }
 
 /**

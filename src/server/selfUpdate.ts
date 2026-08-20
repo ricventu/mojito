@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { ffPull, type FfPullResult } from "./ffPull.js";
+import { ffPull, type FfPullResult } from "./ffPull";
 
 const pexec = promisify(execFile);
 

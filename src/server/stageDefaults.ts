@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
-import type { Effort } from "./types.js";
+import type { Effort } from "./types";
 import {
   mergeEffective, resolveModel, resolveEffort, sanitizeOverrides, type StageDefaults,
 } from "@/lib/stageDefaults";

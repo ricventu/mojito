@@ -1,6 +1,6 @@
-import type { SessionMeta } from "./types.js";
-import { resolveTicketCwd, resolveTicketWorktree } from "./ticketCwd.js";
-import { getConfig, getRegistry } from "./app.js";
+import type { SessionMeta } from "./types";
+import { resolveTicketCwd, resolveTicketWorktree } from "./ticketCwd";
+import { getConfig, getRegistry } from "./app";
 
 export interface DocsTargetDeps {
   // Look up a live session by its tmux name — the registry, in production.

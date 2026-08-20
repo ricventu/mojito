@@ -1,6 +1,6 @@
-import { parseIdentifier } from "./sessionKey.js";
-import { loadProjectMap, resolveRepoFromMap } from "./projects.js";
-import { resolveWorktree } from "./worktree.js";
+import { parseIdentifier } from "./sessionKey";
+import { loadProjectMap, resolveRepoFromMap } from "./projects";
+import { resolveWorktree } from "./worktree";
 
 // The repo a ticket's project maps to, or null.
 export function repoForTicket(projectsPath: string, ticket: string, projectName: string | null): string | null {

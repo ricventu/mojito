@@ -218,7 +218,15 @@ Mojito owns the whole lifecycle — there is no external plugin:
   Every terminal came up empty and every live update stopped, and the client's 1.5s
   reconnect loop turned that into the pty leak `ptyGateway` now guards against. A
   launch also seeds its answer into the session list before navigating (`withSession`),
-  since an unknown `/session/<id>` corrects itself back to the board. In-app Back
+  since an unknown `/session/<id>` corrects itself back to the board. The other half of
+  that file is `nextUpgradeHandler`, which picks the handler Mojito gives Next its *own*
+  `/_next` upgrades — the internal `upgradeHandler` getter, not the public
+  `getUpgradeHandler()`. In dev the public method resolves to the inner NextNodeServer,
+  whose `handleUpgrade` is a documented no-op, so every socket handed to it was dropped
+  and Fast Refresh silently never connected — broken since well before Next 16, and
+  invisible because the HMR path also moved (`/_next/webpack-hmr` → `/_next/hmr`, both
+  under the `/_next` prefix `server.ts` routes on). Next's own suppressed listener
+  always used the getter; now so do we. In-app Back
   buttons step through real history when the previous entry is ours, tracked as a depth
   counter in `history.state` (`src/lib/navDepth.ts`), and fall back to a url otherwise,
   so a link opened straight into a terminal never backs out of Mojito.
@@ -265,7 +273,42 @@ Mojito owns the whole lifecycle — there is no external plugin:
   repo path), resolved by `resolveProjectsPath` in `src/server/config.ts`: env
   `MOJITO_PROJECTS` → `~/.config/mojito/projects.json`.
 
+## Toolchain
+
+- **Next 16 + Turbopack** (RIC-227): `next build` and the custom dev server both run on
+  Turbopack, Next 16's default. Getting there cost the repo's ESM-style `.js` import
+  specifiers in `src/server/**` (`from "./config.js"` → `from "./config"`, 87 of them):
+  they only ever resolved because `next.config.mjs` taught **webpack**
+  `resolve.extensionAlias`, and Turbopack has no equivalent — `experimental.extensionAlias`
+  is on its explicitly-unsupported list. Nothing else wanted them: `tsc` runs
+  `moduleResolution: "Bundler"`, and tsx and vitest both resolve extensionless. Next 16
+  turns a leftover `webpack` key into a hard `process.exit(1)` rather than a warning
+  (auto-mode never falls back), so the config now carries `turbopack: {}` and no webpack
+  block. `--webpack` / `next({ dev, webpack: true })` remain the documented escape hatch
+  if Turbopack ever blocks a change.
+- Two Next 16 behaviours worth knowing: `next dev` writes to `.next/dev` (covered by the
+  `.next/` ignore) and takes a **lockfile** there, so only one dev server per checkout —
+  a stale lock from a hard-killed process is detected by pid and taken over, which is
+  what keeps `scripts/dev-supervisor.sh`'s kill-and-respawn recovery working. And
+  `next dev` **writes a managed block into `CLAUDE.md`** itself
+  (`<!-- BEGIN:nextjs-agent-rules -->`); it is committed because Next re-adds it on
+  every dev run, and `agentRules: false` in the config is the way to opt out.
+- **xterm 6**: a clean bump. Nothing Mojito uses was touched by the 6.0 removals
+  (`windowsMode`, `fastScrollModifier`, the canvas renderer, `overviewRulerWidth`), and
+  the viewport/scrollbar rewrite is invisible here because `globals.css` only ever
+  styles the `.xterm` root, never xterm's internals.
+
 ## Tests
 
 `npx tsc --noEmit && npx vitest run` — server logic lives under `src/server/`, tests under
 `tests/server/`. The tmux integration test is skipped when `tmux` is unavailable.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

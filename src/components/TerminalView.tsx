@@ -8,7 +8,10 @@ import { FitAddon } from "@xterm/addon-fit";
 // .next/server/vendor-chunks/ layout whose webpack-runtime disagrees with the
 // path it requires, and the build dies collecting page data for /_document
 // ("Cannot find module './chunks/vendor-chunks/next.js'"). `next dev` is
-// unaffected, so this only ever broke the production build.
+// unaffected, so this only ever broke the production build. That failure was
+// webpack's, and the build runs on Turbopack since Next 16 (RIC-227) — the global
+// import is kept because it is the plainer arrangement, not because it is still
+// forced. Treat the diagnosis as history, not as a Turbopack constraint.
 import AccessoryBar from "./AccessoryBar";
 import DocsView from "./DocsView";
 import StateBadge from "./StateBadge";

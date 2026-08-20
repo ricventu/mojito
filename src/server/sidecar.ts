@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import type { SessionMeta } from "./types.js";
+import type { SessionMeta } from "./types";
 
 function sessionsDir(stateDir: string): string {
   const dir = join(stateDir, "sessions");

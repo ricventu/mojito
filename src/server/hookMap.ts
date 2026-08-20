@@ -1,4 +1,4 @@
-import type { HookEventName, SessionState } from "./types.js";
+import type { HookEventName, SessionState } from "./types";
 
 export interface HookOutcome {
   state: SessionState;

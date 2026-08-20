@@ -1,7 +1,7 @@
-import { loadConfig } from "./config.js";
-import { Registry } from "./registry.js";
-import { EventBus } from "./events.js";
-import type { AppConfig } from "./types.js";
+import { loadConfig } from "./config";
+import { Registry } from "./registry";
+import { EventBus } from "./events";
+import type { AppConfig } from "./types";
 
 let _config: AppConfig | undefined;
 let _registry: Registry | undefined;

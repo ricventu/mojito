@@ -1,8 +1,8 @@
 import { spawn as ptySpawn } from "node-pty";
 import type { WebSocket } from "ws";
-import { capturePane, hasSession } from "./tmux.js";
-import { sanitizeEnv } from "./childEnv.js";
-import { SESSION_GONE_CODE } from "../lib/ptyClose.js";
+import { capturePane, hasSession } from "./tmux";
+import { sanitizeEnv } from "./childEnv";
+import { SESSION_GONE_CODE } from "../lib/ptyClose";
 
 export interface AttachDeps {
   hasSession: (name: string) => Promise<boolean>;

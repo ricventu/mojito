@@ -1,6 +1,6 @@
 import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
-import { spawnEnv, tmuxEnvArgs, type EnvLike } from "./childEnv.js";
+import { spawnEnv, tmuxEnvArgs, type EnvLike } from "./childEnv";
 
 const pexec = promisify(execFile);
 

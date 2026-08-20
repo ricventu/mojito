@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import type { DecodedImage } from "./imageUpload.js";
+import type { DecodedImage } from "./imageUpload";
 import { extForType, pastedImageDir } from "@/lib/pastedImagePath";
 
 // Write validated images into the session's per-session paste dir and return their
