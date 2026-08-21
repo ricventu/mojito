@@ -12,6 +12,7 @@ import TicketCard from "./TicketCard";
 import SessionCard from "./SessionCard";
 import StatusBadge from "./StatusBadge";
 import { mineOnly, liveStatuses } from "@/lib/ticketFilter";
+import { ticketUrls } from "@/lib/ticketLink";
 import { useProjects } from "@/lib/useProjects";
 import { soleProject } from "@/lib/sheetProject";
 import { sessionStatus } from "@/lib/sessionFilter";
@@ -82,6 +83,10 @@ export default function UnifiedList(
     [scoped, sessions, configured],
   );
   const statuses = useMemo(() => mergedStatuses(scoped, sessions, live), [scoped, sessions, live]);
+  // Unscoped like `live`, and for the same reason: the loose cards below show a ticket
+  // id without holding the ticket, and Mine must not decide whether that id can link
+  // to its issue on Linear.
+  const urls = useMemo(() => ticketUrls(tickets), [tickets]);
 
   const { ticketRows, looseSessions } = useMemo(
     () => buildUnifiedRows({
@@ -207,6 +212,7 @@ export default function UnifiedList(
                     <SessionCard
                       key={s.id}
                       session={s}
+                      ticketUrl={s.ticket ? urls.get(s.ticket) : undefined}
                       onOpen={() => onOpen(s)}
                       onOpenDocs={() => onOpenSessionDocs(s)}
                       onDismiss={() => dismiss(s)}

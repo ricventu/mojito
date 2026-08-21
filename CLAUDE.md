@@ -178,13 +178,11 @@ Mojito owns the whole lifecycle — there is no external plugin:
   header renders, and it takes the session's *live ticket* — the whole `TicketSummary`
   from the polled list, not just its status — because two of the three things it shows
   are only there: the current status (`launchStatus` is a launch-time snapshot) and the
-  issue's `url`, which the ticket id links to. `TicketSummary.url` comes straight from
-  Linear's API (`issue.url`), never built from a workspace slug Mojito would have to
-  learn and keep; a ticket that has left the open list — Done, or a custom session —
-  simply renders its id as plain text. The header also carries two "open this directory
-  elsewhere" actions: Warp (`warp://action/new_tab?path=…`) and VS Code
-  (`vscode://file/…/`, trailing slash = folder), both pointed at `session.cwd` — the
-  worktree when the ticket has one, the repo root otherwise. They are anchors handing a
+  issue's `url`, which the ticket id links to (see **Ticket id links** below). The header
+  also carries two "open this directory elsewhere" actions: Warp
+  (`warp://action/new_tab?path=…`) and VS Code (`vscode://file/…/`, trailing slash =
+  folder), both pointed at `session.cwd` — the worktree when the ticket has one, the
+  repo root otherwise. They are anchors handing a
   url to the OS, not a server-side `open -a`: no endpoint and no child process, and the
   machine with Warp and VS Code on it is the machine the browser runs on. `openInApp.ts`
   builds them, refuses anything not absolute (a relative path resolves against whatever
@@ -192,6 +190,28 @@ Mojito owns the whole lifecycle — there is no external plugin:
   header decides not to render the action. Both are hidden below 480px: a phone has no
   handler for either scheme, so the tap ends in an OS error, and the two glyphs cost the
   title width it needs there.
+- **Ticket id links**: every `RIC-…` label Mojito shows is the way to open that issue on
+  Linear (RIC-242) — the board cards, the loose session cards, the launch sheet header and
+  the terminal header all render it through one `TicketLink` component, with
+  `ticketLinkUrl`/`ticketUrls` (`src/lib/ticketLink.ts`) as the pure half. The url is
+  never built: it rides on `TicketSummary.url` straight from Linear's API (`issue.url`),
+  because the alternative is Mojito learning a workspace slug and keeping it, and a
+  guessed url is worse than no link — so a ticket with no url (a custom session, one that
+  has left the open list, a list cached before the field existed) renders its id as the
+  plain `.id` span it always was. `ticketLinkUrl` also drops anything that is not
+  http(s): the value lands in an `href` a human taps, where a `javascript:`/`data:` one
+  would run in Mojito's own origin. `ticketUrls` mirrors `liveStatuses` and wants the
+  *unscoped* ticket list for the same reason — a session whose ticket the filters hide is
+  exactly the one that ends up in the loose group, and its url is fine.
+  Both card kinds had to give up a slice of their tap region for this: the id row now
+  sits *outside* `.tap`, because a `role="button"` element's children are presentational
+  to ARIA, so a link nested in one is announced as part of the button and cannot be
+  reached on its own — the same nesting rule that made those regions divs instead of
+  buttons (`tapProps`). The cost is a strip of card beside the id that opens nothing; the
+  title, labels and session rows below it still open the sheet. Two `.id` labels are
+  deliberately left as plain text: `AlertLayer`'s, whose whole surface is the tap that
+  takes you to the session waiting for input, and the docs header's, where the identifier
+  is prose (`RIC-242 · docs`) rather than a label.
 - **Client url state**: the address bar is the single source of truth for which view is
   open and how the list is filtered (RIC-204). `src/lib/appLocation.ts` is the pure
   codec — `parseLocation`/`formatLocation` over `/`, `/stacks`, `/session/<id>`,

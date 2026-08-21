@@ -6,6 +6,7 @@ import { resolveEffort, resolveModel, MODELS, EFFORTS } from "@/lib/stageDefault
 import { useStageDefaults } from "@/lib/useStageDefaults";
 import { tmuxName } from "@/server/sessionKey";
 import StateBadge from "./StateBadge";
+import TicketLink from "./TicketLink";
 import { Choice } from "./ui/choice";
 import QaVerdictButtons from "./QaVerdictButtons";
 import type { SessionMeta, TicketSummary } from "@/server/types";
@@ -307,7 +308,7 @@ export default function LaunchSheet(
     return (
       <div className="sheet-backdrop">
         <div className="sheet">
-          <h3><span className="id" style={{ fontSize: 16 }}>{ticket.identifier}</span> <span className="chip">{ticket.statusName}</span></h3>
+          <h3><TicketLink id={ticket.identifier} url={ticket.url} /> <span className="chip">{ticket.statusName}</span></h3>
           {outcome.done === "mr-created" ? (
             <div className="outcome">
               <p className="outcome-head">MR opened · {ticket.identifier} moved to Done</p>
@@ -339,7 +340,7 @@ export default function LaunchSheet(
     // would drop the later setErr(...) on the floor, leaving a failed launch reporting nothing.
     <div className="sheet-backdrop" onClick={launchBusy ? undefined : onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
-        <h3><span className="id" style={{ fontSize: 16 }}>{ticket.identifier}</span> <span className="chip">{ticket.statusName}</span></h3>
+        <h3><TicketLink id={ticket.identifier} url={ticket.url} /> <span className="chip">{ticket.statusName}</span></h3>
         {ticket.title && <p className="sheet-title">{ticket.title}</p>}
         {isToQa ? (
           <>

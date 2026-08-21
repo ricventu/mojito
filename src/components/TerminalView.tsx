@@ -16,6 +16,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import AccessoryBar from "./AccessoryBar";
 import DocsView from "./DocsView";
 import StateBadge from "./StateBadge";
+import TicketLink from "./TicketLink";
 import { apiFetch } from "@/lib/client";
 import { dismissSession } from "@/lib/dismissSession";
 import { computeTouchScroll, wheelSequences } from "@/lib/touchScroll";
@@ -410,23 +411,10 @@ export default function TerminalView(
       <header className="term-head">
         <button className="back" aria-label="Back" onClick={onBack}>‹</button>
         <div className="term-ident">
-          {/* The id is the ticket's name here, so it is what opens the issue on Linear —
-              a new tab, since leaving the terminal would drop the pty socket. Plain text
-              when there is no url to link to (a custom session, or a ticket that has
-              left the open list). */}
-          {head.id && (head.ticketUrl
-            ? (
-              <a
-                className="id"
-                href={head.ticketUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={`Open ${head.id} in Linear`}
-              >
-                {head.id}
-              </a>
-            )
-            : <span className="id">{head.id}</span>)}
+          {/* The id is the ticket's name here, so it is what opens the issue on Linear;
+              plain text when there is no url for it (a custom session, or a ticket that
+              has left the open list) — see TicketLink. */}
+          {head.id && <TicketLink id={head.id} url={head.ticketUrl} />}
           {head.status && <span className="status">{head.status}</span>}
           {head.title && <span className="title">{head.title}</span>}
         </div>
