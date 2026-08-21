@@ -286,6 +286,16 @@ Mojito owns the whole lifecycle — there is no external plugin:
   (auto-mode never falls back), so the config now carries `turbopack: {}` and no webpack
   block. `--webpack` / `next({ dev, webpack: true })` remain the documented escape hatch
   if Turbopack ever blocks a change.
+- **`next dev` is unreachable from a phone**, which matters because Mojito is a
+  phone-first app and its own tickets ask for measurements taken there. Next 16 blocks
+  cross-origin `/_next/*` dev resources for any host but `localhost`, so loading the dev
+  server over the LAN — or even `127.0.0.1` — 403s every JS chunk. React then never
+  hydrates, and the failure wears a **completely misleading face**: the token gate
+  renders (it is server HTML) but its Save button is inert, so it looks like the token
+  is being rejected rather than like the app never booted. `allowedDevOrigins: ['<lan-ip>']`
+  in `next.config.mjs` lifts it, but for anything performance-related use
+  `npm run build && npm start` instead — production has no such restriction, and a dev
+  build's rendering is not what you want to benchmark anyway.
 - Two Next 16 behaviours worth knowing: `next dev` writes to `.next/dev` (covered by the
   `.next/` ignore) and takes a **lockfile** there, so only one dev server per checkout —
   a stale lock from a hard-killed process is detected by pid and taken over, which is
@@ -323,6 +333,31 @@ Mojito owns the whole lifecycle — there is no external plugin:
   (`windowsMode`, `fastScrollModifier`, the canvas renderer, `overviewRulerWidth`), and
   the viewport/scrollbar rewrite is invisible here because `globals.css` only ever
   styles the `.xterm` root, never xterm's internals.
+- **Terminal renderer**: the browser terminal draws on the GPU via
+  `@xterm/addon-webgl` (RIC-239) — the DOM renderer's worst case is exactly
+  Mojito's, tmux repainting claude's full-screen TUI, where every changed cell is
+  DOM work. The addon is the only one of xterm 6's that was adopted; the rest were
+  evaluated and rejected in RIC-227. `attachWebglRenderer`
+  (`src/lib/terminalRenderer.ts`) is the whole of it, and it exists for the
+  **fallback**, not the load: Safari drops a WebGL context when the tab goes to the
+  background — a phone in a pocket, the same scenario `startHeartbeat` is for — and
+  an unhandled loss leaves the terminal **black** rather than degrading. Two facts
+  read off the addon's source rather than assumed: `dispose()` *is* the fallback
+  (`activate` registers a disposable that calls
+  `renderService.setRenderer(core._createRenderer())`, so the DOM renderer comes
+  back with the buffer intact), and `onContextLoss` is **not** `webglcontextlost` —
+  the renderer `preventDefault()`s that and waits 3s for `webglcontextrestored`, so
+  a context the browser gives back never reaches us and `onContextLoss` means "gone
+  for good". Hence the fall back to DOM is permanent: re-loading a context that was
+  refused once only flips the terminal between renderers. Loading is allowed to
+  fail silently (the constructor throws on Safari < 16, `activate` throws without
+  WebGL2) because this runs partway through the mount — an escaping throw would
+  take the socket, the resize handlers and the touch scroll with it and leave a
+  dead terminal where a DOM-rendered one would have worked. Costs ~29KB gzipped,
+  and only on the `ssr:false` terminal chunk, which the board never loads.
+  `globals.css` is untouched, and `touchScroll` still measures `term.element` (the
+  `.xterm` root) — the WebGL canvas goes inside `.xterm-screen`, so the row-height
+  maths is unchanged.
 
 ## Tests
 
