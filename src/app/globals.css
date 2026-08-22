@@ -154,12 +154,19 @@ a.id:any-link:hover { text-decoration-color: var(--accent); }
 .empty { color: var(--text-dim); padding: 24px 4px; text-align: center; }
 
 /* ---- Section title ---- */
+/* The project name is the outermost grouping in the list, one level above the
+   status sub-header below it — RIC-244 brightens it to `--text` (bumped from
+   `--text-faint`, which read fainter than everything it groups) and gives the
+   trailing rule the same `--border-hi` weight `.sub-label` sits under. Each .sect
+   is the sole first child of its own <section> (UnifiedList), so `.sect:first-child`
+   matched every section, not just the page's first one — the extra top margin never
+   showed. `section + section > .sect` targets only a section that follows another. */
 .sect {
-  font: 600 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
-  color: var(--text-faint); margin: 14px 2px 10px; display: flex; align-items: center; gap: 8px;
+  font: 700 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--text); margin: 2px 2px 10px; display: flex; align-items: center; gap: 8px;
 }
-.sect::after { content: ""; flex: 1; height: 1px; background: var(--border); }
-.sect:first-child { margin-top: 2px; }
+.sect::after { content: ""; flex: 1; height: 1px; background: var(--border-hi); }
+section + section > .sect { margin-top: 24px; }
 
 /* ---- Status sub-group header (within a project section) ---- */
 .substatus { margin: 12px 2px 8px; }
