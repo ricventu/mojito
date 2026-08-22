@@ -94,6 +94,18 @@ label { color: var(--text); }
 .btn.danger { color: var(--err); background: var(--err-bg); border-color: color-mix(in srgb, var(--err) 40%, var(--border)); }
 .btn.danger:hover { border-color: var(--err); }
 
+/* ---- Icon controls ---- */
+/* Every icon in the app is a lucide stroke svg inheriting `currentColor`, never
+   an emoji (which renders in its own colours and weight) and never punctuation
+   standing in for a pictogram (`×` for close, `‹` for back — text metrics, so
+   never actually centred). One class rather than a variant per call site.
+   `display: block` on the svg takes it off the text baseline, whose descender
+   gap would otherwise make an icon-only control taller than its text siblings.
+   The one deliberate exception is AccessoryBar's key row: `↑ ⏎ ⇧⏎ Esc ^C` are
+   the *names of keys*, not icons, and stay text. */
+.icon { display: inline-flex; align-items: center; justify-content: center; }
+.icon > svg { display: block; }
+
 /* ---- Cards ---- */
 .card {
   display: block; width: 100%; text-align: left;
@@ -307,7 +319,7 @@ button.chip:active { transform: scale(.96); }
   color: var(--text); box-shadow: var(--shadow); cursor: pointer;
 }
 .alert .id { font: 700 13px var(--mono); color: var(--attn); }
-.alert .x { margin-left: auto; color: var(--text-dim); background: none; border: none; font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.alert .x { margin-left: auto; color: var(--text-dim); background: none; border: none; cursor: pointer; padding: 0 4px; }
 
 /* ---- Bottom nav ---- */
 .nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; border-top: 1px solid var(--border);
@@ -317,7 +329,7 @@ button.chip:active { transform: scale(.96); }
 .nav .tab.active { color: var(--text); }
 .nav .tab.active::before { content: ""; position: absolute; top: 0; left: 30%; right: 30%; height: 2px;
   background: var(--accent); border-radius: 2px; }
-.nav .tab.settings { flex: none; padding-left: 18px; padding-right: 18px; font-size: 16px; }
+.nav .tab.settings { flex: none; padding-left: 18px; padding-right: 18px; }
 .nav .tab .count { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px;
   padding: 0 5px; margin-left: 6px; border-radius: 999px; background: var(--attn); color: #1a1206;
   font: 700 11px var(--mono); vertical-align: middle; }
@@ -339,7 +351,7 @@ button.chip:active { transform: scale(.96); }
 .thumb { position: relative; width: 64px; height: 64px; border-radius: var(--r-sm);
   overflow: hidden; border: 1px solid var(--border-hi); }
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.thumb .x { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; line-height: 16px;
+.thumb .x { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px;
   padding: 0; border-radius: 50%; border: none; background: rgba(0, 0, 0, .6); color: #fff;
   font-size: 14px; cursor: pointer; }
 
@@ -382,7 +394,7 @@ button.chip:active { transform: scale(.96); }
 .term-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px;
   border-bottom: 1px solid var(--border); background: var(--surface); }
 .term-head .back { width: 32px; height: 32px; border-radius: 8px; background: var(--surface-hi);
-  border: 1px solid var(--border-hi); color: var(--text); font-size: 18px; cursor: pointer; flex: none; }
+  border: 1px solid var(--border-hi); color: var(--text); cursor: pointer; flex: none; }
 
 .term-ident { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; overflow: hidden; }
 .term-ident .id { flex: none; font: 700 13px var(--mono); color: var(--text); letter-spacing: -.01em; }
@@ -396,7 +408,6 @@ button.chip:active { transform: scale(.96); }
 /* Warp / VS Code are anchors, not buttons (see openInApp.ts): they need the two things
    a <button> gets for free — no UA underline, and a flex box to centre the glyph in. */
 .term-actions a.btn { display: inline-flex; align-items: center; font-family: var(--mono); text-decoration: none; }
-.term-head .kill .glyph { display: none; }
 
 /* Phone: shed the labels whose meaning is already carried by colour, or by the
    card the user tapped to get here, so the title keeps as much width as it can. */
@@ -407,9 +418,7 @@ button.chip:active { transform: scale(.96); }
     position: absolute; width: 1px; height: 1px;
     overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }
-  .term-head .kill .lbl { display: none; }
-  .term-head .kill .glyph { display: inline; }
-  .term-head .kill { padding: 7px 10px; font-size: 13px; line-height: 1; }
+  .term-head .kill { padding: 7px 10px; }
   /* Warp and VS Code go: a phone has no handler for either scheme, so the taps end in
      an OS error at best, and the two glyphs cost the title the width it needs here. */
   .term-actions a.btn { display: none; }
@@ -419,12 +428,21 @@ button.chip:active { transform: scale(.96); }
   border: 1px solid var(--border-hi); color: var(--text); font: 600 13px var(--mono); cursor: pointer; }
 .acc .k:active { background: var(--border); }
 .acc-wrap { display: flex; flex-direction: column; }
-.paste-field { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border); background: var(--surface); }
-.paste-field .paste-input {
-  flex: 1; min-width: 0; height: 40px; resize: none;
+/* The composer. Buttons hug the bottom so they stay put as the field grows —
+   the textarea's height is set from JS (see composerHeight.ts), which is also
+   why the height here is a `min-height`: it is the one-line fallback for the
+   pass before the font metrics resolve, and JS only ever grows past it.
+   `line-height` is explicit and comes after `font: inherit` (which would
+   otherwise carry the inherited one in): composerHeight reads it back through
+   getComputedStyle, and "normal" is not a number. */
+.composer { display: flex; align-items: flex-end; gap: 6px; padding: 8px;
+  border-top: 1px solid var(--border); background: var(--surface); }
+.composer .composer-input {
+  flex: 1; min-width: 0; min-height: 40px; resize: none; overflow-y: auto;
   padding: 8px 10px; border-radius: 8px;
   border: 1px solid var(--border); background: var(--surface-hi); color: var(--text);
   font: inherit;
+  line-height: 20px;
 }
 .term-img-err { margin: 0; padding: 8px 10px; border-top: 1px solid var(--border); background: var(--surface); }
 .btns { display: flex; gap: 8px; padding: 8px; }
@@ -524,7 +542,7 @@ button.chip:active { transform: scale(.96); }
 .docs-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px;
   border-bottom: 1px solid var(--border); background: var(--surface); }
 .docs-head .back { width: 32px; height: 32px; border-radius: 8px; background: var(--surface-hi);
-  border: 1px solid var(--border-hi); color: var(--text); font-size: 18px; cursor: pointer; flex: none; }
+  border: 1px solid var(--border-hi); color: var(--text); cursor: pointer; flex: none; }
 .docs-head .name { font: 600 13px/1.3 var(--mono); overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; }
 .docs-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;

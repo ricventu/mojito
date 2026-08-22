@@ -208,7 +208,43 @@ Mojito owns the whole lifecycle — there is no external plugin:
   the *receiving* app considers current) and answers `""` for "no link", which is how the
   header decides not to render the action. Both are hidden below 480px: a phone has no
   handler for either scheme, so the tap ends in an OS error, and the two glyphs cost the
-  title width it needs there.
+  title width it needs there. They are also the only labels in the app deliberately left
+  as ASCII rather than icons (see **Icons**): `>_` and `</>` say *terminal* and *code
+  editor* in a way two lucide pictograms do not, and being phone-hidden they never sit
+  next to the icon row anyway.
+- **Terminal composer**: the compose toggle, first key in the accessory bar, opens a real
+  `<textarea>` you write in, then inject into the terminal through xterm's own
+  paste path (`AccessoryBar`, `term.paste`). It exists because **the terminal is
+  not a text field**, which is the root cause of a whole family of iOS
+  complaints: xterm takes input through one hidden helper textarea sized to a
+  single cell at `zIndex: -5`, cleared on Enter/Ctrl-C/blur and never reconciled
+  with what the pty holds. So a long-press offers no "Incolla" (the terminal is a
+  canvas); holding the spacebar turns the keyboard into a caret trackpad but
+  nothing in xterm turns a caret move into `\x1b[C`/`\x1b[D`, so the gesture
+  slides a caret around a scratch buffer and sends nothing; and dictation
+  arrives **twice**, because xterm's `_inputEvent` insertText path and
+  `CompositionHelper`'s `compositionend` path can each deliver the same phrase
+  — the `cancel(ev)` meant to stop the first cannot, since `input` is not a
+  cancelable event. In a plain textarea all three work natively, and you get to
+  read a dictated prompt back before it reaches claude. It leads the row because
+  `.acc` is `overflow-x: auto` and a phone shows about ten of its keys — the
+  head is the only slot that never needs a swipe. Its icon is lucide's
+  `SquarePen` (see **Icons** below; an emoji there rendered in its own colours
+  and weight, off from the text keys beside it, and `✎` was too faint to find).
+  **Do not "simplify" this back into a paste box**: paste was only the first
+  symptom noticed. It is a toggle and not an always-on row because it grows into
+  `.term-body`, whose whole
+  visible band is ~13 rows once the keyboard is up (`keyboardInset.ts`) — the
+  same budget that already costs `.term-head` its place. Injecting sends no CR:
+  a dictation mangles names and code tokens, so the review step is claude's own
+  input line, and `⏎` is one tap away in the same bar. Growth is
+  `composerHeight` (`src/lib/composerHeight.ts`) ÷ the measuring effect, the
+  usual split; it answers a **border-box** height (`scrollHeight` never counts
+  the border) and `null` while `getComputedStyle().lineHeight` is still
+  "normal", which is why `.composer-input` declares `line-height` explicitly and
+  *after* `font: inherit`. The xterm-level dictation duplication is deliberately
+  left unfixed — the composer is the path that does not double, and patching
+  xterm's internals needs an event trace off a real device first.
 - **Ticket id links**: every `RIC-…` label Mojito shows is the way to open that issue on
   Linear (RIC-242) — the board cards, the loose session cards, the launch sheet header and
   the terminal header all render it through one `TicketLink` component, with
@@ -279,7 +315,7 @@ Mojito owns the whole lifecycle — there is no external plugin:
   projects" is a state chips cannot express at all. So `ListFilters.project` is a
   `string[]` where `[]` means every project — `filterTickets`/`filterSessions` treat a
   non-empty set as OR — and `activeFilters` reports the whole set as one chip, since
-  removing one project is what the select itself is for and a per-project ✕ would need
+  removing one project is what the select itself is for and a per-project clear would need
   `FilterKey` to carry a value. The status chips stay chips: five values that never grow.
   The select's place in the toolbar is the top row, beside the three actions
   (RIC-226): the toolbar reads project select + `+ Ticket`/`+ Session`/`Clean up`,
@@ -308,6 +344,24 @@ Mojito owns the whole lifecycle — there is no external plugin:
   `.sheet-backdrop`, which closes the whole sheet. Overriding a `globals.css` element
   rule (`input:focus`) takes a `focus:` variant, not a plain utility: element +
   pseudo-class outranks a bare class.
+- **Icons**: every icon is a **lucide** stroke svg (`lucide-react`, already a
+  dependency for shadcn), imported per icon and sized by a `size={n}` prop —
+  *not* by a Tailwind class, which would spread the utilities past
+  `src/components/ui`. Controls carrying one take `.icon` (`globals.css`), whose
+  two rules centre the svg and `display: block` it off the text baseline, whose
+  descender gap otherwise makes an icon-only control taller than its text
+  siblings. What the sweep replaced is why the rule exists:
+  **colour emoji** (📎 📄, rendering in their own palette and weight, ignoring
+  the theme) and **punctuation impersonating a pictogram** — `×` *and* `✕` *and*
+  a 20px `×` for three different "close" buttons, `‹` (a left angle quote) for
+  Back, `⚙` needing `font-size: 16px` to read at all. Text metrics never centre
+  and never scale with a stroke, so each one was nudged into place by a
+  hand-tuned `font-size`/`line-height`; those are gone. Two deliberate
+  exceptions, both of which a future cleanup will want to re-break: the
+  accessory bar's key row (`↑ ↓ ← → ⏎ ⇧⏎ Esc Tab ^C`) is the *names of keys*,
+  not icons — no lucide glyph spells "Esc" — and Warp/VS Code's `>_` / `</>`
+  (see **Terminal header**). Prose in comments may still name a glyph; markup
+  must not.
 - **Projects map**: `~/.config/mojito/projects.json` (Linear team key → project name →
   repo path), resolved by `resolveProjectsPath` in `src/server/config.ts`: env
   `MOJITO_PROJECTS` → `~/.config/mojito/projects.json`.

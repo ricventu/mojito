@@ -1,4 +1,5 @@
 "use client";
+import { X } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 export default function AlertLayer(
@@ -27,7 +28,9 @@ export default function AlertLayer(
         <div className="alert" onClick={() => onOpen(top.id)}>
           <span className="id">{top.ticket}</span>
           <span>{top.message}</span>
-          <button className="x" onClick={(e) => { e.stopPropagation(); onClear(); }}>×</button>
+          <button className="x icon" aria-label="Dismiss alert" onClick={(e) => { e.stopPropagation(); onClear(); }}>
+            <X size={18} aria-hidden="true" />
+          </button>
         </div>
       </div>
     </>

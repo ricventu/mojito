@@ -1,4 +1,5 @@
 "use client";
+import { X } from "lucide-react";
 import { useRef, useState } from "react";
 import { apiFetch } from "@/lib/client";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES, MAX_IMAGES } from "@/lib/imageConstants";
@@ -155,7 +156,9 @@ export default function NewTicketSheet(
               <div key={img.id} className="thumb">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={img.dataUrl} alt={img.name} />
-                <button type="button" className="x" aria-label="Remove image" onClick={() => removeImage(img.id)}>×</button>
+                <button type="button" className="x icon" aria-label="Remove image" onClick={() => removeImage(img.id)}>
+                  <X size={12} aria-hidden="true" />
+                </button>
               </div>
             ))}
           </div>

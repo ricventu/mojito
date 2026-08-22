@@ -13,6 +13,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 // webpack's, and the build runs on Turbopack since Next 16 (RIC-227) — the global
 // import is kept because it is the plainer arrangement, not because it is still
 // forced. Treat the diagnosis as history, not as a Turbopack constraint.
+import { ChevronLeft, FileText, Plus, X } from "lucide-react";
 import AccessoryBar from "./AccessoryBar";
 import DocsView from "./DocsView";
 import StateBadge from "./StateBadge";
@@ -409,7 +410,9 @@ export default function TerminalView(
     <div className="term-root" ref={rootRef}>
       {!kbdOpen && (
       <header className="term-head">
-        <button className="back" aria-label="Back" onClick={onBack}>‹</button>
+        <button className="back icon" aria-label="Back" onClick={onBack}>
+          <ChevronLeft size={20} aria-hidden="true" />
+        </button>
         <div className="term-ident">
           {/* The id is the ticket's name here, so it is what opens the issue on Linear;
               plain text when there is no url for it (a custom session, or a ticket that
@@ -434,24 +437,30 @@ export default function TerminalView(
               &lt;/&gt;
             </a>
           )}
-          <button className="btn sm" aria-label="New ticket" title="New ticket" onClick={onNewTicket}>+</button>
-          <button className="btn sm" aria-label="Documents" title="Documents" onClick={onOpenDocs}>📄</button>
+          <button className="btn sm icon" aria-label="New ticket" title="New ticket" onClick={onNewTicket}>
+            <Plus size={15} aria-hidden="true" />
+          </button>
+          <button className="btn sm icon" aria-label="Documents" title="Documents" onClick={onOpenDocs}>
+            <FileText size={15} aria-hidden="true" />
+          </button>
           <StateBadge state={session.state} />
+          {/* Icon at every width. The Kill/Dismiss distinction it used to spell out
+              on desktop now rides on `title`/`aria-label` and on `.danger`'s colour —
+              see terminalHeader.ts for which of the two this session gets. */}
           <button
-            className={`btn sm kill${head.killDanger ? " danger" : ""}`}
+            className={`btn sm kill icon${head.killDanger ? " danger" : ""}`}
             aria-label={head.killLabel}
             title={head.killLabel}
             onClick={kill}
           >
-            <span className="lbl">{head.killLabel}</span>
-            <span className="glyph" aria-hidden="true">✕</span>
+            <X size={15} aria-hidden="true" />
           </button>
         </div>
       </header>
       )}
       <div ref={holder} className="term-body" />
       {imgErr && <div className="term-img-err err-text">{imgErr}</div>}
-      <AccessoryBar onSend={send} onPasteText={(t) => termRef.current?.paste(t)} onPickImages={pickImages} />
+      <AccessoryBar onSend={send} onInsertText={(t) => termRef.current?.paste(t)} onPickImages={pickImages} />
       {docs && (
         <DocsView
           token={token}

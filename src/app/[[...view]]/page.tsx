@@ -10,6 +10,7 @@ import { useSelfUpdate } from "@/lib/useSelfUpdate";
 import TokenGate from "@/components/TokenGate";
 import UnifiedList from "@/components/UnifiedList";
 import StacksPanel from "@/components/StacksPanel";
+import { Settings } from "lucide-react";
 import AlertLayer from "@/components/AlertLayer";
 import SettingsSheet from "@/components/SettingsSheet";
 import NewTicketSheet from "@/components/NewTicketSheet";
@@ -190,7 +191,9 @@ export default function Home() {
           Tickets{needsInput ? <span className="count">{needsInput}</span> : null}
         </button>
         <button className={`tab${view.kind === "stacks" ? " active" : ""}`} onClick={() => go({ kind: "stacks" })}>Stacks</button>
-        <button className="tab settings" aria-label="Settings" onClick={() => setSettingsOpen(true)}>⚙</button>
+        <button className="tab settings icon" aria-label="Settings" onClick={() => setSettingsOpen(true)}>
+          <Settings size={17} aria-hidden="true" />
+        </button>
       </nav>
     </div>
   );

@@ -1,4 +1,5 @@
 "use client";
+import { ChevronLeft, RotateCw } from "lucide-react";
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { useDocList, useDocContent, type DocsTarget } from "@/lib/useDocs";
@@ -23,9 +24,9 @@ export default function DocsView(
     onBack: () => void;
   },
 ) {
-  // Two independent counters, not one shared: bumping the list's ↻ must not
+  // Two independent counters, not one shared: bumping the list's reload must not
   // re-fetch an open document (and vice versa) — the two refreshes are
-  // separate user intents even though they share one button glyph.
+  // separate user intents even though they share one button icon.
   const [listReload, setListReload] = useState(0);
   const [docReload, setDocReload] = useState(0);
   const { files, error: listError } = useDocList(token, target, listReload);
@@ -35,14 +36,18 @@ export default function DocsView(
   return (
     <div className="docs-root">
       <header className="docs-head">
-        <button className="back" aria-label="Back" onClick={onBack}>‹</button>
+        <button className="back icon" aria-label="Back" onClick={onBack}>
+          <ChevronLeft size={20} aria-hidden="true" />
+        </button>
         <span className="name">{selected ? (current?.name ?? selected) : `${label} · docs`}</span>
         <span className="grow" />
         <button
-          className="btn sm"
+          className="btn sm icon"
           aria-label="Reload"
           onClick={() => (selected ? setDocReload((n) => n + 1) : setListReload((n) => n + 1))}
-        >↻</button>
+        >
+          <RotateCw size={14} aria-hidden="true" />
+        </button>
       </header>
       <div className="docs-scroll">
         {selected ? (

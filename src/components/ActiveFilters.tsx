@@ -1,4 +1,5 @@
 "use client";
+import { X } from "lucide-react";
 import type { ActiveFilter, FilterKey } from "@/lib/activeFilters";
 
 /**
@@ -31,10 +32,10 @@ export default function ActiveFilters(
           onClick={() => onClear(f.key)}
         >
           <span className="af-text">{f.label}</span>
-          <span className="af-x" aria-hidden="true">✕</span>
+          <X className="af-x" size={13} aria-hidden="true" />
         </button>
       ))}
-      {/* With a single filter its own ✕ is already clear-all, so a second control
+      {/* With a single filter its own clear icon is already clear-all, so a second control
           would only be noise. */}
       {filters.length > 1 && (
         <button className="chip af-all" onClick={onClearAll}>Clear all</button>
