@@ -262,7 +262,7 @@ Mojito owns the whole lifecycle — there is no external plugin:
   turns Option+drag from a column selection into a flowing one
   (`shouldColumnSelect` excludes exactly this case): a rectangle cut out of a TUI
   is not what anyone copies. On a phone the answer is the composer's, in the other
-  direction — a **real text surface**: the accessory bar's second key opens a
+  direction — a **real text surface**: the accessory bar's last key opens a
   `<pre>` holding the buffer as text (`bufferText`, `src/lib/terminalText.ts`),
   where iOS's own long-press → "Copia" works. A copy *button* is not an option
   there and never will be while `server.ts` is plain http: `navigator.clipboard`
@@ -272,7 +272,16 @@ Mojito owns the whole lifecycle — there is no external plugin:
   no branch — the alt buffer has no scrollback, so a TUI yields exactly its screen
   while a shell yields its history too — joins wrapped rows to what they continue
   (a path broken across rows is the main thing being copied, and a newline in the
-  middle of one ruins the paste), and trims blank rows at the ends only. It is a
+  middle of one ruins the paste), and trims blank rows at the ends only. It also
+  trims each line's right-hand padding **itself**, because xterm will not:
+  `translateToString(true)` stops at the last cell with content
+  (`getTrimmedLength`) and a space *is* content, so the spaces tmux paints its
+  pane with survive it. Left in, every line comes out the full width of the pane
+  and the paste re-wraps wherever it lands — which reads as the copy having
+  invented line breaks, and is exactly how it was first reported. The lesson for
+  the tests is the sharper one: the fake that stood in for `translateToString`
+  trimmed with a regex of its own, so it asserted the assumption instead of
+  xterm's behaviour and the bug shipped green. It is a
   snapshot, deliberately: text reflowing under a half-placed selection handle
   cannot be copied.
 - **Ticket id links**: every `RIC-…` label Mojito shows is the way to open that issue on

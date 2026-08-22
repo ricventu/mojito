@@ -179,9 +179,14 @@ export default function AccessoryBar(
         >
           <SquarePen size={16} aria-hidden="true" />
         </button>
-        {/* Second key, beside the composer: `.acc` scrolls horizontally and a
-            phone shows about ten of its keys, so the two text surfaces are the
-            two that must never need a swipe. */}
+        {KEYS.map((k) => (
+          <button key={k.label} className="k" onClick={() => onSend(k.bytes)}>{k.label}</button>
+        ))}
+        {/* At the tail, with the other icon action rather than among the keys:
+            it is reached deliberately, not mid-typing. `.acc` scrolls
+            horizontally and a phone shows about ten of its keys, so this one
+            costs a swipe — the trade for keeping the head of the row to the
+            composer and the keys that get pressed in a hurry. */}
         <button
           type="button"
           className="k icon"
@@ -191,9 +196,6 @@ export default function AccessoryBar(
         >
           <TextSelect size={16} aria-hidden="true" />
         </button>
-        {KEYS.map((k) => (
-          <button key={k.label} className="k" onClick={() => onSend(k.bytes)}>{k.label}</button>
-        ))}
         <button type="button" className="k icon" aria-label="Attach image" onClick={() => fileInput.current?.click()}>
           <Paperclip size={16} aria-hidden="true" />
         </button>

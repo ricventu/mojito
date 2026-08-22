@@ -47,7 +47,8 @@ const isBlank = (s: string) => s.trim().length === 0;
 
 /**
  * The whole active buffer as text: rows joined by newlines, wrapped rows joined
- * to what they continue, and the blank rows at either end dropped.
+ * to what they continue, each line's right-hand padding trimmed, and the blank
+ * rows at either end dropped.
  *
  * `length` covers the scrollback too, which is deliberate and needs no branch:
  * the alternate screen buffer (claude's TUI, and anything else full-screen) has
@@ -65,9 +66,10 @@ export function bufferText(buffer: BufferLike): string {
   const lines: string[] = [];
   for (let y = 0; y < rows.length; y++) {
     const row = rows[y];
-    // Trim this row's right-hand padding — unless the next row continues it, in
-    // which case this one is full to the last cell and any trailing space is
-    // part of the text rather than padding.
+    // `trimRight` here drops only the cells nothing ever wrote to (see the note
+    // below on why that is not the padding) — and not even those when the next
+    // row continues this one, since it is then full to the last cell and every
+    // trailing space belongs to the text.
     const continued = rows[y + 1]?.isWrapped === true;
     const text = row ? row.translateToString(!continued) : "";
     // A wrapped first row has had its predecessor scrolled out of the
@@ -76,9 +78,20 @@ export function bufferText(buffer: BufferLike): string {
     else lines.push(text);
   }
 
+  // Trim each line's right-hand padding **here**, because xterm will not:
+  // `translateToString(true)` stops at the last cell with content
+  // (`getTrimmedLength`), and a space character *is* content — so the spaces
+  // tmux paints its pane with survive it. Left in, every line comes out the
+  // full width of the pane, and the paste re-wraps wherever it lands, which
+  // reads as the copy having invented line breaks.
+  //
+  // Per assembled line rather than per row, so the seam inside a joined line
+  // keeps its spaces: they are in the middle of the text, not at the end of it.
+  const trimmed = lines.map((l) => l.replace(/[^\S\n]+$/, ""));
+
   let start = 0;
-  let end = lines.length;
-  while (start < end && isBlank(lines[start])) start += 1;
-  while (end > start && isBlank(lines[end - 1])) end -= 1;
-  return lines.slice(start, end).join("\n");
+  let end = trimmed.length;
+  while (start < end && isBlank(trimmed[start])) start += 1;
+  while (end > start && isBlank(trimmed[end - 1])) end -= 1;
+  return trimmed.slice(start, end).join("\n");
 }
