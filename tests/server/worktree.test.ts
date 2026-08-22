@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   parseWorktrees, matchWorktree, worktreeSlug, listLocalBranches,
-  findExistingTicketWorktree, createTicketWorktree,
+  findExistingTicketWorktree, createTicketWorktree, listPickableWorktrees, resolveWorktreePick,
 } from "@/server/worktree";
 
 const PORCELAIN = `worktree /code/lime
@@ -242,5 +242,84 @@ run("createTicketWorktree", () => {
 
     const res = await createTicketWorktree(repo, "RIC-46", "Add thing", "main", undefined, 200);
     expect(res.warning).toContain("init-worktree.sh");
+  });
+});
+
+const PORCELAIN_FLAGGED = `worktree /code/lime
+HEAD abc
+bare
+
+worktree /code/lime-detached
+HEAD def
+detached
+
+worktree /code/lime-gone
+HEAD ghi
+branch refs/heads/gone
+prunable gitdir file points to non-existent location
+`;
+
+describe("parseWorktrees flags", () => {
+  it("leaves a plain worktree free of flags, so the shape stays {path, branch}", () => {
+    expect(parseWorktrees(PORCELAIN)[0]).toEqual({ path: "/code/lime", branch: "main" });
+  });
+  it("records bare, detached and prunable", () => {
+    const wts = parseWorktrees(PORCELAIN_FLAGGED);
+    expect(wts[0]).toEqual({ path: "/code/lime", branch: "", bare: true });
+    expect(wts[1]).toEqual({ path: "/code/lime-detached", branch: "", detached: true });
+    expect(wts[2]).toEqual({
+      path: "/code/lime-gone", branch: "gone", prunable: true,
+    });
+  });
+});
+
+run("listPickableWorktrees", () => {
+  it("lists the repo's linked worktrees, never the repo itself", () => {
+    const repo = makeRepo(roots);
+    const a = join(repo, ".claude", "worktrees", "RIC-1-a");
+    git(repo, ["worktree", "add", a, "-b", "RIC-1-a"]);
+    expect(listPickableWorktrees(repo)).toEqual([{ path: a, branch: "RIC-1-a" }]);
+  });
+  it("returns an empty list when the repo has no linked worktree", () => {
+    expect(listPickableWorktrees(makeRepo(roots))).toEqual([]);
+  });
+  it("drops a worktree whose directory is gone — launching there would fail", () => {
+    const repo = makeRepo(roots);
+    const gone = join(repo, ".claude", "worktrees", "RIC-2-gone");
+    git(repo, ["worktree", "add", gone, "-b", "RIC-2-gone"]);
+    rmSync(gone, { recursive: true, force: true });
+    expect(listPickableWorktrees(repo)).toEqual([]);
+  });
+  it("returns an empty list when git fails (not a repo)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mojito-wt-notrepo-"));
+    roots.push(dir);
+    expect(listPickableWorktrees(dir)).toEqual([]);
+  });
+});
+
+run("resolveWorktreePick", () => {
+  it("accepts a path the repo actually has a worktree at", () => {
+    const repo = makeRepo(roots);
+    const a = join(repo, ".claude", "worktrees", "RIC-1-a");
+    git(repo, ["worktree", "add", a, "-b", "RIC-1-a"]);
+    expect(resolveWorktreePick(repo, a)).toBe(a);
+  });
+  // The client names the directory a session is spawned in, so an unlisted path is the
+  // one thing that must never be honoured — including the repo root's own parent tricks.
+  it("refuses a path that is not one of the repo's worktrees", () => {
+    const repo = makeRepo(roots);
+    expect(resolveWorktreePick(repo, join(repo, "..", "elsewhere"))).toBeNull();
+    expect(resolveWorktreePick(repo, "/etc")).toBeNull();
+  });
+  it("refuses the repo root itself — that is the no-pick fallback, not a pick", () => {
+    const repo = makeRepo(roots);
+    expect(resolveWorktreePick(repo, repo)).toBeNull();
+  });
+  it("refuses a worktree whose directory has been removed since the list was fetched", () => {
+    const repo = makeRepo(roots);
+    const gone = join(repo, ".claude", "worktrees", "RIC-2-gone");
+    git(repo, ["worktree", "add", gone, "-b", "RIC-2-gone"]);
+    rmSync(gone, { recursive: true, force: true });
+    expect(resolveWorktreePick(repo, gone)).toBeNull();
   });
 });

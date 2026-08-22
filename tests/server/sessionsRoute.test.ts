@@ -25,8 +25,9 @@ const h = vi.hoisted(() => ({
   // Takes an (unused) param so mock.calls[0][0] indexes into a non-empty tuple below.
   launchSession: vi.fn(async (_req: unknown) => ({ ok: true, meta: { id: "mojito-RIC-46-work" } }) as
     { ok: boolean; reason?: string; meta?: unknown }),
-  launchCustomSession: vi.fn(async () => ({ ok: true, meta: {} })),
-  launchShellSession: vi.fn(async () => ({ ok: true, meta: {} })),
+  // Same (unused) param as launchSession above, so mock.calls[0][0] is indexable.
+  launchCustomSession: vi.fn(async (_req: unknown) => ({ ok: true, meta: {} })),
+  launchShellSession: vi.fn(async (_req: unknown) => ({ ok: true, meta: {} })),
   // Controllable per test so one test can prove the duplicate check runs before assets
   // are ever touched.
   hasSession: vi.fn(async () => false),
@@ -151,6 +152,55 @@ describe("POST /api/sessions (ticket)", () => {
     await POST(req(launch));
     const passed = h.launchSession.mock.calls[0][0] as { createWorktree: boolean };
     expect(passed.createWorktree).toBe(false);
+  });
+
+  it("forwards a picked worktree to launchSession", async () => {
+    await POST(req({ ...launch, worktree: "/repo/.claude/worktrees/RIC-9-x" }));
+    const passed = h.launchSession.mock.calls[0][0] as { worktree?: string };
+    expect(passed.worktree).toBe("/repo/.claude/worktrees/RIC-9-x");
+  });
+
+  // A non-string worktree must not travel: it ends up in resolveWorktreePick, whose
+  // string comparison would silently treat anything else as "no match" — but the route is
+  // where a malformed body stops.
+  it("drops a non-string worktree", async () => {
+    await POST(req({ ...launch, worktree: { evil: true } }));
+    const passed = h.launchSession.mock.calls[0][0] as { worktree?: string };
+    expect(passed.worktree).toBeUndefined();
+  });
+});
+
+describe("POST /api/sessions — the picked worktree on custom and shell launches", () => {
+  it("forwards it for a project-scoped custom session", async () => {
+    await POST(req({ kind: "custom", projectName: "Mojito", worktree: "/repo/wt" }));
+    const passed = h.launchCustomSession.mock.calls[0][0] as { worktree?: string };
+    expect(passed.worktree).toBe("/repo/wt");
+  });
+
+  it("forwards it for a ticket-scoped custom session", async () => {
+    await POST(req({ kind: "custom", projectName: "Mojito", ticket: "RIC-46", status: "In Progress", worktree: "/repo/wt" }));
+    const passed = h.launchCustomSession.mock.calls[0][0] as { worktree?: string; ticket?: string };
+    expect(passed.ticket).toBe("RIC-46");
+    expect(passed.worktree).toBe("/repo/wt");
+  });
+
+  it("forwards it for a project-scoped shell", async () => {
+    await POST(req({ kind: "shell", projectName: "Mojito", worktree: "/repo/wt" }));
+    const passed = h.launchShellSession.mock.calls[0][0] as { worktree?: string };
+    expect(passed.worktree).toBe("/repo/wt");
+  });
+
+  it("forwards it for a ticket-scoped shell", async () => {
+    await POST(req({ kind: "shell", projectName: "Mojito", ticket: "RIC-46", status: "In Progress", worktree: "/repo/wt" }));
+    const passed = h.launchShellSession.mock.calls[0][0] as { worktree?: string; ticket?: string };
+    expect(passed.ticket).toBe("RIC-46");
+    expect(passed.worktree).toBe("/repo/wt");
+  });
+
+  it("drops a non-string worktree on a custom launch too", async () => {
+    await POST(req({ kind: "custom", projectName: "Mojito", worktree: 42 }));
+    const passed = h.launchCustomSession.mock.calls[0][0] as { worktree?: string };
+    expect(passed.worktree).toBeUndefined();
   });
 
   // The board move is best-effort by design (the session is already running, so a failed

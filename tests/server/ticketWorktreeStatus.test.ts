@@ -7,6 +7,7 @@ function deps(over: Partial<Parameters<typeof getTicketWorktreeStatus>[4]> = {})
     findExistingTicketWorktree: vi.fn(() => null as string | null),
     listLocalBranches: vi.fn(() => ["main", "dev"]),
     detectDefaultBranch: vi.fn(async () => "main"),
+    listPickableWorktrees: vi.fn(() => [{ path: "/repo/.claude/worktrees/RIC-9-other", branch: "RIC-9-other" }]),
     ...over,
   };
 }
@@ -15,21 +16,31 @@ describe("getTicketWorktreeStatus", () => {
   it("reports exists:true and skips branch lookup when a worktree already exists", async () => {
     const d = deps({ findExistingTicketWorktree: vi.fn(() => "/repo/.claude/worktrees/RIC-1-x") });
     const res = await getTicketWorktreeStatus("/cfg.json", "RIC-1", "mojito", "Some title", d);
-    expect(res).toEqual({ exists: true, branches: [], defaultBranch: null });
+    expect(res).toEqual({ exists: true, branches: [], defaultBranch: null, worktrees: [] });
     expect(d.listLocalBranches).not.toHaveBeenCalled();
     expect(d.detectDefaultBranch).not.toHaveBeenCalled();
+    // The picker only shows where the question does, so nothing is listed on this path.
+    expect(d.listPickableWorktrees).not.toHaveBeenCalled();
   });
 
   it("reports exists:false with the repo's local branches and detected default when none exists", async () => {
     const d = deps();
     const res = await getTicketWorktreeStatus("/cfg.json", "RIC-1", "mojito", "Some title", d);
-    expect(res).toEqual({ exists: false, branches: ["main", "dev"], defaultBranch: "main" });
+    expect(res).toEqual({ exists: false, branches: ["main", "dev"], defaultBranch: "main",
+      worktrees: [{ path: "/repo/.claude/worktrees/RIC-9-other", branch: "RIC-9-other" }] });
   });
 
   it("falls back to a null default branch when it cannot be detected", async () => {
     const d = deps({ detectDefaultBranch: vi.fn(async () => { throw new Error("no origin/HEAD"); }) });
     const res = await getTicketWorktreeStatus("/cfg.json", "RIC-1", "mojito", "Some title", d);
-    expect(res).toEqual({ exists: false, branches: ["main", "dev"], defaultBranch: null });
+    expect(res).toEqual({ exists: false, branches: ["main", "dev"], defaultBranch: null,
+      worktrees: [{ path: "/repo/.claude/worktrees/RIC-9-other", branch: "RIC-9-other" }] });
+  });
+
+  it("offers nothing to pick when the repo has no other worktree", async () => {
+    const d = deps({ listPickableWorktrees: vi.fn(() => []) });
+    const res = await getTicketWorktreeStatus("/cfg.json", "RIC-1", "mojito", "Some title", d);
+    expect(res.worktrees).toEqual([]);
   });
 
   // No resolvable repo: reports exists:true so the UI skips the create-worktree question —
@@ -37,7 +48,7 @@ describe("getTicketWorktreeStatus", () => {
   it("reports exists:true when the ticket maps to no repo", async () => {
     const d = deps({ repoForTicket: vi.fn(() => null) });
     const res = await getTicketWorktreeStatus("/cfg.json", "RIC-1", "mojito", "Some title", d);
-    expect(res).toEqual({ exists: true, branches: [], defaultBranch: null });
+    expect(res).toEqual({ exists: true, branches: [], defaultBranch: null, worktrees: [] });
     expect(d.findExistingTicketWorktree).not.toHaveBeenCalled();
   });
 });

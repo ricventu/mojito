@@ -76,8 +76,27 @@ Mojito owns the whole lifecycle — there is no external plugin:
   (`worktree.ts`). When neither exists, the launch sheet — via
   `GET /api/tickets/[id]/worktree-status` — asks the human whether to create one and from
   which base branch; "no" opens in the repo root and asks again next launch, same as
-  before this existed. Creation (`createTicketWorktree`) is a plain `git worktree add`
-  Mojito runs itself, never delegated to the session — separate from the work prompt's
+  before this existed. Since RIC-243 that question has a third answer, "Existing":
+  the same endpoint also reports the repo's other worktrees (`listPickableWorktrees`),
+  and picking one opens the session there instead of creating anything. The **New
+  session** sheet has the same field for a project-scoped session or terminal, fed by
+  `GET /api/projects/worktrees` — hidden for General (the home directory is not a repo)
+  and for a project whose repo has no linked worktree, since a select with one option is
+  noise. Three labels only (`No`/`Existing`/`Yes`), because `.btns` gives each an equal
+  third of a sheet 320px wide on the narrowest phone. The pick rides the launch body as
+  `worktree` and **is never trusted**: it names the directory a session is spawned in, so
+  `resolveWorktreePick` echoes it back only when the repo really has a worktree there —
+  an invented path, or one removed between the sheet's fetch and the tap, falls back to
+  the repo root with the usual echoed warning rather than failing the launch. It wins over
+  every other cwd rule (`defaultResolveCwd`), including the ticket's own worktree: it is
+  the only one of them that is an explicit choice. `WorktreeAnswer.kind`
+  (`src/lib/worktreeChoice.ts`) is the discriminator the sheet renders on and is
+  deliberately not derived from the picked value — a user who picks and then resets the
+  select to "Repo root" would otherwise have the select vanish under them with no way
+  back. Bare and prunable worktrees are never offered: the first has no working tree, the
+  second's directory is gone, so git would refuse to work in either.
+  Creation (`createTicketWorktree`) is a plain `git worktree add` Mojito runs itself,
+  never delegated to the session — separate from the work prompt's
   continued silence on branches (the "no worktree rule" above is about what the *prompt*
   tells the session, not what Mojito does before spawning it). If the repo has
   `scripts/init-worktree.sh`, Mojito runs it once inside the fresh worktree; if not,

@@ -8,6 +8,9 @@ import { tmuxName } from "@/server/sessionKey";
 import StateBadge from "./StateBadge";
 import TicketLink from "./TicketLink";
 import { Choice } from "./ui/choice";
+import { Combobox } from "./ui/combobox";
+import { worktreeOptions } from "@/lib/worktreeOptions";
+import { canPickWorktree, launchWorktreeFields, worktreeAnswer, type WorktreeAnswer, type WorktreeStatus } from "@/lib/worktreeChoice";
 import QaVerdictButtons from "./QaVerdictButtons";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 import { holdsSheetOpen, type HeldOutcome } from "@/lib/verdictOutcome";
@@ -47,8 +50,8 @@ export default function LaunchSheet(
   // Whether the ticket already has a worktree, checked once per ticket. "loading" lets the
   // launch buttons show immediately rather than flash in after the fetch — only a confirmed
   // exists:false gates them behind the create-worktree question below.
-  const [wtStatus, setWtStatus] = useState<"loading" | { exists: boolean; branches: string[]; defaultBranch: string | null }>("loading");
-  const [wtAnswer, setWtAnswer] = useState<{ create: boolean; baseBranch: string } | null>(null);
+  const [wtStatus, setWtStatus] = useState<"loading" | WorktreeStatus>("loading");
+  const [wtAnswer, setWtAnswer] = useState<WorktreeAnswer | null>(null);
   useEffect(() => {
     let live = true;
     setWtStatus("loading");
@@ -59,11 +62,15 @@ export default function LaunchSheet(
         if (ticket.project) qs.set("projectName", ticket.project);
         const res = await apiFetch(token, `/api/tickets/${ticket.identifier}/worktree-status?${qs}`);
         const data = res.ok ? await res.json() : null;
-        const status = data && typeof data.exists === "boolean" ? data : { exists: true, branches: [], defaultBranch: null };
+        // A server that predates the worktrees field answers without it; an absent list is
+        // "nothing to pick", which is exactly what an empty one means to the sheet.
+        const status: WorktreeStatus = data && typeof data.exists === "boolean"
+          ? { ...data, worktrees: Array.isArray(data.worktrees) ? data.worktrees : [] }
+          : { exists: true, branches: [], defaultBranch: null, worktrees: [] };
         if (live) setWtStatus(status);
       } catch {
         // Unreachable check degrades to "exists" — skip the question, same as before it existed.
-        if (live) setWtStatus({ exists: true, branches: [], defaultBranch: null });
+        if (live) setWtStatus({ exists: true, branches: [], defaultBranch: null, worktrees: [] });
       }
     })();
     return () => { live = false; };
@@ -184,7 +191,7 @@ export default function LaunchSheet(
         method: "POST",
         body: JSON.stringify({ ticket: ticket.identifier, status: ticket.statusName, model, effort,
           projectName: ticket.project, title: ticket.title, labels: ticket.labels,
-          createWorktree: wtAnswer?.create ?? false, baseBranch: wtAnswer?.baseBranch }),
+          ...launchWorktreeFields(wtAnswer) }),
       });
       if (res.status === 409) {
         setErr("That session is still alive — open it, or kill it from its terminal, before starting a new one.");
@@ -209,7 +216,7 @@ export default function LaunchSheet(
         method: "POST",
         body: JSON.stringify({ kind: "custom", ticket: ticket.identifier, status: ticket.statusName,
           projectName: ticket.project, title: ticket.title, labels: ticket.labels, model, effort,
-          createWorktree: wtAnswer?.create ?? false, baseBranch: wtAnswer?.baseBranch }),
+          ...launchWorktreeFields(wtAnswer) }),
       });
       if (!res.ok) { setErr(await apiError(res, "launch failed")); return; }
       await enter(res);
@@ -230,7 +237,7 @@ export default function LaunchSheet(
         method: "POST",
         body: JSON.stringify({ kind: "shell", ticket: ticket.identifier, status: ticket.statusName,
           projectName: ticket.project, title: ticket.title, labels: ticket.labels,
-          createWorktree: wtAnswer?.create ?? false, baseBranch: wtAnswer?.baseBranch }),
+          ...launchWorktreeFields(wtAnswer) }),
       });
       if (!res.ok) { setErr(await apiError(res, "terminal failed")); return; }
       await enter(res);
@@ -268,23 +275,37 @@ export default function LaunchSheet(
   // Asked once per ticket, only when it has no worktree yet: replaces the launch buttons
   // until answered, so a session never opens in a spot the human didn't choose. "No"
   // launches into the repo root exactly like before this existed, and asks again next time
-  // (nothing was created); "Yes" pins a base branch that rides along with the launch.
+  // (nothing was created); "Yes" pins a base branch that rides along with the launch;
+  // "Existing" opens one of the worktrees the repo already has (RIC-243) — three labels
+  // this short because `.btns` gives each an equal third of a sheet that is 320px wide on
+  // the narrowest phone, and a longer one wraps inside its own button.
   const worktreeChoice = needsWorktreeChoice ? (
     <div className="field" style={{ marginTop: 12 }}>
       <span className="lbl">Create a worktree for this ticket?</span>
       <div className="btns" style={{ marginTop: 4 }}>
-        <button className="btn sm ghost" onClick={() => setWtAnswer({ create: false, baseBranch: "" })}>No</button>
-        <button className="btn sm primary"
-          onClick={() => setWtAnswer({ create: true, baseBranch: wtStatus.defaultBranch ?? wtStatus.branches[0] ?? "" })}>
-          Yes
-        </button>
+        <button className="btn sm ghost" onClick={() => setWtAnswer(worktreeAnswer("no", wtStatus))}>No</button>
+        {/* Offered only when there is something to open — a button onto an empty select
+            is worse than no button (RIC-243). */}
+        {canPickWorktree(wtStatus) && (
+          <button className="btn sm ghost" onClick={() => setWtAnswer(worktreeAnswer("pick", wtStatus))}>Existing</button>
+        )}
+        <button className="btn sm primary" onClick={() => setWtAnswer(worktreeAnswer("create", wtStatus))}>Yes</button>
       </div>
     </div>
   ) : null;
-  const baseBranchSelect = wtAnswer?.create && wtStatus !== "loading" ? (
+  const baseBranchSelect = wtAnswer?.kind === "create" && wtStatus !== "loading" ? (
     <div className="field" style={{ marginTop: 12 }}><span className="lbl">Base branch</span>
       <Choice label="Base branch" value={wtAnswer.baseBranch} options={wtStatus.branches}
-        onChange={(v) => setWtAnswer({ create: true, baseBranch: v })} />
+        onChange={(v) => setWtAnswer({ kind: "create", baseBranch: v, worktree: "" })} />
+    </div>
+  ) : null;
+  // Searchable rather than a Choice: the list is as long as the repo has worktrees, and
+  // branch names are long enough that scanning them wants a filter.
+  const worktreeSelect = wtAnswer?.kind === "pick" && wtStatus !== "loading" ? (
+    <div className="field" style={{ marginTop: 12 }}><span className="lbl">Worktree</span>
+      <Combobox label="Worktree" searchLabel="Search worktrees…" emptyLabel="No worktree matches."
+        options={worktreeOptions(wtStatus.worktrees)} value={wtAnswer.worktree}
+        onChange={(v) => setWtAnswer({ kind: "pick", baseBranch: "", worktree: v })} />
     </div>
   ) : null;
 
@@ -360,6 +381,7 @@ export default function LaunchSheet(
             )}
             {worktreeChoice}
             {baseBranchSelect}
+            {worktreeSelect}
             {qaSession.start && canLaunch && (
               <button className="btn primary block" style={{ marginTop: 12 }} disabled={launchBusy} onClick={() => start()}>
                 {launching === "work" ? "Starting…" : existing ? "Start new work session" : "Start work session"}
@@ -384,6 +406,7 @@ export default function LaunchSheet(
             {selectors}
             {worktreeChoice}
             {baseBranchSelect}
+            {worktreeSelect}
             {canLaunch && (
               <button className="btn primary block" disabled={launchBusy} onClick={() => start()}>
                 {launching === "work" ? "Starting…" : existing ? "Start new session" : "Start session"}

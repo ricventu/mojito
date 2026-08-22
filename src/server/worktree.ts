@@ -34,20 +34,37 @@ function fixedWorktreePath(repo: string, ticket: string, title: string): string 
   return join(realRepoPath(repo), ".claude", "worktrees", worktreeSlug(ticket, title));
 }
 
-export function parseWorktrees(porcelain: string): { path: string; branch: string }[] {
-  const out: { path: string; branch: string }[] = [];
-  let path = "";
-  let branch = "";
+// One entry of `git worktree list --porcelain`. The three flags are set only when git
+// actually reports them, so a plain worktree stays the bare { path, branch } this has
+// always been — every existing caller compares that shape.
+export interface WorktreeEntry {
+  path: string;
+  branch: string;
+  // No working tree to launch in.
+  bare?: boolean;
+  // On a commit rather than a branch — usable, but it has no branch name to label it with.
+  detached?: boolean;
+  // Registered but its directory is gone; git would refuse to work there.
+  prunable?: boolean;
+}
+
+export function parseWorktrees(porcelain: string): WorktreeEntry[] {
+  const out: WorktreeEntry[] = [];
+  let entry: WorktreeEntry = { path: "", branch: "" };
+  const flush = () => {
+    if (entry.path) out.push(entry);
+    entry = { path: "", branch: "" };
+  };
   for (const line of porcelain.split("\n")) {
-    if (line.startsWith("worktree ")) path = line.slice("worktree ".length).trim();
-    else if (line.startsWith("branch ")) branch = line.slice("branch ".length).replace("refs/heads/", "").trim();
-    else if (line.trim() === "" && path) {
-      out.push({ path, branch });
-      path = "";
-      branch = "";
-    }
+    if (line.startsWith("worktree ")) entry.path = line.slice("worktree ".length).trim();
+    else if (line.startsWith("branch ")) entry.branch = line.slice("branch ".length).replace("refs/heads/", "").trim();
+    // `prunable` and `detached` carry an optional reason after the keyword, `bare` never does.
+    else if (line.trim() === "bare") entry.bare = true;
+    else if (line === "detached" || line.startsWith("detached ")) entry.detached = true;
+    else if (line === "prunable" || line.startsWith("prunable ")) entry.prunable = true;
+    else if (line.trim() === "" && entry.path) flush();
   }
-  if (path) out.push({ path, branch });
+  flush();
   return out;
 }
 
@@ -100,6 +117,31 @@ export function findExistingTicketWorktree(repo: string, ticket: string, title: 
   const fixed = fixedWorktreePath(repo, ticket, title);
   if (worktrees.some((w) => w.path === fixed)) return fixed;
   return matchWorktree(worktrees, ticket);
+}
+
+// The repo's linked worktrees, as a picker can offer them: never the repo itself (that is
+// the no-pick fallback, not a choice), never a bare one (no working tree to launch in) and
+// never a prunable one (its directory is gone, so git would refuse to work there). Never
+// throws — a repo git cannot read simply offers nothing.
+export function listPickableWorktrees(repo: string, run: GitRun = defaultGitRun(repo)): WorktreeEntry[] {
+  let worktrees: WorktreeEntry[];
+  try {
+    worktrees = parseWorktrees(run(["worktree", "list", "--porcelain"]));
+  } catch {
+    return [];
+  }
+  const self = realRepoPath(repo);
+  return worktrees.filter((w) => w.path !== self && !w.bare && !w.prunable);
+}
+
+// A client-chosen worktree path, echoed back only when the repo really has a worktree
+// there. The value names the directory a session is spawned in, so it is never trusted:
+// anything not in listPickableWorktrees — an invented path, or one whose worktree was
+// removed between the sheet's fetch and the launch — answers null, and the caller falls
+// back to the repo root.
+export function resolveWorktreePick(repo: string, path: string, run: GitRun = defaultGitRun(repo)): string | null {
+  if (!path) return null;
+  return listPickableWorktrees(repo, run).some((w) => w.path === path) ? path : null;
 }
 
 // The reason a failure is worth showing tends to be near the END of a tool's output — a

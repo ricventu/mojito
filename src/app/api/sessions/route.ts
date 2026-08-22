@@ -18,9 +18,15 @@ export async function POST(req: Request) {
   if (!tokenFromHeaders(req.headers, cfg.token)) return new NextResponse("unauthorized", { status: 401 });
   let body;
   try { body = await req.json(); } catch { return new NextResponse("bad json", { status: 400 }); }
+  // A worktree the human picked from the sheet (RIC-243). Only a non-empty string travels:
+  // it ends up in resolveWorktreePick, whose comparison would read anything else as "no
+  // match" and silently fall back — so a malformed body stops here instead. Applies to
+  // every kind, and to both the ticket-scoped and project-scoped shapes of custom/shell.
+  const picked = typeof body.worktree === "string" && body.worktree ? { worktree: body.worktree } : {};
   if (body.kind === "custom") {
     const res = await launchCustomSession(
       { projectName: body.projectName ?? null, model: body.model ?? "opus", effort: body.effort ?? "high",
+        ...picked,
         ...(typeof body.ticket === "string" && body.ticket
           ? { ticket: body.ticket, status: body.status ?? "", title: body.title ?? "",
               labels: Array.isArray(body.labels) ? body.labels : [],
@@ -35,6 +41,7 @@ export async function POST(req: Request) {
   if (body.kind === "shell") {
     const res = await launchShellSession(
       { projectName: body.projectName ?? null,
+        ...picked,
         ...(typeof body.ticket === "string" && body.ticket
           ? { ticket: body.ticket, status: body.status ?? "", title: body.title ?? "",
               labels: Array.isArray(body.labels) ? body.labels : [],
@@ -74,7 +81,7 @@ export async function POST(req: Request) {
       projectName: body.projectName ?? null,
       title: body.title ?? "", labels: Array.isArray(body.labels) ? body.labels : [],
       description: content.description, assets: prepared.assets, attachments: prepared.attachments,
-      createWorktree: Boolean(body.createWorktree), baseBranch: body.baseBranch },
+      createWorktree: Boolean(body.createWorktree), baseBranch: body.baseBranch, ...picked },
     { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token, projectsPath: cfg.projectsPath,
       hasSession, newSession, pipePane, bus: getBus() },
   );

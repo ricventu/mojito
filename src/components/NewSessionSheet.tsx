@@ -1,11 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client";
 import { launchedSession } from "@/lib/launchedSession";
 import { useProjectPicker } from "@/lib/useProjectPicker";
 import { projectOptions } from "@/lib/projectOptions";
 import { Combobox } from "./ui/combobox";
 import { Choice } from "./ui/choice";
+import { worktreeOptions, REPO_ROOT, type WorktreeChoice } from "@/lib/worktreeOptions";
 import type { SessionMeta } from "@/server/types";
 
 const MODELS = ["opus", "sonnet", "fable"];
@@ -30,11 +31,36 @@ export default function NewSessionSheet(
   const [model, setModel] = useState("opus");
   const [effort, setEffort] = useState("high");
   const [err, setErr] = useState<string | null>(null);
+  // The worktrees of the selected project's repo, and which one to open in (RIC-243).
+  // Re-fetched per project, and the selection resets with it: a path from the previous
+  // project is not a worktree of this one, and the server would refuse it anyway.
+  const [worktrees, setWorktrees] = useState<WorktreeChoice[]>([]);
+  const [worktree, setWorktree] = useState(REPO_ROOT);
+  useEffect(() => {
+    let live = true;
+    setWorktree(REPO_ROOT);
+    // General has no repo, so there is nothing to ask the server about.
+    if (!projectName) { setWorktrees([]); return; }
+    (async () => {
+      try {
+        const res = await apiFetch(token, `/api/projects/worktrees?projectName=${encodeURIComponent(projectName)}`);
+        const data = res.ok ? await res.json() : null;
+        if (live) setWorktrees(Array.isArray(data?.worktrees) ? data.worktrees : []);
+      } catch {
+        // Unreachable check hides the field, which is what "no worktrees" already means:
+        // the launch lands in the repo root exactly as it did before this existed.
+        if (live) setWorktrees([]);
+      }
+    })();
+    return () => { live = false; };
+  }, [token, projectName]);
 
   const start = async () => {
+    // Only a real pick travels; REPO_ROOT is the empty string the server reads as "no pick".
+    const picked = worktree ? { worktree } : {};
     const body = mode === "terminal"
-      ? { kind: "shell", projectName }
-      : { kind: "custom", projectName, model, effort };
+      ? { kind: "shell", projectName, ...picked }
+      : { kind: "custom", projectName, model, effort, ...picked };
     const res = await apiFetch(token, "/api/sessions", {
       method: "POST",
       body: JSON.stringify(body),
@@ -64,6 +90,14 @@ export default function NewSessionSheet(
           <Combobox options={projectOptions(projects)} value={project} onChange={setProject}
             label="Project" searchLabel="Search projects…" emptyLabel="No project matches." />
         </div>
+        {/* Hidden when there is nothing to choose: General, and any project whose repo has
+            no linked worktree. A field with one option is noise. */}
+        {worktrees.length > 0 && (
+          <div className="field"><span className="lbl">Worktree</span>
+            <Combobox options={worktreeOptions(worktrees)} value={worktree} onChange={setWorktree}
+              label="Worktree" searchLabel="Search worktrees…" emptyLabel="No worktree matches." />
+          </div>
+        )}
         {mode === "claude" && (
           <div className="two">
             <div className="field"><span className="lbl">Model</span>
