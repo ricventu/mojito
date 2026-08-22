@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import * as tmux from "@/server/tmux";
+import { attachPty } from "@/server/ptyGateway";
 import { startStackSession, panesDead } from "@/server/tmux";
 import { watchStartupStall } from "@/server/startupStall";
 import { Registry } from "@/server/registry";
@@ -112,6 +113,35 @@ run("tmux control (requires tmux)", () => {
     } finally {
       delete env.LINEAR_API_KEY;
       delete env.NODE_ENV;
+      await tmux.killSession(name);
+    }
+  });
+
+  // RIC-241 end to end, and the half of it a single view still shows: a cursor
+  // appearing at random positions all over the browser terminal. tmux hides the cursor
+  // while it repaints, but only ever with the sequence the client's own terminfo names,
+  // and `xterm-color` — the TERM the gateway attached with from its first commit —
+  // names none. So the hide never left tmux, the browser drew a cursor nobody had told
+  // it to hide, and tmux parked it wherever its last cell run had ended.
+  //
+  // A pane that simply hides its cursor is the whole fixture: the sequence has to reach
+  // the client. Real tmux, real node-pty, the gateway's own spawn — the terminfo lookup
+  // being tested happens inside tmux and no stub can stand in for it.
+  it("passes a pane's cursor-hide through to the browser (RIC-241)", async () => {
+    const name = "mojito-test-cursor-hide";
+    await tmux.killSession(name).catch(() => {});
+    await tmux.newSession(name, tmpdir(), "printf '\\033[?25l'; sleep 30");
+
+    let stream = "";
+    const ws = {
+      on: () => {},
+      send: (chunk: unknown) => { stream += String(chunk); },
+      close: () => {},
+    };
+    try {
+      attachPty(ws as never, name);
+      await vi.waitFor(() => expect(stream).toContain("\x1b[?25l"), { timeout: 5000 });
+    } finally {
       await tmux.killSession(name);
     }
   });

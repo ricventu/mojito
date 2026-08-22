@@ -106,7 +106,19 @@ export function attachPty(ws: WebSocket, id: string, deps: Partial<AttachDeps> =
 
       try {
         pty = d.spawn("tmux", ["attach-session", "-t", id], {
-          name: "xterm-color",
+          // tmux only ever emits a sequence the client's terminfo names, and it hides the
+          // cursor while it repaints. `xterm-color` — what this spawned with from its first
+          // commit — defines no `civis`/`cnorm` at all, so every cursor-hide claude's TUI
+          // asked for was dropped here: the browser drew a cursor it had never been told to
+          // hide, and tmux left it wherever its last cell run ended, which reads as a cursor
+          // blinking at random positions all over the screen (RIC-241). Measured on one real
+          // session and pane: 0 hide sequences reached the client under `xterm-color`, 20 in
+          // three seconds under `xterm-256color`. Neither the renderer nor the number of
+          // attached views is involved — which is why the symptom outlived both the DOM/WebGL
+          // comparison and the single-view case. `xterm-256color` is also what xterm.js
+          // itself is built to be: `xterm-color` capped the terminal at 8 colours, so tmux
+          // was downsampling claude's palette on the way out too.
+          name: "xterm-256color",
           cols,
           rows,
           cwd: process.env.HOME,

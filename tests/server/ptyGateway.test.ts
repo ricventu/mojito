@@ -84,6 +84,30 @@ describe("attachPty", () => {
     expect(ws.close).not.toHaveBeenCalledWith(SESSION_GONE_CODE, expect.any(String));
   });
 
+  // RIC-241, the half of it that a single view still shows: a cursor blinking at
+  // seemingly random positions all over the terminal. tmux hides the cursor while it
+  // repaints, but it can only ever emit a sequence the *client's* terminfo names — and
+  // `xterm-color`, the TERM this gateway attached with from its first commit, names
+  // none: it has no `civis`/`cnorm` at all. So every cursor-hide claude's TUI asks for
+  // is dropped by tmux, the browser keeps drawing a cursor it was never told to hide,
+  // and tmux parks that cursor wherever its last cell run ended on each repaint.
+  // Measured against one real tmux session and one pane, three seconds per attach: 0
+  // hide sequences reached the client under `xterm-color`, 20 under `xterm-256color`.
+  // Nothing about the renderer or the number of attached views enters into it, which is
+  // why it survived both the DOM/WebGL comparison and the single-view case.
+  it("attaches with a TERM tmux can hide the cursor on", async () => {
+    const ws = fakeWs();
+    const deps: Partial<AttachDeps> = {
+      hasSession: vi.fn(async () => true),
+      spawn: spawnStub(),
+      capturePane: vi.fn(async () => ""),
+    };
+    attachPty(ws as never, "mojito-RIC-241-work", deps);
+    await vi.waitFor(() => expect(deps.spawn).toHaveBeenCalled());
+
+    expect(vi.mocked(deps.spawn!).mock.calls[0][2]!.name).toBe("xterm-256color");
+  });
+
   it("normalizes bare LF scrollback to CRLF so xterm does not stair-step lines", async () => {
     // tmux capture-pane emits bare "\n"; written into xterm unchanged, every
     // replayed line starts at the column where the previous one ended — the

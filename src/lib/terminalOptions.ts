@@ -6,7 +6,7 @@ import type { ITerminalOptions } from "@xterm/xterm";
  * Kept out of the component so the one setting that silently corrupts the
  * screen can be pinned by a test: **convertEol must stay off.**
  *
- * The pty gateway attaches with `TERM=xterm-color`, whose terminfo defines
+ * The pty gateway attaches with `TERM=xterm-256color`, whose terminfo defines
  * `cud1=\n`. tmux therefore moves the cursor down one row by emitting a bare
  * LF, relying on the column being preserved. `convertEol: true` makes xterm
  * treat every LF as CRLF, so the column snaps to 0 and tmux's following cell
