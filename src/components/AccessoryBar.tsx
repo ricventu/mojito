@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Paperclip, SquarePen, X } from "lucide-react";
+import { Paperclip, SquarePen, TextSelect, X } from "lucide-react";
 import { normalizePaste } from "@/lib/pasteText";
 import { composerHeight } from "@/lib/composerHeight";
 
@@ -24,8 +24,15 @@ const KEYS: { label: string; bytes: string }[] = [
 const COMPOSER_MAX_LINES = 5;
 
 export default function AccessoryBar(
-  { onSend, onInsertText, onPickImages }:
-  { onSend: (bytes: string) => void; onInsertText: (text: string) => void; onPickImages: (files: File[]) => void },
+  { onSend, onInsertText, onPickImages, onReadScreen }:
+  {
+    onSend: (bytes: string) => void;
+    onInsertText: (text: string) => void;
+    onPickImages: (files: File[]) => void;
+    // The terminal's text, read on demand rather than watched: the panel below is
+    // a snapshot, so this is called once per open.
+    onReadScreen: () => string;
+  },
 ) {
   // The composer: a real <textarea> to write in, whose content is then injected
   // into the terminal through xterm's own paste path.
@@ -51,6 +58,19 @@ export default function AccessoryBar(
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
+  // The mirror of the composer: the terminal's own text on a surface iOS will
+  // let you long-press, select and copy. `null` is closed; a string is the
+  // snapshot taken when it opened. See terminalText.ts for why the terminal
+  // itself cannot be selected on any platform, and why a copy *button* is not
+  // an option here (no `navigator.clipboard` outside a secure context, and
+  // Mojito is served over plain http).
+  //
+  // A snapshot rather than a live view: the pty keeps writing behind this, and
+  // text that reflows under a half-placed selection handle cannot be copied.
+  // Re-reading it is close and open again.
+  const [screen, setScreen] = useState<string | null>(null);
+  const screenRef = useRef<HTMLPreElement>(null);
+
   // Size the field to its content. Runs on every keystroke and on reveal, since
   // a dictated phrase lands as one change and would otherwise stay clipped to
   // whatever height the field opened at.
@@ -75,6 +95,25 @@ export default function AccessoryBar(
     el.style.height = height === null ? "" : `${height}px`;
   }, [draft, composerOpen]);
 
+  // Open at the bottom: the newest output is what a copy is almost always
+  // after, and a shell session's snapshot carries its whole scrollback.
+  useEffect(() => {
+    const el = screenRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [screen]);
+
+  // The two panels take their room from the same place — `.term-body`, whose
+  // visible band is worth about 13 rows once the keyboard is up — so opening
+  // one closes the other.
+  const toggleScreen = () => {
+    setScreen((v) => (v === null ? onReadScreen() : null));
+    setComposerOpen(false);
+  };
+  const toggleComposer = () => {
+    setComposerOpen((v) => !v);
+    setScreen(null);
+  };
+
   const inject = () => {
     const text = normalizePaste(draft);
     // Empty / whitespace-only: no-op and keep the field open so the user can retry or
@@ -92,6 +131,21 @@ export default function AccessoryBar(
 
   return (
     <div className="acc-wrap">
+      {screen !== null && (
+        <div className="screen-text">
+          {/* Plain non-editable text, deliberately not a <textarea>: focusing one
+              raises the keyboard, which is both the wrong thing to happen when
+              you meant to copy and enough of a viewport change to send the
+              terminal through a re-fit. A <pre> long-presses straight into
+              iOS's own "Copia". */}
+          <pre ref={screenRef} className={`screen-text-body${screen ? "" : " screen-text-empty"}`}>
+            {screen || "— nessun testo sullo schermo —"}
+          </pre>
+          <button type="button" className="k icon" aria-label="Chiudi" onClick={() => setScreen(null)}>
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+      )}
       {composerOpen && (
         <div className="composer">
           {/* autoFocus fires on mount (when composerOpen flips true), so the field
@@ -121,9 +175,21 @@ export default function AccessoryBar(
           className="k icon"
           aria-label="Componi"
           title="Componi (dettatura, incolla, sposta il cursore)"
-          onClick={() => setComposerOpen((v) => !v)}
+          onClick={toggleComposer}
         >
           <SquarePen size={16} aria-hidden="true" />
+        </button>
+        {/* Second key, beside the composer: `.acc` scrolls horizontally and a
+            phone shows about ten of its keys, so the two text surfaces are the
+            two that must never need a swipe. */}
+        <button
+          type="button"
+          className="k icon"
+          aria-label="Seleziona testo"
+          title="Seleziona testo (tieni premuto per copiare)"
+          onClick={toggleScreen}
+        >
+          <TextSelect size={16} aria-hidden="true" />
         </button>
         {KEYS.map((k) => (
           <button key={k.label} className="k" onClick={() => onSend(k.bytes)}>{k.label}</button>

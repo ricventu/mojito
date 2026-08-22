@@ -451,6 +451,27 @@ button.chip:active { transform: scale(.96); }
   font: inherit;
   line-height: 20px;
 }
+/* The screen-text panel: the terminal's own output on a surface that can be
+   selected, since the terminal cannot be (see terminalText.ts). Outside
+   `.xterm`, so neither xterm's `user-select: none` nor the `touch-action: none`
+   that makes the terminal a JS-scrolled surface reaches it — `user-select` is
+   restated anyway, because being selectable is the entire point of the element
+   and nothing about that should depend on a rule staying narrow.
+
+   `pre-wrap` rather than a horizontal scroll: a terminal row is up to `cols`
+   wide and a phone is not, and a CSS wrap is not a newline — a long path
+   selected across two visual lines still copies as one string. */
+.screen-text { display: flex; align-items: flex-start; gap: 6px; padding: 8px;
+  border-top: 1px solid var(--border); background: var(--surface); }
+.screen-text .screen-text-body {
+  flex: 1; min-width: 0; max-height: 42vh; overflow-y: auto; margin: 0;
+  padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface-hi); color: var(--text);
+  font: 12px/1.45 var(--mono);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  user-select: text; -webkit-user-select: text;
+}
+.screen-text .screen-text-empty { color: var(--text-dim); }
 .term-img-err { margin: 0; padding: 8px 10px; border-top: 1px solid var(--border); background: var(--surface); }
 .btns { display: flex; gap: 8px; padding: 8px; }
 .btns .btn { flex: 1; padding: 13px; }

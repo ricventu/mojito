@@ -24,6 +24,7 @@ import { computeTouchScroll, wheelSequences } from "@/lib/touchScroll";
 import { SESSION_GONE_CODE } from "@/lib/ptyClose";
 import { termRootStyle, isKeyboardOpen } from "@/lib/keyboardInset";
 import { terminalOptions } from "@/lib/terminalOptions";
+import { bufferText } from "@/lib/terminalText";
 import { urlLinkProvider } from "@/lib/terminalLinkProvider";
 import { isUsableGeometry } from "@/lib/terminalFit";
 import { attachWebglRenderer } from "@/lib/terminalRenderer";
@@ -360,6 +361,14 @@ export default function TerminalView(
   }, []);
 
   const send = (bytes: string) => wsRef.current?.send(new TextEncoder().encode(bytes));
+  // Hand the accessory bar the terminal's text when it asks for it. Nothing in
+  // the terminal itself can be selected on a phone — mouse tracking, a canvas,
+  // and our own touch handling each rule it out on their own — so copying goes
+  // through a plain selectable surface instead (see terminalText.ts).
+  const readScreen = () => {
+    const term = termRef.current;
+    return term ? bufferText(term.buffer.active) : "";
+  };
   const pickImages = async (files: File[]) => {
     const images = files.filter((f) => f.type.startsWith("image/"));
     if (!images.length) return;
@@ -460,7 +469,12 @@ export default function TerminalView(
       )}
       <div ref={holder} className="term-body" />
       {imgErr && <div className="term-img-err err-text">{imgErr}</div>}
-      <AccessoryBar onSend={send} onInsertText={(t) => termRef.current?.paste(t)} onPickImages={pickImages} />
+      <AccessoryBar
+        onSend={send}
+        onInsertText={(t) => termRef.current?.paste(t)}
+        onPickImages={pickImages}
+        onReadScreen={readScreen}
+      />
       {docs && (
         <DocsView
           token={token}

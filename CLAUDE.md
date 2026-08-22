@@ -245,6 +245,36 @@ Mojito owns the whole lifecycle — there is no external plugin:
   *after* `font: inherit`. The xterm-level dictation duplication is deliberately
   left unfixed — the composer is the path that does not double, and patching
   xterm's internals needs an event trace off a real device first.
+- **Copying text out**: the terminal itself cannot be selected, on any platform, and
+  four independent things say so — claude's TUI turns on mouse tracking, so xterm
+  calls `_selectionService.disable()` for the duration; xterm.css sets
+  `.xterm { user-select: none }`; xterm's always-on `mousedown` listener
+  `preventDefault()`s unconditionally; and a touch drag produces no mouse events at
+  all, on top of `.term-root .xterm { touch-action: none }` and Mojito's own
+  capture-phase `touchmove`. **The renderer is not among the reasons** — selection
+  was equally impossible under the DOM renderer before RIC-239, so reverting that
+  buys nothing and pays for it with the exact case WebGL was adopted for. Two
+  separate fixes, therefore. On a Mac, `macOptionClickForcesSelection`
+  (`terminalOptions.ts`) is the whole of it: xterm's one escape hatch is
+  `shouldForceSelection`, which off a Mac reads `shiftKey` — so shift+drag already
+  worked on Linux and Windows — but on one reads `altKey && thisOption`, and the
+  option defaults to `false`, which is why macOS had no gesture at all. It also
+  turns Option+drag from a column selection into a flowing one
+  (`shouldColumnSelect` excludes exactly this case): a rectangle cut out of a TUI
+  is not what anyone copies. On a phone the answer is the composer's, in the other
+  direction — a **real text surface**: the accessory bar's second key opens a
+  `<pre>` holding the buffer as text (`bufferText`, `src/lib/terminalText.ts`),
+  where iOS's own long-press → "Copia" works. A copy *button* is not an option
+  there and never will be while `server.ts` is plain http: `navigator.clipboard`
+  does not exist outside a secure context, so nothing but native selection can
+  reach the clipboard from the phone. A `<pre>` and not a `<textarea>` because
+  focusing one raises the keyboard. `bufferText` reads the whole active buffer with
+  no branch — the alt buffer has no scrollback, so a TUI yields exactly its screen
+  while a shell yields its history too — joins wrapped rows to what they continue
+  (a path broken across rows is the main thing being copied, and a newline in the
+  middle of one ruins the paste), and trims blank rows at the ends only. It is a
+  snapshot, deliberately: text reflowing under a half-placed selection handle
+  cannot be copied.
 - **Ticket id links**: every `RIC-…` label Mojito shows is the way to open that issue on
   Linear (RIC-242) — the board cards, the loose session cards, the launch sheet header and
   the terminal header all render it through one `TicketLink` component, with
