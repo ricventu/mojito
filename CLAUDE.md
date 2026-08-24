@@ -178,8 +178,25 @@ Mojito owns the whole lifecycle — there is no external plugin:
   the loader, so a credential added to `.env.local` later is scrubbed without anyone
   remembering to update a list. Covered at both ends — pure unit tests in
   `tests/server/childEnv.test.ts` and a real-tmux case in `tmux.integration.test.ts` that
-  asserts a pane sees neither `NODE_ENV` nor a leaked key. Deliberately *not* extended to
-  Mojito's own git/`gh`/`systemctl` calls, which no `NODE_ENV` branch touches.
+  asserts a pane sees neither `NODE_ENV`, nor a leaked key, nor `TURBOPACK`. Deliberately
+  *not* extended to Mojito's own git/`gh`/`systemctl` calls, which no `NODE_ENV` branch
+  touches. `.env` is not the only thing that writes to `process.env` after boot, which is
+  the RIC-246 half: **Next mutates its own process** — `next()` sets `TURBOPACK`, and
+  building the server sets `NEXT_DEPLOYMENT_ID` — and both used to ride into every session,
+  where `TURBOPACK` is read by *any* repo's `next` as that repo's bundler choice. Observed
+  as a Playwright suite dying because its `pnpm dev --webpack` exited 1 on "Multiple bundler
+  flags set: TURBOPACK=1, --webpack" (the value need not be `1`; every reader of it in Next
+  is a truthiness check, so Mojito's own `auto` collides identically). Two mechanisms again,
+  and the split matters: `server.ts` diffs `process.env` across `next()`+`prepare()`
+  (`snapshotEnvKeys`/`registerEnvKeysAddedSince`, the generalized halves of
+  `registerEnvFileKeys` — a diff spanning statements, since those two writes sit either
+  side of an `await`), which catches whatever Next injects next without naming it; *and*
+  the bundler-selection keys (`TURBOPACK`, `NEXT_RSPACK`, the three `IS_*_TEST`/
+  `NEXT_TEST_USE_RSPACK` switches) are in `DROP_EXACT` unconditionally, because a diff
+  cannot see a value that was **already there when Mojito booted** — which is exactly the
+  self-perpetuating case: a leaking Mojito poisons the tmux server's global environment,
+  and a Mojito launched from one of its shells inherits the variable and hands it on. Note
+  the diff must close before the first spawn, i.e. before `server.ts`'s tmux calls.
 - **Status model**: `src/server/statusModel.ts` is authoritative; `src/lib/status.ts`
   mirrors it for presentation and a sync-guard test ties them together. Work-phase
   sessions share a single tmux id `mojito-<ticket>-work` across Backlog/Todo/In

@@ -94,8 +94,9 @@ run("tmux control (requires tmux)", () => {
 
   // RIC-207 end to end, against a real tmux server: whatever that server's global
   // environment holds, the pane a Mojito session runs in must not see Mojito's
-  // NODE_ENV=production (under which pnpm/npm strip a workspace's devDependencies) or the
-  // credentials Mojito loaded from its own .env.
+  // NODE_ENV=production (under which pnpm/npm strip a workspace's devDependencies), the
+  // credentials Mojito loaded from its own .env, or — RIC-246 — the TURBOPACK that `next()`
+  // writes into Mojito's process, which collides with `next --webpack` in any other repo.
   it("gives a session's pane none of Mojito's own environment", async () => {
     const name = "mojito-test-env-scrub";
     const dump = join(mkdtempSync(join(tmpdir(), "mojito-env-")), "env.txt");
@@ -106,11 +107,17 @@ run("tmux control (requires tmux)", () => {
     const env = process.env as Record<string, string | undefined>;
     env.NODE_ENV = "production";
     env.LINEAR_API_KEY = "lin_api_should_not_leak";
+    env.TURBOPACK = "auto";
     try {
-      await tmux.newSession(name, tmpdir(), `sh -c 'printf "[%s][%s]" "$NODE_ENV" "$LINEAR_API_KEY" > ${dump}; sleep 5'`);
+      await tmux.newSession(
+        name,
+        tmpdir(),
+        `sh -c 'printf "[%s][%s][%s]" "$NODE_ENV" "$LINEAR_API_KEY" "$TURBOPACK" > ${dump}; sleep 5'`,
+      );
       await vi.waitFor(() => expect(existsSync(dump)).toBe(true), { timeout: 5000 });
-      expect(readFileSync(dump, "utf8")).toBe("[][]");
+      expect(readFileSync(dump, "utf8")).toBe("[][][]");
     } finally {
+      delete env.TURBOPACK;
       delete env.LINEAR_API_KEY;
       delete env.NODE_ENV;
       await tmux.killSession(name);

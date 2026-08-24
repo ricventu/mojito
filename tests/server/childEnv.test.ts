@@ -5,7 +5,9 @@ import {
   tmuxEnvArgs,
   registerMojitoOnlyKeys,
   registerEnvFileKeys,
+  registerEnvKeysAddedSince,
   resetMojitoOnlyKeys,
+  snapshotEnvKeys,
   type EnvLike,
 } from "@/server/childEnv";
 
@@ -41,6 +43,7 @@ const POLLUTED = {
   MOJITO_TOKEN: "s3cret",
   MOJITO_PORT: "4711",
   LINEAR_API_KEY: "lin_api_deadbeef",
+  TURBOPACK: "auto",
 };
 
 beforeEach(() => {
@@ -88,6 +91,28 @@ describe("sanitizeEnv", () => {
   it("skips undefined values rather than stringifying them", () => {
     expect(sanitizeEnv({ HOME: "/Users/me", NOPE: undefined })).toEqual({ HOME: "/Users/me" });
   });
+
+  // RIC-246: `next()` writes TURBOPACK into Mojito's own process at boot, and every one of
+  // these is read by *any* repo's `next` command to pick a bundler. Leaked, they either
+  // override that repo's choice or collide with it — `pnpm dev --webpack` in a session
+  // exits 1 with "Multiple bundler flags set: TURBOPACK=1, --webpack".
+  it("drops Next's bundler-selection variables, whatever value they carry", () => {
+    const env = {
+      TURBOPACK: "auto",
+      NEXT_RSPACK: "1",
+      IS_TURBOPACK_TEST: "1",
+      IS_WEBPACK_TEST: "1",
+      NEXT_TEST_USE_RSPACK: "1",
+      HOME: "/Users/me",
+    };
+    expect(sanitizeEnv(env)).toEqual({ HOME: "/Users/me" });
+  });
+
+  // Not a blanket NEXT_ prefix: NEXT_TELEMETRY_DISABLED is a preference the user sets for
+  // themselves, and dropping it would turn telemetry back on inside every session.
+  it("keeps the user's own NEXT_ preferences", () => {
+    expect(sanitizeEnv({ NEXT_TELEMETRY_DISABLED: "1" })).toEqual({ NEXT_TELEMETRY_DISABLED: "1" });
+  });
 });
 
 // Nobody has to remember to extend a list when .env.local grows a key: the .env loader's own
@@ -105,6 +130,36 @@ describe("registerEnvFileKeys", () => {
     const env: EnvLike = { HOME: "/Users/me", MY_TOKEN: "from-shell" };
     registerEnvFileKeys(() => {}, env);
     expect(sanitizeEnv(env).MY_TOKEN).toBe("from-shell");
+  });
+});
+
+// The .env loader runs at boot, but Next mutates process.env later still — `next()` sets
+// TURBOPACK, and constructing the server sets NEXT_DEPLOYMENT_ID. Same diffing trick,
+// spanning statements instead of wrapping one call, because those two sit either side of
+// an await in server.ts (RIC-246).
+describe("snapshotEnvKeys / registerEnvKeysAddedSince", () => {
+  it("scrubs whatever Next added to the environment between the two calls", () => {
+    const env: EnvLike = { HOME: "/Users/me" };
+    const before = snapshotEnvKeys(env);
+    env.NEXT_DEPLOYMENT_ID = "";
+    registerEnvKeysAddedSince(before, env);
+    expect(sanitizeEnv(env)).toEqual({ HOME: "/Users/me" });
+  });
+
+  it("leaves a variable that was already there alone, even if Next rewrote its value", () => {
+    const env: EnvLike = { HOME: "/Users/me", MY_TOKEN: "from-shell" };
+    const before = snapshotEnvKeys(env);
+    env.MY_TOKEN = "rewritten";
+    registerEnvKeysAddedSince(before, env);
+    expect(sanitizeEnv(env).MY_TOKEN).toBe("rewritten");
+  });
+
+  // A snapshot is a copy, not a live view of the same object.
+  it("is not fooled by the environment it snapshotted being mutated in place", () => {
+    const env: EnvLike = { HOME: "/Users/me" };
+    const before = snapshotEnvKeys(env);
+    env.LATE = "x";
+    expect(before.has("LATE")).toBe(false);
   });
 });
 
@@ -150,6 +205,14 @@ describe("tmuxEnvArgs", () => {
   it("leaves a clean global PATH alone rather than restating it", () => {
     const args = tmuxEnvArgs({ PATH: CLEAN_PATH, npm_config_local_prefix: "/Users/me/code/Mojito/mojito" });
     expect(args.some((a) => a.startsWith("PATH="))).toBe(false);
+  });
+
+  // The one case a boot-time diff can never catch: the value is already in Mojito's
+  // environment before Mojito starts, because a Mojito session poisoned the tmux server's
+  // global environment and Mojito was launched from one of its shells. An empty TURBOPACK
+  // is as good as an absent one — every reader of it in Next is a plain truthiness check.
+  it("shadows a TURBOPACK the tmux server's global environment already carries", () => {
+    expect(tmuxEnvArgs({ TURBOPACK: "1", HOME: "/Users/me" })).toEqual(["-e", "TURBOPACK="]);
   });
 
   // Nothing to shadow means nothing to say: a clean tmux server must not get an empty

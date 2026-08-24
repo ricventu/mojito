@@ -38,6 +38,22 @@ const DROP_EXACT = new Set([
   "_", // the invoking shell's "last argv[0]"; every shell resets it anyway
   "__NEXT_PROCESSED_ENV", // marker left by @next/env after it loaded Mojito's .env files
   "LINEAR_API_KEY", // Mojito is the only Linear client; a session has no business holding it
+  // Next's bundler-selection variables (RIC-246). `next()` writes TURBOPACK into Mojito's
+  // own process the moment the server boots, and these are the exact keys any *other*
+  // repo's `next` command consults to pick a bundler (`getBundlerFromEnv`,
+  // `parseBundlerArgs`). Leaked, they either override that repo's choice or collide with
+  // it outright: a session running `pnpm dev --webpack` exits 1 with "Multiple bundler
+  // flags set: TURBOPACK=1, --webpack" and takes its Playwright suite down with it.
+  // Dropped unconditionally, unlike the .env keys below, because a value already present
+  // when Mojito boots is exactly the case that self-perpetuates — Mojito launched from a
+  // shell of a session a leaking Mojito created inherits it and hands it on. A bundler is
+  // per-project by definition anyway, so even a hand-exported one has no business
+  // deciding for a repo that never asked.
+  "TURBOPACK",
+  "NEXT_RSPACK",
+  "IS_TURBOPACK_TEST",
+  "IS_WEBPACK_TEST",
+  "NEXT_TEST_USE_RSPACK",
 ]);
 
 // Keys that reached process.env from Mojito's .env files at boot. Registered by server.ts
@@ -55,16 +71,31 @@ export function resetMojitoOnlyKeys(): void {
   mojitoOnlyKeys = new Set<string>();
 }
 
+/** The keys `env` holds right now, as a copy — the `before` half of a diff. */
+export function snapshotEnvKeys(env: EnvLike = process.env): Set<string> {
+  return new Set(Object.keys(env));
+}
+
 /**
- * Runs the .env loader and registers whatever it added to the environment. Diffing beats
- * naming the keys: `.env.local` gaining a credential later is scrubbed without anyone
- * remembering this file. Variables the user had already exported are untouched by dotenv
- * semantics and so never show up in the diff — those are their environment, not Mojito's.
+ * Registers every key `env` has gained since the snapshot as Mojito's own. Diffing beats
+ * naming keys: whatever Mojito's boot pulls in next is scrubbed without anyone remembering
+ * this file. Only *new* keys count — a variable the user exported themselves is their
+ * environment even if something rewrote its value along the way.
+ */
+export function registerEnvKeysAddedSince(before: Set<string>, env: EnvLike = process.env): void {
+  registerMojitoOnlyKeys(Object.keys(env).filter((k) => !before.has(k)));
+}
+
+/**
+ * Runs the .env loader and registers whatever it added to the environment, so `.env.local`
+ * gaining a credential later needs no edit here. Variables the user had already exported
+ * are untouched by dotenv semantics and so never show up in the diff — those are their
+ * environment, not Mojito's.
  */
 export function registerEnvFileKeys(load: () => void, env: EnvLike = process.env): void {
-  const before = new Set(Object.keys(env));
+  const before = snapshotEnvKeys(env);
   load();
-  registerMojitoOnlyKeys(Object.keys(env).filter((k) => !before.has(k)));
+  registerEnvKeysAddedSince(before, env);
 }
 
 function isMojitoOnly(key: string): boolean {

@@ -9,7 +9,7 @@ import { adoptOrphanSessions } from "./src/server/adoptOrphans";
 import { tokenFromUrl } from "./src/server/auth";
 import { attachPty } from "./src/server/ptyGateway";
 import { attachEvents } from "./src/server/eventsWs";
-import { registerEnvFileKeys } from "./src/server/childEnv";
+import { registerEnvFileKeys, registerEnvKeysAddedSince, snapshotEnvKeys } from "./src/server/childEnv";
 import { startHeartbeat, markAlive } from "./src/server/heartbeat";
 import { claimUpgrades, dropForeignUpgradeListeners, nextUpgradeHandler } from "./src/server/nextUpgrade";
 
@@ -34,9 +34,16 @@ registerEnvFileKeys(() => loadEnvConfig(process.cwd(), dev));
 
 async function main() {
   const cfg = getConfig();
+  // Next writes to process.env as it boots, and none of it belongs to the repos Mojito's
+  // sessions work in (RIC-246): `next()` sets TURBOPACK, which any other repo's `next`
+  // reads as its bundler choice, and building the server sets NEXT_DEPLOYMENT_ID. Same
+  // diff as the .env loader above, spanning statements because those two writes sit either
+  // side of prepare()'s await. Must close before the first spawn — the tmux calls below.
+  const beforeNext = snapshotEnvKeys();
   const app = next({ dev });
   const handle = app.getRequestHandler();
   await app.prepare();
+  registerEnvKeysAddedSince(beforeNext);
   // Must run after prepare() — Next throws otherwise. Not getUpgradeHandler(): in dev
   // that one resolves to a no-op and takes Fast Refresh with it (see nextUpgrade.ts).
   const upgradeHandle = nextUpgradeHandler(app);
