@@ -382,11 +382,29 @@ Mojito owns the whole lifecycle — there is no external plugin:
   buttons step through real history when the previous entry is ours, tracked as a depth
   counter in `history.state` (`src/lib/navDepth.ts`), and fall back to a url otherwise,
   so a link opened straight into a terminal never backs out of Mojito.
+- **Board scope**: the board shows only the projects `projects.json` maps —
+  `GET /api/tickets` passes `listMappedProjects` into `listOpenIssues`, which scopes the
+  Linear query itself (`project: { name: { in: $projects } }`, names as a variable, never
+  interpolated). It is a *query* filter and not a screen filter on purpose: a workspace
+  project Mojito has no path for can offer nothing but tickets that answer `no-repo` when
+  you tap them, and they were also eating the `first: 100` budget the mapped projects
+  share. A ticket with **no** project is scoped out along with them, on the same test:
+  Mojito resolves a session's directory from the project, so a project-less ticket is
+  exactly as unlaunchable as one naming an unmapped project. The one case that survives
+  the scope is an **empty** map, which scopes nothing and returns the whole workspace:
+  `loadProjectMap` swallows a parse error and answers `{}`, so scoping on that would
+  blank the entire board
+  with no explanation whenever the file is malformed. Note the consequence for `no-repo`,
+  which is now nearly unreachable from the board and stays only as the launch's own guard.
 - **Project filter**: the board's project filter offers *every configured project*, not
   only the ones its open tickets name (RIC-225) — `mergedProjects` unions
   `/api/projects` (`useProjects`) with the names the tickets and sessions on screen
-  carry, so a project whose tickets are all closed is still reachable, and a ticket
-  naming a project the map has dropped does not silently lose its option. It is a
+  carry, so a project whose tickets are all closed is still reachable. Since **Board
+  scope** above the ticket half of that union is a fallback rather than the routine case
+  (an unmapped project's tickets no longer arrive at all); what it still covers is the
+  render or two before `/api/projects` answers, a *session* whose project left the map
+  after it was launched — its card is on screen, so its name must stay filterable — and
+  the fail-open path, where a malformed projects.json empties both sides. It is a
   multi-select with a search box rather than a chip row: the list is now as long as
   projects.json, which a horizontally scrolling row cannot show, and "these two
   projects" is a state chips cannot express at all. So `ListFilters.project` is a

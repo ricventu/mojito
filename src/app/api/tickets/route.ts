@@ -5,14 +5,17 @@ import { listOpenIssues, uploadImage } from "@/server/linear";
 import { validateImages } from "@/server/imageUpload";
 import { launchIntakeSession } from "@/server/launch";
 import { writeTicketDraft } from "@/server/ticketDraft";
-import { loadProjectMap, teamKeyForProject } from "@/server/projects";
+import { loadProjectMap, listMappedProjects, teamKeyForProject } from "@/server/projects";
 import { hasSession, newSession, pipePane } from "@/server/tmux";
 
 export async function GET(req: Request) {
   const cfg = getConfig();
   if (!tokenFromHeaders(req.headers, cfg.token)) return new NextResponse("unauthorized", { status: 401 });
+  // Scoped to the mapped projects: the board only shows what Mojito can
+  // actually open a session in. See listOpenIssues for the empty-map and no-project cases.
+  const projects = listMappedProjects(loadProjectMap(cfg.projectsPath)).map((p) => p.name);
   try {
-    return NextResponse.json(await listOpenIssues(cfg.linearApiKey));
+    return NextResponse.json(await listOpenIssues(cfg.linearApiKey, projects));
   } catch {
     return new NextResponse("linear error", { status: 502 });
   }

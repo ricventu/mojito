@@ -40,22 +40,45 @@ function mapIssueNode(node: IssueNode): TicketSummary {
   };
 }
 
-export async function listOpenIssues(apiKey: string, fetchImpl: typeof fetch = fetch): Promise<TicketSummary[]> {
+/**
+ * The open issues Mojito shows on its board — scoped to the projects `projects.json`
+ * actually maps. Mojito can only launch a session into a project it has a path
+ * for, so a workspace project it knows nothing about had nothing to offer but tickets that
+ * answer `no-repo` when you tap them, while still eating the `first: 100` budget the
+ * mapped projects share.
+ *
+ * A ticket with no project at all is scoped out too: Mojito resolves a session's directory
+ * from the project, so a project-less ticket is as unlaunchable as an unmapped one.
+ *
+ * An empty `projects` list scopes nothing and returns the whole workspace, on purpose:
+ * loadProjectMap swallows a parse error and answers `{}`, so scoping on it would blank
+ * the entire board with no explanation whenever projects.json is malformed.
+ */
+export async function listOpenIssues(
+  apiKey: string,
+  projects: readonly string[] = [],
+  fetchImpl: typeof fetch = fetch,
+): Promise<TicketSummary[]> {
+  const scoped = projects.length > 0;
+  // The variable is declared only when it is used: GraphQL rejects a document that
+  // defines a variable it never references.
+  const header = scoped ? "query ($projects: [String!]!)" : "query";
+  const open = `state: { type: { nin: ["completed", "canceled"] } }`;
+  const filter = scoped ? `${open}, project: { name: { in: $projects } }` : open;
   const data = await query<{ issues: { nodes: IssueNode[] } }>(
     apiKey,
     {
-      // Every open issue, not just the viewer's — the "Mine" restriction is a UI filter
-      // over `assignedToMe`, so unassigned tickets stay reachable from Mojito.
-      query: `query {
-        issues(filter: {
-          state: { type: { nin: ["completed", "canceled"] } }
-        }, first: 100) {
+      // Every open issue of those projects, not just the viewer's — the "Mine" restriction
+      // is a UI filter over `assignedToMe`, so unassigned tickets stay reachable.
+      query: `${header} {
+        issues(filter: { ${filter} }, first: 100) {
           nodes {
             identifier title url state { name type } project { name }
             labels { nodes { name } } assignee { isMe }
           }
         }
       }`,
+      ...(scoped ? { variables: { projects: [...projects] } } : {}),
     },
     fetchImpl,
   );

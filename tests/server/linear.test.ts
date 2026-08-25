@@ -27,7 +27,7 @@ describe("linear client", () => {
         ],
       },
     });
-    const items = await listOpenIssues("k", f);
+    const items = await listOpenIssues("k", [], f);
     expect(items[0]).toEqual({
       identifier: "RIC-46",
       title: "Do thing",
@@ -44,7 +44,7 @@ describe("linear client", () => {
   // an issue the API answers without it has to map to "" rather than undefined.
   it("maps a missing url to an empty string", async () => {
     const f = fakeFetch({ issues: { nodes: [{ identifier: "RIC-2", state: { name: "Todo" } }] } });
-    const items = await listOpenIssues("k", f);
+    const items = await listOpenIssues("k", [], f);
     expect(items[0].url).toBe("");
   });
 
@@ -57,18 +57,55 @@ describe("linear client", () => {
         ],
       },
     });
-    const items = await listOpenIssues("k", f);
+    const items = await listOpenIssues("k", [], f);
     expect(items.map((t) => t.assignedToMe)).toEqual([false, false]);
   });
 
   it("no longer restricts the query to the viewer's own issues", async () => {
     const f = fakeFetch({ issues: { nodes: [] } });
-    await listOpenIssues("k", f);
+    await listOpenIssues("k", [], f);
     const body = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string;
     // The assignee survives only as a selected field, never as a filter clause.
     expect(body).not.toContain("isMe: {");
     expect(body).toContain("assignee { isMe }");
     expect(body).toContain("nin");
+  });
+
+  // The board only shows projects projects.json maps, so the scoping happens in
+  // the query rather than on screen — an unmapped project's tickets never arrive.
+  it("scopes the query to the mapped projects", async () => {
+    const f = fakeFetch({ issues: { nodes: [] } });
+    await listOpenIssues("k", ["Mojito", "Weflo"], f);
+    const call = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    const sent = JSON.parse(call.body as string) as { query: string; variables?: { projects?: string[] } };
+    expect(sent.variables?.projects).toEqual(["Mojito", "Weflo"]);
+    // The names ride as a variable, never interpolated into the document.
+    expect(sent.query).not.toContain("Mojito");
+    expect(sent.query).toContain("$projects: [String!]!");
+    expect(sent.query).toContain("project: { name: { in: $projects } }");
+  });
+
+  // A project-less ticket is scoped out with the unmapped ones: Mojito resolves a
+  // session's directory from the project, so it is just as unlaunchable.
+  it("does not exempt issues with no project", async () => {
+    const f = fakeFetch({ issues: { nodes: [] } });
+    await listOpenIssues("k", ["Mojito"], f);
+    const body = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string;
+    expect(body).not.toContain("null: true");
+    expect(body).not.toContain("or:");
+  });
+
+  // loadProjectMap answers {} for an unreadable or malformed file, so scoping on an empty
+  // list would blank the whole board. It fails open instead — and declares no variable,
+  // since GraphQL rejects a document defining one it never uses.
+  it("scopes nothing when no project is mapped", async () => {
+    const f = fakeFetch({ issues: { nodes: [] } });
+    await listOpenIssues("k", [], f);
+    const call = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    const sent = JSON.parse(call.body as string) as { query: string; variables?: unknown };
+    expect(sent.variables).toBeUndefined();
+    expect(sent.query).not.toContain("$projects");
+    expect(sent.query).toContain("nin");
   });
 
   it("returns a single issue status", async () => {

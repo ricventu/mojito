@@ -116,9 +116,16 @@ export function mergedStatuses(
  * `configured` is projects.json's list (see /api/projects) and is why the filter is not
  * derived from the board alone (RIC-225): a project whose every ticket is closed — or
  * which has no ticket yet at all — had no chip and so could not be filtered *to*, even
- * though the same project is selectable in every launch sheet. The board's own names
- * still come in on top of it, since a ticket can name a project the map has since
- * dropped and dropping its option would silently widen the filter.
+ * though the same project is selectable in every launch sheet.
+ *
+ * The board's own names still come in on top of it, but that is now a fallback
+ * rather than the routine case: /api/tickets now scopes the Linear query to the mapped
+ * projects, so a ticket naming an unmapped one no longer arrives at all. What the union
+ * still covers is the two ways the board can legitimately hold a name the map does not:
+ * the render or two before /api/projects answers, and a *session* whose project was
+ * dropped from the map after it was launched — its card is on screen, so its name has to
+ * stay filterable. It also keeps the filter honest on listOpenIssues' fail-open path,
+ * where a malformed projects.json leaves both this list and `configured` empty.
  *
  * `tickets` is the mine-scoped list, same as mergedStatuses: sessions are not scoped
  * by Mine, so the full list comes in. `configured` is not scoped by anything — it is
