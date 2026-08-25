@@ -4,8 +4,9 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, chmodSync, readFileSync,
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
-  parseWorktrees, matchWorktree, worktreeSlug, listLocalBranches,
+  parseWorktrees, matchWorktree, worktreeSlug, listLocalBranches, listRemoteBranches,
   findExistingTicketWorktree, createTicketWorktree, listPickableWorktrees, resolveWorktreePick,
+  splitRemoteRef, fetchAllRemotes,
 } from "@/server/worktree";
 
 const PORCELAIN = `worktree /code/lime
@@ -83,6 +84,24 @@ function makeRepo(roots: string[]): string {
   // git reports worktree paths with symlinks resolved (e.g. macOS /var -> /private/var);
   // realpath here so string comparisons against git's own output line up.
   return realpathSync(repo);
+}
+
+// A clone of a fresh repo: the pair every remote-base case needs — `upstream` is the server,
+// `clone` is the checkout a launch happens in, with origin/main pointing at whatever it last
+// fetched.
+function makeClone(roots: string[]): { upstream: string; clone: string } {
+  const upstream = makeRepo(roots);
+  const clone = join(upstream, "..", "clone");
+  execFileSync("git", ["clone", upstream, clone], { encoding: "utf8", env: SANDBOX_ENV });
+  configureRepo(clone);
+  return { upstream, clone: realpathSync(clone) };
+}
+
+// A commit on the upstream's main that the clone has not seen yet.
+function commitUpstream(upstream: string, file: string): void {
+  writeFileSync(join(upstream, file), "later\n");
+  git(upstream, ["add", "-A"]);
+  git(upstream, ["commit", "--no-gpg-sign", "-m", `add ${file}`]);
 }
 
 const roots: string[] = [];
@@ -321,5 +340,100 @@ run("resolveWorktreePick", () => {
     git(repo, ["worktree", "add", gone, "-b", "RIC-2-gone"]);
     rmSync(gone, { recursive: true, force: true });
     expect(resolveWorktreePick(repo, gone)).toBeNull();
+  });
+});
+
+describe("splitRemoteRef", () => {
+  const remotes = ["origin", "upstream"];
+  it("splits a remote-tracking name into its remote and branch", () => {
+    expect(splitRemoteRef("origin/main", remotes)).toEqual({ remote: "origin", branch: "main" });
+    expect(splitRemoteRef("upstream/release/2.x", remotes)).toEqual({ remote: "upstream", branch: "release/2.x" });
+  });
+  // `feature/foo` is an ordinary local branch name: only the remote list can tell the two apart.
+  it("answers null for a local branch, however many slashes it has", () => {
+    expect(splitRemoteRef("main", remotes)).toBeNull();
+    expect(splitRemoteRef("feature/foo", remotes)).toBeNull();
+  });
+  it("prefers the longest matching remote name", () => {
+    expect(splitRemoteRef("origin/mirror/main", ["origin", "origin/mirror"]))
+      .toEqual({ remote: "origin/mirror", branch: "main" });
+  });
+  it("answers null when the repo has no remotes at all", () => {
+    expect(splitRemoteRef("origin/main", [])).toBeNull();
+  });
+});
+
+run("listRemoteBranches", () => {
+  it("lists the repo's remote-tracking branches, never origin/HEAD", () => {
+    const { clone } = makeClone(roots);
+    // git clone writes origin/HEAD as a symref onto origin/main: kept, it would offer the
+    // same branch twice under a name that hides which one it is.
+    expect(listRemoteBranches(clone)).toEqual(["origin/main"]);
+  });
+  it("returns an empty list for a repo with no remote", () => {
+    expect(listRemoteBranches(makeRepo(roots))).toEqual([]);
+  });
+  it("returns an empty list when git fails (not a repo)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mojito-wt-notrepo-"));
+    roots.push(dir);
+    expect(listRemoteBranches(dir)).toEqual([]);
+  });
+});
+
+run("fetchAllRemotes", () => {
+  it("brings the remote-tracking refs up to date", async () => {
+    const { upstream, clone } = makeClone(roots);
+    commitUpstream(upstream, "later.txt");
+    const before = git(clone, ["rev-parse", "origin/main"]);
+    await fetchAllRemotes(clone);
+    expect(git(clone, ["rev-parse", "origin/main"])).not.toBe(before);
+    expect(git(clone, ["rev-parse", "origin/main"])).toBe(git(upstream, ["rev-parse", "main"]));
+  });
+  it("throws when the fetch fails, so the action can report it", async () => {
+    const { upstream, clone } = makeClone(roots);
+    rmSync(upstream, { recursive: true, force: true });
+    await expect(fetchAllRemotes(clone)).rejects.toThrow();
+  });
+});
+
+run("createTicketWorktree off a remote base", () => {
+  // The point of offering origin/main at all: the ref is only as fresh as the last fetch, so
+  // a remote base is fetched before the worktree is cut from it.
+  it("fetches the picked remote branch first, so the worktree carries the newest commit", async () => {
+    const { upstream, clone } = makeClone(roots);
+    commitUpstream(upstream, "later.txt");
+    const res = await createTicketWorktree(clone, "RIC-9", "Off origin", "origin/main");
+    expect(existsSync(join(res.cwd, "later.txt"))).toBe(true);
+    // The local main is left where it was — the fetch updates tracking refs, nothing else.
+    expect(existsSync(join(clone, "later.txt"))).toBe(false);
+  });
+
+  it("does not fetch for a local base", async () => {
+    const { upstream, clone } = makeClone(roots);
+    commitUpstream(upstream, "later.txt");
+    const res = await createTicketWorktree(clone, "RIC-9", "Off local", "main");
+    expect(existsSync(join(res.cwd, "later.txt"))).toBe(false);
+    expect(git(clone, ["rev-parse", "origin/main"])).not.toBe(git(upstream, ["rev-parse", "main"]));
+  });
+
+  // Offline, expired credentials, a moved remote: the base is then whatever git already had,
+  // which is still work the user can do — the launch is warned about, never blocked.
+  it("still creates the worktree when the fetch fails, with a warning", async () => {
+    const { upstream, clone } = makeClone(roots);
+    rmSync(upstream, { recursive: true, force: true });
+    const res = await createTicketWorktree(clone, "RIC-9", "Off origin", "origin/main");
+    expect(res.cwd).toBe(join(clone, ".claude", "worktrees", "RIC-9-off-origin"));
+    expect(existsSync(res.cwd)).toBe(true);
+    expect(res.warning).toContain("could not fetch origin/main");
+  });
+
+  // Two independent failures, one warning field: the fetch one used to be the only thing
+  // reported, or got dropped by whichever return happened last.
+  it("reports the fetch warning alongside the setup-script one", async () => {
+    const { upstream, clone } = makeClone(roots);
+    rmSync(upstream, { recursive: true, force: true });
+    const res = await createTicketWorktree(clone, "RIC-9", "Off origin", "origin/main");
+    expect(res.warning).toContain("could not fetch origin/main");
+    expect(res.warning).toContain("init-worktree.sh");
   });
 });

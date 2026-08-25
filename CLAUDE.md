@@ -76,7 +76,28 @@ Mojito owns the whole lifecycle — there is no external plugin:
   (`worktree.ts`). When neither exists, the launch sheet — via
   `GET /api/tickets/[id]/worktree-status` — asks the human whether to create one and from
   which base branch; "no" opens in the repo root and asks again next launch, same as
-  before this existed. Since RIC-243 that question has a third answer, "Existing":
+  before this existed. The base branch list offers the repo's **remote-tracking branches
+  as well as its local ones, remotes first** (`listRemoteBranches` + `baseBranchOptions`),
+  and pre-selects `origin/<default>` (`defaultBaseBranch`) — the local `main` of a
+  checkout Mojito's own sessions work in is routinely behind the server, and a worktree
+  cut from it starts with someone else's merged work missing. Nothing is deduplicated:
+  `main` and `origin/main` are different commits, which is the whole point. `origin/HEAD`
+  is dropped as a duplicate of whatever it points at, matched on `refname:strip=2` because
+  `refname:short` shortens that ref to a bare `origin` that looks like a branch name.
+  Picking a remote base does not by itself make it current — a tracking ref is only as
+  fresh as the last fetch — so `createTicketWorktree` fetches **that one branch** before
+  `worktree add` when the base names a remote (`splitRemoteRef` against `git remote`, so
+  `feature/foo` is not mistaken for one). Best effort, like the setup script: a fetch that
+  fails leaves the worktree branching off the ref git already had, with a warning, and the
+  warning field now joins the several a creation can collect (`worktreeResult`). The sheet
+  also carries an explicit **Fetch** action beside the field
+  (`POST /api/tickets/[id]/worktree-fetch` → `fetchTicketRemotes`, `git fetch --all
+  --prune` and then re-read the status), for the branch created since the sheet opened; it
+  is a POST because it writes refs, where worktree-status stays read-only. A prune can drop
+  the selected ref, so the answer goes through `reconcileBaseBranch` — a select holding a
+  value with no option renders blank and submits whatever it fell back to. The field is a
+  searchable `Combobox` rather than a `Choice` now that the list is roughly twice as long.
+  Since RIC-243 that question has a third answer, "Existing":
   the same endpoint also reports the repo's other worktrees (`listPickableWorktrees`),
   and picking one opens the session there instead of creating anything. The **New
   session** sheet has the same field for a project-scoped session or terminal, fed by

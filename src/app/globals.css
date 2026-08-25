@@ -346,6 +346,15 @@ button.chip:active { transform: scale(.96); }
 .field .lbl { font: 600 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-dim);
   margin-bottom: 6px; display: block; }
 .field select, .field input, .field textarea { width: 100%; }
+/* A field label with an action on its right (the launch sheet's base-branch Fetch). The
+   label's own bottom margin moves to the row, or the button would centre against a box 6px
+   taller than the text and sit visibly high. */
+.lbl-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.lbl-row .lbl { margin-bottom: 0; }
+/* A button carrying an icon *and* a label: .icon is for icon-only controls, so it adds no
+   gap between the two. */
+.btn.with-icon { display: inline-flex; align-items: center; gap: 6px; }
+.btn.with-icon > svg { display: block; }
 .two { display: flex; gap: 10px; }
 .two .field { flex: 1; }
 .toggle { display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--surface-hi);

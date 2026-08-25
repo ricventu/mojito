@@ -104,6 +104,27 @@ export function listLocalBranches(repo: string, run: GitRun = defaultGitRun(repo
   }
 }
 
+// The repo's remote-tracking branches, spelled the way `git worktree add` takes them as a
+// start point (`origin/main`). Offered alongside the local ones because branching off the
+// local `main` is branching off whatever that checkout last pulled, which is routinely
+// behind the server.
+//
+// `origin/HEAD` is dropped: it is a symref onto one of the branches already in the list, so
+// keeping it would offer the same branch twice under a name that hides which one it is. It is
+// matched on `refname:strip=2` and not on `refname:short`, which shortens
+// `refs/remotes/origin/HEAD` all the way down to a bare `origin` — a value that looks like a
+// branch name, sorts first, and is the very ref meant to be filtered out.
+export function listRemoteBranches(repo: string, run: GitRun = defaultGitRun(repo)): string[] {
+  try {
+    return run(["for-each-ref", "--format=%(refname:strip=2)", "refs/remotes/"])
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l && !l.endsWith("/HEAD"));
+  } catch {
+    return [];
+  }
+}
+
 // The ticket's worktree if one already exists — the fixed slugged path Mojito creates,
 // or (compatibility with worktrees a session created on its own before this existed) any
 // worktree whose branch name carries the ticket id, wherever it lives. Never creates.
@@ -153,7 +174,10 @@ function tail(s: string): string {
   return t.length > 300 ? `…${t.slice(-300)}` : t;
 }
 
-function detail(e: unknown): string {
+// The end of a failed git/script run, for a warning a human reads: stderr when the failure
+// carries one, the error message otherwise. Exported because the fetch action reports its
+// own failures the same way (fetchTicketRemotes.ts) and truncation logic copied twice drifts.
+export function gitFailureDetail(e: unknown): string {
   if (e && typeof e === "object" && "stderr" in e && typeof (e as { stderr: unknown }).stderr === "string") {
     return tail((e as { stderr: string }).stderr);
   }
@@ -170,17 +194,95 @@ export interface WorktreeResult {
 
 type AsyncGitRun = (args: string[]) => Promise<string>;
 
+// A `git fetch` crosses the network and a `git worktree add` checks out a whole tree, so
+// neither is instant — but neither may wedge a launch (or the Fetch action's request)
+// forever either.
+const GIT_TIMEOUT_MS = 2 * 60 * 1000;
+
 function defaultAsyncGitRun(repo: string): AsyncGitRun {
-  return async (args) => (await pexecFile("git", args, { cwd: repo, encoding: "utf8" })).stdout;
+  return async (args) => (await pexecFile("git", args, {
+    cwd: repo,
+    encoding: "utf8",
+    timeout: GIT_TIMEOUT_MS,
+    // Not spawnEnv(): git wants the real environment here — SSH_AUTH_SOCK and the
+    // credential helper's config are how a fetch authenticates at all. GIT_TERMINAL_PROMPT
+    // is the one override: there is nothing on this stdin to answer a username prompt with,
+    // so a fetch that needs one has to fail now rather than hang until the timeout.
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+  })).stdout;
+}
+
+/**
+ * The remote a base-branch name belongs to, or null when it names a local branch.
+ *
+ * Split against the repo's actual remotes rather than on the first slash: `feature/foo` is
+ * a perfectly ordinary local branch name, and only `git remote` can say whether the leading
+ * segment is a remote. Longest match first, so a repo with both `origin` and `origin/mirror`
+ * as remote names resolves the more specific one.
+ */
+export function splitRemoteRef(ref: string, remotes: readonly string[]): { remote: string; branch: string } | null {
+  const hit = [...remotes].sort((a, b) => b.length - a.length).find((r) => ref.startsWith(`${r}/`));
+  return hit ? { remote: hit, branch: ref.slice(hit.length + 1) } : null;
+}
+
+/**
+ * Fetches every remote and prunes the tracking refs whose branch is gone, for the launch
+ * sheet's Fetch action: the base-branch list is only as fresh as the last fetch, and pruning
+ * is what stops it offering a branch that no longer exists on the server.
+ *
+ * Throws on failure — unlike the targeted fetch inside createTicketWorktree, this one *is*
+ * the user's request, so its failure is a message and not a footnote.
+ */
+export async function fetchAllRemotes(repo: string, run: AsyncGitRun = defaultAsyncGitRun(repo)): Promise<void> {
+  await run(["fetch", "--all", "--prune"]);
+}
+
+/**
+ * Brings the picked base up to date when it is a remote one, so "off origin/main" means what
+ * it says instead of "off whatever origin/main looked like at the last fetch".
+ *
+ * Targeted rather than `fetch --all`: one branch over the network, and nothing at all when
+ * the pick is local. Best effort — a fetch that fails (offline, expired credentials) leaves
+ * the worktree branching off the ref git already had, with a warning; an unreachable network
+ * is not a reason to refuse to start work.
+ *
+ * `git fetch <remote> <branch>` updates `refs/remotes/<remote>/<branch>` on the way, since
+ * the branch is covered by the remote's configured refspec (git ≥ 1.8.4), so the ref
+ * `worktree add` reads next is the one just fetched.
+ */
+async function fetchBaseBranch(baseBranch: string, run: AsyncGitRun): Promise<string | null> {
+  let remotes: string[];
+  try {
+    remotes = (await run(["remote"])).split("\n").map((l) => l.trim()).filter(Boolean);
+  } catch {
+    // No readable remotes — treat the base as local, exactly as before this existed.
+    return null;
+  }
+  const hit = splitRemoteRef(baseBranch, remotes);
+  if (!hit) return null;
+  try {
+    await run(["fetch", hit.remote, hit.branch]);
+    return null;
+  } catch (e) {
+    return `could not fetch ${baseBranch} — branching off the last fetched state: ${gitFailureDetail(e)}`;
+  }
+}
+
+// One warning field, and a creation can now collect two of them (a stale-base fetch and a
+// failing setup script are independent). Absent rather than empty when there is nothing to
+// say: callers echo the warning as the session's first terminal line.
+function worktreeResult(cwd: string, warnings: readonly string[]): WorktreeResult {
+  return warnings.length ? { cwd, warning: warnings.join(" · ") } : { cwd };
 }
 
 // Generous but bounded: composer/pnpm installs plus a DB migrate can legitimately take
 // several minutes on a cold cache, but a hung script must not wedge a launch forever.
 const SCRIPT_TIMEOUT_MS = 10 * 60 * 1000;
 
-// Creates the ticket's worktree at its fixed slugged path, off baseBranch, and — best
-// effort — runs scripts/init-worktree.sh inside it if the repo has one. Never
-// throws: a failure at either step is reported as a warning, not a blocked launch.
+// Creates the ticket's worktree at its fixed slugged path, off baseBranch — fetching that
+// base first when it is a remote-tracking one — and, best effort, runs
+// scripts/init-worktree.sh inside it if the repo has one. Never throws: a failure at any of
+// the three steps is reported as a warning, not a blocked launch.
 //
 // Both git and the setup script run through async execFile, never execFileSync: the setup
 // script (composer/pnpm install, a DB migrate, ...) can run for minutes, and a sync call
@@ -198,21 +300,27 @@ export async function createTicketWorktree(
 ): Promise<WorktreeResult> {
   const slug = worktreeSlug(ticket, title);
   const path = fixedWorktreePath(repo, ticket, title);
+  const warnings: string[] = [];
+  // Before the add, not after: the point is for `worktree add` to read the ref this refreshed.
+  const stale = await fetchBaseBranch(baseBranch, run);
+  if (stale) warnings.push(stale);
   try {
     await run(["worktree", "add", path, "-b", slug, baseBranch]);
   } catch (e) {
-    return { cwd: repo, warning: `could not create the worktree: ${detail(e)}` };
+    // The fetch warning rides along: a failed fetch is often the reason the base does not
+    // resolve at all (a branch that only ever existed on the remote).
+    return worktreeResult(repo, [...warnings, `could not create the worktree: ${gitFailureDetail(e)}`]);
   }
   const script = join(repo, "scripts", "init-worktree.sh");
   if (!existsSync(script)) {
-    return { cwd: path, warning: "scripts/init-worktree.sh not found — worktree created without setup" };
+    return worktreeResult(path, [...warnings, "scripts/init-worktree.sh not found — worktree created without setup"]);
   }
   try {
     // Never process.env: a setup script's whole job is installing dependencies, and Mojito's
     // own NODE_ENV=production makes that *delete* the worktree's devDependencies (childEnv.ts).
     await pexecFile(script, [], { cwd: path, encoding: "utf8", timeout: scriptTimeoutMs, env: spawnEnv() });
   } catch (e) {
-    return { cwd: path, warning: `scripts/init-worktree.sh failed: ${detail(e)}` };
+    return worktreeResult(path, [...warnings, `scripts/init-worktree.sh failed: ${gitFailureDetail(e)}`]);
   }
-  return { cwd: path };
+  return worktreeResult(path, warnings);
 }

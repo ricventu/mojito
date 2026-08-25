@@ -8,6 +8,7 @@ import type { WorktreeChoice } from "./worktreeOptions";
 export interface WorktreeStatus {
   exists: boolean;
   branches: string[];
+  remoteBranches: string[];
   defaultBranch: string | null;
   worktrees: WorktreeChoice[];
 }
@@ -33,6 +34,52 @@ export interface WorktreeAnswer {
 }
 
 /**
+ * The bases a created worktree can branch off, remote-tracking ones first.
+ *
+ * Remotes lead because they are the answer that is almost always wanted: the local `main`
+ * of a checkout Mojito's own sessions work in is routinely behind the server, and a worktree
+ * branched off it starts with someone else's merged work missing. Nothing is deduplicated —
+ * `main` and `origin/main` are genuinely different commits, which is the entire point.
+ */
+export function baseBranchOptions(status: WorktreeStatus): string[] {
+  return [...status.remoteBranches, ...status.branches];
+}
+
+/**
+ * The base the select opens on: the *remote* default branch when the repo has one
+ * (`origin/main`), the local default otherwise, and failing that whatever the list starts
+ * with — an empty string only when there is nothing at all to offer.
+ *
+ * The remote's name for the default branch comes from the local one (detectDefaultBranch
+ * answers a bare `main`), matched by tail against the remote list rather than by assuming
+ * `origin`: a repo whose only remote is `upstream` still gets a remote default.
+ */
+export function defaultBaseBranch(status: WorktreeStatus): string {
+  const def = status.defaultBranch;
+  if (def) {
+    const remote = status.remoteBranches.find((b) => b === `origin/${def}`)
+      ?? status.remoteBranches.find((b) => b.endsWith(`/${def}`));
+    if (remote) return remote;
+    if (status.branches.includes(def)) return def;
+  }
+  return baseBranchOptions(status)[0] ?? "";
+}
+
+/**
+ * The answer to keep after a Fetch refreshed the status: the same one, unless the base it
+ * names is no longer on offer (the fetch pruned a remote-tracking ref whose branch was
+ * deleted on the server), in which case it falls back to the default.
+ *
+ * A value with no matching option is not a harmless leftover — the select renders blank and
+ * submits the branch nobody chose (the same trap knownProject exists for).
+ */
+export function reconcileBaseBranch(answer: WorktreeAnswer | null, status: WorktreeStatus): WorktreeAnswer | null {
+  if (answer?.kind !== "create") return answer;
+  if (baseBranchOptions(status).includes(answer.baseBranch)) return answer;
+  return { ...answer, baseBranch: defaultBaseBranch(status) };
+}
+
+/**
  * Whether the "open an existing one" answer is worth offering: only when the repo has a
  * worktree to open. A button that leads to an empty select is worse than no button.
  */
@@ -49,7 +96,7 @@ export function canPickWorktree(status: WorktreeStatus): boolean {
  */
 export function worktreeAnswer(kind: WorktreeAnswerKind, status: WorktreeStatus): WorktreeAnswer {
   if (kind === "create") {
-    return { kind, baseBranch: status.defaultBranch ?? status.branches[0] ?? "", worktree: "" };
+    return { kind, baseBranch: defaultBaseBranch(status), worktree: "" };
   }
   if (kind === "pick") {
     return { kind, baseBranch: "", worktree: status.worktrees[0]?.path ?? "" };

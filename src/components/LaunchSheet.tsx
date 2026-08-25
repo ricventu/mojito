@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { RotateCw } from "lucide-react";
 import { apiFetch } from "@/lib/client";
 import { apiError } from "@/lib/apiError";
 import { resolveEffort, resolveModel, MODELS, EFFORTS } from "@/lib/stageDefaults";
@@ -10,7 +11,10 @@ import TicketLink from "./TicketLink";
 import { Choice } from "./ui/choice";
 import { Combobox } from "./ui/combobox";
 import { worktreeOptions } from "@/lib/worktreeOptions";
-import { canPickWorktree, launchWorktreeFields, worktreeAnswer, type WorktreeAnswer, type WorktreeStatus } from "@/lib/worktreeChoice";
+import {
+  baseBranchOptions, canPickWorktree, launchWorktreeFields, reconcileBaseBranch, worktreeAnswer,
+  type WorktreeAnswer, type WorktreeStatus,
+} from "@/lib/worktreeChoice";
 import QaVerdictButtons from "./QaVerdictButtons";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 import { holdsSheetOpen, type HeldOutcome } from "@/lib/verdictOutcome";
@@ -22,6 +26,35 @@ import { isActiveSession } from "@/lib/activeSession";
 // Shared by all three launch handlers: the only part of their shape that would drift if
 // copied. A thrown fetch is the case that used to show the user nothing at all.
 const LAUNCH_FAILED = "launch request failed — check the connection and retry";
+
+// "There is nothing to ask": what an unreachable or unreadable worktree check degrades to,
+// which is the behaviour from before the question existed — launch in whatever cwd the
+// server resolves, create nothing.
+const NO_QUESTION: WorktreeStatus =
+  { exists: true, branches: [], remoteBranches: [], defaultBranch: null, worktrees: [] };
+
+// Every list is normalized rather than trusted: a server that predates one of these fields
+// answers without it, and an absent list means exactly what an empty one does to the sheet
+// ("nothing to offer"), where an undefined one would throw inside the selects.
+function parseWorktreeStatus(data: unknown): WorktreeStatus {
+  const d = data as Partial<WorktreeStatus> | null;
+  if (!d || typeof d.exists !== "boolean") return NO_QUESTION;
+  return {
+    exists: d.exists,
+    branches: Array.isArray(d.branches) ? d.branches : [],
+    remoteBranches: Array.isArray(d.remoteBranches) ? d.remoteBranches : [],
+    defaultBranch: typeof d.defaultBranch === "string" ? d.defaultBranch : null,
+    worktrees: Array.isArray(d.worktrees) ? d.worktrees : [],
+  };
+}
+
+// The two worktree endpoints take the same pair, and the title is what locates the ticket's
+// own worktree by its slugged path — an omitted one looks like a different worktree.
+function worktreeQuery(ticket: TicketSummary): string {
+  const qs = new URLSearchParams({ title: ticket.title ?? "" });
+  if (ticket.project) qs.set("projectName", ticket.project);
+  return qs.toString();
+}
 
 export default function LaunchSheet(
   { token, ticket, sessions, onClose, onLaunched, onOpen, onOpenDocs }:
@@ -58,19 +91,12 @@ export default function LaunchSheet(
     setWtAnswer(null);
     (async () => {
       try {
-        const qs = new URLSearchParams({ title: ticket.title ?? "" });
-        if (ticket.project) qs.set("projectName", ticket.project);
-        const res = await apiFetch(token, `/api/tickets/${ticket.identifier}/worktree-status?${qs}`);
+        const res = await apiFetch(token, `/api/tickets/${ticket.identifier}/worktree-status?${worktreeQuery(ticket)}`);
         const data = res.ok ? await res.json() : null;
-        // A server that predates the worktrees field answers without it; an absent list is
-        // "nothing to pick", which is exactly what an empty one means to the sheet.
-        const status: WorktreeStatus = data && typeof data.exists === "boolean"
-          ? { ...data, worktrees: Array.isArray(data.worktrees) ? data.worktrees : [] }
-          : { exists: true, branches: [], defaultBranch: null, worktrees: [] };
-        if (live) setWtStatus(status);
+        if (live) setWtStatus(parseWorktreeStatus(data));
       } catch {
         // Unreachable check degrades to "exists" — skip the question, same as before it existed.
-        if (live) setWtStatus({ exists: true, branches: [], defaultBranch: null, worktrees: [] });
+        if (live) setWtStatus(NO_QUESTION);
       }
     })();
     return () => { live = false; };
@@ -108,6 +134,7 @@ export default function LaunchSheet(
   // list to refetch — the ticket prop is a snapshot taken when the sheet opened.
   const [mine, setMine] = useState(ticket.assignedToMe);
   const [assigning, setAssigning] = useState(false);
+  const [fetching, setFetching] = useState(false);
   const existingId = tmuxName(ticket.identifier, ticket.statusName);
   const existing = sessions.find((s) => s.id === existingId);
   // The single active-state definition, not a fourth hand-copied list of states.
@@ -142,6 +169,30 @@ export default function LaunchSheet(
       setErr("verdict request failed — check the connection and retry");
     } finally {
       setVerdictPending(null);
+    }
+  };
+
+  // Refresh the remote-tracking refs and the list built from them, for the case the base
+  // branch select cannot fix by itself: `origin/main` is only as new as the last fetch, so a
+  // pick made without this branches off a base that merely looks current. The answer replaces
+  // the whole status — a fetch can also reveal a branch created since the sheet opened — and
+  // the answer's own warning is shown beside the list, which stays usable either way.
+  const fetchRemotes = async () => {
+    setErr(null);
+    setFetching(true);
+    try {
+      const res = await apiFetch(token, `/api/tickets/${ticket.identifier}/worktree-fetch?${worktreeQuery(ticket)}`,
+        { method: "POST" });
+      if (!res.ok) { setErr(await apiError(res, "fetch failed")); return; }
+      const body = await res.json();
+      const next = parseWorktreeStatus(body?.status);
+      setWtStatus(next);
+      setWtAnswer((a) => reconcileBaseBranch(a, next));
+      if (body?.warning) setErr(String(body.warning));
+    } catch {
+      setErr("fetch request failed — check the connection and retry");
+    } finally {
+      setFetching(false);
     }
   };
 
@@ -293,9 +344,26 @@ export default function LaunchSheet(
       </div>
     </div>
   ) : null;
+  // Searchable rather than a Choice: with the remote-tracking branches in it the list is
+  // roughly twice as long as the repo has branches, well past what a plain menu is scannable
+  // at. Remote refs read as `origin/main` next to a bare `main`, so nothing labels them.
   const baseBranchSelect = wtAnswer?.kind === "create" && wtStatus !== "loading" ? (
-    <div className="field" style={{ marginTop: 12 }}><span className="lbl">Base branch</span>
-      <Choice label="Base branch" value={wtAnswer.baseBranch} options={wtStatus.branches}
+    <div className="field" style={{ marginTop: 12 }}>
+      <div className="lbl-row">
+        <span className="lbl">Base branch</span>
+        {/* Offered only when there is a remote-tracking branch to refresh: on a repo with no
+            remote a fetch has nothing to do, and the action would just be noise. */}
+        {wtStatus.remoteBranches.length > 0 && (
+          <button className="btn sm ghost with-icon" onClick={fetchRemotes} disabled={fetching}
+            title="Fetch the remotes, so a remote base is the current one">
+            <RotateCw size={13} aria-hidden="true" />
+            {fetching ? "Fetching…" : "Fetch"}
+          </button>
+        )}
+      </div>
+      <Combobox label="Base branch" searchLabel="Search branches…" emptyLabel="No branch matches."
+        options={baseBranchOptions(wtStatus).map((b) => ({ value: b, label: b }))}
+        value={wtAnswer.baseBranch}
         onChange={(v) => setWtAnswer({ kind: "create", baseBranch: v, worktree: "" })} />
     </div>
   ) : null;
