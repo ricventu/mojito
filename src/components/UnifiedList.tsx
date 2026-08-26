@@ -6,7 +6,7 @@ import LaunchSheet from "./LaunchSheet";
 import NewSessionSheet from "./NewSessionSheet";
 import FilterBar from "./FilterBar";
 import ActiveFilters from "./ActiveFilters";
-import { activeFilters, type FilterKey } from "@/lib/activeFilters";
+import { activeFilters, removeFilter, type ActiveFilter } from "@/lib/activeFilters";
 import { NO_FILTERS, type ListFilters } from "@/lib/appLocation";
 import TicketCard from "./TicketCard";
 import SessionCard from "./SessionCard";
@@ -107,19 +107,9 @@ export default function UnifiedList(
     [query, project, status, mine, sessionsOnly],
   );
 
-  const clearFilter = (key: FilterKey) => {
-    // A Record rather than a switch: TypeScript requires every FilterKey to have an
-    // entry, so a new filter fails to compile here instead of silently no-op'ing when
-    // its chip is tapped.
-    const clear: Record<FilterKey, () => void> = {
-      query: () => setFilter("query", ""),
-      project: () => setProject([]),
-      status: () => setStatus(null),
-      mine: () => setMine(false),
-      sessions: () => setSessionsOnly(false),
-    };
-    clear[key]();
-  };
+  // One entry, not one setter per key: which values a chip drops is removeFilter's,
+  // and a project chip drops only its own project (RIC-252) rather than the selection.
+  const clearFilter = (chip: ActiveFilter) => onFilters(removeFilter(filters, chip), "push");
 
   // One call, not five setters: each would be its own history entry, leaving Back to
   // walk the filters on again one at a time.

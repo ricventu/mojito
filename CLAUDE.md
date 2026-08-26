@@ -438,9 +438,17 @@ Mojito owns the whole lifecycle — there is no external plugin:
   projects.json, which a horizontally scrolling row cannot show, and "these two
   projects" is a state chips cannot express at all. So `ListFilters.project` is a
   `string[]` where `[]` means every project — `filterTickets`/`filterSessions` treat a
-  non-empty set as OR — and `activeFilters` reports the whole set as one chip, since
-  removing one project is what the select itself is for and a per-project clear would need
-  `FilterKey` to carry a value. The status chips stay chips: five values that never grow.
+  non-empty set as OR — and `activeFilters` reports **one chip per selected project**
+  (RIC-252), each carrying its name as the entry's `value` so its ✕ drops only that one.
+  It used to be a single chip listing them all, on the grounds that the select two rows
+  up is where an individual project comes back off; but the chip's ✕ is the only removal
+  the sticky bar offers, and it took the whole selection with it — so the way back to one
+  project was to reopen the select and untick, which reads as the bar refusing to undo
+  what it reports. Clear all still drops the lot, and now shows for two selected projects
+  since it is no longer what a single chip's ✕ already does. Which values a chip drops is
+  the pure `removeFilter(filters, chip)`, not a Record of setters in `UnifiedList` — the
+  rule is testable in the node-only setup that way, and one `onFilters` call keeps a
+  removal to one history entry. The status chips stay chips: five values that never grow.
   The select's place in the toolbar is the top row, beside the three actions
   (RIC-226): the toolbar reads project select + `+ Ticket`/`+ Session`/`Clean up`,
   then the status chips, then the text field, then the sticky active-filter badges.
