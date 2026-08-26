@@ -7,6 +7,13 @@ SHELL := /bin/bash
 # otherwise every physical line runs in its own shell and variables set on one
 # line are gone on the next. The `=` (recursive) snippet vars below keep their
 # `$$` until they are expanded into a recipe, so they compose correctly.
+#
+# `.SHELLFLAGS` landed in 3.82 as well, so it is likewise ignored there: on macOS
+# these recipes run under a plain `/bin/bash -c` with NO `-e`, and a command that
+# fails mid-recipe is walked straight past with the target still reporting success.
+# Do not trust `-e` in a recipe that has to run on the Mac — check the exit status
+# yourself, as `https` does. (It does apply on the Linux box, whose make is newer,
+# which is why `restart` can lean on it.)
 
 # Load .env.local, then resolve port (default 4711) and token.
 LOAD_ENV = set -a; { [ -f .env.local ] && . ./.env.local; } || true; set +a; PORT="$${MOJITO_PORT:-4711}"; TOKEN="$${MOJITO_TOKEN:-}"
@@ -38,6 +45,8 @@ help:
 	@echo "  make start    dev server (Mac kept awake), prints every URL: local, Wi-Fi, Tailscale"
 	@echo "  make prod     next build, then serve it under a health supervisor (no rebuild on change)"
 	@echo "  make restart  prod deploy: next build, then restart $(SERVICE) (systemd --user) + health check"
+	@echo "  make https    put Mojito behind the Tailscale HTTPS hostname (needed to install it in Chrome)"
+	@echo "  make https-off  tear that down again"
 
 ## start: dev server, Mac kept awake via caffeinate; prints every reachable URL
 ## (local, Wi-Fi/LAN, and — when the tailnet is up — the Tailscale direct IP, which
@@ -83,4 +92,43 @@ restart:
 	echo "WARN: no HTTP 200 after 30s — check: journalctl --user -u $(SERVICE) -e" >&2; \
 	exit 1
 
-.PHONY: help start prod restart
+## https: front Mojito with Tailscale Serve, i.e. an https://<host>.<tailnet>.ts.net
+## URL with a real Let's Encrypt certificate. Needed to *install* Mojito as an app in
+## Chrome or on Android: Chromium only offers "Install" on a secure origin, and
+## server.ts speaks plain http (localhost is the one http origin browsers trust, which
+## is why installing works on the Mac already and nowhere else). Safari needs none of
+## this — iOS "Add to Home Screen" and macOS "Add to Dock" work off the http URL.
+##
+## Runs in the background (--bg) and persists across reboots, so this is a one-time
+## setup rather than something to run beside `make start`. The plain http URLs keep
+## working: Serve adds a front door, it does not close the others. SHOW_URLS already
+## prints the resulting hostname, so this ends by re-printing the banner.
+## The `if !` is not stylistic: `.SHELLFLAGS` is ignored by the make that ships with
+## macOS (see the header note), so `-e` is not in effect here and a failing
+## `tailscale serve` would otherwise be walked straight past — printing a banner with
+## no Serve URL in it under a line telling you to go open the Serve URL. Which is
+## exactly what it did before this check; a stopped tailnet is the common case.
+https:
+	@$(LOAD_ENV); \
+	echo "==> tailscale serve --bg $$PORT"; \
+	if ! tailscale serve --bg "$$PORT"; then \
+		echo "" >&2; \
+		echo "  Could not hand Mojito to Tailscale Serve. If the line above says the" >&2; \
+		echo "  tailnet is stopped, run \`tailscale up\` and try again; if it asks for" >&2; \
+		echo "  HTTPS certificates, enable them for the tailnet in the admin console." >&2; \
+		echo "" >&2; \
+		exit 1; \
+	fi; \
+	$(SHOW_URLS); \
+	echo "  Open the Tailscale Serve URL to get Chrome's install prompt."; \
+	echo ""
+
+## https-off: drop the Serve front door (the http URLs are unaffected). Note this
+## resets *all* serve config for this node, not only Mojito's — `tailscale serve
+## reset` has no per-target form.
+https-off:
+	@echo "==> tailscale serve reset"; \
+	tailscale serve reset; \
+	echo "OK — Tailscale Serve is off; the http URLs still work."
+
+.PHONY: help start prod restart https https-off

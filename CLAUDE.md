@@ -494,6 +494,37 @@ Mojito owns the whole lifecycle — there is no external plugin:
   not icons — no lucide glyph spells "Esc" — and Warp/VS Code's `>_` / `</>`
   (see **Terminal header**). Prose in comments may still name a glyph; markup
   must not.
+- **Installable app (PWA)**: `public/manifest.webmanifest` plus the `appleWebApp` and
+  `icons` metadata in `src/app/layout.tsx`. The whole subject is governed by one fact:
+  **Chromium only offers "Install" on a secure origin, and `server.ts` speaks plain
+  http** (RIC-250). So the browsers split in two. Safari needs nothing — iOS "Add to
+  Home Screen" and macOS "Add to Dock" both work off the http URL, which is why the
+  installed-standalone safe-area handling in `globals.css` predates this ticket and
+  was already observable. Chromium installs only on `localhost` (the one http origin
+  browsers trust) unless you front the server with TLS, which `make https` does via
+  `tailscale serve --bg $PORT` — a real Let's Encrypt certificate, because an origin
+  with a *certificate error* is not secure either and a self-signed listener inside
+  `server.ts` would install nothing. Nothing about the transport changed; Serve adds
+  a front door beside the http ones. What the manifest actually needed was the second
+  icon size: Chromium wants a 192 **and** a 512 and only had the 192, which is why
+  desktop Chrome offered nothing even on localhost. Icons all come from
+  `public/icon.svg` via `scripts/gen-icons.sh` — the drawing is inside the 80%
+  maskable safe circle so one file serves `purpose: "any maskable"` rather than
+  needing a padded second copy, and the script **lints the SVG first** because
+  `qlmanage` answers malformed XML with WebKit's error page and will rasterize *that*
+  into a perfectly valid PNG of red error text, exit code 0. `public/sw.js` stays a
+  deliberate no-op with no fetch handler: Chromium dropped the service-worker clause
+  from its criteria, an offline cache is meaningless for a client of a same-machine
+  server, and a cached shell would fight "Pull & deploy". It is not deleted only
+  because an installed worker outlives the file that installed it. Two consequences
+  to know: the token gate shows up once per install (`start_url` is `/` and carries
+  no token, and an installed app need not share `localStorage` with the browser —
+  iOS gives home-screen apps their own container), and Next 16 emits the standardized
+  `mobile-web-app-capable`, not the apple-prefixed tag, which costs nothing since iOS
+  takes standalone from the manifest's own `display`.
+  `tests/client/manifest.test.ts` asserts Chromium's criteria over the real file
+  including that every icon `src` exists on disk — the failure mode with no other
+  symptom is a renamed icon, which silently un-installs the app.
 - **Projects map**: `~/.config/mojito/projects.json` (Linear team key → project name →
   repo path), resolved by `resolveProjectsPath` in `src/server/config.ts`: env
   `MOJITO_PROJECTS` → `~/.config/mojito/projects.json`.
@@ -554,6 +585,17 @@ Mojito owns the whole lifecycle — there is no external plugin:
   coalesces a `start` on an active unit, `triggerRebuild()` coalesces a second SIGUSR2.
   `make start` (dev server + `scripts/dev-supervisor.sh`, HMR, `tsx watch`) is the
   other option and is unchanged.
+- **The Makefile has no `set -e` on macOS.** It declares
+  `.SHELLFLAGS := -eu -o pipefail -c`, and macOS ships **GNU Make 3.81**, which
+  predates `.SHELLFLAGS` (3.82) and ignores it outright — the same version gap the
+  file's header already notes for `.ONESHELL:`. So every recipe there runs under a
+  plain `bash -c`: a command that fails mid-recipe is stepped straight over and the
+  target still exits 0. Found the hard way in RIC-250, where `make https` printed
+  "Open the Tailscale Serve URL" under a banner containing no such URL because
+  `tailscale serve` had exited 1 against a stopped tailnet. Check the status yourself
+  in anything that has to run on the Mac (`if ! cmd; then … exit 1; fi`, as `https`
+  does). `restart` may keep leaning on `-e` — it is the Linux box's path, and that
+  make is new enough.
 - **xterm 6**: a clean bump. Nothing Mojito uses was touched by the 6.0 removals
   (`windowsMode`, `fastScrollModifier`, the canvas renderer, `overviewRulerWidth`), and
   the viewport/scrollbar rewrite is invisible here because `globals.css` only ever

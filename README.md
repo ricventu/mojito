@@ -36,6 +36,44 @@ Config lives in `.env.local`:
 
 Tests: `npx tsc --noEmit && npx vitest run`.
 
+## Install it as an app
+
+Mojito is a PWA, so it can be installed to a home screen or a dock and run without
+browser chrome. What you have to do first depends entirely on the browser, because
+**Chromium only offers "Install" on a secure origin** and `server.ts` speaks plain
+http:
+
+| Browser | What to do |
+| --- | --- |
+| **Safari, iOS** | Open any of the URLs above → Share → *Add to Home Screen*. Works over http. |
+| **Safari, macOS** | Open any of the URLs above → Share → *Add to Dock*. Works over http. |
+| **Chrome/Edge, on this Mac** | Open the **Local** URL. `localhost` is the one http origin browsers trust, so the install button is already in the address bar. |
+| **Chrome/Edge/Android, anywhere else** | Needs HTTPS — run `make https` once, then open the **Tailscale Serve** URL. |
+
+```bash
+make https      # tailscale serve --bg $PORT  →  https://<host>.<tailnet>.ts.net
+make https-off  # tear it down again
+```
+
+`make https` is a one-time setup: Tailscale Serve runs in the background, survives
+reboots, and terminates TLS with a real Let's Encrypt certificate, so there is no
+certificate warning to click through — which matters, because a browser does *not*
+treat an origin with a certificate error as secure and would refuse to install
+anyway. It adds a front door without closing any: the http URLs keep working.
+
+Two things worth knowing once installed:
+
+- **The token is per-install.** `start_url` is `/` and carries no token, and an
+  installed app does not necessarily share `localStorage` with the browser you
+  installed it from (iOS gives home-screen apps their own container). Expect the
+  token gate once on first launch; it is remembered from then on.
+- **Serve is also a secure context**, which is the one thing that would let the
+  phone use `navigator.clipboard`. Mojito does not currently take advantage of
+  that — the terminal's copy path is still the accessory bar's text view.
+
+The icons come from `public/icon.svg`; run `scripts/gen-icons.sh` after editing it to
+re-cut the PNGs.
+
 ## Remote access over Tailscale
 
 To open Mojito from your phone on any network, use the **Tailscale** URL printed by

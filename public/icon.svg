@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Mojito">
+  <!-- Source of truth for every app icon; scripts/gen-icons.sh rasterizes the PNGs
+       from this file. Flat fills only, no gradients, no strokes and no text: it has
+       to survive being drawn at 40px on a home screen, and it is also handed to
+       desktop Chrome as-is (the `sizes: "any"` manifest entry).
+
+       Geometry: a lime slice seen cut-face-on, centred on 256,256 of a 512 canvas.
+       The rind's outer radius is 196, i.e. 76.5% of the canvas, which is inside the
+       80% safe circle Android's launcher masks a `maskable` icon down to. That is
+       what lets one drawing serve `purpose: "any maskable"` instead of needing a
+       second, padded copy. Move it outward and Android starts clipping the ribs.
+
+       Colours are the app's own tokens from globals.css: the ground is bg, the
+       flesh is accent, and the rind is a deeper lime so the ring still separates
+       from the flesh at small sizes (at 60px the two read as one flat disc when
+       they share a value).
+
+       The eight segment paths are generated geometry, not hand-drawn: each spans
+       45 degrees less a 2.2 degree gap per side, running from a 15px central core
+       out to r=164. Editing them by hand is a mistake; regenerate instead.
+
+       Careful with this comment: XML forbids a double hyphen inside one, so the
+       token names above are spelled bare rather than with their CSS prefix. A
+       stray one makes WebKit render an error page, and qlmanage will happily
+       rasterize *that* into an icon — which is why gen-icons.sh lints first. -->
+  <rect width="512" height="512" fill="#0d0f11" />
+  <circle cx="256" cy="256" r="196" fill="#3fbf6d" />
+  <circle cx="256" cy="256" r="170" fill="#0d0f11" />
+  <g fill="#5ce08a">
+    <path d="M271 256.6 L419.9 262.3 A164 164 0 0 1 376.3 367.4 L267 266.2 A15 15 0 0 0 271 256.6Z" />
+    <path d="M266.2 267 L367.4 376.3 A164 164 0 0 1 262.3 419.9 L256.6 271 A15 15 0 0 0 266.2 267Z" />
+    <path d="M255.4 271 L249.7 419.9 A164 164 0 0 1 144.6 376.3 L245.8 267 A15 15 0 0 0 255.4 271Z" />
+    <path d="M245 266.2 L135.7 367.4 A164 164 0 0 1 92.1 262.3 L241 256.6 A15 15 0 0 0 245 266.2Z" />
+    <path d="M241 255.4 L92.1 249.7 A164 164 0 0 1 135.7 144.6 L245 245.8 A15 15 0 0 0 241 255.4Z" />
+    <path d="M245.8 245 L144.6 135.7 A164 164 0 0 1 249.7 92.1 L255.4 241 A15 15 0 0 0 245.8 245Z" />
+    <path d="M256.6 241 L262.3 92.1 A164 164 0 0 1 367.4 135.7 L266.2 245 A15 15 0 0 0 256.6 241Z" />
+    <path d="M267 245.8 L376.3 144.6 A164 164 0 0 1 419.9 249.7 L271 255.4 A15 15 0 0 0 267 245.8Z" />
+  </g>
+</svg>
