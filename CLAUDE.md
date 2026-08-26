@@ -133,7 +133,12 @@ Mojito owns the whole lifecycle — there is no external plugin:
   tells the session, not what Mojito does before spawning it). If the repo has
   `scripts/init-worktree.sh`, Mojito runs it once inside the fresh worktree; if not,
   or if either step fails, the launch is never blocked — a warning is echoed as the first
-  line of the session's own terminal instead. A project's Stacks panel has a "Create
+  line of the session's own terminal instead. **Mojito's own repo has had one since
+  RIC-240** (`pnpm install`, then the pty perms fix): before pnpm a per-worktree
+  `node_modules` was a ~520 MB copy nobody would pay for automatically, so every
+  worktree arrived empty and each session populated it by hand as its first act.
+  It deliberately does not copy `.env.local` in — keeping `LINEAR_API_KEY` and
+  `MOJITO_TOKEN` out of spawned sessions is the whole point of RIC-207. A project's Stacks panel has a "Create
   worktree script" action that opens a plain Claude session in the project root to write
   that script.
 - **Session context**: the launcher writes `<stateDir>/context/<id>.json`
@@ -199,8 +204,14 @@ Mojito owns the whole lifecycle — there is no external plugin:
   block and prefixes PATH with Mojito's own `node_modules/.bin` chain, and `loadEnvConfig`
   then layers `.env.local` (`LINEAR_API_KEY`, `MOJITO_TOKEN`) on top. All of it used to
   reach the shell of every agent session (RIC-207), where the damage is silent and
-  destructive rather than cosmetic: under `NODE_ENV=production` a bare `pnpm install`
-  *deletes* a workspace's already-installed devDependencies and exits 0. Two layers, both
+  destructive rather than cosmetic: under `NODE_ENV=production` a bare `npm install`
+  *deletes* a workspace's already-installed devDependencies and exits 0 — measured again
+  on npm 11 in RIC-240, where it took typescript, tsx and vitest out of a tree that had
+  them. Note the one thing that measurement *changed*: **pnpm 11 does not do this.** A
+  bare `pnpm install` keeps devDependencies whatever `NODE_ENV` says; only an explicit
+  `--prod` strips them. That makes the scrubbing belt-and-braces for Mojito's own repo
+  and no less necessary in general — a session works in whatever repo it is pointed at,
+  on whatever package manager and version that repo pins. Two layers, both
   needed — the sanitized `env` on the spawn covers a tmux server Mojito itself starts, and
   `tmuxEnvArgs` adds session-scoped `-e` overrides for what a *pre-existing* tmux server
   still leaks globally (that server outlives Mojito and hands its global environment to
@@ -531,6 +542,45 @@ Mojito owns the whole lifecycle — there is no external plugin:
 
 ## Toolchain
 
+- **pnpm, not npm** (RIC-240). One lockfile, `pnpm-lock.yaml`; `package-lock.json` is
+  deleted *and* gitignored, because Turbopack picks the project root by finding a
+  lockfile and two of them is a coin flip. `packageManager` in `package.json` pins the
+  exact pnpm, which corepack then enforces. What bought the migration is worktrees:
+  Mojito makes one per ticket and each wants its own `node_modules`, which under npm was
+  ~520 MB and minutes of install — ~4 GB across the eight worktrees on the machine when
+  this was measured. Under pnpm three full installs that `du` reports as **1.6 GB** cost
+  **31 MB** of real disk and ~3s each, which is what makes `scripts/init-worktree.sh`
+  worth running automatically.
+  **The mechanism is not hard links, and that matters.** On APFS pnpm clones (`clonefile`)
+  rather than links: blocks are shared copy-on-write, but every checkout gets its own
+  **inode**. So `du` and `stat` both lie about the saving — measure it as free-space delta
+  across an install, never with `du` — and, the useful half, a `chmod` in one checkout
+  does *not* reach the store or its siblings. That is what settles `fix-pty-perms`, the
+  one thing this migration was expected to change the semantics of: it does not. The
+  chmod is as local under pnpm as it was under npm (verified: store and sibling installs
+  stayed 644 while one went 755), and it is still *needed* — pnpm leaves node-pty's
+  `spawn-helper` mode 644 exactly as npm did. It moved to `scripts/fix-pty-perms.sh` so
+  that `predev`, `prestart` and `init-worktree.sh` can all reach it without one package
+  manager shelling out to another. On a filesystem with no `clonefile` (ext4 on the Linux
+  box) pnpm falls back to real hard links and the chmod *would* be global — harmless there
+  only because the glob matches darwin/win32 prebuilds, which nothing on Linux executes.
+  The whole space argument rests on store and worktrees sharing a **volume**; they do
+  (`~/Library/pnpm/store` and `~/code/…`, same `/dev/disk3s5`). Re-check with `stat -f %d`
+  on both before trusting any of the numbers above on another machine.
+  Two settings in `pnpm-workspace.yaml` are load-bearing and both fail *silently*:
+  `allowBuilds` (pnpm 10+ skips install scripts unless the package is named — no
+  `node-pty` means no pty binding at all, no `esbuild` means tsx cannot run `server.ts`
+  or one test; `allowBuilds` is pnpm 11's name for pnpm 10's `onlyBuiltDependencies`,
+  and it is an object, not a list), and `enablePrePostScripts: true`, since `predev`/
+  `prestart` are the only thing putting the +x back and pnpm's default for that has
+  moved between majors. `tests/repo/packaging.test.ts` fails if any of it regresses.
+  **Still to do by hand, off this repo:** the Linux box's `mojito-deploy.service` runs
+  `npm ci`, which has no lockfile to read any more — change it to
+  `pnpm install --frozen-lockfile`. Nothing in the repo can do that or notice it is
+  wrong; the symptom is a deploy that fails at the install step.
+  Rollback, if it ever comes to that, is `git revert`, `npm install`, and putting
+  `npm run dev` back in `scripts/dev-supervisor.sh` — no data migration, nothing outside
+  `node_modules`.
 - **Next 16 + Turbopack** (RIC-227): `next build` and the custom dev server both run on
   Turbopack, Next 16's default. Getting there cost the repo's ESM-style `.js` import
   specifiers in `src/server/**` (`from "./config.js"` → `from "./config"`, 87 of them):
@@ -550,7 +600,7 @@ Mojito owns the whole lifecycle — there is no external plugin:
   renders (it is server HTML) but its Save button is inert, so it looks like the token
   is being rejected rather than like the app never booted. `allowedDevOrigins: ['<lan-ip>']`
   in `next.config.mjs` lifts it, but for anything performance-related use
-  `npm run build && npm start` instead — production has no such restriction, and a dev
+  `pnpm build && pnpm start` instead — production has no such restriction, and a dev
   build's rendering is not what you want to benchmark anyway.
 - Two Next 16 behaviours worth knowing: `next dev` writes to `.next/dev` (covered by the
   `.next/` ignore) and takes a **lockfile** there, so only one dev server per checkout —
@@ -566,7 +616,7 @@ Mojito owns the whole lifecycle — there is no external plugin:
   in, so "someone saved a file" is not a deploy trigger. A source change goes live
   only when asked — SIGUSR2 to the pid in `.prod-supervisor.pid`, which is what the
   "Pull & deploy" button sends (`src/server/selfUpdate.ts`). That cycle is
-  `npm install` → stop → build → start, every time: the install is unconditional
+  `pnpm install` → stop → build → start, every time: the install is unconditional
   because a pull can bring a lockfile change and nothing in the supervisor watches for
   one, and on an unchanged tree it costs seconds — cheap next to serving a build whose
   dependencies are missing. Conditioning it was tried and dropped: neither "the manifests
@@ -574,7 +624,7 @@ Mojito owns the whole lifecycle — there is no external plugin:
   machinery when the answer is almost always yes and a needless install costs seconds.
   The install runs with the old server still up (a lockfile the registry cannot satisfy
   therefore aborts the cycle with the current build still live), and it is the only step
-  the watchdog is held off for, since npm rewriting `node_modules` under the live server
+  the watchdog is held off for, since pnpm rewriting `node_modules` under the live server
   can make it briefly unhealthy and a restart there is pure harm. A **typecheck** step
   used to precede the stop, to spend a doomed deploy's failure before the downtime rather
   than after; it is gone — `next build` type-checks anyway, so it bought ordering, not
@@ -628,8 +678,12 @@ Mojito owns the whole lifecycle — there is no external plugin:
 
 ## Tests
 
-`npx tsc --noEmit && npx vitest run` — server logic lives under `src/server/`, tests under
-`tests/server/`. The tmux integration test is skipped when `tmux` is unavailable.
+`pnpm typecheck && pnpm test` — server logic lives under `src/server/`, tests under
+`tests/server/`. The tmux integration test is skipped when `tmux` is unavailable, and is
+the one file in the suite that is occasionally flaky under parallel load (it drives a real
+tmux server); re-run it alone before believing it. `tests/repo/packaging.test.ts` guards
+the packaging itself — one lockfile, the two `allowBuilds` entries, the pre/post-script
+setting, and that no script shells out to another package manager.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

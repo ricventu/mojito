@@ -36,11 +36,17 @@ describe("isSelfUpdateEnabled", () => {
   });
 });
 
+// Every case here passes its own signal function. Left to the default, `runSelfUpdate`
+// calls the real `signalProdSupervisor`, which reads `.prod-supervisor.pid` from the
+// cwd — so the test passed only in a checkout that happened to have `make prod`
+// running, and failed in every worktree. Worse in the passing case than in the failing
+// one: it sends a live SIGUSR2, i.e. running the suite deployed the server.
 describe("runSelfUpdate single-flight", () => {
   it("shares one in-flight pull between concurrent callers", async () => {
     const d = deferredPull();
-    const a = runSelfUpdate(d.pull);
-    const b = runSelfUpdate(d.pull);
+    const noop = async () => {};
+    const a = runSelfUpdate(d.pull, noop);
+    const b = runSelfUpdate(d.pull, noop);
     expect(d.calls()).toBe(1); // second caller did not start a new pull
     d.release({ status: "updated", from: "aaa", to: "bbb" });
     expect(await a).toEqual({ status: "updated", from: "aaa", to: "bbb" });
