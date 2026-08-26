@@ -49,8 +49,13 @@ export async function signalProdSupervisor(
 
 // Start the rebuild+restart without blocking, so this request can return its
 // response before the server it triggers is torn down. On Linux that is the SAME
-// systemd unit (stop -> npm ci -> build -> start) the post-merge git hook starts on a
+// systemd unit (stop -> install -> build -> start) the post-merge git hook starts on a
 // real merge; on the Mac it is the prod supervisor's SIGUSR2 cycle.
+//
+// NOTE (RIC-240): that unit lives on the Linux box, not in this repo, and its install
+// step is still `npm ci` — which has had no package-lock.json to read since the pnpm
+// migration. It needs `pnpm install --frozen-lockfile`. Nothing here can change it or
+// detect that it is wrong; the symptom is a deploy failing at the install step.
 export async function triggerDeploy(): Promise<void> {
   if (process.platform === "darwin") return signalProdSupervisor();
   await pexec("systemctl", ["--user", "start", "--no-block", "mojito-deploy.service"]);

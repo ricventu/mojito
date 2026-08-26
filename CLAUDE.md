@@ -550,7 +550,10 @@ Mojito owns the whole lifecycle — there is no external plugin:
   ~520 MB and minutes of install — ~4 GB across the eight worktrees on the machine when
   this was measured. Under pnpm three full installs that `du` reports as **1.6 GB** cost
   **31 MB** of real disk and ~3s each, which is what makes `scripts/init-worktree.sh`
-  worth running automatically.
+  worth running automatically. Read that number honestly: the store pays for a version
+  of a package **once**, machine-wide, so the marginal worktree is ~10 MB and seconds
+  while the first install of a *new* dependency set still costs what it costs. It is the
+  per-worktree marginal cost the migration was after, and that is the one that collapsed.
   **The mechanism is not hard links, and that matters.** On APFS pnpm clones (`clonefile`)
   rather than links: blocks are shared copy-on-write, but every checkout gets its own
   **inode**. So `du` and `stat` both lie about the saving — measure it as free-space delta

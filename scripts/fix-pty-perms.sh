@@ -8,7 +8,7 @@
 #
 # It lives in a script rather than in a `package.json` line so that `predev`,
 # `prestart` and `scripts/init-worktree.sh` can all reach it without one package
-# manager shelling out to another — and so nothing here names npm or pnpm.
+# manager shelling out to another — and so no package manager is invoked at all.
 #
 # On pnpm `node_modules/node-pty` is a symlink into `node_modules/.pnpm`; the
 # glob resolves through it. The chmod stays local to this checkout: pnpm clones
