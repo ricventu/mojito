@@ -416,7 +416,9 @@ export default function TerminalView(
   };
 
   return (
-    <div className="term-root" ref={rootRef}>
+    // `kbd` is presentational only: it drops the bottom safe-area inset, which the
+    // keyboard covers anyway (see globals.css). The geometry itself is set from JS above.
+    <div className={`term-root${kbdOpen ? " kbd" : ""}`} ref={rootRef}>
       {!kbdOpen && (
       <header className="term-head">
         <button className="back icon" aria-label="Back" onClick={onBack}>

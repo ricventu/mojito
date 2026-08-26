@@ -24,7 +24,7 @@ export default function AlertLayer(
   return (
     <>
       <audio ref={audio} src="/alert.mp3" preload="auto" />
-      <div style={{ position: "fixed", top: 8, left: 8, right: 8, zIndex: 50 }}>
+      <div className="alert-layer">
         <div className="alert" onClick={() => onOpen(top.id)}>
           <span className="id">{top.ticket}</span>
           <span>{top.message}</span>

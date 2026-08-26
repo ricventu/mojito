@@ -185,7 +185,9 @@ export default function Home() {
   const needsInput = sessions.filter((s) => s.state === "needs-input").length;
 
   return (
-    <div style={{ paddingBottom: 64 }}>
+    // `.page` carries the padding that clears the fixed nav below and the status bar
+    // above — see globals.css, and RIC-257 for why the top matters.
+    <div className="page">
       <AlertLayer alerts={alerts} onOpen={openTerminal} onClear={() => setAlerts([])} />
       {settingsOpen && <SettingsSheet token={token} onClose={() => setSettingsOpen(false)} selfUpdate={selfUpdate} />}
       {newTicketSheet}

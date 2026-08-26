@@ -25,9 +25,12 @@ export const metadata: Metadata = {
   // <meta name="apple-mobile-web-app-title">, a different tag from <title>, so it
   // does not touch the client-owned document title the comment above protects.
   //
-  // `black-translucent` runs the layout under the status bar rather than below it,
-  // which is not a cosmetic choice: globals.css already offsets .nav by
-  // env(safe-area-inset-top) for exactly this, so `black` would double the gap.
+  // `black-translucent` runs the layout under the status bar rather than below it, so
+  // the layout viewport is the whole screen and every surface touching an edge has to
+  // pay `env(safe-area-inset-*)` itself — the `--sat`/`--sab`/`--sal`/`--sar` tokens in
+  // globals.css and the rules that spend them. Switching to `black` would zero those
+  // insets (iOS lays the viewport out below the status bar instead) and double the gap
+  // wherever one is already paid, so the two are a pair: change neither alone.
   //
   // `capable: true` renders as <meta name="mobile-web-app-capable">, NOT the
   // apple-prefixed tag you may be looking for — Next 16 emits the standardized

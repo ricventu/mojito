@@ -536,6 +536,32 @@ Mojito owns the whole lifecycle — there is no external plugin:
   `tests/client/manifest.test.ts` asserts Chromium's criteria over the real file
   including that every icon `src` exists on disk — the failure mode with no other
   symptom is a renamed icon, which silently un-installs the app.
+- **Safe areas**: full-bleed is a *pair* of settings — `viewportFit: "cover"` and
+  Apple's `black-translucent` status bar, both in `layout.tsx` — and together they
+  mean the layout viewport is the whole screen, with the clock and the home indicator
+  sitting **over** it. So every surface that touches an edge has to pay
+  `env(safe-area-inset-*)` itself; one that does not simply has its content under the
+  system UI. Only two ever did, which is what RIC-257 reported: on an iPhone 11 the
+  board's toolbar and the terminal's header both rendered beneath the clock. The four
+  insets are aliased once in `:root` as `--sat`/`--sar`/`--sab`/`--sal`, which writes
+  the `0px` fallback in one place and — the useful half — lets a desktop browser render
+  the real phone geometry by overriding four values, the only way to *see* this layout
+  off a device. Changing the status bar style would zero the insets (iOS then lays the
+  viewport out below the status bar) and double every gap already paid, so the pair
+  moves together or not at all. Three placements are deliberate and not obvious:
+  the top inset is on **`.term-root`**, not on `.term-head`, because the header is
+  unmounted while the keyboard is up and the terminal would slide back under the clock
+  mid-typing (`.term-root` takes `background: var(--surface)` so the strip it pays for
+  reads as the header's own); `.acc` pays the bottom inset **except** under
+  `.term-root.kbd`, since with the keyboard up that band's bottom edge is the keyboard
+  and not the home indicator, and paying it there costs ~2 of the ~13 visible rows;
+  and `.page` clears `calc(64px + var(--sab))`, the nav's height *and* the inset the
+  nav pays underneath it. `.page::before` is the opaque strip that keeps cards from
+  scrolling under the clock — `black-translucent` asks for exactly that and nobody
+  wants to read it. `tests/client/safeArea.test.ts` asserts the tokens and every
+  surface that spends them, in the shape of the manifest test above: this is CSS that
+  is invisible on a desktop and in the node-only test setup alike (both report every
+  inset as 0), so nothing else in the tree would notice it going away.
 - **Projects map**: `~/.config/mojito/projects.json` (Linear team key → project name →
   repo path), resolved by `resolveProjectsPath` in `src/server/config.ts`: env
   `MOJITO_PROJECTS` → `~/.config/mojito/projects.json`.
