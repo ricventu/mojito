@@ -1,0 +1,25 @@
+# pnpm settings for this repo. Not a monorepo — this file exists because pnpm 11
+# reads its settings from here (they moved out of .npmrc), and one setting is not
+# optional for Mojito.
+#
+# pnpm 10+ refuses to run a dependency's install scripts unless it is named here
+# (`onlyBuiltDependencies` in 10, `allowBuilds` in 11 — an object, not a list).
+# Both entries below are load-bearing, and both fail *silently* if dropped:
+#
+#   node-pty  the native module the terminal is built on. Without its build there
+#             is no pty binding at all and `server.ts` dies on import.
+#   esbuild   tsx's bundler, so it is what runs `server.ts` and every test. Its
+#             postinstall is what puts the platform binary in place.
+#
+# Two esbuild majors are installed (tsx's and vitest's); the key is the package
+# name, so one entry covers both.
+allowBuilds:
+  esbuild: true
+  node-pty: true
+
+# `predev` and `prestart` are what run scripts/fix-pty-perms.sh, and both
+# supervisors depend on them. pnpm's own default for this has moved between
+# majors and the failure mode is silent and total — no +x on spawn-helper means
+# every terminal session dies at spawn — so it is pinned here rather than
+# inherited. (npm always ran pre/post scripts, which is why nothing said so before.)
+enablePrePostScripts: true

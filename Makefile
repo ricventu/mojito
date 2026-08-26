@@ -79,7 +79,7 @@ prod:
 ## (SHELLFLAGS -e), so the running server is never replaced by a broken build.
 restart:
 	@echo "==> Building (next build)…"; \
-	npm run build; \
+	pnpm build; \
 	echo "==> Restarting $(SERVICE)…"; \
 	systemctl --user restart "$(SERVICE)"; \
 	$(LOAD_ENV); \

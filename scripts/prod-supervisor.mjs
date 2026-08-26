@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // Health-check + rebuild supervisor for the Mojito PRODUCTION build.
 //
-// One `next build`, then the resulting server (`npm start`) is kept alive: the
+// One `next build`, then the resulting server (`pnpm start`) is kept alive: the
 // app is served from an optimized build, never from Next's dev server, so page
 // loads and renders are fast. Invoked by `make prod`, which wraps it in
 // `caffeinate` and prints the reachable URLs.
 //
-// One loop runs over one child process (`npm start`):
+// One loop runs over one child process (`pnpm start`):
 //
 //   health   poll /api/health every POLL_INTERVAL_MS; after MAX_FAILURES
 //            consecutive failures, restart the server (no rebuild — a wedge
@@ -21,7 +21,7 @@
 // sessions are working in, where writes are constant. A source change reaches
 // production only when asked for.
 //
-// Asking for it is SIGUSR2, which runs npm install → stop → build → start, every
+// Asking for it is SIGUSR2, which runs pnpm install → stop → build → start, every
 // time and in that order. The install is unconditional because a pull can bring a
 // lockfile change and nothing here would otherwise notice; on an unchanged tree it
 // costs seconds. It runs while the old server is still serving, so a lockfile the
@@ -65,7 +65,7 @@ const log = (msg) => console.log(`[prod-supervisor] ${msg}`);
 /** @type {import("node:child_process").ChildProcess | null} */
 let server = null;
 /** @type {import("node:child_process").ChildProcess | null} */
-let oneShot = null; // the in-flight `npm install` / `npm run build`
+let oneShot = null; // the in-flight `pnpm install` / `pnpm build`
 /** @type {"serving" | "rebuilding" | "down"} */
 let state = "down";
 let seenUp = false;
@@ -81,11 +81,28 @@ let pollTimer = null;
 // --- child process plumbing -------------------------------------------------
 
 // `detached` puts each child in its own process group so we can signal the
-// whole tree (npm -> tsx -> node, npm -> next): an orphaned node would keep
+// whole tree (pnpm -> tsx -> node, pnpm -> next): an orphaned node would keep
 // holding the port and every respawn would die on EADDRINUSE. It also means
 // the terminal's Ctrl-C reaches only us, so we forward it deliberately.
-const spawnNpm = (args) =>
-  spawn("npm", args, { stdio: "inherit", detached: true, env: process.env });
+// `env` is passed explicitly so the install below can hand us one with NODE_ENV
+// stripped. Everything else inherits ours unchanged: `start` needs it (it sets
+// NODE_ENV=production itself, through cross-env) and so does `build`.
+const spawnPnpm = (args, env = process.env) =>
+  spawn("pnpm", args, { stdio: "inherit", detached: true, env });
+
+// The environment for `pnpm install`, with NODE_ENV dropped. Under
+// NODE_ENV=production an install strips devDependencies and exits 0 — silently taking
+// typescript, tsx and vitest with it, so the `next build` two lines down fails for a
+// reason that points nowhere near here (RIC-207). Measured in RIC-240: npm 11 does
+// exactly that, pnpm 11 does *not* (it needs an explicit `--prod`). So this is
+// belt-and-braces today and cheap insurance against pnpm changing its mind — the cost
+// of being wrong is a deploy that half-installs itself and a build nobody can explain.
+// We normally inherit no NODE_ENV at all (`make prod` runs us before anything sets it),
+// but "normally" is not a guarantee when the value arrives from whatever shell ran us.
+function installEnv() {
+  const { NODE_ENV: _dropped, ...rest } = process.env;
+  return rest;
+}
 
 function killGroup(pid, signal) {
   try {
@@ -110,18 +127,18 @@ function waitExit(proc, timeoutMs) {
   });
 }
 
-/** Run an npm script to completion. Resolves the exit code (non-zero on signal/spawn error). */
-function runOnce(args, label) {
+/** Run a pnpm command to completion. Resolves the exit code (non-zero on signal/spawn error). */
+function runOnce(args, label, env) {
   log(`${label}…`);
   return new Promise((resolve) => {
-    const proc = spawnNpm(args);
+    const proc = spawnPnpm(args, env);
     oneShot = proc;
     const done = (code) => {
       if (oneShot === proc) oneShot = null;
       resolve(code);
     };
     proc.on("error", (err) => {
-      console.error(`[prod-supervisor] failed to run \`npm ${args.join(" ")}\`:`, err);
+      console.error(`[prod-supervisor] failed to run \`pnpm ${args.join(" ")}\`:`, err);
       done(1);
     });
     proc.on("exit", (code, signal) => done(signal ? 1 : (code ?? 1)));
@@ -130,7 +147,7 @@ function runOnce(args, label) {
 
 async function startServer() {
   if (shuttingDown) return;
-  const proc = spawnNpm(["start"]);
+  const proc = spawnPnpm(["start"]);
   server = proc;
   state = "serving";
   seenUp = false;
@@ -214,23 +231,23 @@ async function poll() {
 
 async function rebuildCycle() {
   // Dependencies first, every time: a pull can bring a lockfile change, and nothing else
-  // in this process watches for one. On an unchanged tree `npm install` is a no-op of a
+  // in this process watches for one. On an unchanged tree `pnpm install` is a no-op of a
   // few seconds — cheap next to a build whose dependencies are missing. The server keeps
   // serving through it (the install is not what takes the app down, the build is), but the
-  // health watchdog is held off: npm rewriting node_modules under a live server can make
+  // health watchdog is held off: pnpm rewriting node_modules under a live server can make
   // it briefly unhealthy, and restarting it mid-install is pure harm.
   const watchdogState = state;
   state = "rebuilding";
-  const installed = await runOnce(["install"], "installing dependencies");
+  const installed = await runOnce(["install"], "installing dependencies", installEnv());
   state = watchdogState;
   if (installed !== 0) {
-    log("npm install FAILED — keeping the current build live, nothing rebuilt.");
+    log("pnpm install FAILED — keeping the current build live, nothing rebuilt.");
     return;
   }
   state = "rebuilding";
   log("stopping the server for the rebuild (the app is DOWN until it finishes)");
   await stopServer();
-  if ((await runOnce(["run", "build"], "building")) !== 0) {
+  if ((await runOnce(["build"], "building")) !== 0) {
     log("build FAILED — bringing the server back on whatever is in .next; expect errors until you fix it.");
   }
   crashes = 0; // a fresh build deserves a fresh crash budget
@@ -297,7 +314,7 @@ function acceptRebuildSignals() {
 }
 
 async function main() {
-  if ((await runOnce(["run", "build"], "initial production build")) !== 0) {
+  if ((await runOnce(["build"], "initial production build")) !== 0) {
     console.error("[prod-supervisor] initial build failed — nothing to serve. Fix the build and rerun `make prod`.");
     process.exit(1);
   }

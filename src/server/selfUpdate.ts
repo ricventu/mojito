@@ -49,7 +49,7 @@ export async function signalProdSupervisor(
 
 // Start the rebuild+restart without blocking, so this request can return its
 // response before the server it triggers is torn down. On Linux that is the SAME
-// systemd unit (stop -> npm ci -> build -> start) the post-merge git hook starts on a
+// systemd unit (stop -> install -> build -> start) the post-merge git hook starts on a
 // real merge; on the Mac it is the prod supervisor's SIGUSR2 cycle.
 export async function triggerDeploy(): Promise<void> {
   if (process.platform === "darwin") return signalProdSupervisor();
