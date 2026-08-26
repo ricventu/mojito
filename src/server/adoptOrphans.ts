@@ -10,7 +10,8 @@ export interface AdoptOrphansDeps {
 }
 
 // mojito-<TICKET>-<suffix> (work session, or the -conflict fix session) — teamKey is
-// always uppercase, so this never matches mojito-custom-… or mojito-shell-….
+// always uppercase, so this never matches mojito-custom-…, mojito-intake-… or
+// mojito-shell-….
 const TICKET_SESSION_RE = /^mojito-([A-Z][A-Z0-9]*-\d+)-/;
 
 /**
@@ -60,7 +61,9 @@ export function adoptOrphanSessions(
           labels: ctx.labels,
         }
       : {
-          kind: id.startsWith("mojito-shell-") ? "shell" : ticketMatch ? "ticket" : "custom",
+          kind: id.startsWith("mojito-shell-") ? "shell"
+            : id.startsWith("mojito-intake-") ? "intake"
+            : ticketMatch ? "ticket" : "custom",
           id,
           ticket: ticketMatch?.[1] ?? "",
           launchStatus: "",

@@ -36,6 +36,13 @@ export function customSessionName(slug: string, unique: string): string {
   return `mojito-custom-${slug}-${unique}`;
 }
 
+// The New-ticket intake session (RIC-251). Its own prefix rather than mojito-custom-:
+// the id is what tmux, `mojito-` orphan adoption and the terminal header all show, and
+// "which of these is the ticket I just jotted down" should not need the sheet's memory.
+export function intakeSessionName(slug: string, unique: string): string {
+  return `mojito-intake-${slug}-${unique}`;
+}
+
 export function shellSessionName(slug: string, unique: string): string {
   return `mojito-shell-${slug}-${unique}`;
 }

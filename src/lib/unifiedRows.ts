@@ -87,9 +87,9 @@ export function orderTicketRows(rows: TicketRow[]): TicketRow[] {
 
 /**
  * Distinct statuses across tickets and sessions, ordered by lifecycle rank (unknown
- * ones — including the synthetic Custom and Terminal buckets — last, alphabetical
- * tie-break). Same comparison ticketStatuses and sessionStatuses each apply on their
- * own side, so a merged chip row stays in lifecycle order.
+ * ones — including the synthetic Custom, New ticket and Terminal buckets — last,
+ * alphabetical tie-break). Same comparison ticketStatuses and sessionStatuses each apply
+ * on their own side, so a merged chip row stays in lifecycle order.
  *
  * `tickets` is the mine-scoped list, matching how the old ticket list derived its chips:
  * toggling Mine must never leave a chip that matches nothing. Sessions are not scoped

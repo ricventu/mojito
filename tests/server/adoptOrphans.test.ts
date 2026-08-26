@@ -48,10 +48,14 @@ describe("adoptOrphanSessions", () => {
     expect(adopted).toMatchObject({ kind: "ticket", id: "mojito-RIC-9-work", ticket: "RIC-9", state: "running" });
   });
 
-  it("adopts an orphaned custom/shell session with the bare id as its title", () => {
+  it("adopts an orphaned custom/intake/shell session with the bare id as its title", () => {
     const r = new Registry(dir);
-    adoptOrphanSessions(r, dir, "/projects.json", ["mojito-custom-mojito-abc123", "mojito-shell-general-def456"]);
+    adoptOrphanSessions(r, dir, "/projects.json",
+      ["mojito-custom-mojito-abc123", "mojito-intake-mojito-abc123", "mojito-shell-general-def456"]);
     expect(r.get("mojito-custom-mojito-abc123")).toMatchObject({ kind: "custom", ticket: "", title: "mojito-custom-mojito-abc123" });
+    // The id prefix is the only thing left to read a kind off here — an adopted session has
+    // no sidecar and no launch context (RIC-251).
+    expect(r.get("mojito-intake-mojito-abc123")).toMatchObject({ kind: "intake", ticket: "", title: "mojito-intake-mojito-abc123" });
     expect(r.get("mojito-shell-general-def456")).toMatchObject({ kind: "shell", ticket: "", title: "mojito-shell-general-def456" });
   });
 

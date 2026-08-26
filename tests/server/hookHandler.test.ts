@@ -429,6 +429,66 @@ describe("handleHook — custom sessions", () => {
   });
 });
 
+// RIC-251 gave the New-ticket session its own kind. It is a custom session in every
+// mechanical respect, so it must keep taking the custom path here — the branch keys on
+// "not a ticket session" precisely so a new kind cannot fall into the lifecycle path and
+// start writing Linear statuses for a ticket it does not have.
+describe("handleHook — intake sessions", () => {
+  function seedIntake(over: Partial<SessionMeta> = {}): Registry {
+    const registry = new Registry(dir);
+    registry.upsert({ kind: "intake", id: "mojito-intake-mojito-abc", ticket: "", launchStatus: "",
+      model: "sonnet", effort: "medium", state: "starting", cwd: "/code/mojito",
+      createdAt: "2026-08-26T00:00:00.000Z", title: "mojito", labels: [], ...over });
+    return registry;
+  }
+  const deps = (registry: Registry, bus: EventBus) => ({
+    registry, bus, readResult: noResult, moveToQa: noopMoveToQa, moveToDone: noopMoveToDone,
+    clearResult: noopClearResult,
+  });
+
+  it("leaves starting on SessionStart, exactly as a custom session does", async () => {
+    const registry = seedIntake();
+    const bus = new EventBus();
+    const events: unknown[] = [];
+    bus.subscribe((e) => events.push(e));
+    await handleHook("mojito-intake-mojito-abc", "SessionStart", deps(registry, bus));
+    expect(registry.get("mojito-intake-mojito-abc")?.state).toBe("running");
+    expect(events).toContainEqual({ type: "session.state", id: "mojito-intake-mojito-abc", state: "running" });
+  });
+
+  it("rests at idle after its turn rather than raising a needs-input alert", async () => {
+    const registry = seedIntake({ state: "running" });
+    const bus = new EventBus();
+    const events: unknown[] = [];
+    bus.subscribe((e) => events.push(e));
+    await handleHook("mojito-intake-mojito-abc", "Stop", deps(registry, bus));
+    expect(registry.get("mojito-intake-mojito-abc")?.state).toBe("idle");
+    expect(events).not.toContainEqual(expect.objectContaining({ type: "session.alert" }));
+  });
+
+  it("closes as done on SessionEnd and never touches Linear", async () => {
+    const registry = seedIntake({ state: "idle" });
+    const bus = new EventBus();
+    const moveToQa = vi.fn(noopMoveToQa);
+    const readResult = vi.fn(noResult);
+    await handleHook("mojito-intake-mojito-abc", "SessionEnd",
+      { ...deps(registry, bus), moveToQa, readResult });
+    expect(registry.get("mojito-intake-mojito-abc")?.state).toBe("done");
+    expect(moveToQa).not.toHaveBeenCalled();
+    expect(readResult).not.toHaveBeenCalled();
+  });
+
+  it("still surfaces a genuine block — the MCP write's permission prompt", async () => {
+    const registry = seedIntake({ state: "running" });
+    const bus = new EventBus();
+    const events: unknown[] = [];
+    bus.subscribe((e) => events.push(e));
+    await handleHook("mojito-intake-mojito-abc", "PermissionRequest", deps(registry, bus));
+    expect(registry.get("mojito-intake-mojito-abc")?.state).toBe("needs-input");
+    expect(events).toContainEqual(expect.objectContaining({ type: "session.alert", kind: "needs-input" }));
+  });
+});
+
 it("does not overwrite a ticket session's title", async () => {
   const { registry } = seed({ title: "Linear title" });
   const bus = new EventBus();

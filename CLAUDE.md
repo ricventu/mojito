@@ -29,9 +29,20 @@ Mojito owns the whole lifecycle — there is no external plugin:
   URLs sit behind Linear's file auth), writes the raw note plus the resulting URLs to
   `<stateDir>/drafts/<random>.json` (`ticketDraft.ts`), and launches an **intake session**
   (`launchIntakeSession`) that reads that draft, rewrites it, titles it, and creates the
-  issue *itself* through the Linear MCP. It is a plain custom session — no ticket, no
+  issue *itself* through the Linear MCP. Mechanically a custom session — no ticket, no
   launch context, no result file — because the issue it creates is the whole outcome;
-  Sonnet at medium effort is inlined there, since no status names this work. Ticket copy
+  Sonnet at medium effort is inlined there, since no status names this work. It registers
+  under its own `kind: "intake"` and its own `mojito-intake-<slug>-<hex>` id all the same
+  (RIC-251): it is the one session on the board Mojito started on the human's behalf
+  rather than at their pick, and filed under Custom it was indistinguishable from a claude
+  session they opened themselves. The kind is *presentation only* — `sessionStatus` buckets
+  it under `INTAKE_STATUS` ("New ticket", `indigo`, a hue globals.css already declares and
+  no lifecycle status claims) so it groups and filters on its own, and everything
+  behavioural still treats it as custom. `handleHook` and `SessionCard` therefore key on
+  "is a **ticket** session" rather than naming the kinds that are not: written the other
+  way, the next kind added would fall into the lifecycle path and start writing Linear
+  statuses for a ticket it does not have. Orphan adoption reads the kind off the id prefix,
+  which is the only thing left to read it from once the sidecar is gone. Ticket copy
   goes out in Italian whatever the note was written in, and the session labels the issue
   with one of Linear's `Bug`/`Improvement`/`Feature` (the names are the team's own
   capitalization, passed to the MCP verbatim) instead of announcing its nature in a
@@ -382,6 +393,24 @@ Mojito owns the whole lifecycle — there is no external plugin:
   buttons step through real history when the previous entry is ours, tracked as a depth
   counter in `history.state` (`src/lib/navDepth.ts`), and fall back to a url otherwise,
   so a link opened straight into a terminal never backs out of Mojito.
+- **Live updates**: `/ws/events` is the *only* thing that refreshes the session list —
+  `useSessions` has no poll of its own (tickets do, every 45s). And the bus is
+  fire-and-forget: `EventBus.emit` walks whoever is subscribed right now, nothing is
+  buffered and nothing replays. So a gap in that socket used to be a **permanent** gap in
+  what the board showed: whatever changed while it was down was never learned, and a card
+  sat at the last state it heard — for a session that had just launched, "starting" forever
+  (RIC-251). The fix is not a longer retry, it is refetching on every successful connection:
+  `openEventStream` (`src/lib/eventStream.ts`) owns the dial-and-reconnect loop and calls
+  `onConnect` each time, first connection included, with `useEvents` reduced to the glue
+  (url + effect lifetime) so the loop is testable against a fake socket in the node-only
+  vitest setup — the usual split. The New-ticket flow hit this on *every* use, which is why
+  it was reported there: it opens the session in a new browser tab, so the tab holding the
+  board goes to the background exactly as its intake session boots, and SessionStart,
+  PostToolUse and Stop all fire into a socket nobody is listening on. A deploy does the same
+  to every open client. `visibilitychange` covers the other shape of the same miss — a
+  phone can leave the socket half-open, frames going nowhere and no close event ever
+  arriving, so the reconnect never happens; coming back to the tab refetches. Both resync
+  sessions only: a flapping connection must not turn into a burst of Linear queries.
 - **Board scope**: the board shows only the projects `projects.json` maps —
   `GET /api/tickets` passes `listMappedProjects` into `listOpenIssues`, which scopes the
   Linear query itself (`project: { name: { in: $projects } }`, names as a variable, never

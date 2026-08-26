@@ -3,7 +3,7 @@ import { join, basename } from "node:path";
 import { homedir } from "node:os";
 import { randomBytes } from "node:crypto";
 import type { Effort, SessionMeta } from "./types";
-import { tmuxName, validateTicket, statusSlug, customSessionName, conflictSessionName, shellSessionName } from "./sessionKey";
+import { tmuxName, validateTicket, statusSlug, customSessionName, intakeSessionName, conflictSessionName, shellSessionName } from "./sessionKey";
 import { buildHookSettings } from "./hookSettings";
 import { loadProjectMap, resolvePathForProject } from "./projects";
 import { repoForTicket } from "./ticketCwd";
@@ -241,6 +241,11 @@ export interface CustomLaunchRequest {
   // session, of the project's repo for a project-scoped one. Ignored for General, which
   // opens in the home directory and has no repo to pick from.
   worktree?: string;
+  // Set only by launchIntakeSession (RIC-251). A New-ticket session is a custom session in
+  // every mechanical respect — nothing below branches on this but the id prefix and the
+  // registered `kind`, both of which exist so the board can name it instead of filing it
+  // among the bare claude sessions the human started themselves.
+  intake?: boolean;
 }
 
 export function buildCustomClaudeCommand(req: CustomLaunchRequest, settingsPath: string): string {
@@ -264,7 +269,7 @@ export async function launchCustomSession(
   if (!scoped) return { ok: false, reason: "no-repo" };
   const { cwd, slug, warning } = scoped;
 
-  const id = customSessionName(slug, genId());
+  const id = (req.intake ? intakeSessionName : customSessionName)(slug, genId());
 
   const settingsDir = join(deps.stateDir, "settings");
   mkdirSync(settingsDir, { recursive: true, mode: 0o700 });
@@ -280,7 +285,7 @@ export async function launchCustomSession(
 
   const title = req.ticket ? (req.title ?? basename(cwd)) : cwd === homeDir() ? "home" : basename(cwd);
   const meta: SessionMeta = {
-    kind: "custom",
+    kind: req.intake ? "intake" : "custom",
     id,
     ticket: req.ticket ?? "",
     launchStatus: "",
@@ -487,9 +492,12 @@ export interface IntakeLaunchRequest {
 }
 
 /**
- * Launch the session that turns a New-ticket draft into a Linear issue. A custom session
- * — no ticket, no launch context, no result file — because at this point there is no
- * ticket: the session creates it through the Linear MCP and that is the end of its job.
+ * Launch the session that turns a New-ticket draft into a Linear issue. Mechanically a
+ * custom session — no ticket, no launch context, no result file — because at this point
+ * there is no ticket: the session creates it through the Linear MCP and that is the end
+ * of its job. It registers as `kind: "intake"` all the same (RIC-251), so the board names
+ * it instead of filing it among the bare claude sessions the human started themselves;
+ * everything downstream of the kind treats intake exactly as custom.
  * Sonnet at medium effort is inlined rather than resolved through BUILTIN_STAGE_DEFAULTS:
  * this is a rewrite of one paragraph, not work on a ticket, and no status names it.
  */
@@ -502,7 +510,7 @@ export async function launchIntakeSession(
     hasImages: req.hasImages,
   });
   return launchCustomSession(
-    { projectName: req.projectName, model: "sonnet", effort: "medium", prompt },
+    { projectName: req.projectName, model: "sonnet", effort: "medium", prompt, intake: true },
     deps,
   );
 }

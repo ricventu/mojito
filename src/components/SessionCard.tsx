@@ -25,9 +25,11 @@ export default function SessionCard(
     <div className={`card${s.state === "needs-input" ? " attn" : ""}`}>
       {/* A ticket session leads with its id, which links to Linear — so that row sits
           outside the tap region below, where a link would be swallowed by the
-          `role="button"` (see TicketLink). A custom or shell session has no id, so
-          its own header row stays inside the tap. */}
-      {s.kind !== "custom" && s.kind !== "shell" && (
+          `role="button"` (see TicketLink). Every other kind — custom, intake, shell —
+          has no id, so its own header row stays inside the tap. Keyed on "is a ticket
+          session" rather than on the kinds that are not, so a kind added later cannot
+          land here asking for a ticket link it has no ticket for. */}
+      {s.kind === "ticket" && (
         <div className="card-head">
           <TicketLink id={s.ticket ?? ""} url={ticketUrl} />
           <span className="grow" />
@@ -35,7 +37,7 @@ export default function SessionCard(
         </div>
       )}
       <div className="tap" {...tapProps(onOpen)}>
-        {s.kind === "custom" || s.kind === "shell" ? (
+        {s.kind !== "ticket" ? (
           <>
             <div className="row">
               <span className="session-title">{s.title}</span>

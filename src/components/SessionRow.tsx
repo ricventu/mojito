@@ -11,7 +11,11 @@ import type { SessionMeta } from "@/server/types";
  */
 function rowLabel(s: SessionMeta): string {
   if (s.kind === "shell") return "terminal";
-  return `${s.kind === "custom" ? "claude" : "work"} · ${s.model}`;
+  // "new ticket" is unreachable in practice — an intake session has no ticket to nest
+  // under, so it only ever renders as a loose SessionCard — but naming it here keeps the
+  // fallback from calling it "work", which is the one thing it certainly is not.
+  const what = s.kind === "custom" ? "claude" : s.kind === "intake" ? "new ticket" : "work";
+  return `${what} · ${s.model}`;
 }
 
 export default function SessionRow(

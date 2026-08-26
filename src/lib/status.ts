@@ -27,6 +27,16 @@ export const CUSTOM_STATUS = "Custom";
  */
 export const TERMINAL_STATUS = "Terminal";
 
+/**
+ * Synthetic non-lifecycle status for the New-ticket intake session (RIC-251), parallel to
+ * CUSTOM_STATUS. It reads as a status name rather than a session kind because that is the
+ * slot it occupies — the board's own group divider and one of the status filter's chips —
+ * and "New ticket" is what the human pressed to get it. Absent from
+ * STATUS_ORDER/STATUS_COLOR; its rank falls through to "last" and its hue is handled
+ * explicitly in statusColorClass.
+ */
+export const INTAKE_STATUS = "New ticket";
+
 export const STATUS_COLOR: Record<string, string> = {
   Backlog: "grey",
   Todo: "grey",
@@ -42,10 +52,13 @@ export function statusRank(name: string): number {
   return STATUS_ORDER[name] ?? Number.MAX_SAFE_INTEGER;
 }
 
-/** Badge color-hue class for a status; custom and terminal sessions each get
+/** Badge color-hue class for a status; custom, intake and terminal sessions each get
  *  their own hue, other unknown statuses are muted. */
 export function statusColorClass(name: string): string {
   if (name === CUSTOM_STATUS) return "pink";
   if (name === TERMINAL_STATUS) return "term";
+  // indigo is already declared for lifecycle badges and mapped to no status, so the
+  // intake bucket gets a hue of its own without a new token.
+  if (name === INTAKE_STATUS) return "indigo";
   return STATUS_COLOR[name] ?? "muted";
 }

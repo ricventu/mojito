@@ -1,26 +1,29 @@
 "use client";
 import { useEffect } from "react";
 import type { MojitoEvent } from "@/server/events";
+import { openEventStream, type EventSocket } from "./eventStream";
 
-export function useEvents(token: string, onEvent: (e: MojitoEvent) => void) {
+/**
+ * The live-update socket. `onEvent` fires per event; `onConnect` fires on every successful
+ * (re)connection, including the first — see openEventStream, which owns the reconnect loop
+ * and explains why resyncing on connect is what keeps the list honest. This half is the
+ * glue: the url, and tying the stream's lifetime to the effect's.
+ */
+export function useEvents(token: string, onEvent: (e: MojitoEvent) => void, onConnect?: () => void) {
   useEffect(() => {
     if (!token) return;
-    let ws: WebSocket | null = null;
-    let closed = false;
-    let retry: ReturnType<typeof setTimeout>;
-    const connect = () => {
-      const proto = location.protocol === "https:" ? "wss" : "ws";
-      ws = new WebSocket(`${proto}://${location.host}/ws/events?token=${encodeURIComponent(token)}`);
-      ws.onmessage = (m) => onEvent(JSON.parse(m.data));
-      ws.onclose = () => {
-        if (!closed) retry = setTimeout(connect, 2000);
-      };
-    };
-    connect();
-    return () => {
-      closed = true;
-      clearTimeout(retry);
-      ws?.close();
-    };
-  }, [token, onEvent]);
+    return openEventStream(
+      () => {
+        const proto = location.protocol === "https:" ? "wss" : "ws";
+        const ws = new WebSocket(`${proto}://${location.host}/ws/events?token=${encodeURIComponent(token)}`);
+        // A real WebSocket declares its handlers as `(this: WebSocket, ev: Event) => any`,
+        // which under strictFunctionTypes is assignable to no narrower parameter type — and
+        // narrower is the whole point of EventSocket, which exists so the reconnect logic can
+        // be driven by a fake in the node-only test setup. Nothing here reads an event object,
+        // so the cast gives up nothing.
+        return ws as unknown as EventSocket;
+      },
+      { onEvent, onConnect },
+    );
+  }, [token, onEvent, onConnect]);
 }
