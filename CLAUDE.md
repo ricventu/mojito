@@ -577,10 +577,6 @@ Mojito owns the whole lifecycle — there is no external plugin:
   and it is an object, not a list), and `enablePrePostScripts: true`, since `predev`/
   `prestart` are the only thing putting the +x back and pnpm's default for that has
   moved between majors. `tests/repo/packaging.test.ts` fails if any of it regresses.
-  **Still to do by hand, off this repo:** the Linux box's `mojito-deploy.service` runs
-  `npm ci`, which has no lockfile to read any more — change it to
-  `pnpm install --frozen-lockfile`. Nothing in the repo can do that or notice it is
-  wrong; the symptom is a deploy that fails at the install step.
   Rollback, if it ever comes to that, is `git revert`, `npm install`, and putting
   `npm run dev` back in `scripts/dev-supervisor.sh` — no data migration, nothing outside
   `node_modules`.
