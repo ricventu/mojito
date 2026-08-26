@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sessionStatuses, filterSessions, sessionStatus, CUSTOM_STATUS, TERMINAL_STATUS } from "@/lib/sessionFilter";
+import { sessionStatuses, filterSessions, sessionStatus, CUSTOM_STATUS, INTAKE_STATUS, TERMINAL_STATUS } from "@/lib/sessionFilter";
 import { NO_PROJECT } from "@/lib/ticketFilter";
 import type { SessionMeta } from "@/server/types";
 
@@ -53,6 +53,18 @@ describe("sessionStatuses", () => {
     expect(sessionStatuses(sessions)).toEqual([CUSTOM_STATUS]);
   });
 
+  // RIC-251: an intake session used to fall into CUSTOM_STATUS, which made the New-ticket
+  // session Mojito started on the human's behalf indistinguishable from the claude sessions
+  // they started themselves.
+  it("surfaces intake sessions as their own bucket, apart from the custom one", () => {
+    const sessions = [
+      session({ kind: "intake", launchStatus: "" }),
+      session({ kind: "custom", launchStatus: "" }),
+      session({ launchStatus: "To QA" }),
+    ];
+    expect(sessionStatuses(sessions)).toEqual(["To QA", CUSTOM_STATUS, INTAKE_STATUS]);
+  });
+
   it("surfaces shell sessions as the TERMINAL_STATUS bucket, sorted last", () => {
     const sessions = [
       session({ kind: "shell", launchStatus: "" }),
@@ -95,6 +107,18 @@ describe("filterSessions", () => {
     ];
     const out = filterSessions(withCustom, { query: "", project: [], status: CUSTOM_STATUS });
     expect(out.map((s) => s.id)).toEqual(["d"]);
+  });
+
+  it("filters intake sessions via the INTAKE_STATUS bucket, leaving custom ones out", () => {
+    const withBoth = [
+      ...sessions,
+      session({ id: "d", kind: "custom", launchStatus: "", ticket: "", projectName: "Mojito", title: "Custom one" }),
+      session({ id: "f", kind: "intake", launchStatus: "", ticket: "", projectName: "Mojito", title: "mojito" }),
+    ];
+    expect(filterSessions(withBoth, { query: "", project: [], status: INTAKE_STATUS }).map((s) => s.id))
+      .toEqual(["f"]);
+    expect(filterSessions(withBoth, { query: "", project: [], status: CUSTOM_STATUS }).map((s) => s.id))
+      .toEqual(["d"]);
   });
 
   it("filters shell sessions via the TERMINAL_STATUS bucket", () => {
@@ -147,8 +171,9 @@ describe("live ticket statuses", () => {
     expect(sessionStatus(session({ ticket: "RIC-9", launchStatus: "Todo" }), live)).toBe("Todo");
   });
 
-  it("leaves custom and shell sessions in their synthetic buckets", () => {
+  it("leaves custom, intake and shell sessions in their synthetic buckets", () => {
     expect(sessionStatus(session({ kind: "custom", ticket: "RIC-1" }), live)).toBe(CUSTOM_STATUS);
+    expect(sessionStatus(session({ kind: "intake", ticket: "RIC-1" }), live)).toBe(INTAKE_STATUS);
     expect(sessionStatus(session({ kind: "shell", ticket: "RIC-1" }), live)).toBe(TERMINAL_STATUS);
   });
 

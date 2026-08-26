@@ -62,7 +62,22 @@ export default function Home() {
     refreshSessions();
     if (e.type === "session.alert") setAlerts((a) => [{ id: e.id, ticket: e.ticket, message: e.message }, ...a].slice(0, 20));
   }, [refreshSessions]);
-  useEvents(token, onEvent);
+  // Third argument = resync on every (re)connection, which is what keeps the list from
+  // freezing at whatever it last heard; openEventStream explains why. Tickets are left out
+  // of it on purpose — they have their own 45s poll, and a flapping connection must not
+  // turn into a burst of Linear queries.
+  useEvents(token, onEvent, refreshSessions);
+
+  // The other way an event goes missing: a phone that backgrounds this tab can leave the
+  // socket half-open — frames are sent into it and no close event ever arrives, so the
+  // reconnect resync above never gets its chance. Refetching when the tab comes back
+  // covers that, and costs one local request. Sessions only: tickets have their own 45s
+  // poll, and this fires every time the user switches away and back.
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") refreshSessions(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refreshSessions]);
 
   // A terminal url whose session is gone — killed from another tab, swept, or simply
   // stale in a bookmark. Correct the address bar rather than leave a blank page, and

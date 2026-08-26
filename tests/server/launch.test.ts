@@ -772,9 +772,10 @@ describe("launchStackResolveSession", () => {
   });
 });
 
-// The intake session (New-ticket sheet): a custom session whose whole job is to turn the
-// human's rough note into a Linear issue, so it carries no ticket and reports nothing back
-// to Mojito — the issue it creates is the result.
+// The intake session (New-ticket sheet): mechanically a custom session whose whole job is
+// to turn the human's rough note into a Linear issue, so it carries no ticket and reports
+// nothing back to Mojito — the issue it creates is the result. It registers under its own
+// kind and id prefix all the same (RIC-251), which is what lets the board name it.
 describe("launchIntakeSession", () => {
   function intakeDeps(over: Record<string, unknown> = {}) {
     const projectsPath = join(dir, "projects.json");
@@ -800,7 +801,7 @@ describe("launchIntakeSession", () => {
     const res = await launchIntakeSession(intakeReq, d);
     expect(res.ok).toBe(true);
     const meta = (res as { ok: true; meta: SessionMeta }).meta;
-    expect(meta).toMatchObject({ kind: "custom", ticket: "", cwd: "/code/mojito", model: "sonnet", effort: "medium" });
+    expect(meta).toMatchObject({ kind: "intake", ticket: "", cwd: "/code/mojito", model: "sonnet", effort: "medium" });
     const command = d.newSession.mock.calls[0][2];
     expect(command).toContain("--model 'sonnet' --effort 'medium'");
     expect(command).toContain("/state/drafts/ab12cd.json");
@@ -826,6 +827,28 @@ describe("launchIntakeSession", () => {
   it("refuses a project that maps to no repository", async () => {
     const res = await launchIntakeSession({ ...intakeReq, projectName: "Ghost" }, intakeDeps());
     expect(res).toMatchObject({ ok: false, reason: "no-repo" });
+  });
+
+  // RIC-251: the board showed this session as an ordinary "Custom" one, indistinguishable
+  // from a claude session the human started themselves. The kind is what the status bucket
+  // reads (sessionStatus), and the id prefix is what tmux and orphan adoption read.
+  it("registers as an intake session, under its own id prefix", async () => {
+    const d = intakeDeps();
+    const res = await launchIntakeSession(intakeReq, d);
+    const meta = (res as { ok: true; meta: SessionMeta }).meta;
+    expect(meta.kind).toBe("intake");
+    expect(meta.id).toBe("mojito-intake-mojito-abc123");
+    expect(d.newSession.mock.calls[0][0]).toBe("mojito-intake-mojito-abc123");
+  });
+
+  // The flag is the intake launcher's alone: a session started from the New session sheet
+  // is a plain custom one and must keep saying so.
+  it("leaves an ordinary custom launch as custom", async () => {
+    const d = intakeDeps();
+    const res = await launchCustomSession({ projectName: "Mojito", model: "opus", effort: "high" }, d);
+    const meta = (res as { ok: true; meta: SessionMeta }).meta;
+    expect(meta.kind).toBe("custom");
+    expect(meta.id).toBe("mojito-custom-mojito-abc123");
   });
 });
 

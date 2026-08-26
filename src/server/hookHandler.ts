@@ -31,17 +31,20 @@ export async function handleHook(
   const meta = deps.registry.get(id);
   if (!meta) return;
 
-  if (meta.kind === "custom" || meta.kind === "shell") {
-    // Shell sessions fire no hooks, so this branch is unreachable for them today; guarding here
+  if (meta.kind !== "ticket") {
+    // Shell sessions fire no hooks, so that branch is unreachable for them today; guarding here
     // future-proofs against any stray/manual hook pushing a plain terminal into the ticket session path.
-    // Custom sessions have no ticket and no lifecycle: neither kind calls Linear or
-    // moves to a new stage, and SessionEnd is a clean close (done), not a failure. A custom
-    // session is interactive, so it rests at "idle" between turns (mapCustomHook).
-    const outcome = meta.kind === "custom"
-      ? mapCustomHook(event, meta.state)
-      : event === "SessionEnd"
-        ? { state: "done" as const, alert: null }
-        : mapHook(event, false, meta.state);
+    // Custom and intake sessions have no ticket and no lifecycle: none of these kinds calls
+    // Linear or moves to a new stage, and SessionEnd is a clean close (done), not a failure.
+    // Both are interactive, so they rest at "idle" between turns (mapCustomHook) — an intake
+    // session is a custom session wearing its purpose (RIC-251), and keying on "not a ticket
+    // session" rather than naming the kinds is what keeps the next such kind from silently
+    // falling into the lifecycle path below.
+    const outcome = meta.kind === "shell"
+      ? (event === "SessionEnd"
+          ? { state: "done" as const, alert: null }
+          : mapHook(event, false, meta.state))
+      : mapCustomHook(event, meta.state);
     const patch: Partial<SessionMeta> = { state: outcome.state, message: outcome.alert?.message };
     // Label from Claude Code's session name. An explicit `session_title` (from --name /
     // /rename, delivered on SessionStart) wins; otherwise fall back to CC's auto-generated

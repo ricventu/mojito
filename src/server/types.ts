@@ -13,7 +13,13 @@ export type HookEventName =
   | "SessionEnd";
 
 export interface SessionMeta {
-  kind: "ticket" | "custom" | "shell"; // "ticket" = full work-phase lifecycle session; "custom" = standalone claude; "shell" = plain login-shell terminal ($SHELL, or bash)
+  // "ticket" = full work-phase lifecycle session; "custom" = standalone claude;
+  // "intake" = the New-ticket session that turns a draft into a Linear issue (RIC-251) —
+  // a custom session in every mechanical respect (no ticket, no lifecycle, mapCustomHook
+  // drives its state), but it says so on the board instead of hiding among the bare
+  // claude sessions the human started themselves; "shell" = plain login-shell terminal
+  // ($SHELL, or bash).
+  kind: "ticket" | "custom" | "intake" | "shell";
   id: string;            // tmux session name, e.g. "mojito-RIC-46-work"
   ticket: string;        // "RIC-46" (empty for custom sessions)
   launchStatus: string;  // Linear status name at launch (empty for custom sessions)

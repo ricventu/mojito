@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { KNOWN_STATUSES } from "@/server/statusModel";
-import { STATUS_ORDER, STATUS_COLOR, statusRank, statusColorClass, CUSTOM_STATUS, TERMINAL_STATUS } from "@/lib/status";
+import { STATUS_ORDER, STATUS_COLOR, statusRank, statusColorClass, CUSTOM_STATUS, INTAKE_STATUS, TERMINAL_STATUS } from "@/lib/status";
 
 describe("status metadata", () => {
   it("covers exactly the statuses the server model knows — nothing missing, nothing extra", () => {
@@ -31,10 +31,22 @@ describe("status metadata", () => {
     expect(statusColorClass("Done")).toBe("green");
   });
 
-  it("gives the custom and terminal buckets their own distinct hues", () => {
+  it("gives the custom, intake and terminal buckets their own distinct hues", () => {
     expect(statusColorClass(CUSTOM_STATUS)).toBe("pink");
+    expect(statusColorClass(INTAKE_STATUS)).toBe("indigo");
     expect(statusColorClass(TERMINAL_STATUS)).toBe("term");
-    expect(statusColorClass(CUSTOM_STATUS)).not.toBe(statusColorClass(TERMINAL_STATUS));
+    const hues = [CUSTOM_STATUS, INTAKE_STATUS, TERMINAL_STATUS].map(statusColorClass);
+    expect(new Set(hues).size).toBe(hues.length);
+  });
+
+  // The synthetic buckets share the badge stylesheet with the lifecycle statuses, so an
+  // unstyled hue would render as an unreadable bare chip (RIC-251 reuses `indigo`, which
+  // globals.css already declares and no lifecycle status claims).
+  it("styles every synthetic bucket's hue", () => {
+    const STYLED = new Set(["grey", "blue", "indigo", "amber", "teal", "green", "red", "muted", "pink", "term"]);
+    for (const bucket of [CUSTOM_STATUS, INTAKE_STATUS, TERMINAL_STATUS]) {
+      expect(STYLED, `hue for ${bucket}`).toContain(statusColorClass(bucket));
+    }
   });
 
   it("only uses hues that have a matching badge CSS rule", () => {
