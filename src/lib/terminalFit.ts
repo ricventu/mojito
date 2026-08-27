@@ -30,3 +30,41 @@ export function isUsableGeometry(dims: Geometry | undefined | null): boolean {
   if (!Number.isFinite(cols) || !Number.isFinite(rows)) return false;
   return cols >= MIN_COLS && rows >= MIN_ROWS;
 }
+
+/**
+ * One pass of "keep the pty and the terminal the same size".
+ *
+ * Two separate things happen here, and keeping them separate is the whole point.
+ * *Re-fitting* — re-measuring the terminal against the box it sits in — is
+ * refused in two cases: while the mobile keyboard is up (the terminal keeps the
+ * rows it had and `.term-body` shows the bottom of them, so the TUI's input line
+ * stays on screen without claude's whole layout being resized against a band we
+ * cannot measure), and for a geometry the keyboard is only passing through (see
+ * `isUsableGeometry` above).
+ *
+ * *Publishing* the geometry is not refused, ever. `send` is the client's only
+ * channel for telling the pty how big the terminal is, and the pty starts life
+ * at the gateway's 80x24 spawn default. Skipping it alongside the fit meant a
+ * socket that (re)connected while the keyboard was up — a phone coming back from
+ * the background with the keyboard restored, a deploy, any 1.5s reconnect —
+ * spawned its `tmux attach` at 24 rows and had nothing left to correct it. tmux
+ * then repainted claude's whole TUI into the top 24 rows of a grid the terminal
+ * still held ~54 of, and the bottom-anchored view showed nothing but the blank
+ * rows underneath: the input line off the top of the screen, which is exactly how
+ * RIC-258 was reported. Re-sending a geometry the pty already has is a no-op.
+ */
+export interface GeometrySync {
+  /** Is the mobile virtual keyboard up? (see keyboardInset.ts) */
+  keyboardOpen: boolean;
+  /** FitAddon's proposal for the box the terminal sits in. */
+  propose: () => Geometry | undefined;
+  /** Re-measure the terminal against that box. */
+  refit: () => void;
+  /** Tell the pty the geometry the terminal actually has. */
+  send: () => void;
+}
+
+export function syncGeometry(s: GeometrySync): void {
+  if (!s.keyboardOpen && isUsableGeometry(s.propose())) s.refit();
+  s.send();
+}
