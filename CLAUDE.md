@@ -481,8 +481,15 @@ Mojito owns the whole lifecycle — there is no external plugin:
   that used to be the **Stacks tab**, which is gone: the board's divider was already the
   only thing naming a project and did nothing, while the actions belonging to a project
   lived one tab away on a screen that listed the same names again. `page.tsx` therefore
-  has one view left, and the bottom nav keeps only the needs-input count and the
-  settings gear. Which actions a row offers is the pure `projectActions`
+  has one view left and **no bottom nav at all**: a tab bar whose one destination is the
+  page you are already on is furniture, so the two things it still carried moved into
+  the board's own toolbar — the settings gear closes the actions row (top-right of the
+  board) and the needs-input count is the amber pill immediately left of it, counted off
+  the *unfiltered* session list since it answers "is anything waiting for me". The empty
+  board spells Settings out as a text button instead: the toolbar is not rendered there,
+  and an empty board (a Linear outage, a bad deploy) is exactly when you want the
+  "Pull & deploy" that lives in that sheet. Which actions a row offers is the pure
+  `projectActions`
   (`src/lib/projectToolbar.ts`) and the rules are the old panel's, kept whole — notably
   **Stop shows whenever there is a stack**, since detection can read "crashed" while
   orphan processes still hold the ports. Two things are new. `hasWorktreeScript` on
@@ -588,8 +595,9 @@ Mojito owns the whole lifecycle — there is no external plugin:
   reads as the header's own); `.acc` pays the bottom inset **except** under
   `.term-root.kbd`, since with the keyboard up that band's bottom edge is the keyboard
   and not the home indicator, and paying it there costs ~2 of the ~13 visible rows;
-  and `.page` clears `calc(64px + var(--sab))`, the nav's height *and* the inset the
-  nav pays underneath it. `.page::before` is the opaque strip that keeps cards from
+  and `.page`'s bottom is the bare `var(--sab)` — it used to add the 64px of the bottom
+  nav, which RIC-253 removed, and the board now has no fixed bottom surface to clear at
+  all. `.page::before` is the opaque strip that keeps cards from
   scrolling under the clock — `black-translucent` asks for exactly that and nobody
   wants to read it. `tests/client/safeArea.test.ts` asserts the tokens and every
   surface that spends them, in the shape of the manifest test above: this is CSS that

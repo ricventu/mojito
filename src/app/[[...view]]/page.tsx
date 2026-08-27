@@ -9,7 +9,6 @@ import { useEvents } from "@/lib/useEvents";
 import { useSelfUpdate } from "@/lib/useSelfUpdate";
 import TokenGate from "@/components/TokenGate";
 import UnifiedList from "@/components/UnifiedList";
-import { Settings } from "lucide-react";
 import AlertLayer from "@/components/AlertLayer";
 import SettingsSheet from "@/components/SettingsSheet";
 import NewTicketSheet from "@/components/NewTicketSheet";
@@ -184,37 +183,27 @@ export default function Home() {
     );
   }
 
-  const needsInput = sessions.filter((s) => s.state === "needs-input").length;
-
   return (
-    // `.page` carries the padding that clears the fixed nav below and the status bar
-    // above — see globals.css, and RIC-257 for why the top matters.
+    // `.page` carries the padding that keeps the board clear of the status bar above
+    // and the home indicator below — see globals.css, and RIC-257 for why it matters.
     <div className="page">
       <AlertLayer alerts={alerts} onOpen={openTerminal} onClear={() => setAlerts([])} />
       {settingsOpen && <SettingsSheet token={token} onClose={() => setSettingsOpen(false)} selfUpdate={selfUpdate} />}
       {newTicketSheet}
       {/* Every view that is not a terminal or a doc overlay is this list — an
-          unrecognised path parses as the list, so it lands somewhere real. */}
+          unrecognised path parses as the list, so it lands somewhere real. There is no
+          bottom nav any more (RIC-253): with the Stacks tab folded into the board's
+          project dividers it held one destination, which was the page you were already
+          on, so Settings and the needs-input count moved into the board's own toolbar. */}
       <UnifiedList token={token} tickets={tickets} sessions={sessions}
         filters={filters} onFilters={setFilters} selfUpdate={selfUpdate}
         onLaunched={() => { refreshSessions(); refreshTickets(); }}
         onChanged={refreshSessions}
         onNewTicket={() => setNewTicketOpen(true)}
+        onSettings={() => setSettingsOpen(true)}
         onOpen={openLaunched}
         onOpenTicketDocs={(t) => go({ kind: "docs", target: { ticket: t.identifier, project: t.project }, doc: null })}
         onOpenSessionDocs={(s) => go({ kind: "docs", target: { session: s.id }, doc: null })} />
-      {/* One destination left since the Stacks tab was folded into the board's project
-          dividers (RIC-253), so the bar carries the needs-input count and the settings
-          gear rather than a choice: the Tickets entry is where you already are, and
-          tapping it re-pushes nothing (see useAppLocation.navigate). */}
-      <nav className="nav">
-        <button className="tab active" onClick={() => go(LIST)}>
-          Tickets{needsInput ? <span className="count">{needsInput}</span> : null}
-        </button>
-        <button className="tab settings icon" aria-label="Settings" onClick={() => setSettingsOpen(true)}>
-          <Settings size={17} aria-hidden="true" />
-        </button>
-      </nav>
     </div>
   );
 }

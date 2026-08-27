@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { Settings } from "lucide-react";
 import { apiFetch } from "@/lib/client";
 import { dismissSession } from "@/lib/dismissSession";
 import LaunchSheet from "./LaunchSheet";
@@ -35,7 +36,7 @@ const NO_TICKET = "No ticket";
 export default function UnifiedList(
   {
     token, tickets, sessions, filters, onFilters, selfUpdate,
-    onLaunched, onChanged, onNewTicket, onOpen, onOpenTicketDocs, onOpenSessionDocs,
+    onLaunched, onChanged, onNewTicket, onSettings, onOpen, onOpenTicketDocs, onOpenSessionDocs,
   }: {
     token: string;
     tickets: TicketSummary[];
@@ -51,6 +52,9 @@ export default function UnifiedList(
     // Owned by the page, not here: the same sheet is reachable from the terminal
     // header, which this component is not on screen for (RIC-224).
     onNewTicket: () => void;
+    // The board's toolbar is where Settings lives since the bottom nav was retired
+    // (RIC-253); the sheet itself stays the page's, like the two above.
+    onSettings: () => void;
     onOpen: (s: SessionMeta) => void;
     onOpenTicketDocs: (t: TicketSummary) => void;
     onOpenSessionDocs: (s: SessionMeta) => void;
@@ -154,6 +158,11 @@ export default function UnifiedList(
     onChanged();
   };
 
+  // The badge on the toolbar's gear row, counted here now that the nav it used to ride
+  // on is gone. Sessions are not scoped by any filter for this: it answers "is anything
+  // waiting for me", which a narrowed board must not be able to understate.
+  const needsInput = sessions.filter((s) => s.state === "needs-input").length;
+
   const empty = tickets.length === 0 && sessions.length === 0;
   const noMatches = !empty && ticketRows.length === 0 && looseSessions.length === 0;
 
@@ -164,6 +173,11 @@ export default function UnifiedList(
           <p className="empty">Nothing here yet.</p>
           <button className="btn primary block" onClick={onNewTicket}>+ New ticket</button>
           <button className="btn ghost block" onClick={() => setNewSession(true)}>New session</button>
+          {/* Spelled out rather than a gear: the toolbar that carries the icon is not
+              rendered on an empty board, and Settings has to stay reachable — it is
+              where "Pull & deploy" lives, which is exactly what an empty board (a
+              Linear outage, a bad deploy) can call for. */}
+          <button className="btn ghost block" onClick={onSettings}>Settings</button>
         </div>
       )}
       {!empty && (
@@ -179,6 +193,14 @@ export default function UnifiedList(
               <button className="btn primary sm" onClick={onNewTicket}>+ Ticket</button>
               <button className="btn ghost sm" onClick={() => setNewSession(true)}>+ Session</button>
               <button className="btn ghost sm" onClick={cleanup}>Clean up</button>
+              {needsInput > 0 && (
+                <span className="count" title={`${needsInput} session${needsInput === 1 ? "" : "s"} waiting for input`}>
+                  {needsInput}
+                </span>
+              )}
+              <button className="btn ghost sm icon settings" aria-label="Settings" title="Settings" onClick={onSettings}>
+                <Settings size={15} aria-hidden="true" />
+              </button>
             </>
           }
         />

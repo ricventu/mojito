@@ -53,7 +53,7 @@ describe("surfaces that touch a screen edge", () => {
   // keyboard is up (see TerminalView), so the inset has to live on something that is
   // always there or the terminal slides back under the status bar mid-typing.
   it.each([
-    [".page", "--sat"],                 // the board / stacks page
+    [".page", "--sat"],                 // the board
     [".term-root", "--sat"],            // the terminal, header or no header
     [".docs-head", "--sat"],            // the docs overlay's own header
     [".alert-layer", "--sat"],          // the fixed needs-input banner
@@ -64,8 +64,7 @@ describe("surfaces that touch a screen edge", () => {
   });
 
   it.each([
-    [".page", "--sab"],                 // clears the nav *and* the home indicator
-    [".nav", "--sab"],
+    [".page", "--sab"],                 // clears the home indicator
     [".acc", "--sab"],                  // the terminal's bottom-most bar
     [".docs-scroll", "--sab"],
     [".sheet", "--sab"],
@@ -74,15 +73,16 @@ describe("surfaces that touch a screen edge", () => {
     expect(block(selector)).toContain(token);
   });
 
-  // The page clears the nav's 64px *and* the inset the nav itself pays underneath it;
-  // clearing only the 64px leaves the last card under the bar on a home-indicator phone.
-  it("clears the whole bottom nav, inset included", () => {
-    expect(block(".page")).toMatch(/padding-bottom:\s*calc\(64px \+ var\(--sab\)\)/);
+  // RIC-253 retired the bottom nav, so the page's bottom is the bare inset: the 64px
+  // that used to clear the bar would now be a gap under the last card. The board has no
+  // fixed bottom surface left, which is also why `.nav` is gone from the lists above.
+  it("clears the home indicator and nothing else", () => {
+    expect(block(".page")).toMatch(/padding-bottom:\s*var\(--sab\)/);
   });
 
   // Landscape on a notched phone puts the notch on one side, so left/right are not
   // always 0 — every full-bleed container pays them too.
-  it.each([".page", ".term-root", ".docs-root", ".nav", ".sheet"])(
+  it.each([".page", ".term-root", ".docs-root", ".sheet"])(
     "%s pays the horizontal insets",
     (selector) => {
       const body = block(selector);
