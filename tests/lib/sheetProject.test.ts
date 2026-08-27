@@ -60,9 +60,8 @@ describe("newTicketProject", () => {
   });
 
   // Filters ride along on every path (see formatLocation), so the chip the user left
-  // on the board still describes what they are looking at over on Stacks or in a doc.
+  // on the board still describes what they are looking at over in a doc.
   it("takes the project filter on the other non-session views too", () => {
-    expect(newTicketProject({ kind: "stacks" }, filters({ project: ["Mojito"] }), null)).toBe("Mojito");
     expect(newTicketProject(
       { kind: "docs", target: { ticket: "RIC-1", project: null }, doc: null },
       filters({ project: ["Mojito"] }),

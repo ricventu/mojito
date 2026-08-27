@@ -13,8 +13,10 @@ describe("parseLocation", () => {
     expect(parseLocation("/", "")).toEqual(list());
   });
 
-  it("reads the stacks path", () => {
-    expect(parseLocation("/stacks", "")).toEqual({ view: { kind: "stacks" }, filters: NO_FILTERS });
+  // /stacks was its own view until RIC-253 folded that panel into the board's project
+  // dividers; an old bookmark now lands on the list like any other unknown path.
+  it("reads the retired stacks path as the list", () => {
+    expect(parseLocation("/stacks", "")).toEqual(list());
   });
 
   it("reads every filter out of the query", () => {
@@ -34,8 +36,8 @@ describe("parseLocation", () => {
       .toEqual(["Mojito"]);
   });
 
-  it("reads filters on a non-list path, so switching tabs cannot drop them", () => {
-    expect(parseLocation("/stacks", "?q=filtri").filters.query).toBe("filtri");
+  it("reads filters on a non-list path, so leaving the board cannot drop them", () => {
+    expect(parseLocation("/session/s1", "?q=filtri").filters.query).toBe("filtri");
   });
 
   it("treats an empty project or status as unset, matching the activeFilters convention", () => {
@@ -121,8 +123,8 @@ describe("formatLocation", () => {
   });
 
   it("carries the filters onto other views", () => {
-    expect(formatLocation({ view: { kind: "stacks" }, filters: { ...NO_FILTERS, query: "filtri" } }))
-      .toBe("/stacks?q=filtri");
+    expect(formatLocation({ view: { kind: "docs", target: { session: "s1" }, doc: null }, filters: { ...NO_FILTERS, query: "filtri" } }))
+      .toBe("/docs/session/s1?q=filtri");
   });
 
   it("writes a terminal path", () => {
@@ -155,7 +157,6 @@ describe("round trip", () => {
     list(),
     list({ query: "a&b=c", project: ["My Project"], status: "To QA", mine: true, sessionsOnly: true }),
     list({ project: ["Mojito", "A, B", "No project"] }),
-    { view: { kind: "stacks" }, filters: { ...NO_FILTERS, status: "In Progress" } },
     { view: { kind: "session", id: "mojito-RIC-204-work", docs: null }, filters: { ...NO_FILTERS, mine: true } },
     { view: { kind: "session", id: "s1", docs: { doc: null } }, filters: NO_FILTERS },
     { view: { kind: "session", id: "s1", docs: { doc: "plans/2026-08-18-x.md" } }, filters: NO_FILTERS },

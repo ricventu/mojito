@@ -1,4 +1,4 @@
-import { statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -18,6 +18,7 @@ export interface StackDeps {
   selfPath: string; // the server's own repo root (process.cwd()); its row is not pullable
   loadMap?: (path: string) => ProjectMap;
   isExecutable?: (p: string) => boolean;
+  exists?: (p: string) => boolean;
   listPanes?: () => Promise<PaneInfo[]>;
   startSession?: (name: string, cwd: string, command: string) => Promise<void>;
   stopSession?: (name: string) => Promise<void>;
@@ -31,6 +32,13 @@ export interface StackTarget {
   hasStack: boolean;
   pullable: boolean;
   self: boolean;
+}
+
+// `scripts/init-worktree.sh`, tested for existence rather than for the +x bit: this is
+// the same check createTicketWorktree makes before it runs the script, so "the repo has
+// one" means the same thing in the toolbar as it does at launch time (RIC-253).
+function worktreeScriptPath(root: string): string {
+  return join(root, "scripts", "init-worktree.sh");
 }
 
 function defaultIsExecutable(p: string): boolean {
@@ -101,6 +109,7 @@ export async function listStacks(deps: StackDeps): Promise<StackRow[]> {
   const listPanes = deps.listPanes ?? tmuxListAllPanes;
   const projects = listMappedProjects(loadMap(deps.projectsPath));
   const panes = await listPanes();
+  const exists = deps.exists ?? existsSync;
   return projects.map(({ name, path }): StackRow => {
     const slug = statusSlug(name);
     const hasStack = isExecutable(join(path, "scripts", "start.sh"));
@@ -111,6 +120,7 @@ export async function listStacks(deps: StackDeps): Promise<StackRow[]> {
       status: hasStack ? deriveStatus(slug, path, panes) : null,
       pullable: resolve(path) !== resolve(deps.selfPath),
       self: resolve(path) === resolve(deps.selfPath),
+      hasWorktreeScript: exists(worktreeScriptPath(path)),
     };
   });
 }

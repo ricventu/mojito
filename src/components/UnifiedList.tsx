@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { Settings } from "lucide-react";
 import { apiFetch } from "@/lib/client";
 import { dismissSession } from "@/lib/dismissSession";
 import LaunchSheet from "./LaunchSheet";
@@ -11,9 +12,12 @@ import { NO_FILTERS, type ListFilters } from "@/lib/appLocation";
 import TicketCard from "./TicketCard";
 import SessionCard from "./SessionCard";
 import StatusBadge from "./StatusBadge";
+import ProjectToolbar from "./ProjectToolbar";
 import { mineOnly, liveStatuses } from "@/lib/ticketFilter";
 import { ticketUrls } from "@/lib/ticketLink";
 import { useProjects } from "@/lib/useProjects";
+import { useStacks } from "@/lib/useStacks";
+import { stackFor } from "@/lib/projectToolbar";
 import { soleProject } from "@/lib/sheetProject";
 import { sessionStatus } from "@/lib/sessionFilter";
 import { groupByStatus } from "@/lib/groupByStatus";
@@ -21,7 +25,9 @@ import { orderSessions } from "@/lib/orderSessions";
 import { isActiveSession } from "@/lib/activeSession";
 import {
   buildUnifiedRows, groupByProject, mergedProjects, mergedStatuses, orderTicketRows,
+  withManagedSections,
 } from "@/lib/unifiedRows";
+import type { SelfUpdate } from "@/lib/useSelfUpdate";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 
 /** Divider label for the sessions that hang off no visible ticket. */
@@ -29,19 +35,26 @@ const NO_TICKET = "No ticket";
 
 export default function UnifiedList(
   {
-    token, tickets, sessions, filters, onFilters,
-    onLaunched, onChanged, onNewTicket, onOpen, onOpenTicketDocs, onOpenSessionDocs,
+    token, tickets, sessions, filters, onFilters, selfUpdate,
+    onLaunched, onChanged, onNewTicket, onSettings, onOpen, onOpenTicketDocs, onOpenSessionDocs,
   }: {
     token: string;
     tickets: TicketSummary[];
     sessions: SessionMeta[];
     filters: ListFilters;
     onFilters: (f: ListFilters, mode: "push" | "replace") => void;
+    // Owned by the page (one instance, shared with the Settings sheet) so the project
+    // toolbar's "Pull & deploy" and that sheet's can never disagree about whether a
+    // deploy is in flight — see useSelfUpdate.
+    selfUpdate: SelfUpdate;
     onLaunched: () => void;
     onChanged: () => void;
     // Owned by the page, not here: the same sheet is reachable from the terminal
     // header, which this component is not on screen for (RIC-224).
     onNewTicket: () => void;
+    // The board's toolbar is where Settings lives since the bottom nav was retired
+    // (RIC-253); the sheet itself stays the page's, like the two above.
+    onSettings: () => void;
     onOpen: (s: SessionMeta) => void;
     onOpenTicketDocs: (t: TicketSummary) => void;
     onOpenSessionDocs: (s: SessionMeta) => void;
@@ -95,11 +108,21 @@ export default function UnifiedList(
     [scoped, sessions, query, project, status, sessionsOnly, live],
   );
 
+  // Every mapped project's stack state, for the toolbars on the project dividers
+  // (RIC-253). A project with no row here — NO_PROJECT, or one projects.json has
+  // dropped since a session named it — simply gets the plain divider it always had.
+  const { stacks, refresh: refreshStacks } = useStacks(token);
+
   // Bucket both kinds by project — see groupByProject for the encounter-order and
-  // never-lost-a-section rules.
+  // never-lost-a-section rules — then pad the selected projects the board has no rows
+  // for, which is what keeps a quiet project's toolbar reachable (withManagedSections).
   const projectSections = useMemo(
-    () => groupByProject(ticketRows, looseSessions),
-    [ticketRows, looseSessions],
+    () => withManagedSections(
+      groupByProject(ticketRows, looseSessions),
+      project,
+      stacks.map((s) => s.project),
+    ),
+    [ticketRows, looseSessions, project, stacks],
   );
 
   const chips = useMemo(
@@ -135,6 +158,11 @@ export default function UnifiedList(
     onChanged();
   };
 
+  // The badge on the toolbar's gear row, counted here now that the nav it used to ride
+  // on is gone. Sessions are not scoped by any filter for this: it answers "is anything
+  // waiting for me", which a narrowed board must not be able to understate.
+  const needsInput = sessions.filter((s) => s.state === "needs-input").length;
+
   const empty = tickets.length === 0 && sessions.length === 0;
   const noMatches = !empty && ticketRows.length === 0 && looseSessions.length === 0;
 
@@ -145,6 +173,11 @@ export default function UnifiedList(
           <p className="empty">Nothing here yet.</p>
           <button className="btn primary block" onClick={onNewTicket}>+ New ticket</button>
           <button className="btn ghost block" onClick={() => setNewSession(true)}>New session</button>
+          {/* Spelled out rather than a gear: the toolbar that carries the icon is not
+              rendered on an empty board, and Settings has to stay reachable — it is
+              where "Pull & deploy" lives, which is exactly what an empty board (a
+              Linear outage, a bad deploy) can call for. */}
+          <button className="btn ghost block" onClick={onSettings}>Settings</button>
         </div>
       )}
       {!empty && (
@@ -160,6 +193,14 @@ export default function UnifiedList(
               <button className="btn primary sm" onClick={onNewTicket}>+ Ticket</button>
               <button className="btn ghost sm" onClick={() => setNewSession(true)}>+ Session</button>
               <button className="btn ghost sm" onClick={cleanup}>Clean up</button>
+              {needsInput > 0 && (
+                <span className="count" title={`${needsInput} session${needsInput === 1 ? "" : "s"} waiting for input`}>
+                  {needsInput}
+                </span>
+              )}
+              <button className="btn ghost sm icon settings" aria-label="Settings" title="Settings" onClick={onSettings}>
+                <Settings size={15} aria-hidden="true" />
+              </button>
             </>
           }
         />
@@ -176,7 +217,14 @@ export default function UnifiedList(
       )}
       {projectSections.map((sec) => (
         <section key={sec.project}>
-          <h4 className="sect">{sec.project}</h4>
+          <ProjectToolbar
+            project={sec.project}
+            stack={stackFor(stacks, sec.project)}
+            token={token}
+            refresh={refreshStacks}
+            onOpenSession={onOpen}
+            selfUpdate={selfUpdate}
+          />
           {groupByStatus(sec.ticketRows, (r) => r.ticket.statusName).map((group) => (
             <div key={group.status}>
               <div className="substatus"><StatusBadge status={group.status} /></div>

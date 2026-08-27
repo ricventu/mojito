@@ -138,9 +138,10 @@ Mojito owns the whole lifecycle — there is no external plugin:
   `node_modules` was a ~520 MB copy nobody would pay for automatically, so every
   worktree arrived empty and each session populated it by hand as its first act.
   It deliberately does not copy `.env.local` in — keeping `LINEAR_API_KEY` and
-  `MOJITO_TOKEN` out of spawned sessions is the whole point of RIC-207. A project's Stacks panel has a "Create
-  worktree script" action that opens a plain Claude session in the project root to write
-  that script.
+  `MOJITO_TOKEN` out of spawned sessions is the whole point of RIC-207. A project's
+  toolbar (see **Project toolbar** below) carries a "Create worktree script" action that
+  opens a plain Claude session in the project root to write that script — offered only
+  while the repo has none, tested with the same `existsSync` this launch path uses.
 - **Session context**: the launcher writes `<stateDir>/context/<id>.json`
   (`{identifier, statusName, title, project, labels, description, assets?, attachments?}`);
   the prompt embeds the path. It exists to save the session the tokens of
@@ -368,7 +369,7 @@ Mojito owns the whole lifecycle — there is no external plugin:
   is prose (`RIC-242 · docs`) rather than a label.
 - **Client url state**: the address bar is the single source of truth for which view is
   open and how the list is filtered (RIC-204). `src/lib/appLocation.ts` is the pure
-  codec — `parseLocation`/`formatLocation` over `/`, `/stacks`, `/session/<id>`,
+  codec — `parseLocation`/`formatLocation` over `/`, `/session/<id>`,
   `/session/<id>/docs`, `/docs/ticket/<id>`, `/docs/session/<id>` plus the five filter
   params (`project` repeats — one parameter per selected project, since a project name
   is free text and could hold whatever separator a joined list picked) — and
@@ -378,12 +379,14 @@ Mojito owns the whole lifecycle — there is no external plugin:
   `mojito-tab` are gone, along with `usePersistedState` itself: localStorage is shared
   between browser tabs, which is exactly what made two tabs unable to hold two filter
   sets. Consequences worth knowing: filters are serialized on *every* path, so leaving
-  the list for the stacks panel and coming back does not drop them; defaults are
+  the list for a terminal or a doc and coming back does not drop them; defaults are
   omitted, so the unfiltered board is a bare `/` (and the PWA's `start_url` therefore
   always opens clean); typing in the filter box replaces the entry instead of pushing
   one per keystroke; and the page lives at `src/app/[[...view]]/page.tsx`, an optional
-  catch-all, which is what makes a hard reload of `/stacks` serve the app instead of a
-  404 — `/api/*` and `public/` still win as the more specific routes. That catch-all
+  catch-all, which is what makes a hard reload of `/session/<id>` serve the app instead
+  of a 404 — `/api/*` and `public/` still win as the more specific routes. `/stacks` was
+  a view of its own until RIC-253 and is now simply unrecognised, which parses as the
+  list: an old bookmark lands on the board rather than on a blank page. That catch-all
   also matches `/ws/pty` and `/ws/events`, which is what `claimUpgrades`
   (`src/server/nextUpgrade.ts`) exists for: Next attaches an `upgrade` listener of its
   own on the first request it handles and ends any socket whose path its router
@@ -472,6 +475,43 @@ Mojito owns the whole lifecycle — there is no external plugin:
   (`flex: 0 1 auto`) at their own `.btn.sm` height and the select takes the slack:
   stretched to a quarter of the toolbar each they were the loudest thing on the
   board. On their own line they stay `flex: 1 1 0` — there the width is a tap target.
+- **Project toolbar**: each project section's divider is a management toolbar
+  (`ProjectToolbar`, RIC-253) — Start, Stop, Logs, Pull (or **Pull & deploy** on the
+  server's own checkout), Push, and **Create worktree script**. These are the actions
+  that used to be the **Stacks tab**, which is gone: the board's divider was already the
+  only thing naming a project and did nothing, while the actions belonging to a project
+  lived one tab away on a screen that listed the same names again. `page.tsx` therefore
+  has one view left and **no bottom nav at all**: a tab bar whose one destination is the
+  page you are already on is furniture, so the two things it still carried moved into
+  the board's own toolbar — the settings gear closes the actions row (top-right of the
+  board) and the needs-input count is the amber pill immediately left of it, counted off
+  the *unfiltered* session list since it answers "is anything waiting for me". The empty
+  board spells Settings out as a text button instead: the toolbar is not rendered there,
+  and an empty board (a Linear outage, a bad deploy) is exactly when you want the
+  "Pull & deploy" that lives in that sheet. Which actions a row offers is the pure
+  `projectActions`
+  (`src/lib/projectToolbar.ts`) and the rules are the old panel's, kept whole — notably
+  **Stop shows whenever there is a stack**, since detection can read "crashed" while
+  orphan processes still hold the ports. Two things are new. `hasWorktreeScript` on
+  `StackRow` is why "Create worktree script" can hide itself once the script exists; it
+  tests *existence*, not the +x bit, because that is what `createTicketWorktree` checks
+  before running it. And `withManagedSections` (`unifiedRows.ts`) pads a section for
+  every **explicitly selected** project the board has no rows for — a mapped project
+  whose tickets are all closed would otherwise have no divider to hang its toolbar off,
+  where the Stacks tab listed every mapped project unconditionally. Only selected ones,
+  so the unfiltered board does not become a list of everything in projects.json; the
+  filter already offers every configured project (RIC-225), so selecting one is the way
+  in. The buttons are **icon-only** (lucide + `title`/`aria-label`): six of them have to
+  share a line with a project name on a 320px phone, which no set of labels does, and
+  `.proj-head` wraps them onto a right-aligned second line where they still do not fit.
+  The two exceptions are worth knowing: "Resolve with Claude" keeps its words because it
+  appears only after a pull has already failed, and `useStacks` polls at 15s rather than
+  the panel's 5s now that it runs on the app's default view — every action refreshes on
+  completion, so the interval only has to catch a stack that changed outside Mojito.
+  "Pull & deploy" is deliberately *also* still in the Settings sheet, which is where it
+  has room for the paragraph explaining that it restarts the server; both call sites
+  share the one `useSelfUpdate` in `page.tsx`, so they cannot disagree about whether a
+  deploy is in flight.
 - **UI kit**: the selects are shadcn/ui sources under `src/components/ui`
   (`select`, `popover`, `command`, plus `combobox` and `choice`, the two app-level
   shapes: searchable — single or multi — and a short fixed list). They are the only
@@ -555,8 +595,9 @@ Mojito owns the whole lifecycle — there is no external plugin:
   reads as the header's own); `.acc` pays the bottom inset **except** under
   `.term-root.kbd`, since with the keyboard up that band's bottom edge is the keyboard
   and not the home indicator, and paying it there costs ~2 of the ~13 visible rows;
-  and `.page` clears `calc(64px + var(--sab))`, the nav's height *and* the inset the
-  nav pays underneath it. `.page::before` is the opaque strip that keeps cards from
+  and `.page`'s bottom is the bare `var(--sab)` — it used to add the 64px of the bottom
+  nav, which RIC-253 removed, and the board now has no fixed bottom surface to clear at
+  all. `.page::before` is the opaque strip that keeps cards from
   scrolling under the clock — `black-translucent` asks for exactly that and nobody
   wants to read it. `tests/client/safeArea.test.ts` asserts the tokens and every
   surface that spends them, in the shape of the manifest test above: this is CSS that
