@@ -35,7 +35,6 @@ export const NO_FILTERS: ListFilters = {
  */
 export type AppView =
   | { kind: "list" }
-  | { kind: "stacks" }
   | { kind: "session"; id: string; docs: { doc: string | null } | null }
   | { kind: "docs"; target: DocsTarget; doc: string | null };
 
@@ -71,7 +70,6 @@ function readView(pathname: string, params: URLSearchParams): AppView {
   const parts = segments(pathname);
   const doc = params.get("doc");
   if (parts.length === 0) return { kind: "list" };
-  if (parts.length === 1 && parts[0] === "stacks") return { kind: "stacks" };
   if (parts[0] === "session" && parts.length === 2) {
     return { kind: "session", id: parts[1], docs: null };
   }
@@ -84,7 +82,8 @@ function readView(pathname: string, params: URLSearchParams): AppView {
     }
     if (parts[1] === "session") return { kind: "docs", target: { session: parts[2] }, doc };
   }
-  // Anything unrecognised is the list, so a stale bookmark or a hand-typed path
+  // Anything unrecognised is the list, so a stale bookmark or a hand-typed path —
+  // /stacks, from before RIC-253 folded that panel into the board's project dividers —
   // lands somewhere real instead of on a blank page.
   return { kind: "list" };
 }
@@ -115,7 +114,6 @@ function viewPath(view: AppView): string {
   const enc = encodeURIComponent;
   switch (view.kind) {
     case "list": return "/";
-    case "stacks": return "/stacks";
     case "session": return `/session/${enc(view.id)}${view.docs ? "/docs" : ""}`;
     case "docs":
       return "ticket" in view.target
@@ -127,8 +125,8 @@ function viewPath(view: AppView): string {
 /**
  * The url for a location — the inverse of parseLocation.
  *
- * Filters are written on every path, not just the list's, so leaving the list for
- * the stacks panel and coming back does not silently drop them. Values sitting at
+ * Filters are written on every path, not just the list's, so leaving the list for a
+ * terminal or a doc and coming back does not silently drop them. Values sitting at
  * their default are omitted instead, which is what keeps the clean board a bare `/`.
  */
 export function formatLocation({ view, filters }: AppLocation): string {

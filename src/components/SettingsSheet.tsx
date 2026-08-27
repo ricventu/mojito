@@ -15,8 +15,9 @@ export default function SettingsSheet({ token, onClose, selfUpdate }: {
 
   // Self-update ("Pull & deploy"): only shown when the server exposes it
   // (MOJITO_SELF_UPDATE=1). `phase` drives the button label and banners. The hook
-  // itself lives in page.tsx (one instance, shared with the Stacks self-row) so this
-  // sheet can never disagree with that row about whether a deploy is in flight.
+  // itself lives in page.tsx (one instance, shared with the project toolbar's row for
+  // this checkout) so this sheet can never disagree with it about whether a deploy is
+  // in flight.
   const { enabled: selfUpdateEnabled, phase, message: pullMsg, error: pullErr, run: onPull } = selfUpdate;
 
   useEffect(() => {

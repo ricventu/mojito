@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildUnifiedRows, groupByProject, orderTicketRows, mergedStatuses, mergedProjects,
-  type TicketRow,
+  withManagedSections, type ProjectSection, type TicketRow,
 } from "@/lib/unifiedRows";
 import { liveStatuses } from "@/lib/ticketFilter";
 import type { SessionMeta, TicketSummary } from "@/server/types";
@@ -419,5 +419,40 @@ describe("live ticket statuses", () => {
     const tickets = [ticket({ identifier: "RIC-218", statusName: "To QA" })];
     const sessions = [session({ ticket: "RIC-218", launchStatus: "Todo" })];
     expect(mergedStatuses(tickets, sessions, liveStatuses(tickets))).toEqual(["To QA"]);
+  });
+});
+
+describe("withManagedSections", () => {
+  const section = (project: string): ProjectSection => ({ project, ticketRows: [], sessions: [] });
+
+  // The reachability case: a mapped project whose tickets are all closed has no section
+  // to hang its Start/Stop/Pull/Push toolbar off, so selecting it in the filter is what
+  // brings the header back.
+  it("adds a section for a selected project the board has no rows for", () => {
+    const out = withManagedSections([section("Mojito")], ["Mojito", "Lime"], ["Mojito", "Lime"]);
+    expect(out.map((s) => s.project)).toEqual(["Mojito", "Lime"]);
+    expect(out[1]).toEqual({ project: "Lime", ticketRows: [], sessions: [] });
+  });
+
+  it("never duplicates a section the board already has", () => {
+    const out = withManagedSections([section("Mojito")], ["Mojito"], ["Mojito"]);
+    expect(out.map((s) => s.project)).toEqual(["Mojito"]);
+  });
+
+  // NO_PROJECT and a project projects.json has dropped are both selectable, and neither
+  // has a repo for the toolbar to act on.
+  it("ignores a selected name no mapped project answers for", () => {
+    expect(withManagedSections([], ["No project", "Gone"], ["Mojito"])).toEqual([]);
+  });
+
+  it("adds nothing when the filter names no project", () => {
+    const sections = [section("Mojito")];
+    expect(withManagedSections(sections, [], ["Mojito", "Lime"])).toBe(sections);
+  });
+
+  it("does not mutate its input", () => {
+    const sections = [section("Mojito")];
+    withManagedSections(sections, ["Lime"], ["Lime"]);
+    expect(sections).toHaveLength(1);
   });
 });

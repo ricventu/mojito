@@ -168,12 +168,11 @@ a.id:any-link {
 a.id:any-link:hover { text-decoration-color: var(--accent); }
 
 /* ---- Layout helpers ---- */
-/* The scrolling page behind the bottom nav — the board and the stacks panel both. The
-   insets are paid here and not on <body> because `.active-filters` is sticky against
-   the viewport: a padding on the scroll container's ancestor would offset it a second
-   time. The bottom clears the nav's own 64px *and* the inset the nav pays underneath
-   it; clearing only the 64px leaves the last card under the bar on a phone with a home
-   indicator. */
+/* The scrolling page behind the bottom nav. The insets are paid here and not on <body>
+   because `.active-filters` is sticky against the viewport: a padding on the scroll
+   container's ancestor would offset it a second time. The bottom clears the nav's own
+   64px *and* the inset the nav pays underneath it; clearing only the 64px leaves the
+   last card under the bar on a phone with a home indicator. */
 .page {
   padding-top: var(--sat);
   padding-left: var(--sal);
@@ -204,20 +203,59 @@ a.id:any-link:hover { text-decoration-color: var(--accent); }
 .grow { flex: 1; }
 .empty { color: var(--text-dim); padding: 24px 4px; text-align: center; }
 
-/* ---- Section title ---- */
+/* ---- Project header / management toolbar ---- */
 /* The project name is the outermost grouping in the list, one level above the
    status sub-header below it — RIC-244 brightens it to `--text` (bumped from
    `--text-faint`, which read fainter than everything it groups) and gives the
-   trailing rule the same `--border-hi` weight `.sub-label` sits under. Each .sect
-   is the sole first child of its own <section> (UnifiedList), so `.sect:first-child`
-   matched every section, not just the page's first one — the extra top margin never
-   showed. `section + section > .sect` targets only a section that follows another. */
+   trailing rule the same `--border-hi` weight `.sub-label` sits under. Each
+   .proj-head is the sole first child of its own <section> (UnifiedList), so
+   `:first-child` matched every section, not just the page's first one — the extra top
+   margin never showed. `section + section > .proj-head` targets only a section that
+   follows another.
+
+   The rule is an element rather than `.sect::after` since RIC-253: a pseudo-element
+   is always the last child, so the actions that now follow it could not be laid out
+   after it. `flex-wrap` is what gives .proj-msg a line of its own below the row. */
+.proj-head {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 2px 2px 10px;
+}
 .sect {
   font: 700 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
-  color: var(--text); margin: 2px 2px 10px; display: flex; align-items: center; gap: 8px;
+  color: var(--text); margin: 0; display: flex; align-items: center; gap: 8px;
 }
-.sect::after { content: ""; flex: 1; height: 1px; background: var(--border-hi); }
-section + section > .sect { margin-top: 24px; }
+.sect-rule { flex: 1; min-width: 12px; height: 1px; background: var(--border-hi); }
+section + section > .proj-head { margin-top: 24px; }
+
+/* Icon-only, and square: six of these have to fit beside a project name on the
+   narrowest phone (see ProjectToolbar for why they carry no labels). `.btn.sm`'s
+   horizontal padding would make each one a wide slab, so it is overridden to a fixed
+   28px box — still a real tap target, and the row reads as a toolbar rather than as
+   six buttons. `margin-left: auto` does nothing on the first line (`.sect-rule` already
+   eats the slack) and right-aligns the row where a long project name wraps it onto one
+   of its own. */
+.proj-actions { display: flex; align-items: center; gap: 6px; flex: none; margin-left: auto; }
+.proj-actions .btn.sm { width: 28px; height: 28px; padding: 0; flex: none; color: var(--text-dim); }
+.proj-actions .btn.sm:hover:not(:disabled) { color: var(--text); }
+.proj-actions .btn.sm:disabled { opacity: .5; cursor: default; }
+/* `.btn:hover` brightens the border unconditionally, which on a disabled button reads
+   as "this does something". */
+.proj-actions .btn.sm:disabled:hover { border-color: var(--border-hi); }
+
+/* What an action had to say for itself: a git result, or a deploy in flight. Takes a
+   whole line under the row (`.proj-head` wraps) so a long message never squeezes the
+   buttons that produced it. */
+.proj-msg {
+  flex: 1 1 100%; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  font: 500 12px/1.4 var(--mono); color: var(--text-dim);
+}
+/* A git failure carries the whole command output, so the text gets a wide flex basis:
+   where it and "Resolve with Claude" cannot share a line, the button wraps below it
+   rather than squeezing the message into a six-line column. */
+.proj-msg .txt { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.proj-msg .acts { display: flex; align-items: center; gap: 8px; flex: none; margin-left: auto; }
+.proj-msg.err { color: var(--err); }
+.proj-msg .x { color: var(--text-faint); background: none; border: none; cursor: pointer; padding: 2px; flex: none; }
+.proj-msg .x:hover { color: var(--text); }
 
 /* ---- Status sub-group header (within a project section) ---- */
 .substatus { margin: 12px 2px 8px; }
@@ -356,19 +394,17 @@ button.chip:active { transform: scale(.96); }
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
-/* ---- Status dot (Stacks rows) ---- */
+/* ---- Status dot (project toolbars) ---- */
+/* A flex item of `.sect` since RIC-253, so the row's own gap spaces it and its old
+   `margin-left`/`vertical-align` (which flex ignores anyway) are gone. */
 .s-dot {
-  display: inline-block;
+  flex: none;
   width: 8px; height: 8px;
   border-radius: 50%;
-  margin-left: 6px;
-  vertical-align: middle;
 }
 .s-dot.running { background: var(--ok); }
 .s-dot.stopped { background: var(--text-faint); }
 .s-dot.crashed { background: var(--err); }
-.s-row { display: flex; align-items: center; gap: 8px; }
-.s-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 
 /* ---- Alert banner ---- */
 .alert {

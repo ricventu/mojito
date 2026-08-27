@@ -187,3 +187,32 @@ export function groupByProject(
   }
   return order.map((name) => sections.get(name)!);
 }
+
+/**
+ * The sections above, plus an empty one for every project the filter explicitly names
+ * that `managed` also knows — the projects whose section header carries a management
+ * toolbar (RIC-253).
+ *
+ * Without this, a mapped project with no open ticket and no session has no section, so
+ * its Start/Stop/Pull/Push actions are unreachable: the board only ever grouped what it
+ * had rows for, while the Stacks tab it replaces listed every mapped project. Padding
+ * only the *explicitly selected* ones is what keeps that reachable without turning the
+ * unfiltered board into a list of every project in projects.json — the filter already
+ * offers every configured project (RIC-225), so selecting one is the way in.
+ *
+ * `managed` gates it because a selected name is not necessarily a repo: NO_PROJECT and
+ * a project projects.json has dropped are both selectable, and an empty section whose
+ * header has no actions on it is a header for nothing. Padded sections come after the
+ * ones that hold rows, in selection order. Does not mutate its inputs.
+ */
+export function withManagedSections(
+  sections: ProjectSection[],
+  selected: readonly string[],
+  managed: readonly string[],
+): ProjectSection[] {
+  const present = new Set(sections.map((s) => s.project));
+  const extra = selected
+    .filter((name) => managed.includes(name) && !present.has(name))
+    .map((project): ProjectSection => ({ project, ticketRows: [], sessions: [] }));
+  return extra.length === 0 ? sections : [...sections, ...extra];
+}

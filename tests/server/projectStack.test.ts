@@ -20,6 +20,9 @@ const MAP = {
   },
 };
 const EXECUTABLE = new Set(["/repo/fb/scripts/start.sh", "/repo/gc/scripts/start.sh"]);
+// Only Mojito's own checkout has scripts/init-worktree.sh (RIC-240) — see the
+// hasWorktreeScript case below.
+const PRESENT = new Set(["/repo/mojito/scripts/init-worktree.sh"]);
 
 function deps(over: Partial<StackDeps> = {}): StackDeps {
   return {
@@ -27,6 +30,7 @@ function deps(over: Partial<StackDeps> = {}): StackDeps {
     selfPath: SELF,
     loadMap: () => MAP as never,
     isExecutable: (p) => EXECUTABLE.has(p),
+    exists: (p) => PRESENT.has(p),
     listPanes: async () => [],
     startSession: async () => {},
     stopSession: async () => {},
@@ -48,6 +52,17 @@ describe("listStacks", () => {
     expect(gc.slug).toBe("gestionale-cooperative");
     const lime = rows.find((r) => r.project === "Lime")!;
     expect(lime).toMatchObject({ hasStack: false, status: null, pullable: true });
+  });
+
+  // The toolbar offers "Create worktree script" on exactly the repos a ticket launch
+  // would warn about, so the flag tests existence — the same check createTicketWorktree
+  // makes — not the +x bit.
+  it("reports whether each repo already has scripts/init-worktree.sh", async () => {
+    const rows = await listStacks(deps());
+    const has = Object.fromEntries(rows.map((r) => [r.project, r.hasWorktreeScript]));
+    expect(has).toEqual({
+      Factorybook: false, "Gestionale Cooperative": false, Lime: false, Mojito: true,
+    });
   });
 
   it("flags the Mojito self-row (path === selfPath) as not pullable", async () => {

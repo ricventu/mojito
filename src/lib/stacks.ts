@@ -9,6 +9,14 @@ export interface StackRow {
   status: StackStatus | null; // meaningful only when hasStack
   pullable: boolean; // false for the Mojito self-row
   self: boolean; // the Mojito checkout this server runs from
+  /**
+   * Whether the repo already has `scripts/init-worktree.sh`. Existence, not
+   * executability — it mirrors the `existsSync` in createTicketWorktree, which is what
+   * actually decides whether a fresh worktree gets set up, so the toolbar's "Create
+   * worktree script" action is offered on exactly the repos a launch would warn about
+   * (RIC-253).
+   */
+  hasWorktreeScript: boolean;
 }
 
 export type PullResponse =

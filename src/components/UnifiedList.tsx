@@ -11,9 +11,12 @@ import { NO_FILTERS, type ListFilters } from "@/lib/appLocation";
 import TicketCard from "./TicketCard";
 import SessionCard from "./SessionCard";
 import StatusBadge from "./StatusBadge";
+import ProjectToolbar from "./ProjectToolbar";
 import { mineOnly, liveStatuses } from "@/lib/ticketFilter";
 import { ticketUrls } from "@/lib/ticketLink";
 import { useProjects } from "@/lib/useProjects";
+import { useStacks } from "@/lib/useStacks";
+import { stackFor } from "@/lib/projectToolbar";
 import { soleProject } from "@/lib/sheetProject";
 import { sessionStatus } from "@/lib/sessionFilter";
 import { groupByStatus } from "@/lib/groupByStatus";
@@ -21,7 +24,9 @@ import { orderSessions } from "@/lib/orderSessions";
 import { isActiveSession } from "@/lib/activeSession";
 import {
   buildUnifiedRows, groupByProject, mergedProjects, mergedStatuses, orderTicketRows,
+  withManagedSections,
 } from "@/lib/unifiedRows";
+import type { SelfUpdate } from "@/lib/useSelfUpdate";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 
 /** Divider label for the sessions that hang off no visible ticket. */
@@ -29,7 +34,7 @@ const NO_TICKET = "No ticket";
 
 export default function UnifiedList(
   {
-    token, tickets, sessions, filters, onFilters,
+    token, tickets, sessions, filters, onFilters, selfUpdate,
     onLaunched, onChanged, onNewTicket, onOpen, onOpenTicketDocs, onOpenSessionDocs,
   }: {
     token: string;
@@ -37,6 +42,10 @@ export default function UnifiedList(
     sessions: SessionMeta[];
     filters: ListFilters;
     onFilters: (f: ListFilters, mode: "push" | "replace") => void;
+    // Owned by the page (one instance, shared with the Settings sheet) so the project
+    // toolbar's "Pull & deploy" and that sheet's can never disagree about whether a
+    // deploy is in flight — see useSelfUpdate.
+    selfUpdate: SelfUpdate;
     onLaunched: () => void;
     onChanged: () => void;
     // Owned by the page, not here: the same sheet is reachable from the terminal
@@ -95,11 +104,21 @@ export default function UnifiedList(
     [scoped, sessions, query, project, status, sessionsOnly, live],
   );
 
+  // Every mapped project's stack state, for the toolbars on the project dividers
+  // (RIC-253). A project with no row here — NO_PROJECT, or one projects.json has
+  // dropped since a session named it — simply gets the plain divider it always had.
+  const { stacks, refresh: refreshStacks } = useStacks(token);
+
   // Bucket both kinds by project — see groupByProject for the encounter-order and
-  // never-lost-a-section rules.
+  // never-lost-a-section rules — then pad the selected projects the board has no rows
+  // for, which is what keeps a quiet project's toolbar reachable (withManagedSections).
   const projectSections = useMemo(
-    () => groupByProject(ticketRows, looseSessions),
-    [ticketRows, looseSessions],
+    () => withManagedSections(
+      groupByProject(ticketRows, looseSessions),
+      project,
+      stacks.map((s) => s.project),
+    ),
+    [ticketRows, looseSessions, project, stacks],
   );
 
   const chips = useMemo(
@@ -176,7 +195,14 @@ export default function UnifiedList(
       )}
       {projectSections.map((sec) => (
         <section key={sec.project}>
-          <h4 className="sect">{sec.project}</h4>
+          <ProjectToolbar
+            project={sec.project}
+            stack={stackFor(stacks, sec.project)}
+            token={token}
+            refresh={refreshStacks}
+            onOpenSession={onOpen}
+            selfUpdate={selfUpdate}
+          />
           {groupByStatus(sec.ticketRows, (r) => r.ticket.statusName).map((group) => (
             <div key={group.status}>
               <div className="substatus"><StatusBadge status={group.status} /></div>

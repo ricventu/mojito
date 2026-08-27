@@ -9,13 +9,11 @@ import { useEvents } from "@/lib/useEvents";
 import { useSelfUpdate } from "@/lib/useSelfUpdate";
 import TokenGate from "@/components/TokenGate";
 import UnifiedList from "@/components/UnifiedList";
-import StacksPanel from "@/components/StacksPanel";
 import { Settings } from "lucide-react";
 import AlertLayer from "@/components/AlertLayer";
 import SettingsSheet from "@/components/SettingsSheet";
 import NewTicketSheet from "@/components/NewTicketSheet";
 import DocsView from "@/components/DocsView";
-import { tabTitle } from "@/lib/tabTitle";
 import { withSession } from "@/lib/launchedSession";
 import { newTicketProject } from "@/lib/sheetProject";
 import type { AppView, ListFilters } from "@/lib/appLocation";
@@ -30,10 +28,14 @@ const TerminalView = dynamic(() => import("@/components/TerminalView"), { ssr: f
 /** Where every in-app Back lands once there is nothing of ours left to go back to. */
 const LIST: AppView = { kind: "list" };
 
+/** The tab title for every view but an open terminal, which sets its own. */
+const TITLE = "Tickets — Mojito";
+
 // This page is the app's only route, mounted on an optional catch-all so that a
-// reload of /stacks or /session/<id> is served the same client bundle instead of a
-// 404 — see appLocation for the url grammar. Unrecognised paths parse as the list,
-// so a stale bookmark still lands somewhere real.
+// reload of /session/<id> is served the same client bundle instead of a 404 — see
+// appLocation for the url grammar. Unrecognised paths parse as the list, so a stale
+// bookmark — /stacks from before RIC-253 folded that panel into the board's project
+// dividers — still lands somewhere real.
 export default function Home() {
   const { token, setToken } = useToken();
   const { location, navigate, replace, back } = useAppLocation();
@@ -43,14 +45,14 @@ export default function Home() {
   const [newTicketOpen, setNewTicketOpen] = useState(false);
   const { tickets, refresh: refreshTickets } = useTickets(token);
   const { sessions, setSessions, loaded: sessionsLoaded, refresh: refreshSessions } = useSessions(token);
-  // Owned here — not by StacksPanel or SettingsSheet — so a deploy's health poll and
-  // "Deploying…" state survive switching tabs or opening a terminal, both of which
-  // unmount StacksPanel mid-deploy. Called unconditionally, above the token/terminal/docs
-  // early returns below, per the rules of hooks; the hook itself no-ops until a token exists.
+  // Owned here — not by the project toolbar or SettingsSheet — so a deploy's health poll
+  // and "Deploying…" state survive opening a terminal or a doc, either of which unmounts
+  // the board mid-deploy. Called unconditionally, above the token/terminal/docs early
+  // returns below, per the rules of hooks; the hook itself no-ops until a token exists.
   const selfUpdate = useSelfUpdate(token);
 
   // Go to another view, carrying the filters: they ride along on every path, so
-  // leaving the list for the stacks panel and coming back does not drop them.
+  // leaving the list for a terminal or a doc and coming back does not drop them.
   const go = useCallback((next: AppView) => navigate({ view: next, filters }), [navigate, filters]);
   const setFilters = useCallback(
     (next: ListFilters, mode: "push" | "replace") =>
@@ -95,7 +97,7 @@ export default function Home() {
   // sets the ticket title and restores this one on close.
   useEffect(() => {
     if (view.kind === "session") return;
-    document.title = token ? tabTitle(view.kind) : "Mojito";
+    document.title = token ? TITLE : "Mojito";
   }, [view.kind, token]);
 
   if (!token) return <TokenGate onSet={setToken} />;
@@ -191,23 +193,24 @@ export default function Home() {
       <AlertLayer alerts={alerts} onOpen={openTerminal} onClear={() => setAlerts([])} />
       {settingsOpen && <SettingsSheet token={token} onClose={() => setSettingsOpen(false)} selfUpdate={selfUpdate} />}
       {newTicketSheet}
-      {view.kind === "stacks"
-        ? <StacksPanel token={token} onOpenLogs={openLaunched} selfUpdate={selfUpdate} />
-        : <UnifiedList token={token} tickets={tickets} sessions={sessions}
-            filters={filters} onFilters={setFilters}
-            onLaunched={() => { refreshSessions(); refreshTickets(); }}
-            onChanged={refreshSessions}
-            onNewTicket={() => setNewTicketOpen(true)}
-            onOpen={openLaunched}
-            onOpenTicketDocs={(t) => go({ kind: "docs", target: { ticket: t.identifier, project: t.project }, doc: null })}
-            onOpenSessionDocs={(s) => go({ kind: "docs", target: { session: s.id }, doc: null })} />}
-      {/* Anything that is not "stacks" is the unified list, so an unrecognised path
-          lands somewhere real. */}
+      {/* Every view that is not a terminal or a doc overlay is this list — an
+          unrecognised path parses as the list, so it lands somewhere real. */}
+      <UnifiedList token={token} tickets={tickets} sessions={sessions}
+        filters={filters} onFilters={setFilters} selfUpdate={selfUpdate}
+        onLaunched={() => { refreshSessions(); refreshTickets(); }}
+        onChanged={refreshSessions}
+        onNewTicket={() => setNewTicketOpen(true)}
+        onOpen={openLaunched}
+        onOpenTicketDocs={(t) => go({ kind: "docs", target: { ticket: t.identifier, project: t.project }, doc: null })}
+        onOpenSessionDocs={(s) => go({ kind: "docs", target: { session: s.id }, doc: null })} />
+      {/* One destination left since the Stacks tab was folded into the board's project
+          dividers (RIC-253), so the bar carries the needs-input count and the settings
+          gear rather than a choice: the Tickets entry is where you already are, and
+          tapping it re-pushes nothing (see useAppLocation.navigate). */}
       <nav className="nav">
-        <button className={`tab${view.kind !== "stacks" ? " active" : ""}`} onClick={() => go(LIST)}>
+        <button className="tab active" onClick={() => go(LIST)}>
           Tickets{needsInput ? <span className="count">{needsInput}</span> : null}
         </button>
-        <button className={`tab${view.kind === "stacks" ? " active" : ""}`} onClick={() => go({ kind: "stacks" })}>Stacks</button>
         <button className="tab settings icon" aria-label="Settings" onClick={() => setSettingsOpen(true)}>
           <Settings size={17} aria-hidden="true" />
         </button>
