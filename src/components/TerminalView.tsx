@@ -26,7 +26,7 @@ import { termRootStyle, isKeyboardOpen } from "@/lib/keyboardInset";
 import { terminalOptions } from "@/lib/terminalOptions";
 import { bufferText } from "@/lib/terminalText";
 import { urlLinkProvider } from "@/lib/terminalLinkProvider";
-import { isUsableGeometry } from "@/lib/terminalFit";
+import { syncGeometry } from "@/lib/terminalFit";
 import { attachWebglRenderer } from "@/lib/terminalRenderer";
 import { keepSettling } from "@/lib/viewportSettle";
 import { terminalTabTitle } from "@/lib/terminalTabTitle";
@@ -133,20 +133,18 @@ export default function TerminalView(
       // `window resize` alone does not fire for it, hence the vv listeners below.
       const vv = window.visualViewport;
 
-      // Fit, but never to a geometry the mobile keyboard is only passing through
-      // on its way to the final one (see terminalFit.ts — a mid-animation band
-      // proposes 1 row, which would resize the tmux window to a single row and
-      // take the TUI's input line with it).
+      // Re-fit the terminal to its box — but never to a geometry the mobile
+      // keyboard is only passing through on its way to the final one, and never
+      // while the keyboard is up at all — and then tell the pty the geometry the
+      // terminal ended the pass with, re-fitted or not. Both halves and the
+      // reasoning for each live in `syncGeometry` (terminalFit.ts).
       const applyFit = () => {
-        // While the keyboard is up, leave the geometry alone entirely. The
-        // terminal keeps the rows it had and `.term-body` shows the bottom of
-        // them (see globals.css), so the input line stays on screen without the
-        // pty — and claude's whole layout — having to be resized against a band
-        // we cannot measure reliably. Also means no TUI reflow while typing.
-        if (kbdOpenRef.current) return;
-        if (!isUsableGeometry(fit.proposeDimensions())) return;
-        fit.fit();
-        sendResize();
+        syncGeometry({
+          keyboardOpen: kbdOpenRef.current,
+          propose: () => fit.proposeDimensions(),
+          refit: () => fit.fit(),
+          send: sendResize,
+        });
       };
 
       // Pin `.term-root` to the visible band (see keyboardInset.ts). Re-read on

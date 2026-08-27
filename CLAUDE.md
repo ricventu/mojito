@@ -273,6 +273,24 @@ Mojito owns the whole lifecycle — there is no external plugin:
   as ASCII rather than icons (see **Icons**): `>_` and `</>` say *terminal* and *code
   editor* in a way two lucide pictograms do not, and being phone-hidden they never sit
   next to the icon row anyway.
+- **Terminal geometry**: the pty's size is the *terminal's* size, always — one invariant,
+  and `syncGeometry` (`src/lib/terminalFit.ts`) is the only place it is maintained. It
+  separates two things that used to be one early return. **Re-fitting** (re-measuring
+  xterm against `.term-body`) is refused while the mobile keyboard is up — the terminal
+  keeps the rows it had and the bottom-anchored `.term-body` shows the bottom of them, so
+  the TUI's input line stays on screen without claude's whole layout being reflowed
+  against a band iOS will not report reliably — and refused for a mid-animation band
+  (`isUsableGeometry`, which a shrinking viewport collapses to 1 row). **Publishing** the
+  geometry to the pty is refused *never*. Skipping the send alongside the fit is RIC-258:
+  `ptyGateway` spawns its `tmux attach` at 80x24 and the client's resize frame is the only
+  thing that ever corrects it, so a socket that (re)connected with the keyboard up — a
+  phone back from the background with the keyboard restored, a deploy, any of the 1.5s
+  reconnects — left the pane at 24 rows for good, and nothing re-sent it until the keyboard
+  closed. tmux then repainted the TUI into the top 24 rows of a grid xterm still held ~52
+  of, and the bottom-anchored view showed only the blank rows beneath it: a wholly black
+  terminal with the input line off the top, which is how the bug was reported and exactly
+  what a 24-into-52 repaint reproduces. Re-sending a size the pty already has is a no-op,
+  so the send is unconditional rather than conditioned on anything having changed.
 - **Terminal composer**: the compose toggle, first key in the accessory bar, opens a real
   `<textarea>` you write in, then inject into the terminal through xterm's own
   paste path (`AccessoryBar`, `term.paste`). It exists because **the terminal is
