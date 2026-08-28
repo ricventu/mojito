@@ -28,6 +28,7 @@ import { bufferText } from "@/lib/terminalText";
 import { urlLinkProvider } from "@/lib/terminalLinkProvider";
 import { syncGeometry } from "@/lib/terminalFit";
 import { attachWebglRenderer } from "@/lib/terminalRenderer";
+import { restoreTerminalPlatform } from "@/lib/terminalPlatform";
 import { keepSettling } from "@/lib/viewportSettle";
 import { terminalTabTitle } from "@/lib/terminalTabTitle";
 import { terminalHeadModel } from "@/lib/terminalHeader";
@@ -84,6 +85,11 @@ export default function TerminalView(
     const start = () => {
       if (torn) return;
       const term = new Terminal(terminalOptions());
+      // Before anything reads a key: xterm mistakes the bundler's `process` shim
+      // for node and concludes it is on no platform at all, which turns the Mac's
+      // Option key into Meta and sends `ESC + <US key>` where the layout meant to
+      // compose `@`, `#`, `[`, `]` … See terminalPlatform.ts.
+      restoreTerminalPlatform(term, navigator);
       const fit = new FitAddon();
       term.loadAddon(fit);
       // Make http(s) URLs in terminal output clickable; open in a new tab. Our

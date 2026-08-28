@@ -291,6 +291,29 @@ Mojito owns the whole lifecycle — there is no external plugin:
   terminal with the input line off the top, which is how the bug was reported and exactly
   what a 24-into-52 repaint reproduces. Re-sending a size the pty already has is a no-op,
   so the send is unconditional rather than conditioned on anything having changed.
+- **Terminal keyboard**: xterm decides `isMac`/`isWindows`/`isFirefox` **once at module
+  load**, and guards that decision with `typeof process !== "undefined" && "title" in
+  process` so the module stays importable from node. In a bundle that guard inverts:
+  the bare `process` is a free variable, the bundler rewrites it to its own browser shim,
+  and the shim has a `title` — so xterm concludes it is running in node, sets its
+  platform string to `"node"`, and every flag comes out `false`. `isMac === false` turns
+  the Mac's **Option key into Meta**: `evaluateKeyboardEvent` takes the "Alt = ESC prefix"
+  branch it was written to skip, `_isThirdLevelShift` stops handing the keystroke back to
+  the browser for the layout to compose, and the event is cancelled. On an Italian layout
+  that is every symbol worth typing — `Option+ò` sent `ESC ;` instead of `@`, `Option+è`
+  sent `ESC [`, and since that is a CSI introducer tmux and the TUI ate what followed,
+  which is why the symptom was "nothing happens at all" rather than a wrong character.
+  `restoreTerminalPlatform` (`src/lib/terminalPlatform.ts`) overwrites
+  `CoreBrowserTerminal.browser` — a plain public field, TypeScript-private only through
+  `_core` — with the flags computed from the real navigator, and is best-effort: a future
+  xterm that renames that seam leaves the terminal as it is rather than failing the mount.
+  Repairing the flag rather than intercepting the keys ourselves is deliberate — a custom
+  handler would still leave xterm's own `keypress` path armed, so the day upstream fixes
+  its detection every such character would arrive **twice**, where this assignment simply
+  becomes a no-op. What it does **not** reach: `SelectionService` reads the Platform
+  module directly, so `macOptionClickForcesSelection` is still inert and the Mac's
+  force-selection gesture is in fact **Shift+drag** (the non-Mac branch of
+  `shouldForceSelection`), not the Option+drag described under **Copying text out**.
 - **Terminal composer**: the compose toggle, first key in the accessory bar, opens a real
   `<textarea>` you write in, then inject into the terminal through xterm's own
   paste path (`AccessoryBar`, `term.paste`). It exists because **the terminal is
