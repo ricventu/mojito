@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { KNOWN_STATUSES } from "@/server/statusModel";
-import { STATUS_ORDER, STATUS_COLOR, statusRank, statusColorClass, CUSTOM_STATUS, INTAKE_STATUS, TERMINAL_STATUS } from "@/lib/status";
+import { KNOWN_STATUSES, MANUAL_STATUSES } from "@/server/statusModel";
+import { STATUS_ORDER, STATUS_COLOR, statusRank, statusColorClass, manualMoveTarget, CUSTOM_STATUS, INTAKE_STATUS, TERMINAL_STATUS } from "@/lib/status";
 
 describe("status metadata", () => {
   it("covers exactly the statuses the server model knows — nothing missing, nothing extra", () => {
@@ -53,6 +53,39 @@ describe("status metadata", () => {
     const ALLOWED_HUES = new Set(["grey", "blue", "indigo", "amber", "teal", "green", "red", "muted"]);
     for (const hue of Object.values(STATUS_COLOR)) {
       expect(ALLOWED_HUES, `hue ${hue}`).toContain(hue);
+    }
+  });
+});
+
+// RIC-275: the launch sheet's one manual status move. Backlog and Todo are the two
+// states nothing in the lifecycle moves a ticket between on its own — every other
+// transition is Mojito's (a launch, a QA verdict), which is why only these two are
+// offered by hand.
+describe("manualMoveTarget", () => {
+  it("offers Todo from Backlog and Backlog from Todo", () => {
+    expect(manualMoveTarget("Backlog")).toBe("Todo");
+    expect(manualMoveTarget("Todo")).toBe("Backlog");
+  });
+
+  it("offers nothing from any other status", () => {
+    for (const s of ["In Progress", "To QA", "Done", "Canceled", "Duplicate", "Whatever", ""]) {
+      expect(manualMoveTarget(s), `target for ${s}`).toBeNull();
+    }
+  });
+
+  // The route validates the target against MANUAL_STATUSES, so a target this function
+  // can produce but the server rejects would be a dead button.
+  it("only ever names a status the server accepts", () => {
+    for (const from of KNOWN_STATUSES) {
+      const to = manualMoveTarget(from);
+      if (to !== null) expect(MANUAL_STATUSES, `target for ${from}`).toContain(to);
+    }
+  });
+
+  // The move is a toggle: every status it offers must itself offer the way back.
+  it("is its own inverse", () => {
+    for (const from of MANUAL_STATUSES) {
+      expect(manualMoveTarget(manualMoveTarget(from)!)).toBe(from);
     }
   });
 });

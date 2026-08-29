@@ -10,6 +10,15 @@ import type { DocsTarget } from "./useDocs";
  * (RIC-225), so "Mojito and Fornace, nothing else" is a state the url has to be able
  * to hold. Empty means every project, which is also what makes the clean board a
  * bare `/`.
+ *
+ * `backlog` is the one value here whose *default narrows* (RIC-275): a board nobody has
+ * touched hides its Backlog tickets, so `false` is both the default and the restrictive
+ * setting and the url parameter reads the other way round from every other one — absent
+ * means hidden, `backlog=1` means shown. That is what keeps the default board a bare
+ * `/`; the alternative, writing the restriction out, would have put a parameter in the
+ * url of every untouched board. It also costs the invariant the rest of this file used
+ * to rest on — "narrows the list" and "deviates from the default" being the same thing —
+ * see filterMemory and activeFilters, which each say which of the two they now mean.
  */
 export interface ListFilters {
   query: string;
@@ -17,15 +26,21 @@ export interface ListFilters {
   status: string | null;
   mine: boolean;
   sessionsOnly: boolean;
+  /** Whether Backlog tickets are shown. Off by default — see above. */
+  backlog: boolean;
 }
 
-/** Every filter at its default: the whole board, nothing narrowed. */
+/**
+ * Every filter at its default. The board the app opens on, not the whole board: the
+ * Backlog is hidden here, which is the one default that narrows.
+ */
 export const NO_FILTERS: ListFilters = {
   query: "",
   project: [],
   status: null,
   mine: false,
   sessionsOnly: false,
+  backlog: false,
 };
 
 /**
@@ -63,6 +78,9 @@ function writeFilters(params: URLSearchParams, filters: ListFilters): void {
   if (filters.status !== null) params.set("status", filters.status);
   if (filters.mine) params.set("mine", "1");
   if (filters.sessionsOnly) params.set("sessions", "1");
+  // Written when Backlog is *shown*, the opposite polarity to the two above: hidden is
+  // the default, and a default is never written — see ListFilters.
+  if (filters.backlog) params.set("backlog", "1");
 }
 
 /**
@@ -94,6 +112,7 @@ function readFilters(params: URLSearchParams): ListFilters {
     // off — same rule the localStorage-backed toggles used before the URL owned them.
     mine: params.get("mine") === "1",
     sessionsOnly: params.get("sessions") === "1",
+    backlog: params.get("backlog") === "1",
   };
 }
 

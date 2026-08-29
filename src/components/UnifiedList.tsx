@@ -8,6 +8,7 @@ import NewSessionSheet from "./NewSessionSheet";
 import FilterBar from "./FilterBar";
 import ActiveFilters from "./ActiveFilters";
 import { activeFilters, removeFilter, type ActiveFilter } from "@/lib/activeFilters";
+import { backlogChip, cycleBacklog } from "@/lib/backlogFilter";
 import { NO_FILTERS, type ListFilters } from "@/lib/appLocation";
 import TicketCard from "./TicketCard";
 import SessionCard from "./SessionCard";
@@ -70,7 +71,7 @@ export default function UnifiedList(
   // which is what lets activeFilters treat Mine like every other filter instead of
   // special-casing the one that would otherwise put a chip in the sticky bar on every
   // single visit, and what keeps the unfiltered board a bare `/`.
-  const { query, project, status, mine, sessionsOnly } = filters;
+  const { query, project, status, mine, sessionsOnly, backlog } = filters;
   const setFilter = <K extends keyof ListFilters>(key: K, value: ListFilters[K]) =>
     onFilters({ ...filters, [key]: value }, "push");
   // Replace, not push: a pushed entry per keystroke would leave Back retyping the
@@ -81,6 +82,9 @@ export default function UnifiedList(
   const setStatus = (s: string | null) => setFilter("status", s);
   const setMine = (v: boolean) => setFilter("mine", v);
   const setSessionsOnly = (v: boolean) => setFilter("sessionsOnly", v);
+  // Not a setter: the Backlog chip moves two values together, and which pair a tap
+  // lands on is cycleBacklog's — pure, so the rule is testable without a DOM.
+  const nextBacklog = () => onFilters(cycleBacklog(filters), "push");
 
   // Mine is a scope, applied before everything else so the chips below describe only
   // the tickets that can actually appear.
@@ -103,9 +107,9 @@ export default function UnifiedList(
 
   const { ticketRows, looseSessions } = useMemo(
     () => buildUnifiedRows({
-      tickets: scoped, sessions, filter: { query, project, status }, sessionsOnly, live,
+      tickets: scoped, sessions, filter: { query, project, status, backlog }, sessionsOnly, live,
     }),
-    [scoped, sessions, query, project, status, sessionsOnly, live],
+    [scoped, sessions, query, project, status, backlog, sessionsOnly, live],
   );
 
   // Every mapped project's stack state, for the toolbars on the project dividers
@@ -126,8 +130,8 @@ export default function UnifiedList(
   );
 
   const chips = useMemo(
-    () => activeFilters({ query, project, status, mine, sessionsOnly }),
-    [query, project, status, mine, sessionsOnly],
+    () => activeFilters(filters),
+    [filters],
   );
 
   // One entry, not one setter per key: which values a chip drops is removeFilter's,
@@ -185,6 +189,7 @@ export default function UnifiedList(
           query={query} onQuery={setQuery}
           projects={projects} active={project} onProject={setProject}
           statuses={statuses} activeStatus={status} onStatus={setStatus}
+          backlog={backlogChip(filters)} onBacklog={nextBacklog}
           mine={mine} onMine={setMine}
           sessionsOnly={sessionsOnly} onSessionsOnly={setSessionsOnly}
           placeholder="Filter tickets and sessions…"

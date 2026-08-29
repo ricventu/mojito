@@ -1,5 +1,5 @@
 import type { TicketSummary } from "@/server/types";
-import { statusRank } from "@/lib/status";
+import { statusRank, BACKLOG_STATUS } from "@/lib/status";
 
 /** Sentinel project name for tickets/sessions that have no Linear project. */
 export const NO_PROJECT = "No project";
@@ -41,17 +41,28 @@ export interface TicketFilter {
   /** The selected projects; empty is every project — see ListFilters. */
   project: string[];
   status: string | null;
+  /**
+   * Whether Backlog tickets are shown (RIC-275). Optional, and absent means shown:
+   * an omitted criterion narrows nothing, which is the convention `project: []` and
+   * `status: null` already follow here. Note that ListFilters.backlog defaults the
+   * other way — the *board* hides the Backlog, this function only obeys.
+   */
+  backlog?: boolean;
 }
 
-/** Tickets matching all active criteria (project AND status AND query). */
+/** Tickets matching all active criteria (project AND status AND query AND backlog). */
 export function filterTickets(
   tickets: TicketSummary[],
-  { query, project, status }: TicketFilter,
+  { query, project, status, backlog = true }: TicketFilter,
 ): TicketSummary[] {
   const q = query.trim().toLowerCase();
   return tickets.filter((t) => {
     if (project.length > 0 && !project.includes(t.project ?? NO_PROJECT)) return false;
     if (status !== null && t.statusName !== status) return false;
+    // Only while no status is selected: `status === BACKLOG_STATUS` is the chip's
+    // "only" state, an explicit request for exactly these tickets, and every other
+    // selection has already dropped them on the line above.
+    if (status === null && !backlog && t.statusName === BACKLOG_STATUS) return false;
     if (!q) return true;
     return [t.identifier, t.title, t.statusName, ...t.labels]
       .some((v) => v.toLowerCase().includes(q));

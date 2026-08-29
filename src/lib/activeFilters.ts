@@ -29,6 +29,14 @@ export interface ActiveFilter {
  * is a status name like any other. parseLocation already drops absent *and* empty
  * parameters on both, so the conventions never meet.
  *
+ * `backlog` is deliberately absent (RIC-275). This bar reports what is *hiding* things
+ * — that is what makes it worth pinning while the toolbar scrolls away — and showing
+ * the Backlog hides nothing; a badge for it would sit here permanently for anyone who
+ * prefers that bucket visible, which is the same noise Mine's own default avoids. Its
+ * state is already legible one row up, where the chip is struck through while the
+ * bucket is excluded. Note this is the one filter for which "deviates from the default"
+ * and "narrows the list" part ways — see filterMemory, which wants the other one.
+ *
  * A multi-project selection is one chip per project, each carrying its own name as
  * `value` (RIC-252). It used to be a single chip listing them all, on the grounds that
  * the select two rows up is where an individual project comes back off — but the chip's

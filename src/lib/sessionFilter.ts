@@ -1,5 +1,5 @@
 import type { SessionMeta } from "@/server/types";
-import { statusRank, CUSTOM_STATUS, INTAKE_STATUS, TERMINAL_STATUS } from "@/lib/status";
+import { statusRank, BACKLOG_STATUS, CUSTOM_STATUS, INTAKE_STATUS, TERMINAL_STATUS } from "@/lib/status";
 import { NO_PROJECT, type LiveStatuses } from "@/lib/ticketFilter";
 
 /**
@@ -53,18 +53,25 @@ export interface SessionFilter {
   /** The selected projects; empty is every project — see ListFilters. */
   project: string[];
   status: string | null;
+  /** Whether Backlog sessions are shown; absent is shown — see TicketFilter.backlog. */
+  backlog?: boolean;
 }
 
-/** Sessions matching all active criteria (project AND status AND query). */
+/** Sessions matching all active criteria (project AND status AND query AND backlog). */
 export function filterSessions(
   sessions: SessionMeta[],
-  { query, project, status }: SessionFilter,
+  { query, project, status, backlog = true }: SessionFilter,
   live?: LiveStatuses,
 ): SessionMeta[] {
   const q = query.trim().toLowerCase();
   return sessions.filter((s) => {
     if (project.length > 0 && !project.includes(s.projectName ?? NO_PROJECT)) return false;
     if (status !== null && sessionStatus(s, live) !== status) return false;
+    // On the same terms filterTickets applies it, and on sessionStatus rather than the
+    // frozen launchStatus for the same reason the status chip is: both halves of the
+    // unified list have to answer for one status, or hiding a ticket orphans its
+    // session into "No ticket" instead of hiding it too.
+    if (status === null && !backlog && sessionStatus(s, live) === BACKLOG_STATUS) return false;
     if (!q) return true;
     return [s.ticket, s.launchStatus, s.model, s.message, s.title]
       .some((v) => v?.toLowerCase().includes(q));

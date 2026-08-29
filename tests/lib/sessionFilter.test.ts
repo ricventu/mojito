@@ -189,3 +189,54 @@ describe("live ticket statuses", () => {
       .toEqual(["a"]);
   });
 });
+
+// RIC-275. Applied to sessions as well as tickets, and on the *live* status, so both
+// sides of the unified list agree about what Backlog means — an exclusion that hit only
+// tickets would leave the hidden ticket's session with nothing to nest under, which is
+// how it would surface alone under "No ticket".
+describe("filterSessions — the Backlog exclusion", () => {
+  const sessions = [
+    session({ id: "a", ticket: "RIC-1", launchStatus: "Backlog" }),
+    session({ id: "b", ticket: "RIC-2", launchStatus: "Todo" }),
+  ];
+
+  it("keeps Backlog sessions when the flag is absent", () => {
+    expect(filterSessions(sessions, { query: "", project: [], status: null }).map((s) => s.id))
+      .toEqual(["a", "b"]);
+  });
+
+  it("drops Backlog sessions when Backlog is hidden", () => {
+    expect(filterSessions(sessions, { query: "", project: [], status: null, backlog: false }).map((s) => s.id))
+      .toEqual(["b"]);
+  });
+
+  it("keeps them once Backlog is shown", () => {
+    expect(filterSessions(sessions, { query: "", project: [], status: null, backlog: true }).map((s) => s.id))
+      .toEqual(["a", "b"]);
+  });
+
+  it("lets an explicit Backlog selection win over the exclusion", () => {
+    expect(filterSessions(sessions, { query: "", project: [], status: "Backlog", backlog: false }).map((s) => s.id))
+      .toEqual(["a"]);
+  });
+
+  // The same reason liveStatuses exists: launchStatus is frozen, so a session launched
+  // from Backlog whose ticket has since moved on must not be hidden with the backlog.
+  it("judges a session on its ticket's live status, not on the frozen launch one", () => {
+    const live = new Map([["RIC-1", "In Progress"]]);
+    expect(filterSessions(sessions, { query: "", project: [], status: null, backlog: false }, live).map((s) => s.id))
+      .toEqual(["a", "b"]);
+  });
+
+  // Custom, intake and shell sessions bucket under their own synthetic status, so
+  // nothing about Backlog can reach them.
+  it("never hides a session with no lifecycle status of its own", () => {
+    const other = [
+      session({ id: "c", kind: "custom" }),
+      session({ id: "d", kind: "intake" }),
+      session({ id: "e", kind: "shell", ticket: "", launchStatus: "" }),
+    ];
+    expect(filterSessions(other, { query: "", project: [], status: null, backlog: false }).map((s) => s.id))
+      .toEqual(["c", "d", "e"]);
+  });
+});

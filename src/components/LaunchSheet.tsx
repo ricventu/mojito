@@ -20,6 +20,7 @@ import type { SessionMeta, TicketSummary } from "@/server/types";
 import { holdsSheetOpen, type HeldOutcome } from "@/lib/verdictOutcome";
 import { qaGateModel, type MergeState } from "@/lib/qaGate";
 import { qaSessionModel } from "@/lib/qaSession";
+import { manualMoveTarget } from "@/lib/status";
 import { launchedSession } from "@/lib/launchedSession";
 import { isActiveSession } from "@/lib/activeSession";
 
@@ -61,10 +62,16 @@ export default function LaunchSheet(
   { token: string; ticket: TicketSummary; sessions: SessionMeta[]; onClose: () => void;
     onLaunched: () => void; onOpen: (s: SessionMeta) => void; onOpenDocs: () => void },
 ) {
-  const isToQa = ticket.statusName === "To QA";
+  // Mirrors ticket.statusName, the way `mine` below mirrors ticket.assignedToMe: the
+  // ticket prop is a snapshot taken when the sheet opened, and the Backlog <-> Todo move
+  // (RIC-275) has to be visible here without waiting for the board to refetch. Every
+  // read of the ticket's status in this component goes through it, so a moved ticket
+  // launches with the status it now has rather than the one it was picked at.
+  const [status, setStatus] = useState(ticket.statusName);
+  const isToQa = status === "To QA";
   // A To QA launch is a work session (Task 7 gives it the work id), so it takes the work
   // profile rather than the app-wide fallback.
-  const stageKey = isToQa ? "In Progress" : ticket.statusName;
+  const stageKey = isToQa ? "In Progress" : status;
   const { defaults } = useStageDefaults(token);
   // Pre-fill the model + effort optimal for this ticket's stage (overridable via the selectors).
   const [model, setModel] = useState<string>(() => resolveModel(stageKey));
@@ -134,8 +141,11 @@ export default function LaunchSheet(
   // list to refetch — the ticket prop is a snapshot taken when the sheet opened.
   const [mine, setMine] = useState(ticket.assignedToMe);
   const [assigning, setAssigning] = useState(false);
+  const [moving, setMoving] = useState(false);
   const [fetching, setFetching] = useState(false);
-  const existingId = tmuxName(ticket.identifier, ticket.statusName);
+  // Backlog, Todo and In Progress collapse to the same work id (see tmuxName), so a
+  // manual move never changes which session this sheet is looking at.
+  const existingId = tmuxName(ticket.identifier, status);
   const existing = sessions.find((s) => s.id === existingId);
   // The single active-state definition, not a fourth hand-copied list of states.
   const existingActive = existing != null && isActiveSession(existing);
@@ -143,6 +153,8 @@ export default function LaunchSheet(
   // start a replacement whenever it is not alive. start() clears a dead registration first,
   // so both can be on screen at once.
   const qaSession = qaSessionModel({ registered: existing != null, active: existingActive });
+  // Null for every status but the manual pair, which is how the button hides itself.
+  const moveTarget = manualMoveTarget(status);
 
   // The To QA verdict is resolved server-side: approve merges (or opens an MR) with no
   // session at all, and only a merge conflict spawns one. projectName and title are sent
@@ -216,6 +228,30 @@ export default function LaunchSheet(
     onLaunched();
   };
 
+  // The one status change a human makes by hand (RIC-275): Backlog <-> Todo, the pair
+  // nothing in the lifecycle moves a ticket between on its own. Optimistic like the
+  // assignee toggle above and for the same reason — the sheet stays open, since moving a
+  // ticket to Todo is usually the step before starting its session.
+  const moveStatus = async () => {
+    const next = manualMoveTarget(status);
+    if (next === null) return;
+    const previous = status;
+    setMoving(true);
+    setStatus(next);
+    const res = await apiFetch(token, `/api/tickets/${ticket.identifier}/status`, {
+      method: "POST",
+      body: JSON.stringify({ status: next }),
+    });
+    setMoving(false);
+    if (!res.ok) {
+      setStatus(previous);
+      setErr(`could not move ${ticket.identifier} to ${next} (${res.status})`);
+      return;
+    }
+    setErr(null);
+    onLaunched();
+  };
+
   // Every launch ends inside the session it just started: starting a session is a request to
   // work in it, not to go back to the board. The 201 body is the registered session, so the
   // terminal opens on it directly without waiting for the list to refetch. A body we cannot
@@ -240,7 +276,7 @@ export default function LaunchSheet(
       // obstacle (launchSession overwrites it); only a LIVE tmux is, and that answers 409 below.
       const res = await apiFetch(token, "/api/sessions", {
         method: "POST",
-        body: JSON.stringify({ ticket: ticket.identifier, status: ticket.statusName, model, effort,
+        body: JSON.stringify({ ticket: ticket.identifier, status, model, effort,
           projectName: ticket.project, title: ticket.title, labels: ticket.labels,
           ...launchWorktreeFields(wtAnswer) }),
       });
@@ -265,7 +301,7 @@ export default function LaunchSheet(
     try {
       const res = await apiFetch(token, "/api/sessions", {
         method: "POST",
-        body: JSON.stringify({ kind: "custom", ticket: ticket.identifier, status: ticket.statusName,
+        body: JSON.stringify({ kind: "custom", ticket: ticket.identifier, status,
           projectName: ticket.project, title: ticket.title, labels: ticket.labels, model, effort,
           ...launchWorktreeFields(wtAnswer) }),
       });
@@ -286,7 +322,7 @@ export default function LaunchSheet(
     try {
       const res = await apiFetch(token, "/api/sessions", {
         method: "POST",
-        body: JSON.stringify({ kind: "shell", ticket: ticket.identifier, status: ticket.statusName,
+        body: JSON.stringify({ kind: "shell", ticket: ticket.identifier, status,
           projectName: ticket.project, title: ticket.title, labels: ticket.labels,
           ...launchWorktreeFields(wtAnswer) }),
       });
@@ -397,7 +433,7 @@ export default function LaunchSheet(
     return (
       <div className="sheet-backdrop">
         <div className="sheet">
-          <h3><TicketLink id={ticket.identifier} url={ticket.url} /> <span className="chip">{ticket.statusName}</span></h3>
+          <h3><TicketLink id={ticket.identifier} url={ticket.url} /> <span className="chip">{status}</span></h3>
           {outcome.done === "mr-created" ? (
             <div className="outcome">
               <p className="outcome-head">MR opened · {ticket.identifier} moved to Done</p>
@@ -429,7 +465,7 @@ export default function LaunchSheet(
     // would drop the later setErr(...) on the floor, leaving a failed launch reporting nothing.
     <div className="sheet-backdrop" onClick={launchBusy ? undefined : onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
-        <h3><TicketLink id={ticket.identifier} url={ticket.url} /> <span className="chip">{ticket.statusName}</span></h3>
+        <h3><TicketLink id={ticket.identifier} url={ticket.url} /> <span className="chip">{status}</span></h3>
         {ticket.title && <p className="sheet-title">{ticket.title}</p>}
         {isToQa ? (
           <>
@@ -482,6 +518,11 @@ export default function LaunchSheet(
             )}
             {canLaunch && customBtn}
           </>
+        )}
+        {moveTarget !== null && (
+          <button className="btn ghost block" style={{ marginTop: 12 }} disabled={moving} onClick={moveStatus}>
+            {moving ? "Moving…" : `Move to ${moveTarget}`}
+          </button>
         )}
         <button className="btn ghost block" style={{ marginTop: 12 }} disabled={assigning} onClick={toggleAssignee}>
           {mine ? "Unassign" : "Assign to me"}

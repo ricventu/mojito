@@ -21,9 +21,10 @@ describe("parseLocation", () => {
   });
 
   it("reads every filter out of the query", () => {
-    const { filters } = parseLocation("/", "?q=filtri&project=Mojito&status=In+Progress&mine=1&sessions=1");
+    const { filters } = parseLocation("/", "?q=filtri&project=Mojito&status=In+Progress&mine=1&sessions=1&backlog=1");
     expect(filters).toEqual({
       query: "filtri", project: ["Mojito"], status: "In Progress", mine: true, sessionsOnly: true,
+      backlog: true,
     });
   });
 
@@ -52,7 +53,18 @@ describe("parseLocation", () => {
   });
 
   it("reads the toggles as on only for an explicit 1", () => {
-    expect(parseLocation("/", "?mine=0&sessions=yes").filters).toEqual(NO_FILTERS);
+    expect(parseLocation("/", "?mine=0&sessions=yes&backlog=yes").filters).toEqual(NO_FILTERS);
+  });
+
+  // The one filter whose default narrows (RIC-275): Backlog is hidden unless the url
+  // says otherwise, so `backlog=1` widens the board where every other parameter
+  // narrows it. Absent therefore means hidden, not "every status".
+  it("reads a missing backlog parameter as Backlog hidden", () => {
+    expect(parseLocation("/", "").filters.backlog).toBe(false);
+  });
+
+  it("reads backlog=1 as Backlog shown", () => {
+    expect(parseLocation("/", "?backlog=1").filters.backlog).toBe(true);
   });
 
   it("reads a session path as a terminal with no docs overlay", () => {
@@ -115,7 +127,18 @@ describe("formatLocation", () => {
   it("writes the filters in a stable order", () => {
     expect(formatLocation(list({
       query: "filtri", project: ["Mojito"], status: "In Progress", mine: true, sessionsOnly: true,
-    }))).toBe("/?q=filtri&project=Mojito&status=In+Progress&mine=1&sessions=1");
+      backlog: true,
+    }))).toBe("/?q=filtri&project=Mojito&status=In+Progress&mine=1&sessions=1&backlog=1");
+  });
+
+  // Backlog hidden is the default board, so the clean url stays a bare `/` even though
+  // that default is the one that narrows.
+  it("omits the backlog parameter while Backlog is hidden", () => {
+    expect(formatLocation(list())).toBe("/");
+  });
+
+  it("writes backlog=1 once Backlog is shown", () => {
+    expect(formatLocation(list({ backlog: true }))).toBe("/?backlog=1");
   });
 
   it("writes one project parameter per selection, so a name may hold any separator", () => {
@@ -220,7 +243,7 @@ describe("filterSearch / parseFilters", () => {
   it("survives a round trip through the query", () => {
     const filters = {
       query: "a&b=c", project: ["Mojito", "A, B"], status: "In Progress",
-      mine: true, sessionsOnly: true,
+      mine: true, sessionsOnly: true, backlog: true,
     };
     expect(parseFilters(filterSearch(filters))).toEqual(filters);
   });

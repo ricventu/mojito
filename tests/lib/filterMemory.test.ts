@@ -44,6 +44,19 @@ describe("seedFilters", () => {
     expect(seedFilters(list(), "mine=0&q=")).toBeNull();
   });
 
+  // RIC-275: Backlog hidden is the *default*, so a remembered set that only un-hides it
+  // deviates from the default board without narrowing it — and has to be restored all
+  // the same, or the preference is dropped on every launch.
+  it("restores a remembered set whose only deviation is showing Backlog", () => {
+    expect(seedFilters(list(), "backlog=1")).toEqual({ ...NO_FILTERS, backlog: true });
+  });
+
+  // Same rule on the other side: a url that already says backlog=1 is a url that names
+  // filters, so storage must not correct it.
+  it("leaves a url that only shows Backlog alone", () => {
+    expect(seedFilters(list({ backlog: true }), "project=Mojito")).toBeNull();
+  });
+
   it("ignores anything in the remembered search that is not a filter", () => {
     expect(seedFilters(list(), "doc=README.md&project=Mojito")).toEqual({
       ...NO_FILTERS, project: ["Mojito"],
