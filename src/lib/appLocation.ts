@@ -54,6 +54,37 @@ function segments(pathname: string): string[] {
   return pathname.split("/").filter((s) => s !== "").map(decodeURIComponent);
 }
 
+/** The filter half of formatLocation, so filterSearch below shares its one format. */
+function writeFilters(params: URLSearchParams, filters: ListFilters): void {
+  if (filters.query !== "") params.set("q", filters.query);
+  // One parameter per project rather than a joined list: a project name is free text
+  // and could hold whatever separator was picked.
+  for (const project of filters.project) params.append("project", project);
+  if (filters.status !== null) params.set("status", filters.status);
+  if (filters.mine) params.set("mine", "1");
+  if (filters.sessionsOnly) params.set("sessions", "1");
+}
+
+/**
+ * The filters alone, as the query string the address bar would carry them in — no
+ * leading `?`, and `""` for the unfiltered board.
+ *
+ * Exported for filterMemory, which remembers the last filter set across app launches:
+ * storing the url's own format rather than a second one of its own is what keeps the
+ * two from drifting, and means a remembered set is read back by the same parser that
+ * reads a hand-typed url.
+ */
+export function filterSearch(filters: ListFilters): string {
+  const params = new URLSearchParams();
+  writeFilters(params, filters);
+  return params.toString();
+}
+
+/** The inverse of filterSearch. Total, and indifferent to a leading `?`. */
+export function parseFilters(search: string): ListFilters {
+  return readFilters(new URLSearchParams(search));
+}
+
 function readFilters(params: URLSearchParams): ListFilters {
   return {
     query: params.get("q") ?? "",
@@ -131,13 +162,7 @@ function viewPath(view: AppView): string {
  */
 export function formatLocation({ view, filters }: AppLocation): string {
   const params = new URLSearchParams();
-  if (filters.query !== "") params.set("q", filters.query);
-  // One parameter per project rather than a joined list: a project name is free text
-  // and could hold whatever separator was picked.
-  for (const project of filters.project) params.append("project", project);
-  if (filters.status !== null) params.set("status", filters.status);
-  if (filters.mine) params.set("mine", "1");
-  if (filters.sessionsOnly) params.set("sessions", "1");
+  writeFilters(params, filters);
   const doc = view.kind === "session" ? view.docs?.doc ?? null : view.kind === "docs" ? view.doc : null;
   if (doc !== null) params.set("doc", doc);
   if (view.kind === "docs" && "ticket" in view.target && view.target.project !== null) {

@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { formatLocation, NO_FILTERS, parseLocation, type AppLocation } from "./appLocation";
+import { FILTER_KEY, filtersToRemember, seedFilters } from "./filterMemory";
 import { canGoBack, pushedState } from "./navDepth";
 
 // What the first render assumes, before the effect below reads the real url. The
@@ -29,6 +30,26 @@ function fromWindow(): AppLocation {
 }
 
 /**
+ * Storage is best effort at both ends: Safari's private mode throws on setItem, and
+ * a browser that refuses to remember filters must not take the board down with it.
+ */
+function readRemembered(): string | null {
+  try {
+    return localStorage.getItem(FILTER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function remember(search: string): void {
+  try {
+    localStorage.setItem(FILTER_KEY, search);
+  } catch {
+    // Nothing to recover: this launch keeps its filters, the next one starts clean.
+  }
+}
+
+/**
  * The address bar as the single source of truth for the client's view and filters.
  *
  * Every navigation is a history entry, so Back works, a reload lands where it left
@@ -38,14 +59,36 @@ function fromWindow(): AppLocation {
  */
 export function useAppLocation() {
   const [location, setLocation] = useState<AppLocation>(UNRESOLVED);
+  const [resolved, setResolved] = useState(false);
 
   useEffect(() => {
-    setLocation(fromWindow());
+    const current = fromWindow();
+    // A board opened with no filters of its own is seeded from the last set the user
+    // left behind (RIC-272) — the PWA's start_url is a bare `/`, so without this every
+    // launch of the installed app arrives unfiltered. seedFilters owns every refusal;
+    // this only writes the url it answers, and writes it with replace rather than push
+    // so Back does not walk into the bare url the seed just left.
+    const seeded = seedFilters(current, readRemembered());
+    const next = seeded === null ? current : { ...current, filters: seeded };
+    if (seeded !== null) {
+      writeHistory(() => window.history.replaceState(window.history.state, "", formatLocation(next)));
+    }
+    setLocation(next);
+    setResolved(true);
     // Back, forward, and the mobile back gesture all arrive here.
     const onPop = () => setLocation(fromWindow());
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
+
+  // Remember what the board is filtered on, for the next launch. Gated on the effect
+  // above having run: the first render is UNRESOLVED, whose filters are the defaults,
+  // and writing those would clear the very set the seed is about to read.
+  useEffect(() => {
+    if (!resolved) return;
+    const search = filtersToRemember(location);
+    if (search !== null) remember(search);
+  }, [resolved, location]);
 
   /** Go somewhere new, adding a history entry. */
   const navigate = useCallback((next: AppLocation) => {
