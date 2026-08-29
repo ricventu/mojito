@@ -409,26 +409,45 @@ Mojito owns the whole lifecycle — there is no external plugin:
   takes you to the session waiting for input, and the docs header's, where the identifier
   is prose (`RIC-242 · docs`) rather than a label.
 - **Client url state**: the address bar is the single source of truth for which view is
-  open and how the list is filtered (RIC-204). `src/lib/appLocation.ts` is the pure
-  codec — `parseLocation`/`formatLocation` over `/`, `/session/<id>`,
-  `/session/<id>/docs`, `/docs/ticket/<id>`, `/docs/session/<id>` plus the five filter
-  params (`project` repeats — one parameter per selected project, since a project name
-  is free text and could hold whatever separator a joined list picked) — and
-  `useAppLocation` is the only `window.history` glue, so everything testable stays
-  testable in the node-only vitest setup (no jsdom, no RTL; same split
-  as `resolveInitialToken` ÷ `useToken`). The five `mojito-list-*` localStorage keys and
-  `mojito-tab` are gone, along with `usePersistedState` itself: localStorage is shared
-  between browser tabs, which is exactly what made two tabs unable to hold two filter
-  sets. Consequences worth knowing: filters are serialized on *every* path, so leaving
-  the list for a terminal or a doc and coming back does not drop them; defaults are
-  omitted, so the unfiltered board is a bare `/` (and the PWA's `start_url` therefore
-  always opens clean); typing in the filter box replaces the entry instead of pushing
-  one per keystroke; and the page lives at `src/app/[[...view]]/page.tsx`, an optional
-  catch-all, which is what makes a hard reload of `/session/<id>` serve the app instead
-  of a 404 — `/api/*` and `public/` still win as the more specific routes. `/stacks` was
-  a view of its own until RIC-253 and is now simply unrecognised, which parses as the
-  list: an old bookmark lands on the board rather than on a blank page. That catch-all
-  also matches `/ws/pty` and `/ws/events`, which is what `claimUpgrades`
+  open and how the list is filtered (RIC-204). `src/lib/appLocation.ts` is the pure codec
+  — `parseLocation`/`formatLocation` over `/`, `/session/<id>`, `/session/<id>/docs`,
+  `/docs/ticket/<id>`, `/docs/session/<id>` plus the five filter params (`project` repeats
+  — one parameter per selected project, since a project name is free text and could hold
+  whatever separator a joined list picked) — and `useAppLocation` is the only
+  `window.history` glue, so everything testable stays testable in the node-only vitest
+  setup (no jsdom, no RTL; same split as `resolveInitialToken` ÷ `useToken`). The five
+  `mojito-list-*` localStorage keys and `mojito-tab` are gone, along with
+  `usePersistedState` itself: localStorage is shared between browser tabs, which is
+  exactly what made two tabs unable to hold two filter sets. Consequences worth knowing:
+  filters are serialized on *every* path, so leaving the list for a terminal or a doc and
+  coming back does not drop them; defaults are omitted, so the unfiltered board is a bare
+  `/`; typing in the filter box replaces the entry instead of pushing one per keystroke;
+  and the page lives at `src/app/[[...view]]/page.tsx`, an optional catch-all, which is
+  what makes a hard reload of `/session/<id>` serve the app instead of a 404 — `/api/*`
+  and `public/` still win as the more specific routes. `/stacks` was a view of its own
+  until RIC-253 and is now simply unrecognised, which parses as the list: an old bookmark
+  lands on the board rather than on a blank page. **One thing is remembered across
+  launches all the same** (RIC-272): the PWA's `start_url` is that bare `/`, so before
+  this every launch of the installed app arrived unfiltered, and re-picking the same two
+  projects was the first thing you did every morning. `filterMemory.ts` puts *one* key
+  back — `mojito-list-filters`, holding the same query string the address bar writes
+  (`filterSearch`/`parseFilters`, exported from `appLocation` so the two formats cannot
+  drift) — and it is deliberately **not** the live filter state that RIC-204 removed:
+  `seedFilters` may only fill in a *cold start*, and `useAppLocation`'s mount effect is
+  the only thing that reads it. The three refusals are the whole design. A url that
+  already names filters wins outright, so a shared link, a bookmark and a reloaded second
+  tab still mean exactly what they say and two tabs still hold two filter sets — storage
+  seeds a board, it never corrects one. Only the list is seeded, since `sessionUrl` builds
+  a terminal url deliberately clean of filters. And a remembered set that narrows nothing
+  is not restored, which is what keeps "Clear all" cleared. The **write** is gated the
+  same way and for a sharper reason: only the list writes, because opening a session in a
+  new browser tab (RIC-224) lands on `/session/<id>` with no filters at all, and a
+  view-blind write would wipe the remembered set on every such open. The write also waits
+  for the mount effect to have run — the first render is `UNRESOLVED`, whose filters are
+  the defaults, so writing those would clear the set the seed is about to read. Both
+  `localStorage` calls are best effort (Safari's private mode throws on `setItem`); a
+  browser that refuses to remember filters must not take the board down with it. That
+  catch-all also matches `/ws/pty` and `/ws/events`, which is what `claimUpgrades`
   (`src/server/nextUpgrade.ts`) exists for: Next attaches an `upgrade` listener of its
   own on the first request it handles and ends any socket whose path its router
   matches — it leaves *unmatched* paths alone precisely so a custom WS server can have

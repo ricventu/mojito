@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  formatLocation, NO_FILTERS, parseLocation, sessionUrl, type AppLocation,
+  filterSearch, formatLocation, NO_FILTERS, parseFilters, parseLocation, sessionUrl,
+  type AppLocation,
 } from "@/lib/appLocation";
 
 const list = (filters: Partial<typeof NO_FILTERS> = {}): AppLocation => ({
@@ -191,5 +192,36 @@ describe("sessionUrl", () => {
       view: { kind: "session", id: "s1", docs: null },
       filters: NO_FILTERS,
     });
+  });
+});
+
+// The filter half of the codec on its own, so the address bar and the remembered
+// filter set (see filterMemory) cannot drift into two formats.
+describe("filterSearch / parseFilters", () => {
+  it("writes the filters as the query the address bar would carry", () => {
+    expect(filterSearch({ ...NO_FILTERS, project: ["Mojito"], status: "To QA" }))
+      .toBe("project=Mojito&status=To+QA");
+  });
+
+  it("writes nothing at all for the unfiltered board", () => {
+    expect(filterSearch(NO_FILTERS)).toBe("");
+  });
+
+  it("reads a query back, with or without its leading question mark", () => {
+    const expected = { ...NO_FILTERS, query: "filtri", mine: true };
+    expect(parseFilters("q=filtri&mine=1")).toEqual(expected);
+    expect(parseFilters("?q=filtri&mine=1")).toEqual(expected);
+  });
+
+  it("reads an empty query as every filter at its default", () => {
+    expect(parseFilters("")).toEqual(NO_FILTERS);
+  });
+
+  it("survives a round trip through the query", () => {
+    const filters = {
+      query: "a&b=c", project: ["Mojito", "A, B"], status: "In Progress",
+      mine: true, sessionsOnly: true,
+    };
+    expect(parseFilters(filterSearch(filters))).toEqual(filters);
   });
 });
