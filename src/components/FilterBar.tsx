@@ -1,5 +1,14 @@
 "use client";
 import { MultiCombobox } from "./ui/combobox";
+import { BACKLOG_STATUS } from "@/lib/status";
+import type { BacklogChip } from "@/lib/backlogFilter";
+
+/** What the Backlog chip says it is doing, and what one more tap will do. */
+const BACKLOG_LABEL: Record<BacklogChip, string> = {
+  off: "Backlog hidden — show only Backlog",
+  only: "Only Backlog — show Backlog with everything else",
+  on: "Backlog shown — hide it",
+};
 
 /**
  * The board's toolbar: project select + actions, then the status chips, then the text
@@ -15,7 +24,7 @@ import { MultiCombobox } from "./ui/combobox";
  */
 export default function FilterBar(
   { query, onQuery, projects, active, onProject, statuses, activeStatus, onStatus,
-    mine, onMine, sessionsOnly, onSessionsOnly, placeholder, action }:
+    backlog, onBacklog, mine, onMine, sessionsOnly, onSessionsOnly, placeholder, action }:
   {
     query: string;
     onQuery: (q: string) => void;
@@ -25,6 +34,14 @@ export default function FilterBar(
     statuses?: string[];
     activeStatus?: string | null;
     onStatus?: (s: string | null) => void;
+    /**
+     * The Backlog chip's tri-state (RIC-275). Given together with `onBacklog`, the
+     * Backlog entry in `statuses` renders and cycles as three states instead of two;
+     * without them it is an ordinary status chip, which is what every other caller of
+     * this bar gets.
+     */
+    backlog?: BacklogChip;
+    onBacklog?: () => void;
     mine?: boolean;
     onMine?: (v: boolean) => void;
     sessionsOnly?: boolean;
@@ -92,13 +109,29 @@ export default function FilterBar(
             <>
               <button className={`chip toggle${(activeStatus ?? null) === null ? " on" : ""}`} onClick={() => onStatus!(null)}>All</button>
               {statuses!.map((s) => (
-                <button
-                  key={s}
-                  className={`chip toggle${activeStatus === s ? " on" : ""}`}
-                  onClick={() => onStatus!(s)}
-                >
-                  {s}
-                </button>
+                // The Backlog chip carries a third state — excluded — because the board
+                // hides that bucket by default; every other status is on or off. Its
+                // state cannot ride on aria-pressed, which holds two values, so the
+                // label spells out where it is and what the next tap does.
+                s === BACKLOG_STATUS && backlog != null && onBacklog ? (
+                  <button
+                    key={s}
+                    className={`chip toggle${backlog === "only" ? " on" : ""}${backlog === "off" ? " off" : ""}`}
+                    aria-label={BACKLOG_LABEL[backlog]}
+                    title={BACKLOG_LABEL[backlog]}
+                    onClick={onBacklog}
+                  >
+                    {s}
+                  </button>
+                ) : (
+                  <button
+                    key={s}
+                    className={`chip toggle${activeStatus === s ? " on" : ""}`}
+                    onClick={() => onStatus!(s)}
+                  >
+                    {s}
+                  </button>
+                )
               ))}
             </>
           )}

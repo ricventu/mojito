@@ -143,6 +143,44 @@ describe("filterTickets", () => {
   });
 });
 
+// RIC-275. `backlog` is absent from every criterion above on purpose: an omitted
+// criterion narrows nothing, which is the convention `project: []` and `status: null`
+// already follow here. Only the board sets it, and it sets it to "hidden" by default.
+describe("filterTickets — the Backlog exclusion", () => {
+  const tickets = [
+    ticket({ identifier: "RIC-1", statusName: "Backlog", title: "Alpha" }),
+    ticket({ identifier: "RIC-2", statusName: "Todo", title: "Beta" }),
+  ];
+
+  it("keeps Backlog tickets when the flag is absent", () => {
+    expect(filterTickets(tickets, { query: "", project: [], status: null }).map((t) => t.identifier))
+      .toEqual(["RIC-1", "RIC-2"]);
+  });
+
+  it("drops Backlog tickets when Backlog is hidden", () => {
+    const out = filterTickets(tickets, { query: "", project: [], status: null, backlog: false });
+    expect(out.map((t) => t.identifier)).toEqual(["RIC-2"]);
+  });
+
+  it("keeps them once Backlog is shown", () => {
+    const out = filterTickets(tickets, { query: "", project: [], status: null, backlog: true });
+    expect(out.map((t) => t.identifier)).toEqual(["RIC-1", "RIC-2"]);
+  });
+
+  // The chip's "only" state selects Backlog while the flag is still off — an explicit
+  // request for exactly these tickets must not be overruled by the default that hides
+  // them.
+  it("lets an explicit Backlog selection win over the exclusion", () => {
+    const out = filterTickets(tickets, { query: "", project: [], status: "Backlog", backlog: false });
+    expect(out.map((t) => t.identifier)).toEqual(["RIC-1"]);
+  });
+
+  it("hides a Backlog ticket the query would otherwise have matched", () => {
+    expect(filterTickets(tickets, { query: "alpha", project: [], status: null, backlog: false }))
+      .toEqual([]);
+  });
+});
+
 describe("liveStatuses", () => {
   it("returns an empty map for no tickets", () => {
     expect(liveStatuses([]).size).toBe(0);

@@ -5,7 +5,7 @@ import type { ListFilters } from "@/lib/appLocation";
 // Every filter off — the landing state once Mine defaults off (Task 3). Each test
 // overrides only the filter it is about.
 function state(p: Partial<ListFilters> = {}): ListFilters {
-  return { query: "", project: [], status: null, mine: false, sessionsOnly: false, ...p };
+  return { query: "", project: [], status: null, mine: false, sessionsOnly: false, backlog: false, ...p };
 }
 
 describe("activeFilters", () => {
@@ -73,6 +73,15 @@ describe("activeFilters", () => {
     expect(activeFilters(all).map((f) => f.key))
       .toEqual(["query", "project", "project", "status"]);
   });
+
+  // RIC-275. Showing the Backlog deviates from the default board but narrows nothing,
+  // and this bar reports only what hides things — a badge here would be permanent for
+  // anyone who prefers that bucket visible. The chip one row up is where its state
+  // lives.
+  it("reports nothing for the Backlog filter, in either state", () => {
+    expect(activeFilters(state({ backlog: true }))).toEqual([]);
+    expect(activeFilters(state({ backlog: false }))).toEqual([]);
+  });
 });
 
 describe("removeFilter", () => {
@@ -82,6 +91,7 @@ describe("removeFilter", () => {
     status: "To QA",
     mine: true,
     sessionsOnly: true,
+    backlog: true,
   });
 
   it("drops only the project its chip names, leaving the rest selected (RIC-252)", () => {
@@ -128,10 +138,14 @@ describe("removeFilter", () => {
     expect(filters).toEqual(all());
   });
 
+  // The bar clears everything it reports — and only that. Backlog is not among the
+  // chips (RIC-275), so emptying the bar leaves it where it was; restoring the default
+  // board is "Clear all", which writes NO_FILTERS wholesale rather than walking chips.
   it("removes every chip it reports, one after another, back to the clean board", () => {
     let filters = all();
     for (const chip of activeFilters(filters)) filters = removeFilter(filters, chip);
-    expect(filters)
-      .toEqual({ query: "", project: [], status: null, mine: false, sessionsOnly: false });
+    expect(filters).toEqual({
+      query: "", project: [], status: null, mine: false, sessionsOnly: false, backlog: true,
+    });
   });
 });

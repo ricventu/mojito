@@ -1,4 +1,4 @@
-import { filterSearch, parseFilters, type AppLocation, type ListFilters } from "./appLocation";
+import { filterSearch, NO_FILTERS, parseFilters, type AppLocation, type ListFilters } from "./appLocation";
 
 /**
  * Where the board's last filter set is remembered. One key, holding the same query
@@ -8,14 +8,24 @@ import { filterSearch, parseFilters, type AppLocation, type ListFilters } from "
  */
 export const FILTER_KEY = "mojito-list-filters";
 
-/** Is anything narrowed at all? The predicate both halves below turn on. */
+/**
+ * Does this set deviate from the board's defaults at all? The predicate both halves
+ * below turn on.
+ *
+ * "Deviates", not "narrows": since RIC-275 those are two different questions, because
+ * `backlog` defaults to hidden and so *widens* the board when it is set. Both callers
+ * want deviation — one asks "does the url already say something?", the other "did the
+ * user leave a preference worth restoring?" — and showing the Backlog answers yes to
+ * each, even though it narrows nothing.
+ */
 function narrowed(filters: ListFilters): boolean {
   return (
     filters.query !== "" ||
     filters.project.length > 0 ||
     filters.status !== null ||
     filters.mine ||
-    filters.sessionsOnly
+    filters.sessionsOnly ||
+    filters.backlog !== NO_FILTERS.backlog
   );
 }
 
@@ -31,7 +41,7 @@ function narrowed(filters: ListFilters): boolean {
  *   a reloaded second tab all mean exactly what they say;
  * - only the list is seeded, since `sessionUrl` builds a terminal url deliberately
  *   clean of filters and a docs overlay is not the board either;
- * - a remembered set that narrows nothing is not restored, which is how clearing
+ * - a remembered set that deviates from nothing is not restored, which is how clearing
  *   every filter stays cleared on the next launch.
  */
 export function seedFilters(location: AppLocation, stored: string | null): ListFilters | null {

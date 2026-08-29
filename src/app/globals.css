@@ -332,6 +332,17 @@ button.chip:active { transform: scale(.96); }
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
+/* Excluded filter chip — the Backlog chip's third state (RIC-275), and the only chip
+   that has one. It has to read as neither selected nor merely unselected, since
+   "unselected" is what every other status chip is while still being shown: the
+   strike-through is what says the bucket is being *removed*, and the dashed border
+   keeps it legible where the fade alone would not (the base chip is already
+   --text-dim). Sits after .chip.on so the two can never both paint. */
+.filter-chips .chip.off {
+  color: var(--text-dim); background: transparent;
+  border-style: dashed; opacity: .55; text-decoration: line-through;
+}
+
 /* ---- Active filter bar (sticky) ---- */
 /* Pinned, unlike .filter above, which scrolls away: with the filter bar off screen a
    filtered list looks like a complete one, which is how a leftover search query hid a

@@ -22,6 +22,8 @@ export interface UnifiedFilter {
   /** The selected projects; empty is every project — see ListFilters. */
   project: string[];
   status: string | null;
+  /** Whether the Backlog is shown; absent is shown — see TicketFilter.backlog. */
+  backlog?: boolean;
 }
 
 /**
@@ -40,6 +42,11 @@ export interface UnifiedFilter {
  * own fields, exactly as the old session list narrowed it. Neutralising the query here
  * would mean searching for one ticket dumped every other ticket's sessions into
  * "No ticket".
+ *
+ * The Backlog exclusion (RIC-275) rides in `filter` and so reaches both calls below,
+ * which is the whole of what makes it safe: hiding only the ticket would leave its
+ * session nested nowhere and surface it alone under "No ticket" — the same orphan the
+ * live-status rule below exists to prevent, arrived at from the other direction.
  *
  * `live` (build it with liveStatuses over the *unscoped* ticket list) is what keeps the
  * status chip from manufacturing orphans: without it a session is judged on the status

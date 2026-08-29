@@ -248,6 +248,48 @@ describe("buildUnifiedRows with sessionsOnly", () => {
   });
 });
 
+// RIC-275. The exclusion is a criterion like the status chip, so it has to reach both
+// halves of the model: hiding only the ticket would leave its session nested nowhere
+// and surface it alone under "No ticket" — the orphan the live-status rule above exists
+// to prevent.
+describe("buildUnifiedRows — the Backlog exclusion", () => {
+  const HIDDEN = { query: "", project: [], status: null, backlog: false };
+
+  it("drops a Backlog ticket and its session together", () => {
+    const rows = buildUnifiedRows({
+      tickets: [ticket({ identifier: "RIC-1", statusName: "Backlog" })],
+      sessions: [session({ id: "a", ticket: "RIC-1", launchStatus: "Backlog" })],
+      filter: HIDDEN, sessionsOnly: false,
+      live: liveStatuses([ticket({ identifier: "RIC-1", statusName: "Backlog" })]),
+    });
+    expect(rows.ticketRows).toEqual([]);
+    expect(rows.looseSessions).toEqual([]);
+  });
+
+  it("keeps a Todo ticket beside the hidden Backlog one", () => {
+    const tickets = [
+      ticket({ identifier: "RIC-1", statusName: "Backlog" }),
+      ticket({ identifier: "RIC-2", statusName: "Todo" }),
+    ];
+    const rows = buildUnifiedRows({
+      tickets, sessions: [], filter: HIDDEN, sessionsOnly: false, live: liveStatuses(tickets),
+    });
+    expect(rows.ticketRows.map((r) => r.ticket.identifier)).toEqual(["RIC-2"]);
+  });
+
+  it("shows both once Backlog is shown", () => {
+    const tickets = [
+      ticket({ identifier: "RIC-1", statusName: "Backlog" }),
+      ticket({ identifier: "RIC-2", statusName: "Todo" }),
+    ];
+    const rows = buildUnifiedRows({
+      tickets, sessions: [], filter: { ...HIDDEN, backlog: true }, sessionsOnly: false,
+      live: liveStatuses(tickets),
+    });
+    expect(rows.ticketRows.map((r) => r.ticket.identifier)).toEqual(["RIC-1", "RIC-2"]);
+  });
+});
+
 describe("orderTicketRows", () => {
   it("orders rows newest-identifier first, numeric-aware", () => {
     const rows = [

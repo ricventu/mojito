@@ -2,6 +2,13 @@
 // Kept in sync with src/server/statusModel.ts (KNOWN_STATUSES) by tests/lib/status.test.ts.
 // Hue keys map to `.badge.<hue>` rules in src/app/globals.css.
 
+/**
+ * The status the board hides by default (RIC-275). Named rather than spelled out at
+ * each of its three call sites, all of which have to agree for the exclusion to reach
+ * tickets and sessions alike.
+ */
+export const BACKLOG_STATUS = "Backlog";
+
 export const STATUS_ORDER: Record<string, number> = {
   Backlog: 0,
   Todo: 1,
@@ -61,4 +68,18 @@ export function statusColorClass(name: string): string {
   // intake bucket gets a hue of its own without a new token.
   if (name === INTAKE_STATUS) return "indigo";
   return STATUS_COLOR[name] ?? "muted";
+}
+
+/**
+ * The status the launch sheet offers to move this ticket to by hand, or `null` when it
+ * offers none — the presentation half of MANUAL_STATUSES (src/server/statusModel.ts),
+ * kept in sync with it by tests/lib/status.test.ts.
+ *
+ * A toggle rather than a picker: the pair is its own inverse, so the button says where
+ * it goes instead of asking.
+ */
+export function manualMoveTarget(status: string): string | null {
+  if (status === BACKLOG_STATUS) return "Todo";
+  if (status === "Todo") return BACKLOG_STATUS;
+  return null;
 }

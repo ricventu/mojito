@@ -421,7 +421,8 @@ Mojito owns the whole lifecycle — there is no external plugin:
   exactly what made two tabs unable to hold two filter sets. Consequences worth knowing:
   filters are serialized on *every* path, so leaving the list for a terminal or a doc and
   coming back does not drop them; defaults are omitted, so the unfiltered board is a bare
-  `/`; typing in the filter box replaces the entry instead of pushing one per keystroke;
+  `/` (which since RIC-275 is the board with its Backlog *hidden* — see **Backlog
+  filter**, the one default that narrows); typing in the filter box replaces the entry instead of pushing one per keystroke;
   and the page lives at `src/app/[[...view]]/page.tsx`, an optional catch-all, which is
   what makes a hard reload of `/session/<id>` serve the app instead of a 404 — `/api/*`
   and `public/` still win as the more specific routes. `/stacks` was a view of its own
@@ -535,6 +536,55 @@ Mojito owns the whole lifecycle — there is no external plugin:
   (`flex: 0 1 auto`) at their own `.btn.sm` height and the select takes the slack:
   stretched to a quarter of the toolbar each they were the loudest thing on the
   board. On their own line they stay `flex: 1 1 0` — there the width is a tap target.
+- **Backlog filter**: the board **hides its Backlog tickets by default** (RIC-275). The
+  Backlog chip therefore carries three states where every other status chip carries two,
+  cycling `off → only → on` (`backlogChip`/`cycleBacklog` in `src/lib/backlogFilter.ts`,
+  the pure half; `FilterBar` renders it and `.chip.off` in `globals.css` strikes it
+  through — a state that reads as neither selected nor merely unselected, since
+  "unselected" is what every other status chip is *while still being shown*). It cannot
+  ride on `aria-pressed`, which holds two values, so the label spells out where the chip
+  is and what one more tap does. The last step back to `off` deliberately leaves `status`
+  alone: reaching it from a board filtered to Todo must not also clear Todo, which the
+  chip does not own.
+  `ListFilters.backlog` is the one filter value whose **default narrows**, and it costs
+  two invariants the rest of the client rested on. First, the url parameter reads the
+  other way round from every other one — absent means *hidden*, `backlog=1` means shown —
+  which is what keeps the default board a bare `/` instead of writing a restriction into
+  the url of every untouched board. Second, "narrows the list" and "deviates from the
+  default" are no longer the same question, and the two places that used to conflate them
+  now each name the one they mean: `filterMemory`'s `narrowed` wants *deviation* (so a
+  remembered `backlog=1` survives a relaunch, and a url carrying it still wins over
+  storage), while `activeFilters` wants *narrowing* and so reports the Backlog filter in
+  neither state — the sticky bar exists to say what is hiding things, and a badge for a
+  filter that hides nothing would sit there permanently for anyone who prefers that
+  bucket visible, which is the same noise Mine's own default avoids. "Clear all" writes
+  `NO_FILTERS` wholesale and so re-hides the Backlog; walking the bar's own ✕s does not,
+  because the bar never claimed that chip.
+  The exclusion itself rides in the filter object through to **both** `filterTickets` and
+  `filterSessions`, on `sessionStatus` rather than the frozen `launchStatus`. That
+  symmetry is the whole of what makes it safe: hiding only the ticket would leave its
+  session nested nowhere and surface it alone under "No ticket" — the same orphan
+  `liveStatuses` exists to prevent, arrived at from the other direction. In those three
+  filter shapes `backlog` is *optional and defaults to shown*, because an omitted
+  criterion narrows nothing, which is the convention `project: []` and `status: null`
+  already follow there; only `ListFilters` defaults the other way. An explicit
+  `status: "Backlog"` — the chip's `only` state — always wins over the exclusion.
+- **Manual status move**: `MANUAL_STATUSES` (`src/server/statusModel.ts`) is the
+  Backlog/Todo pair and the only thing `POST /api/tickets/[id]/status` accepts (RIC-275);
+  `manualMoveTarget` in `src/lib/status.ts` is its presentation mirror, tied to it by
+  `tests/lib/status.test.ts`. Validated against that pair rather than `KNOWN_STATUSES`
+  because every other transition in the lifecycle is Mojito's own — a launch writes In
+  Progress, the result file writes To QA, a verdict writes Done — and each carries
+  preconditions a bare status name cannot express: an open target here would be a way to
+  write Done over unmerged work. Backlog and Todo are the pair nothing moves between on
+  its own, which is why they are the pair offered by hand. The button lives in the launch
+  sheet beside "Assign to me" and is optimistic like it, which is why the sheet now
+  mirrors `ticket.statusName` in local state the way it already mirrored
+  `assignedToMe` — the `ticket` prop is a snapshot taken when the sheet opened, and every
+  read of the status goes through the mirror so a moved ticket launches with the status
+  it now has. Free of consequences elsewhere: `tmuxName` collapses Backlog/Todo/In
+  Progress to the same work id, so a move never changes which session the sheet is
+  looking at, and `stageKey` re-seeds the model/effort selectors as it should.
 - **Project toolbar**: each project section's divider is a management toolbar
   (`ProjectToolbar`, RIC-253) — Start, Stop, Logs, Pull (or **Pull & deploy** on the
   server's own checkout), Push, and **Create worktree script**. These are the actions
