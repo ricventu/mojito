@@ -41,7 +41,11 @@ export default function Home() {
   const { view, filters } = location;
   const [alerts, setAlerts] = useState<{ id: string; ticket: string; message: string }[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [newTicketOpen, setNewTicketOpen] = useState(false);
+  // The New ticket sheet: `null` is closed, and an open one carries the project it was
+  // asked for — a project toolbar's section name, or `null` for "work it out from where
+  // we are" (see newTicketProject). One piece of state rather than two, so the flag and
+  // the project cannot disagree.
+  const [newTicket, setNewTicket] = useState<{ project: string | null } | null>(null);
   const { tickets, refresh: refreshTickets } = useTickets(token);
   const { sessions, setSessions, loaded: sessionsLoaded, refresh: refreshSessions } = useSessions(token);
   // Owned here — not by the project toolbar or SettingsSheet — so a deploy's health poll
@@ -115,13 +119,13 @@ export default function Home() {
   // terminal header too (RIC-224) and the list is not mounted there. It is rendered
   // into every branch below for the same reason. Which project it opens on depends on
   // where it was opened from — see newTicketProject.
-  const newTicketSheet = newTicketOpen && (
+  const newTicketSheet = newTicket && (
     <NewTicketSheet
       token={token}
-      defaultProject={newTicketProject(view, filters, openSession)}
-      onClose={() => setNewTicketOpen(false)}
+      defaultProject={newTicketProject(view, filters, openSession, newTicket.project)}
+      onClose={() => setNewTicket(null)}
       onCreated={() => { refreshSessions(); refreshTickets(); }}
-      onOpen={(s) => { setNewTicketOpen(false); openLaunched(s); }}
+      onOpen={(s) => { setNewTicket(null); openLaunched(s); }}
     />
   );
 
@@ -142,7 +146,7 @@ export default function Home() {
         session={openSession}
         tickets={tickets}
         docs={view.docs}
-        onNewTicket={() => setNewTicketOpen(true)}
+        onNewTicket={() => setNewTicket({ project: null })}
         onOpenDocs={() => go({ kind: "session", id: view.id, docs: { doc: null } })}
         onSelectDoc={(doc) => go({ kind: "session", id: view.id, docs: { doc } })}
         onBack={() => {
@@ -199,7 +203,7 @@ export default function Home() {
         filters={filters} onFilters={setFilters} selfUpdate={selfUpdate}
         onLaunched={() => { refreshSessions(); refreshTickets(); }}
         onChanged={refreshSessions}
-        onNewTicket={() => setNewTicketOpen(true)}
+        onNewTicket={(project) => setNewTicket({ project: project ?? null })}
         onSettings={() => setSettingsOpen(true)}
         onOpen={openLaunched}
         onOpenTicketDocs={(t) => go({ kind: "docs", target: { ticket: t.identifier, project: t.project }, doc: null })}

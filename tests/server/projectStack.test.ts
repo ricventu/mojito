@@ -65,6 +65,18 @@ describe("listStacks", () => {
     });
   });
 
+  // The client builds the toolbar's Warp / VS Code links from it (see projectLinks), so
+  // it has to be the mapped root verbatim rather than a slug or a derived path.
+  it("carries each project's mapped repo root", async () => {
+    const rows = await listStacks(deps());
+    expect(Object.fromEntries(rows.map((r) => [r.project, r.path]))).toEqual({
+      Factorybook: "/repo/fb",
+      "Gestionale Cooperative": "/repo/gc",
+      Lime: "/repo/lime",
+      Mojito: "/repo/mojito",
+    });
+  });
+
   it("flags the Mojito self-row (path === selfPath) as not pullable", async () => {
     const rows = await listStacks(deps());
     const mojito = rows.find((r) => r.project === "Mojito")!;

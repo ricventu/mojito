@@ -59,6 +59,19 @@ describe("newTicketProject", () => {
     expect(newTicketProject(LIST, filters(), null)).toBeNull();
   });
 
+  // A project section's toolbar carries the action too, and there the divider names the
+  // project outright — so it beats the filters and even the open session's own project.
+  it("takes an explicitly picked project over every guess", () => {
+    expect(newTicketProject(LIST, filters(), null, "Lime")).toBe("Lime");
+    expect(newTicketProject(LIST, filters({ project: ["Mojito", "Fornace"] }), null, "Lime")).toBe("Lime");
+    expect(newTicketProject(SESSION, filters(), session("Mojito"), "Lime")).toBe("Lime");
+  });
+
+  it("falls back to the usual rules when nothing was picked", () => {
+    expect(newTicketProject(LIST, filters({ project: ["Mojito"] }), null, null)).toBe("Mojito");
+    expect(newTicketProject(LIST, filters({ project: ["Mojito"] }), null, "  ")).toBe("Mojito");
+  });
+
   // Filters ride along on every path (see formatLocation), so the chip the user left
   // on the board still describes what they are looking at over in a doc.
   it("takes the project filter on the other non-session views too", () => {

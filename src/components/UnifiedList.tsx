@@ -51,8 +51,10 @@ export default function UnifiedList(
     onLaunched: () => void;
     onChanged: () => void;
     // Owned by the page, not here: the same sheet is reachable from the terminal
-    // header, which this component is not on screen for (RIC-224).
-    onNewTicket: () => void;
+    // header, which this component is not on screen for (RIC-224). The argument is the
+    // project to open it on, passed only by a project toolbar — where the section name
+    // *is* the answer, and beats the guess newTicketProject would make from the filters.
+    onNewTicket: (project?: string) => void;
     // The board's toolbar is where Settings lives since the bottom nav was retired
     // (RIC-253); the sheet itself stays the page's, like the two above.
     onSettings: () => void;
@@ -175,7 +177,7 @@ export default function UnifiedList(
       {empty && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <p className="empty">Nothing here yet.</p>
-          <button className="btn primary block" onClick={onNewTicket}>+ New ticket</button>
+          <button className="btn primary block" onClick={() => onNewTicket()}>+ New ticket</button>
           <button className="btn ghost block" onClick={() => setNewSession(true)}>New session</button>
           {/* Spelled out rather than a gear: the toolbar that carries the icon is not
               rendered on an empty board, and Settings has to stay reachable — it is
@@ -195,7 +197,7 @@ export default function UnifiedList(
           placeholder="Filter tickets and sessions…"
           action={
             <>
-              <button className="btn primary sm" onClick={onNewTicket}>+ Ticket</button>
+              <button className="btn primary sm" onClick={() => onNewTicket()}>+ Ticket</button>
               <button className="btn ghost sm" onClick={() => setNewSession(true)}>+ Session</button>
               <button className="btn ghost sm" onClick={cleanup}>Clean up</button>
               {needsInput > 0 && (
@@ -228,6 +230,7 @@ export default function UnifiedList(
             token={token}
             refresh={refreshStacks}
             onOpenSession={onOpen}
+            onNewTicket={() => onNewTicket(sec.project)}
             selfUpdate={selfUpdate}
           />
           {groupByStatus(sec.ticketRows, (r) => r.ticket.statusName).map((group) => (

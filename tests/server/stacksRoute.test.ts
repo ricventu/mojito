@@ -40,7 +40,7 @@ describe("GET /api/stacks", () => {
   });
   it("200 with the stack rows", async () => {
     const rows: StackRow[] = [
-      { project: "Factorybook", slug: "factorybook", hasStack: true, status: "stopped", pullable: true, self: false, hasWorktreeScript: false },
+      { project: "Factorybook", slug: "factorybook", path: "/repo/fb", hasStack: true, status: "stopped", pullable: true, self: false, hasWorktreeScript: false },
     ];
     vi.mocked(listStacks).mockResolvedValue(rows);
     const res = await GET(req());

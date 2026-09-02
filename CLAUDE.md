@@ -71,7 +71,10 @@ Mojito owns the whole lifecycle — there is no external plugin:
   the open session's own project on a terminal (a ticket jotted down while watching a
   session almost always belongs to that repo), otherwise the project the board is
   filtered on — `soleProject`, i.e. only when the filter names exactly one, since the
-  filter holds a set since RIC-225 and one field cannot honour two. **New session**
+  filter holds a set since RIC-225 and one field cannot honour two. Every project
+  section's toolbar carries the action too, and there the section name rides in as
+  `newTicketProject`'s `picked` argument and beats both rules — see **Project toolbar**.
+  **New session**
   pre-selects the same way — it is only reachable from the list, so it takes
   `filters.project` through that same `soleProject`. Both sheets share the Project field
   through `useProjectPicker`, the glue half of the usual split (cf. `useToken` ÷
@@ -269,7 +272,8 @@ Mojito owns the whole lifecycle — there is no external plugin:
   the *receiving* app considers current) and answers `""` for "no link", which is how the
   header decides not to render the action. Both are hidden below 480px: a phone has no
   handler for either scheme, so the tap ends in an OS error, and the two glyphs cost the
-  title width it needs there. They are also the only labels in the app deliberately left
+  title width it needs there. The same pair sits on every project section's divider
+  since RIC-276, pointed at the repo root — see **Project toolbar**. They are also the only labels in the app deliberately left
   as ASCII rather than icons (see **Icons**): `>_` and `</>` say *terminal* and *code
   editor* in a way two lucide pictograms do not, and being phone-hidden they never sit
   next to the icon row anyway.
@@ -586,8 +590,41 @@ Mojito owns the whole lifecycle — there is no external plugin:
   Progress to the same work id, so a move never changes which session the sheet is
   looking at, and `stageKey` re-seeds the model/effort selectors as it should.
 - **Project toolbar**: each project section's divider is a management toolbar
-  (`ProjectToolbar`, RIC-253) — Start, Stop, Logs, Pull (or **Pull & deploy** on the
-  server's own checkout), Push, and **Create worktree script**. These are the actions
+  (`ProjectToolbar`, RIC-253) — Warp, VS Code, **New ticket**, Start, Stop, Logs, Pull
+  (or **Pull & deploy** on the server's own checkout), Push, **Deploy to production with
+  Claude**, and **Create worktree script**. The first three are the terminal header's
+  own, in its own order: they are
+  about the *project*, not about a session, and reaching them used to mean opening one
+  of its sessions first — or, for a ticket, leaving the board filtered on exactly one
+  project so `soleProject` could guess. Warp and VS Code point at the mapped repo root,
+  which is why `StackRow` now carries `path` (verbatim from projects.json — the client
+  only ever hands it to the OS); `projectLinks` builds both and answers `""` for a path
+  that is not absolute, which is the one thing a projects.json entry can be silently
+  wrong about and costs the row those two actions rather than opening an unpredictable
+  directory. They are anchors, keep the header's ASCII labels, and are hidden below
+  480px for the header's own reasons. **New ticket** rides on the same page-owned sheet
+  as the board's and the header's: `newTicketProject` takes an optional `picked` project
+  that wins over every guess (the divider names the project outright), and `page.tsx`
+  holds the sheet as one `{ project } | null` rather than a flag beside a name, so the
+  two cannot disagree. It is offered on every mapped project unconditionally — a repo
+  can always take a ticket, and the sheet's Project field only accepts a name
+  /api/projects offers, which is exactly the set that has a stack row.
+  **Deploy to production with Claude** (`claude-deploy`) opens a project-scoped custom
+  session in the repo root — opus at high effort — with the whole instruction being one
+  line, `fai pull e deploy in produzione`. Deliberately that and nothing more: every
+  project deploys differently, and a session sitting in the repo can read its scripts,
+  Makefile and docs for itself, where anything Mojito wrote into the prompt would be a
+  guess about a procedure it does not own. Note it is **not** the same thing as
+  `deploy`, which is Mojito's own guarded self-update (pull, rebuild, restart *this*
+  server) and exists only on the checkout it runs from: the self-row shows both, and
+  they mean different machines. Offered on every mapped project, because Mojito has no
+  signal that says which repos can deploy — the session it opens is what finds out — and
+  it is the one action on the row that **asks first**, a plain `confirm()` in the
+  component alongside the app's other two (Kill, Clean up). A production deploy reached
+  from a strip of 28px icons is cheap to mistap and expensive to undo, and unlike the git
+  actions it cannot be inspected before it runs. Its icon is `Ship` rather than another
+  up-arrow, which Push and Pull & deploy already own. The rest are the
+  actions
   that used to be the **Stacks tab**, which is gone: the board's divider was already the
   only thing naming a project and did nothing, while the actions belonging to a project
   lived one tab away on a screen that listed the same names again. `page.tsx` therefore
@@ -611,11 +648,12 @@ Mojito owns the whole lifecycle — there is no external plugin:
   where the Stacks tab listed every mapped project unconditionally. Only selected ones,
   so the unfiltered board does not become a list of everything in projects.json; the
   filter already offers every configured project (RIC-225), so selecting one is the way
-  in. The buttons are **icon-only** (lucide + `title`/`aria-label`): six of them have to
-  share a line with a project name on a 320px phone, which no set of labels does, and
-  `.proj-head` wraps them onto a right-aligned second line where they still do not fit.
-  The two exceptions are worth knowing: "Resolve with Claude" keeps its words because it
-  appears only after a pull has already failed, and `useStacks` polls at 15s rather than
+  in. The buttons are **icon-only** (lucide + `title`/`aria-label`): up to eight of them
+  have to share a line with a project name on a 320px phone, which no set of labels
+  does, and `.proj-head` wraps them onto a right-aligned second line where they still do
+  not fit. The exceptions are worth knowing: "Resolve with Claude" keeps its words
+  because it appears only after a pull has already failed, Warp and VS Code keep their
+  ASCII (and are the two the phone drops), and `useStacks` polls at 15s rather than
   the panel's 5s now that it runs on the app's default view — every action refreshes on
   completion, so the interval only has to catch a stack that changed outside Mojito.
   "Pull & deploy" is deliberately *also* still in the Settings sheet, which is where it

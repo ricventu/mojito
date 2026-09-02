@@ -1,10 +1,10 @@
 "use client";
 import { useState } from "react";
 import {
-  ArrowDownToLine, ArrowUpToLine, FileTerminal, Play, Rocket, ScrollText, Square, X,
+  ArrowDownToLine, ArrowUpToLine, FileTerminal, Play, Plus, Rocket, ScrollText, Ship, Square, X,
 } from "lucide-react";
 import { apiFetch } from "@/lib/client";
-import { projectActions, type ProjectAction } from "@/lib/projectToolbar";
+import { projectActions, projectLinks, type ProjectAction } from "@/lib/projectToolbar";
 import {
   pullMessage, pushMessage, syntheticStackSession,
   type PullResponse, type PushResponse, type StackRow,
@@ -22,21 +22,25 @@ import type { SessionMeta } from "@/server/types";
  * names again. Merging them costs the board nothing (a header it already drew) and
  * removes a whole view.
  *
- * Icon-only buttons, each with `title` + `aria-label`: up to six actions have to fit
+ * Icon-only buttons, each with `title` + `aria-label`: up to eight actions have to fit
  * beside a project name on a 320px phone, which no set of labels does — and a divider
  * that pushed the first card off the fold would be a worse trade than a tooltip. The
  * exception is "Resolve with Claude", which appears only after a pull has already
- * failed and needs the words (see the message row below).
+ * failed and needs the words (see the message row below). Warp and VS Code keep the
+ * header's ASCII labels rather than joining the icon row, and are the two the phone
+ * does not render at all — see the render loop.
  *
  * `stack === null` is the ordinary case for the NO_PROJECT bucket and for a project
  * whose name only a session still carries: the header renders exactly as it always did.
  */
-export default function ProjectToolbar({ project, stack, token, refresh, onOpenSession, selfUpdate }: {
+export default function ProjectToolbar({ project, stack, token, refresh, onOpenSession, onNewTicket, selfUpdate }: {
   project: string;
   stack: StackRow | null;
   token: string;
   refresh: () => void;
   onOpenSession: (s: SessionMeta) => void;
+  /** Opens the New ticket sheet already pointed at this project (owned by page.tsx). */
+  onNewTicket: () => void;
   selfUpdate: SelfUpdate;
 }) {
   return (
@@ -50,7 +54,7 @@ export default function ProjectToolbar({ project, stack, token, refresh, onOpenS
       {stack && (
         <StackActions
           stack={stack} token={token} refresh={refresh}
-          onOpenSession={onOpenSession} selfUpdate={selfUpdate}
+          onOpenSession={onOpenSession} onNewTicket={onNewTicket} selfUpdate={selfUpdate}
         />
       )}
     </div>
@@ -59,33 +63,45 @@ export default function ProjectToolbar({ project, stack, token, refresh, onOpenS
 
 /** What each action's button says — in its tooltip and to a screen reader. */
 const LABELS: Record<ProjectAction, string> = {
+  warp: "Open in Warp",
+  vscode: "Open in VS Code",
+  ticket: "New ticket",
   start: "Start stack",
   stop: "Stop stack",
   logs: "Stack logs",
   pull: "Pull",
   deploy: "Pull & deploy",
   push: "Push",
+  "claude-deploy": "Deploy to production with Claude",
   "init-script": "Create worktree script",
 };
 
-const ICONS: Record<ProjectAction, typeof Play> = {
+// Warp and VS Code are not here: like the terminal header's, their labels are
+// deliberately ASCII (`>_`, `</>`) rather than lucide glyphs — see the Icons note in
+// CLAUDE.md.
+const ICONS: Record<Exclude<ProjectAction, "warp" | "vscode">, typeof Play> = {
+  ticket: Plus,
   start: Play,
   stop: Square,
   logs: ScrollText,
   pull: ArrowDownToLine,
   deploy: Rocket,
   push: ArrowUpToLine,
+  // Not another up-arrow: Push and Pull & deploy already own those, and this is the one
+  // button on the row that reaches production.
+  "claude-deploy": Ship,
   "init-script": FileTerminal,
 };
 
 /** What a finished action has to say for itself, until the next one or a dismiss. */
 type Note = { kind: "ok" | "err"; text: string; canResolve: boolean };
 
-function StackActions({ stack, token, refresh, onOpenSession, selfUpdate }: {
+function StackActions({ stack, token, refresh, onOpenSession, onNewTicket, selfUpdate }: {
   stack: StackRow;
   token: string;
   refresh: () => void;
   onOpenSession: (s: SessionMeta) => void;
+  onNewTicket: () => void;
   selfUpdate: SelfUpdate;
 }) {
   const [busy, setBusy] = useState(false);
@@ -119,27 +135,58 @@ function StackActions({ stack, token, refresh, onOpenSession, selfUpdate }: {
     const res = await post("create-worktree-script");
     if (res.ok) onOpenSession((await res.json()).meta as SessionMeta);
   });
+  // The only action on this row that asks first. It is a production deploy, reached from
+  // a strip of icon-only 28px squares — cheap to mistap, expensive to undo — and unlike
+  // the git ones it cannot be inspected before it runs. `confirm()` rather than a sheet,
+  // as with Kill and Clean up: the question is one line and the answer is yes or no.
+  const claudeDeploy = () => {
+    if (!confirm(`Deploy ${stack.project} to production? A Claude session will run the deploy.`)) return;
+    run(async () => {
+      const res = await post("claude-deploy");
+      if (res.ok) onOpenSession((await res.json()).meta as SessionMeta);
+    });
+  };
 
   const deploying = selfUpdate.phase === "pulling" || selfUpdate.phase === "deploying";
-  const onAction: Record<ProjectAction, () => void> = {
+  const onAction: Record<Exclude<ProjectAction, "warp" | "vscode">, () => void> = {
+    ticket: onNewTicket,
     start: () => act("start"),
     stop: () => act("stop"),
     logs: () => onOpenSession(syntheticStackSession(stack.slug, stack.project)),
     pull,
     deploy: selfUpdate.run,
     push,
+    "claude-deploy": claudeDeploy,
     "init-script": initScript,
   };
 
   const actions = projectActions(stack, selfUpdate.enabled);
+  const links = projectLinks(stack);
   return (
     <>
       <div className="proj-actions">
         {actions.map((action) => {
-          const Icon = ICONS[action];
           const label = action === "deploy" && deploying
             ? (selfUpdate.phase === "pulling" ? "Pulling…" : "Deploying…")
             : LABELS[action];
+          // Warp / VS Code are anchors, not buttons: the browser hands the url to the
+          // OS itself, so there is nothing to spawn and nothing to be busy about — and
+          // `busy` must not disable them, since a running pull is exactly when you want
+          // to look at the repo. Hidden below 480px by CSS, as in the terminal header.
+          if (action === "warp" || action === "vscode") {
+            return (
+              <a
+                key={action}
+                className="btn sm ghost"
+                href={action === "warp" ? links.warp : links.vscode}
+                aria-label={label}
+                title={label}
+              >
+                {action === "warp" ? ">_" : "</>"}
+              </a>
+            );
+          }
+          const Icon = ICONS[action];
           return (
             <button
               key={action}

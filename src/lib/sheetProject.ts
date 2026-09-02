@@ -12,11 +12,17 @@ import type { SessionMeta } from "@/server/types";
  * available, and it survives across views because the filters ride along on every path
  * (see formatLocation).
  *
+ * `picked` is the one answer that is not a guess: a project section's toolbar carries
+ * the action too, and there the divider names the project outright, so it wins over
+ * both rules below — including the open session's, since a board is only ever behind a
+ * terminal, never in front of one. Every other call site passes nothing.
+ *
  * `null` means "General (home)": no project, the sheet's own default.
  */
 export function newTicketProject(
-  view: AppView, filters: ListFilters, session: SessionMeta | null,
+  view: AppView, filters: ListFilters, session: SessionMeta | null, picked?: string | null,
 ): string | null {
+  if (picked?.trim()) return picked.trim();
   // `session` can be null on a session view: the list is polled, so a terminal url can
   // be open before its meta has arrived — and a sidecar written before projectName
   // existed leaves it undefined at runtime despite the type.

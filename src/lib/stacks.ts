@@ -5,6 +5,14 @@ export type StackStatus = "running" | "stopped" | "crashed";
 export interface StackRow {
   project: string;
   slug: string;
+  /**
+   * The repo root projects.json maps the project to, verbatim.
+   *
+   * On the client it is only ever handed to the OS as a `warp://`/`vscode://` path (see
+   * openInApp), which is why an entry that is not absolute costs the toolbar those two
+   * actions rather than producing a link that would open an unpredictable directory.
+   */
+  path: string;
   hasStack: boolean;
   status: StackStatus | null; // meaningful only when hasStack
   pullable: boolean; // false for the Mojito self-row

@@ -116,6 +116,7 @@ export async function listStacks(deps: StackDeps): Promise<StackRow[]> {
     return {
       project: name,
       slug,
+      path,
       hasStack,
       status: hasStack ? deriveStatus(slug, path, panes) : null,
       pullable: resolve(path) !== resolve(deps.selfPath),

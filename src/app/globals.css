@@ -241,6 +241,21 @@ section + section > .proj-head { margin-top: 24px; }
 /* `.btn:hover` brightens the border unconditionally, which on a disabled button reads
    as "this does something". */
 .proj-actions .btn.sm:disabled:hover { border-color: var(--border-hi); }
+/* Warp / VS Code are anchors, not buttons (see openInApp.ts), and keep the terminal
+   header's ASCII labels rather than a lucide glyph: `>_` and `</>` say *terminal* and
+   *code editor* in a way two pictograms do not. So they need what a <button> gets for
+   free — no UA underline, and a flex box to centre the two or three characters in the
+   same 28px square as the icons beside them. 11px because `</>` is three glyphs where
+   every neighbour is one. */
+.proj-actions a.btn.sm {
+  display: inline-flex; align-items: center; justify-content: center;
+  font: 600 11px/1 var(--mono); text-decoration: none;
+}
+@media (max-width: 480px) {
+  /* Same trade as the terminal header's: a phone has no handler for either scheme, so
+     the taps end in an OS error, and seven squares do not fit beside a project name. */
+  .proj-actions a.btn.sm { display: none; }
+}
 
 /* What an action had to say for itself: a git result, or a deploy in flight. Takes a
    whole line under the row (`.proj-head` wraps) so a long message never squeezes the
