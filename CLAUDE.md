@@ -622,8 +622,9 @@ Mojito owns the whole lifecycle — there is no external plugin:
   it is the one action on the row that **asks first**, a plain `confirm()` in the
   component alongside the app's other two (Kill, Clean up). A production deploy reached
   from a strip of 28px icons is cheap to mistap and expensive to undo, and unlike the git
-  actions it cannot be inspected before it runs. Its icon is `Ship` rather than another
-  up-arrow, which Push and Pull & deploy already own. The rest are the
+  actions it cannot be inspected before it runs. Its icon is the same `Rocket` as `deploy`'s: on the
+  self-row the two therefore sit side by side telling themselves apart by tooltip
+  alone, which is a deliberate choice — a rocket is what a deploy looks like here. The rest are the
   actions
   that used to be the **Stacks tab**, which is gone: the board's divider was already the
   only thing naming a project and did nothing, while the actions belonging to a project

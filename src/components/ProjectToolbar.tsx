@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import {
-  ArrowDownToLine, ArrowUpToLine, FileTerminal, Play, Plus, Rocket, ScrollText, Ship, Square, X,
+  ArrowDownToLine, ArrowUpToLine, FileTerminal, Play, Plus, Rocket, ScrollText, Square, X,
 } from "lucide-react";
 import { apiFetch } from "@/lib/client";
 import { projectActions, projectLinks, type ProjectAction } from "@/lib/projectToolbar";
@@ -87,9 +87,9 @@ const ICONS: Record<Exclude<ProjectAction, "warp" | "vscode">, typeof Play> = {
   pull: ArrowDownToLine,
   deploy: Rocket,
   push: ArrowUpToLine,
-  // Not another up-arrow: Push and Pull & deploy already own those, and this is the one
-  // button on the row that reaches production.
-  "claude-deploy": Ship,
+  // The same rocket as `deploy`: on the self-row the two sit side by side and only
+  // their tooltips tell them apart, but a deploy is what a rocket means here.
+  "claude-deploy": Rocket,
   "init-script": FileTerminal,
 };
 
