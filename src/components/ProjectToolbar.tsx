@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import {
-  ArrowDownToLine, ArrowUpToLine, FileTerminal, Play, Plus, Rocket, ScrollText, Square, X,
+  ArrowDownToLine, ArrowUpToLine, Bot, FileTerminal, Play, Plus, Rocket, ScrollText, Square, X,
 } from "lucide-react";
 import { apiFetch } from "@/lib/client";
 import { projectActions, projectLinks, type ProjectAction } from "@/lib/projectToolbar";
@@ -22,7 +22,7 @@ import type { SessionMeta } from "@/server/types";
  * names again. Merging them costs the board nothing (a header it already drew) and
  * removes a whole view.
  *
- * Icon-only buttons, each with `title` + `aria-label`: up to eight actions have to fit
+ * Icon-only buttons, each with `title` + `aria-label`: up to nine actions have to fit
  * beside a project name on a 320px phone, which no set of labels does — and a divider
  * that pushed the first card off the fold would be a worse trade than a tooltip. The
  * exception is "Resolve with Claude", which appears only after a pull has already
@@ -33,7 +33,7 @@ import type { SessionMeta } from "@/server/types";
  * `stack === null` is the ordinary case for the NO_PROJECT bucket and for a project
  * whose name only a session still carries: the header renders exactly as it always did.
  */
-export default function ProjectToolbar({ project, stack, token, refresh, onOpenSession, onNewTicket, selfUpdate }: {
+export default function ProjectToolbar({ project, stack, token, refresh, onOpenSession, onNewTicket, onNewSession, selfUpdate }: {
   project: string;
   stack: StackRow | null;
   token: string;
@@ -41,6 +41,8 @@ export default function ProjectToolbar({ project, stack, token, refresh, onOpenS
   onOpenSession: (s: SessionMeta) => void;
   /** Opens the New ticket sheet already pointed at this project (owned by page.tsx). */
   onNewTicket: () => void;
+  /** The same for the New session sheet, which UnifiedList owns — see its `newSession`. */
+  onNewSession: () => void;
   selfUpdate: SelfUpdate;
 }) {
   return (
@@ -54,7 +56,8 @@ export default function ProjectToolbar({ project, stack, token, refresh, onOpenS
       {stack && (
         <StackActions
           stack={stack} token={token} refresh={refresh}
-          onOpenSession={onOpenSession} onNewTicket={onNewTicket} selfUpdate={selfUpdate}
+          onOpenSession={onOpenSession} onNewTicket={onNewTicket} onNewSession={onNewSession}
+          selfUpdate={selfUpdate}
         />
       )}
     </div>
@@ -66,6 +69,7 @@ const LABELS: Record<ProjectAction, string> = {
   warp: "Open in Warp",
   vscode: "Open in VS Code",
   ticket: "New ticket",
+  session: "New session",
   start: "Start stack",
   stop: "Stop stack",
   logs: "Stack logs",
@@ -81,6 +85,9 @@ const LABELS: Record<ProjectAction, string> = {
 // CLAUDE.md.
 const ICONS: Record<Exclude<ProjectAction, "warp" | "vscode">, typeof Play> = {
   ticket: Plus,
+  // Not a terminal glyph: Warp's `>_` sits three squares away, and a session here is as
+  // often a claude one as a shell.
+  session: Bot,
   start: Play,
   stop: Square,
   logs: ScrollText,
@@ -96,12 +103,13 @@ const ICONS: Record<Exclude<ProjectAction, "warp" | "vscode">, typeof Play> = {
 /** What a finished action has to say for itself, until the next one or a dismiss. */
 type Note = { kind: "ok" | "err"; text: string; canResolve: boolean };
 
-function StackActions({ stack, token, refresh, onOpenSession, onNewTicket, selfUpdate }: {
+function StackActions({ stack, token, refresh, onOpenSession, onNewTicket, onNewSession, selfUpdate }: {
   stack: StackRow;
   token: string;
   refresh: () => void;
   onOpenSession: (s: SessionMeta) => void;
   onNewTicket: () => void;
+  onNewSession: () => void;
   selfUpdate: SelfUpdate;
 }) {
   const [busy, setBusy] = useState(false);
@@ -150,6 +158,7 @@ function StackActions({ stack, token, refresh, onOpenSession, onNewTicket, selfU
   const deploying = selfUpdate.phase === "pulling" || selfUpdate.phase === "deploying";
   const onAction: Record<Exclude<ProjectAction, "warp" | "vscode">, () => void> = {
     ticket: onNewTicket,
+    session: onNewSession,
     start: () => act("start"),
     stop: () => act("stop"),
     logs: () => onOpenSession(syntheticStackSession(stack.slug, stack.project)),

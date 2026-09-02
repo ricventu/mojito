@@ -16,10 +16,11 @@ export default function NewSessionSheet(
   { token, defaultProject, onClose, onLaunched, onOpen }:
   {
     token: string;
-    // The project the board is filtered on, when its multi-select names exactly one
-    // (see soleProject) — a session started while looking at one project is for that
-    // project (RIC-224). `null` is General (home), and also what several projects
-    // resolve to, since one field cannot honour them all.
+    // The project a project section's toolbar names, else the one the board is filtered
+    // on when its multi-select names exactly one (see soleProject) — a session started
+    // while looking at one project is for that project (RIC-224). `null` is General
+    // (home), and also what several projects resolve to, since one field cannot honour
+    // them all.
     defaultProject: string | null;
     onClose: () => void;
     onLaunched: () => void;

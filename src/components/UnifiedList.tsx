@@ -64,7 +64,10 @@ export default function UnifiedList(
   },
 ) {
   const [picked, setPicked] = useState<TicketSummary | null>(null);
-  const [newSession, setNewSession] = useState(false);
+  // `null` is closed; an open sheet carries the project it was asked for — a project
+  // toolbar's section name, or `null` for "take the board's filter" (soleProject). One
+  // piece of state rather than two, as with the New ticket sheet in page.tsx.
+  const [newSession, setNewSession] = useState<{ project: string | null } | null>(null);
 
   // The filters live in the url (see appLocation), not in this component and not in
   // localStorage: that is what gives every browser tab its own set, keeps them across
@@ -178,7 +181,7 @@ export default function UnifiedList(
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <p className="empty">Nothing here yet.</p>
           <button className="btn primary block" onClick={() => onNewTicket()}>+ New ticket</button>
-          <button className="btn ghost block" onClick={() => setNewSession(true)}>New session</button>
+          <button className="btn ghost block" onClick={() => setNewSession({ project: null })}>New session</button>
           {/* Spelled out rather than a gear: the toolbar that carries the icon is not
               rendered on an empty board, and Settings has to stay reachable — it is
               where "Pull & deploy" lives, which is exactly what an empty board (a
@@ -198,7 +201,7 @@ export default function UnifiedList(
           action={
             <>
               <button className="btn primary sm" onClick={() => onNewTicket()}>+ Ticket</button>
-              <button className="btn ghost sm" onClick={() => setNewSession(true)}>+ Session</button>
+              <button className="btn ghost sm" onClick={() => setNewSession({ project: null })}>+ Session</button>
               <button className="btn ghost sm" onClick={cleanup}>Clean up</button>
               {needsInput > 0 && (
                 <span className="count" title={`${needsInput} session${needsInput === 1 ? "" : "s"} waiting for input`}>
@@ -231,6 +234,7 @@ export default function UnifiedList(
             refresh={refreshStacks}
             onOpenSession={onOpen}
             onNewTicket={() => onNewTicket(sec.project)}
+            onNewSession={() => setNewSession({ project: sec.project })}
             selfUpdate={selfUpdate}
           />
           {groupByStatus(sec.ticketRows, (r) => r.ticket.statusName).map((group) => (
@@ -277,9 +281,9 @@ export default function UnifiedList(
           onOpenDocs={() => { setPicked(null); onOpenTicketDocs(picked); }} />
       )}
       {newSession && (
-        <NewSessionSheet token={token} defaultProject={soleProject(project)}
-          onClose={() => setNewSession(false)} onLaunched={onChanged}
-          onOpen={(s) => { setNewSession(false); onOpen(s); }} />
+        <NewSessionSheet token={token} defaultProject={newSession.project ?? soleProject(project)}
+          onClose={() => setNewSession(null)} onLaunched={onChanged}
+          onOpen={(s) => { setNewSession(null); onOpen(s); }} />
       )}
     </div>
   );

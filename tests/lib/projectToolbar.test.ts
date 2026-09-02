@@ -16,9 +16,9 @@ function row(over: Partial<StackRow> = {}): StackRow {
   };
 }
 
-// The three the terminal header already carried, now leading every mapped project's
-// row: two links to the repo root and the New ticket sheet.
-const HEAD = ["warp", "vscode", "ticket"] as const;
+// The four that lead every mapped project's row: the terminal header's two links to the
+// repo root, and the board's two creation sheets.
+const HEAD = ["warp", "vscode", "ticket", "session"] as const;
 
 describe("stackFor", () => {
   it("finds the row naming the section's project", () => {
@@ -77,12 +77,12 @@ describe("projectActions", () => {
       .not.toContain("init-script");
   });
 
-  // A repo can always take a ticket, and the sheet's Project field only accepts a name
+  // A repo can always take either, and both sheets' Project field only accepts a name
   // /api/projects offers — which is exactly the set that has a stack row here.
-  it("offers New ticket on every mapped project, whatever its stack and git state", () => {
-    expect(projectActions(row(), true)).toContain("ticket");
+  it("offers both creation sheets on every mapped project, whatever its stack and git state", () => {
+    expect(projectActions(row(), true)).toEqual(expect.arrayContaining(["ticket", "session"]));
     expect(projectActions(row({ hasStack: false, status: null, pullable: false, self: true }), false))
-      .toContain("ticket");
+      .toEqual(expect.arrayContaining(["ticket", "session"]));
   });
 
   // Mojito does not know any repo's deploy procedure, so it has no signal to hide the
@@ -100,7 +100,7 @@ describe("projectActions", () => {
   // relative path would open whatever directory the receiving app considers current.
   it("drops Warp and VS Code when the mapped path is not absolute", () => {
     expect(projectActions(row({ path: "relative/repo" }), false))
-      .toEqual(["ticket", "start", "stop", "logs", "pull", "push", "claude-deploy"]);
+      .toEqual(["ticket", "session", "start", "stop", "logs", "pull", "push", "claude-deploy"]);
     expect(projectActions(row({ path: "" }), false)).not.toContain("warp");
   });
 });

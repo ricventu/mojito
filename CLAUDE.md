@@ -76,7 +76,10 @@ Mojito owns the whole lifecycle — there is no external plugin:
   `newTicketProject`'s `picked` argument and beats both rules — see **Project toolbar**.
   **New session**
   pre-selects the same way — it is only reachable from the list, so it takes
-  `filters.project` through that same `soleProject`. Both sheets share the Project field
+  `filters.project` through that same `soleProject`, and a project toolbar overrides it
+  with the section name exactly as the ticket sheet does (its sheet stays
+  `UnifiedList`'s, so the override is that state's own field rather than a
+  `newTicketProject` argument). Both sheets share the Project field
   through `useProjectPicker`, the glue half of the usual split (cf. `useToken` ÷
   `resolveInitialToken`): the rule lives in `knownProject`, which resolves a name
   `projects.json` has since dropped back to General, because a select on a value with no
@@ -590,10 +593,10 @@ Mojito owns the whole lifecycle — there is no external plugin:
   Progress to the same work id, so a move never changes which session the sheet is
   looking at, and `stageKey` re-seeds the model/effort selectors as it should.
 - **Project toolbar**: each project section's divider is a management toolbar
-  (`ProjectToolbar`, RIC-253) — Warp, VS Code, **New ticket**, Start, Stop, Logs, Pull
-  (or **Pull & deploy** on the server's own checkout), Push, **Deploy to production with
-  Claude**, and **Create worktree script**. The first three are the terminal header's
-  own, in its own order: they are
+  (`ProjectToolbar`, RIC-253) — Warp, VS Code, **New ticket**, **New session**, Start,
+  Stop, Logs, Pull (or **Pull & deploy** on the server's own checkout), Push, **Deploy
+  to production with Claude**, and **Create worktree script**. The first three are the
+  terminal header's own, in its own order: they are
   about the *project*, not about a session, and reaching them used to mean opening one
   of its sessions first — or, for a ticket, leaving the board filtered on exactly one
   project so `soleProject` could guess. Warp and VS Code point at the mapped repo root,
@@ -608,7 +611,12 @@ Mojito owns the whole lifecycle — there is no external plugin:
   holds the sheet as one `{ project } | null` rather than a flag beside a name, so the
   two cannot disagree. It is offered on every mapped project unconditionally — a repo
   can always take a ticket, and the sheet's Project field only accepts a name
-  /api/projects offers, which is exactly the set that has a stack row.
+  /api/projects offers, which is exactly the set that has a stack row. **New session**
+  is the same action the board toolbar's `+ Session` is, and the two are paired here for
+  the same reason they are paired there — both create, and both used to have to guess
+  their project from the filters. Its sheet stays `UnifiedList`'s (unlike the ticket's,
+  it is reachable from nowhere else), so the picked project rides in the same one-piece
+  `{ project } | null` state and `null` still means "take `soleProject`".
   **Deploy to production with Claude** (`claude-deploy`) opens a project-scoped custom
   session in the repo root — opus at high effort — with the whole instruction being one
   line, `fai pull e deploy in produzione`. Deliberately that and nothing more: every
@@ -649,7 +657,7 @@ Mojito owns the whole lifecycle — there is no external plugin:
   where the Stacks tab listed every mapped project unconditionally. Only selected ones,
   so the unfiltered board does not become a list of everything in projects.json; the
   filter already offers every configured project (RIC-225), so selecting one is the way
-  in. The buttons are **icon-only** (lucide + `title`/`aria-label`): up to eight of them
+  in. The buttons are **icon-only** (lucide + `title`/`aria-label`): up to nine of them
   have to share a line with a project name on a 320px phone, which no set of labels
   does, and `.proj-head` wraps them onto a right-aligned second line where they still do
   not fit. The exceptions are worth knowing: "Resolve with Claude" keeps its words

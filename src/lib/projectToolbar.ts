@@ -7,13 +7,16 @@ import type { StackRow } from "./stacks";
  *
  * Most are a `/api/stacks/<slug>/<action>` POST. The exceptions are worth knowing:
  * `logs` opens the stack's tmux session in a terminal; `deploy` runs the guarded
- * self-update flow (banner + health poll + reload) instead of a raw pull; `ticket`
- * opens the New ticket sheet on this project; and `warp`/`vscode` are not requests at
- * all but anchors handing the repo root to the OS (see openInApp).
+ * self-update flow (banner + health poll + reload) instead of a raw pull; `ticket` and
+ * `session` open the two creation sheets on this project; and `warp`/`vscode` are not
+ * requests at all but anchors handing the repo root to the OS (see openInApp).
  *
- * Those last three are the terminal header's own actions, in its own order, offered
- * here as well: a project's divider names the repo the header's cwd usually *is*, and
- * reaching them used to mean opening one of its sessions first.
+ * `warp`, `vscode` and `ticket` are the terminal header's own actions, in its own
+ * order, offered here as well: a project's divider names the repo the header's cwd
+ * usually *is*, and reaching them used to mean opening one of its sessions first.
+ * `session` joins `ticket` for the same reason the board's toolbar pairs `+ Ticket`
+ * with `+ Session` — both create, and both used to have to guess their project from
+ * the filters.
  *
  * `deploy` and `claude-deploy` are **not** two names for one thing. `deploy` is
  * Mojito's own guarded self-update — pull, rebuild, restart *this* server — and exists
@@ -26,6 +29,7 @@ export type ProjectAction =
   | "warp"
   | "vscode"
   | "ticket"
+  | "session"
   | "start"
   | "stop"
   | "logs"
@@ -66,13 +70,13 @@ export function stackFor(stacks: readonly StackRow[], project: string): StackRow
  *   the one action here that answers a question rather than repeating a chore, so once
  *   the script exists the button is noise.
  *
- * The three added since are the terminal header's:
+ * The four added since are the board's own and the terminal header's:
  *
  * - Warp and VS Code only when the mapped path yields a url at all (see projectLinks),
  *   which is the one thing that can silently be wrong about a projects.json entry.
- * - "New ticket" on every mapped project unconditionally: a repo can always take one,
- *   and the sheet's Project field only accepts a name /api/projects offers — which is
- *   exactly the set that has a stack row here.
+ * - "New ticket" and "New session" on every mapped project unconditionally: a repo can
+ *   always take either, and both sheets' Project field only accepts a name
+ *   /api/projects offers — which is exactly the set that has a stack row here.
  *
  * "Deploy with Claude" (`claude-deploy`) is unconditional for the same reason, and is
  * the one action here that asks before it fires — a production deploy is not something
@@ -88,7 +92,7 @@ export function projectActions(stack: StackRow | null, canDeploy: boolean): Proj
   const links = projectLinks(stack);
   if (links.warp) actions.push("warp");
   if (links.vscode) actions.push("vscode");
-  actions.push("ticket");
+  actions.push("ticket", "session");
   if (stack.hasStack) {
     if (stack.status !== "running") actions.push("start");
     actions.push("stop", "logs");
