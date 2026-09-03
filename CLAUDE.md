@@ -643,13 +643,25 @@ Mojito owns the whole lifecycle — there is no external plugin:
   still a set worth naming, so without it the star would be unreachable in exactly that
   state. And the `Filtered` lead is conditional on there being chips, since with none
   nothing is being hidden and the word would be a lie.
-  `.af-action` carries the sticky pin, the bar's own background and a left gutter — it
-  is pinned *over* horizontally scrolling content, and without a surface of its own a
-  chip slides under the star and the two paint on top of each other (observed in a
-  browser, then fixed). The naming field is a column inside that wrapper, because the
-  bar cannot wrap and a refusal message has nowhere to go beside the field; at phone
-  widths it takes the whole bar, which is the right answer anyway — while you are naming
-  a filter set, reading the chips back is not what you are doing.
+  The bar's own structure changed for it: **the chips scroll inside `.af-scroll`, and
+  the action is a sibling of that box** rather than pinned over it. The first cut did
+  pin it — `position: sticky; right: 0` — which needs a background gutter to stop a chip
+  painting under the star (observed), puts a sticky element inside a sticky element that
+  is also the scroll container, and is exactly the kind of thing that cannot be trusted
+  off a real phone. As a sibling of the scroller it simply cannot be scrolled over or
+  away from. How the two share the row is `flex` and nothing else, and both halves
+  matter: `.af-scroll` has `flex-basis: 0` so it demands no width and yields the row to
+  the naming field, while `.fav-save` keeps its default `min-width: auto` and so stops
+  shrinking at its own min-content — give it `min-width: 0` as well and the pair squeeze
+  each other past that floor, the row spills and the bar scrolls horizontally (measured:
+  28px over at 390px). The field is a column, because the bar does not wrap and a
+  refusal message has nowhere to go beside it; at phone widths it takes the whole row,
+  which is the right answer anyway — while you are naming a filter set, reading the
+  chips back is not what you are doing. Verified at 320, 390 and desktop widths: no
+  overflow in either state, and the star flush at the 12px inset throughout.
+  The star wears `.icon` like every other icon-only control. Without it there is no
+  `justify-content: center`, and a 13px glyph in a 26px pill sits 5px left of centre —
+  which is what "the star is not centred" was (measured both ways, then fixed).
   Rename, reorder and delete live behind the pencil rather than inside the
   chips — three controls per chip do not fit a 320px phone, and keeping them out leaves a
   chip one unambiguous tap target, which is the whole point of a quick-access bar; edit

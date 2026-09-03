@@ -62,7 +62,7 @@ export default function SaveFavorite(
     return (
       <div className="af-action">
         <button
-          className="chip fav-act"
+          className="chip fav-act icon"
           aria-label="Save these filters as a favourite" title="Save these filters"
           onClick={() => { setError(null); setNaming(""); }}
         >

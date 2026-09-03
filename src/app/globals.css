@@ -382,23 +382,30 @@ button.chip:active { transform: scale(.96); }
 .fav-err { color: var(--err); font: 600 11px/1.4 var(--sans); }
 
 /* ---- Saving the current filters (the sticky bar's star) ---- */
-/* Pinned to the right-hand end of .active-filters, which is a nowrap scrolling row:
-   `margin-left: auto` puts it at the end while the chips fit, and `sticky right: 0`
-   keeps it there once they do not — otherwise the one control that is always relevant
-   would be the first thing to scroll out of reach.
-   It carries the bar's own background and a left gutter because it is pinned over
-   scrolling content: without them a chip slides under the star and the two paint on
-   top of each other. The shadow fades a chip out as it passes behind. */
+/* The right-hand end of .active-filters, outside the chips' scroller (see .af-scroll),
+   so it always sits at the edge of the bar and nothing can scroll over or under it.
+   `margin-left: auto` is what holds it there when the chips do not fill the row. */
 .active-filters .af-action {
-  flex: none; margin-left: auto; position: sticky; right: 0;
-  display: flex; align-items: center; padding-left: 10px;
-  background: var(--surface); box-shadow: -10px 0 10px -6px var(--surface);
+  flex: none; margin-left: auto; display: flex; align-items: center;
 }
-/* Naming the set: a column, because the bar cannot wrap and a refusal message has
-   nowhere to go beside the field. Wide enough to type in — on a phone that is the
-   whole bar, which is the right answer anyway: while you are naming a filter set,
-   reading the chips back is not what you are doing. */
-.fav-save { flex-direction: column; align-items: stretch; gap: 4px; width: min(420px, 100%); }
+/* Naming the set: a column, because the bar does not wrap and a refusal message has
+   nowhere to go beside the field. It takes the row's width off the chips for as long as
+   it is open — while you are naming a filter set, reading the chips back is not what
+   you are doing — which is what `flex` here and `min-width: 0` on .af-scroll between
+   them arrange. */
+/* Scoped like the .af-action rule it overrides — that selector carries two classes, so
+   a bare `.fav-save` would lose `align-items` to its `center` and leave the refusal
+   message centred under the field instead of aligned with it.
+   The flex values are the whole of how the field and the chips share the row, and both
+   halves matter: the scroller above has `flex-basis: 0`, so it demands no width and
+   yields all of it here, while this keeps its default `min-width: auto` and so stops
+   shrinking at its own min-content — the field, Save and Cancel. Give this one
+   `min-width: 0` too and the pair squeeze each other past that floor, the row spills,
+   and the bar starts scrolling horizontally (measured: 28px over). */
+.active-filters .fav-save {
+  flex: 0 1 auto; width: min(420px, 100%);
+  flex-direction: column; align-items: stretch; gap: 4px;
+}
 .fav-save-row { display: flex; align-items: center; gap: 6px; }
 .fav-save-row .btn { flex: none; }
 
@@ -448,9 +455,18 @@ button.chip:active { transform: scale(.96); }
   margin: 0 -12px 8px; padding: 8px 12px;
   background: var(--surface); border-bottom: 1px solid var(--border);
   display: flex; align-items: center; gap: 6px;
+}
+/* The chips scroll, the bar does not (RIC-306): the "save these filters" action is a
+   sibling of this box, so it keeps its place at the right-hand end instead of being
+   pinned over a scrolling row. `min-width: 0` is what lets this box shrink below its
+   content and actually scroll — a flex item's default `min-width: auto` would push the
+   action off the row instead. */
+.af-scroll {
+  flex: 1 1 0; min-width: 0;
+  display: flex; align-items: center; gap: 6px;
   overflow-x: auto; scrollbar-width: none;
 }
-.active-filters::-webkit-scrollbar { display: none; }
+.af-scroll::-webkit-scrollbar { display: none; }
 .active-filters .chip { flex: none; }
 .af-lead {
   flex: none; font: 600 10px/1 var(--sans); letter-spacing: .06em;
