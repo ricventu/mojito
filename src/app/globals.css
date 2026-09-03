@@ -378,7 +378,9 @@ button.chip:active { transform: scale(.96); }
 
 /* Naming a new favourite, and renaming one: the row is replaced by the field rather
    than growing a second one, which on a phone would push the whole board down. Wraps,
-   so the refusal message lands under the field instead of squeezing it. */
+   so the refusal message lands under the field instead of squeezing it.
+
+   Its width is capped below, with the edit rows'. */
 .fav-form { flex-wrap: wrap; }
 .fav-form .btn { flex: none; }
 .fav-input { flex: 1 1 140px; min-width: 0; padding: 7px 10px; font-size: 13px; }
@@ -389,6 +391,11 @@ button.chip:active { transform: scale(.96); }
    real tap target. */
 .favs-edit { display: flex; flex-direction: column; gap: 6px; padding: 2px 0; }
 .fav-row { display: flex; align-items: center; gap: 6px; }
+/* Both editing surfaces are capped, and to the same width: the arrows, the name and the
+   ✕ have to read as one group, which they stop doing stretched across a 1456px desktop
+   toolbar — the button you must press ends up half a screen from the field you typed
+   in. Below the cap, which is every phone, each is the full width it needs. */
+.fav-form, .fav-row { max-width: 460px; }
 .fav-row .btn.sm { width: 28px; height: 28px; padding: 0; flex: none; color: var(--text-dim); }
 .fav-row .btn.sm:hover:not(:disabled) { color: var(--text); }
 .fav-row .btn.sm:disabled { opacity: .4; cursor: default; }

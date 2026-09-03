@@ -533,7 +533,9 @@ Mojito owns the whole lifecycle — there is no external plugin:
   removal to one history entry. The status chips stay chips: five values that never grow.
   The select's place in the toolbar is the top row, beside the three actions
   (RIC-226): the toolbar reads project select + `+ Ticket`/`+ Session`/`Clean up`,
-  then the status chips, then the text field, then the sticky active-filter badges.
+  then the status chips, then the text field, then the sticky active-filter badges —
+  with the saved-favourites row above all of it since RIC-306, which is the same rule
+  taken one step coarser.
   The search box used to lead, which spent the first row on the control of last
   resort — project and status are one tap each — and pushed the actions down. Where
   four controls do not fit (`.filter-actions` is a wrapping flex row, the select
@@ -576,6 +578,71 @@ Mojito owns the whole lifecycle — there is no external plugin:
   criterion narrows nothing, which is the convention `project: []` and `status: null`
   already follow there; only `ListFilters` defaults the other way. An explicit
   `status: "Backlog"` — the chip's `only` state — always wins over the exclusion.
+- **Filter favourites**: the board's filter set can be saved under a name and re-applied
+  with one tap (RIC-306). A favourite is `{ name, search }`, and `search` is the *query
+  string `filterSearch` already writes* — not a copy of the six `ListFilters` fields.
+  Three things fall out of that: the format cannot drift from the url's, since a
+  favourite is read back by the same `parseFilters` that reads a hand-typed url (the
+  argument `filterMemory` already rests on, and why both formats live in
+  `appLocation`); "which favourite is on screen?" is one canonical string compare
+  rather than a six-field deep-equal a new filter would silently fall out of; and
+  applying one is just a filter change, so the address bar stays the single source of
+  truth (RIC-204) and a favourite is shareable as a plain link like any other board
+  state. The pure half is `src/lib/filterFavorites.ts` — `addFavorite` (replaces a
+  same-name favourite **in place**, so re-saving keeps its position, and the stored
+  name wins over the retyped one since a case-insensitive match means "that one", not
+  a rename), `renameFavorite`/`moveFavorite`/`removeFavorite`, `activeFavorite`, and
+  `validateFavorites`. Two refusals are worth knowing. A rename that collides is
+  refused rather than merged: two favourites carry two filter sets and silently
+  dropping one loses work, though re-capitalising a favourite's *own* name is allowed
+  so a case typo is fixable. And `validateFavorites` **normalizes** every `search`
+  through the url codec, which is the load-bearing half — a parameter `appLocation`
+  does not own (`doc`, `docProject`, anything invented) cannot ride into a saved
+  favourite and back out into the address bar. It rejects rather than repairs
+  otherwise, all-or-nothing: dropping one bad entry leaves a row that silently lost a
+  favourite, where a 422 says what happened. `addRefusal`/`renameRefusal` are the
+  companion predicates saying *why* a save was refused — `addFavorite` can only answer
+  "refused" by handing back what it was given, a silence the row would have to render
+  as nothing happening.
+  Whether a set is worth saving at all is `filterMemory`'s `narrowed`, now exported and
+  on its third caller: "deviates from the default", so a board whose only deviation is
+  *showing* the Backlog (RIC-275) is savable even though it narrows nothing, and the
+  bare board is not — the set it would restore is one tap away as "Clear all".
+  Stored **server-side** in `~/.config/mojito/filter-favorites.json` behind
+  `GET/PUT /api/config/filter-favorites`, the whole stack mirroring stage-defaults
+  (pure lib ÷ cached server IO ÷ route ÷ hook). Config and not `stateDir`, because this
+  is something the human curated like projects.json, where stateDir holds the
+  per-session machine state Mojito writes itself; `configDir` in `src/server/config.ts`
+  is now the one definition of that directory for both readers (`resolveProjectsPath`
+  deliberately stays on its bare `~/.config/mojito`, since teaching it XDG would move
+  an existing user's file). Server-side rather than a second localStorage key next to
+  `mojito-list-filters`: the installed PWA has its own storage container, which is
+  exactly what would have split one set of favourites across every device. The PUT is
+  whole-list — every edit the row offers is a rewrite of the same short array, and
+  per-favourite verbs would leave reordering with no endpoint at all — and
+  `useFilterFavorites` writes optimistically then reconciles, since the reorder arrows
+  are meant to be tapped several times in a row and a round trip before each repaint
+  makes them feel broken. A failed save re-reads the server rather than restoring a
+  remembered list.
+  `FilterFavorites` **leads the toolbar**, above the project select: one tap for a whole
+  filter set is the coarsest control there is, and RIC-226's order is coarsest-first. It
+  rides in as a `favorites?: React.ReactNode` slot, like `action`, so `FilterBar` stays
+  presentational. Rename, reorder and delete live behind a pencil rather than inside the
+  chips — three controls per chip do not fit a 320px phone, and keeping them out leaves a
+  chip one unambiguous tap target, which is the whole point of a quick-access bar; edit
+  mode is a **vertical list** for the same reason. Reordering is `↑`/`↓` and not
+  dragging: HTML5 drag events do not exist under touch, so real dragging means a drag
+  library on the board chunk (which carries none today) for a list of a handful of names,
+  and arrows are keyboard- and screen-reader-usable for free. `moveFavorite` clamps at
+  both ends rather than wrapping, since the arrows get held down. The active chip paints
+  the same lime as a selected status chip (one shared rule in `globals.css`) with
+  `aria-current`, not `aria-pressed` — tapping it re-applies rather than toggling off.
+  `.fav-form` and `.fav-row` share one `max-width`: unstretched they span a 1456px
+  desktop toolbar and put the button you must press half a screen from the field you
+  typed in. The row renders **nothing at all** when there is nothing saved and nothing
+  worth saving, so an untouched board grows no furniture; it is inside the `!empty`
+  branch, so an empty board has no favourites row either — there is nothing for a filter
+  to hide there.
 - **Manual status move**: `MANUAL_STATUSES` (`src/server/statusModel.ts`) is the
   Backlog/Todo pair and the only thing `POST /api/tickets/[id]/status` accepts (RIC-275);
   `manualMoveTarget` in `src/lib/status.ts` is its presentation mirror, tied to it by
