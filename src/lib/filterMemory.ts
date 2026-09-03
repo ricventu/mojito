@@ -10,15 +10,17 @@ export const FILTER_KEY = "mojito-list-filters";
 
 /**
  * Does this set deviate from the board's defaults at all? The predicate both halves
- * below turn on.
+ * below turn on, and — since RIC-306 — the one filterFavorites asks before letting a
+ * filter set be saved or shown a save affordance at all.
  *
  * "Deviates", not "narrows": since RIC-275 those are two different questions, because
- * `backlog` defaults to hidden and so *widens* the board when it is set. Both callers
- * want deviation — one asks "does the url already say something?", the other "did the
- * user leave a preference worth restoring?" — and showing the Backlog answers yes to
- * each, even though it narrows nothing.
+ * `backlog` defaults to hidden and so *widens* the board when it is set. All three
+ * callers want deviation — "does the url already say something?", "did the user leave a
+ * preference worth restoring?", "is this a board worth naming?" — and showing the
+ * Backlog answers yes to each, even though it narrows nothing. activeFilters wants the
+ * other question and says so.
  */
-function narrowed(filters: ListFilters): boolean {
+export function narrowed(filters: ListFilters): boolean {
   return (
     filters.query !== "" ||
     filters.project.length > 0 ||

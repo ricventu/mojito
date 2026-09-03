@@ -341,8 +341,11 @@ button.chip:active { transform: scale(.96); }
 
 /* Selected filter chip — one uniform brand-lime "active" state across BOTH the
    project row and the status row, so selection reads the same everywhere
-   regardless of hue. Placed after the hue rules so it overrides their color/border. */
-.filter-chips .chip.on {
+   regardless of hue. Placed after the hue rules so it overrides their color/border.
+   The favourites row (RIC-306) joins it rather than declaring a lime of its own: the
+   chip standing for the filters now on screen is the same "this is what you are
+   looking at" as a selected status. */
+.filter-chips .chip.on, .favs .chip.on {
   color: var(--accent); background: var(--accent-soft);
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
@@ -357,6 +360,85 @@ button.chip:active { transform: scale(.96); }
   color: var(--text-dim); background: transparent;
   border-style: dashed; opacity: .55; text-decoration: line-through;
 }
+
+/* ---- Filter favourites (RIC-306) ---- */
+/* The quick-access row, leading the toolbar. Scrolls horizontally like .filter-chips
+   and hides its scrollbar for the same reason: on a phone a saved set or two always
+   fits, and the rest is a swipe rather than a row that reflows the whole toolbar. */
+.favs { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 2px 0; scrollbar-width: none; }
+.favs::-webkit-scrollbar { display: none; }
+.favs .chip { flex: none; white-space: nowrap; }
+/* A favourite's name is prose, not a mono label like a status or a project — and it
+   truncates rather than pushing the star and pencil off the row. */
+.fav-chip { max-width: 46vw; overflow: hidden; text-overflow: ellipsis; display: block; font-family: var(--sans); }
+/* The two icon chips that close the row. Square, and a shade dimmer than a favourite:
+   they act on the row rather than being part of it. */
+.fav-act { flex: none; width: 26px; height: 22px; padding: 0; color: var(--text-faint); }
+.fav-act:hover { color: var(--text); border-color: var(--border-hi); }
+
+.fav-input { flex: 1 1 140px; min-width: 0; padding: 7px 10px; font-size: 13px; }
+/* Sits under the field it belongs to, in both places a name is typed — the save group
+   and an edit row are each a column, so no flex basis of its own. */
+.fav-err { color: var(--err); font: 600 11px/1.4 var(--sans); }
+
+/* ---- Saving the current filters (the sticky bar's star) ---- */
+/* The right-hand end of .active-filters, outside the chips' scroller (see .af-scroll),
+   so it always sits at the edge of the bar and nothing can scroll over or under it.
+   `margin-left: auto` is what holds it there when the chips do not fill the row. */
+.active-filters .af-action {
+  flex: none; margin-left: auto; display: flex; align-items: center;
+}
+/* Naming the set: a column, because the bar does not wrap and a refusal message has
+   nowhere to go beside the field. It takes the row's width off the chips for as long as
+   it is open — while you are naming a filter set, reading the chips back is not what
+   you are doing — which is what `flex` here and `min-width: 0` on .af-scroll between
+   them arrange. */
+/* Scoped like the .af-action rule it overrides — that selector carries two classes, so
+   a bare `.fav-save` would lose `align-items` to its `center` and leave the refusal
+   message centred under the field instead of aligned with it.
+   The flex values are the whole of how the field and the chips share the row, and both
+   halves matter: the scroller above has `flex-basis: 0`, so it demands no width and
+   yields all of it here, while this keeps its default `min-width: auto` and so stops
+   shrinking at its own min-content — the field, Save and Cancel. Give this one
+   `min-width: 0` too and the pair squeeze each other past that floor, the row spills,
+   and the bar starts scrolling horizontally (measured: 28px over). */
+.active-filters .fav-save {
+  flex: 0 1 auto; width: min(420px, 100%);
+  flex-direction: column; align-items: stretch; gap: 4px;
+}
+.fav-save-row { display: flex; align-items: center; gap: 6px; }
+.fav-save-row .btn { flex: none; }
+
+/* Edit mode. A vertical list, not the chip row: two arrows, a name and a delete do not
+   fit inside a chip on a 320px phone, and one row per favourite gives each control a
+   real tap target. */
+.favs-edit { display: flex; flex-direction: column; gap: 6px; padding: 2px 0; }
+.fav-row { display: flex; align-items: center; gap: 6px; }
+/* Capped: the arrows, the name and the ✕ have to read as one group, which they stop
+   doing stretched across a 1456px desktop toolbar — the ✕ you must press ends up half a
+   screen from the arrows. Below the cap, which is every phone, the row is the full
+   width it needs. */
+.fav-row { max-width: 460px; }
+.fav-row .btn.sm { width: 28px; height: 28px; padding: 0; flex: none; color: var(--text-dim); }
+.fav-row .btn.sm:hover:not(:disabled) { color: var(--text); }
+.fav-row .btn.sm:disabled { opacity: .4; cursor: default; }
+/* `.btn:hover` brightens the border unconditionally, which on a disabled arrow reads
+   as "this does something" — the same override .proj-actions needs. */
+.fav-row .btn.sm:disabled:hover { border-color: var(--border-hi); }
+/* The name is the rename affordance, so it is a button — styled as the text it shows,
+   left-aligned and taking the slack between the arrows and the ✕. */
+.fav-name {
+  flex: 1 1 auto; min-width: 0; text-align: left; cursor: pointer;
+  background: transparent; border: 1px dashed var(--border-hi); border-radius: var(--r-sm);
+  padding: 6px 9px; color: var(--text); font: 500 13px/1.2 var(--sans);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fav-name:hover { border-color: var(--accent); }
+.fav-rename { flex: 1 1 auto; min-width: 0; display: flex; gap: 6px; }
+.fav-rename .btn { flex: none; }
+.fav-row .fav-del { color: var(--text-faint); }
+.fav-row .fav-del:hover { color: var(--err); border-color: color-mix(in srgb, var(--err) 40%, var(--border)); }
+.fav-done { display: flex; }
 
 /* ---- Active filter bar (sticky) ---- */
 /* Pinned, unlike .filter above, which scrolls away: with the filter bar off screen a
@@ -373,9 +455,18 @@ button.chip:active { transform: scale(.96); }
   margin: 0 -12px 8px; padding: 8px 12px;
   background: var(--surface); border-bottom: 1px solid var(--border);
   display: flex; align-items: center; gap: 6px;
+}
+/* The chips scroll, the bar does not (RIC-306): the "save these filters" action is a
+   sibling of this box, so it keeps its place at the right-hand end instead of being
+   pinned over a scrolling row. `min-width: 0` is what lets this box shrink below its
+   content and actually scroll — a flex item's default `min-width: auto` would push the
+   action off the row instead. */
+.af-scroll {
+  flex: 1 1 0; min-width: 0;
+  display: flex; align-items: center; gap: 6px;
   overflow-x: auto; scrollbar-width: none;
 }
-.active-filters::-webkit-scrollbar { display: none; }
+.af-scroll::-webkit-scrollbar { display: none; }
 .active-filters .chip { flex: none; }
 .af-lead {
   flex: none; font: 600 10px/1 var(--sans); letter-spacing: .06em;
