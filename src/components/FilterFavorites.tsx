@@ -1,22 +1,19 @@
 "use client";
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Pencil, Star, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, X } from "lucide-react";
 import {
-  activeFavorite, addFavorite, addRefusal, favoriteFilters, moveFavorite,
-  removeFavorite, renameFavorite, renameRefusal, MAX_NAME,
+  activeFavorite, favoriteFilters, moveFavorite, removeFavorite, renameFavorite,
+  renameRefusal, MAX_NAME, type FilterFavorite,
 } from "@/lib/filterFavorites";
-import { narrowed } from "@/lib/filterMemory";
-import { useFilterFavorites } from "@/lib/useFilterFavorites";
 import type { ListFilters } from "@/lib/appLocation";
 
 /**
- * What the row is currently doing. A union rather than three booleans, so "naming a
- * new favourite while renaming an old one" cannot be expressed at all — the same rule
- * AppView's nested docs target follows.
+ * What the row is currently doing. A union rather than a flag beside a draft, so
+ * "renaming nothing" cannot be expressed — the same rule AppView's nested docs target
+ * follows.
  */
 type Mode =
   | { kind: "idle" }
-  | { kind: "naming"; draft: string }
   | { kind: "editing"; renaming: { of: string; draft: string } | null };
 
 const IDLE: Mode = { kind: "idle" };
@@ -35,43 +32,39 @@ const IDLE: Mode = { kind: "idle" };
  * doubles as a report of where you are — `aria-current` rather than `aria-pressed`,
  * since tapping it again re-applies rather than toggling off.
  *
- * Rename, reorder and delete live behind the pencil instead of inside the chips: three
- * controls per chip do not fit a 320px phone, and keeping them out means a chip in
- * normal mode is one unambiguous tap target, which is the whole point of a quick-access
- * bar. Reordering is arrows and not dragging — HTML5 drag events do not exist under
- * touch, so real dragging would mean a drag library on the board chunk, which today
- * carries none, for a list of a handful of names.
+ * Saving is *not* here: the star lives at the right-hand end of the sticky
+ * active-filters bar, beside the filters it saves (SaveFavorite). This row holds the
+ * saved sets and the pencil that manages them, which is a different subject — and the
+ * split is why the favourites list is owned by UnifiedList and handed to both.
+ *
+ * Rename, reorder and delete live behind that pencil instead of inside the chips:
+ * three controls per chip do not fit a 320px phone, and keeping them out means a chip
+ * is one unambiguous tap target, which is the whole point of a quick-access bar.
+ * Reordering is arrows and not dragging — HTML5 drag events do not exist under touch,
+ * so real dragging would mean a drag library on the board chunk, which today carries
+ * none, for a list of a handful of names.
  */
 export default function FilterFavorites(
-  { token, filters, onApply }:
-  { token: string; filters: ListFilters; onApply: (f: ListFilters) => void },
+  { favorites, filters, onApply, onSave }:
+  {
+    favorites: FilterFavorite[];
+    filters: ListFilters;
+    onApply: (f: ListFilters) => void;
+    onSave: (next: FilterFavorite[]) => Promise<boolean>;
+  },
 ) {
-  const { favorites, save } = useFilterFavorites(token);
   const [mode, setMode] = useState<Mode>(IDLE);
-  // Why the last attempt was refused, shown beside the field it was typed in. Cleared
-  // by the next keystroke, so a corrected name does not carry a stale complaint.
+  // Why the last rename was refused, shown under the field it was typed in. Cleared by
+  // the next keystroke, so a corrected name does not carry a stale complaint.
   const [error, setError] = useState<string | null>(null);
 
   const active = activeFavorite(favorites, filters);
-  // Offered only for a board that deviates from the defaults: the set a favourite of
-  // the bare board would restore is one tap away as "Clear all".
-  const canSave = narrowed(filters);
 
-  const store = async (next: typeof favorites) => {
-    if (!await save(next)) alert("Could not save the favourites.");
+  const store = async (next: FilterFavorite[]) => {
+    if (!await onSave(next)) alert("Could not save the favourites.");
   };
 
-  const beginNaming = () => { setError(null); setMode({ kind: "naming", draft: "" }); };
   const close = () => { setError(null); setMode(IDLE); };
-
-  const submitName = async (draft: string) => {
-    const refusal = addRefusal(favorites, draft, filters);
-    // The field stays open with what was typed still in it, which is the whole reason
-    // addFavorite's refusals are a separate predicate rather than a silent no-op.
-    if (refusal) { setError(refusal); return; }
-    close();
-    await store(addFavorite(favorites, draft, filters));
-  };
 
   const submitRename = async (of: string, draft: string) => {
     const refusal = renameRefusal(favorites, of, draft);
@@ -90,31 +83,10 @@ export default function FilterFavorites(
     await store(next);
   };
 
-  if (mode.kind === "naming") {
-    return (
-      <form
-        className="favs fav-form"
-        onSubmit={(e) => { e.preventDefault(); submitName(mode.draft); }}
-      >
-        <input
-          className="fav-input"
-          // Focused on open: the row was replaced by this field on the user's own
-          // tap, so anything else costs a second tap before they can type.
-          autoFocus
-          type="text"
-          maxLength={MAX_NAME}
-          placeholder="Name these filters…"
-          aria-label="Favourite name"
-          value={mode.draft}
-          onChange={(e) => { setError(null); setMode({ kind: "naming", draft: e.target.value }); }}
-          onKeyDown={(e) => { if (e.key === "Escape") close(); }}
-        />
-        <button className="btn sm primary" type="submit">Save</button>
-        <button className="btn sm ghost" type="button" onClick={close}>Cancel</button>
-        {error && <span className="fav-err">{error}</span>}
-      </form>
-    );
-  }
+  // Nothing saved: no row at all, so a board whose owner never saved a filter set
+  // grows no furniture it has no use for. The star that starts one is on the sticky
+  // bar, not here, so this is not the way in.
+  if (favorites.length === 0) return null;
 
   if (mode.kind === "editing") {
     const renaming = mode.renaming;
@@ -145,7 +117,7 @@ export default function FilterFavorites(
               >
                 <input
                   className="fav-input"
-                  // Focused on open, as above.
+                  // Focused on open, as with the save field.
                   autoFocus
                   type="text"
                   maxLength={MAX_NAME}
@@ -190,10 +162,6 @@ export default function FilterFavorites(
     );
   }
 
-  // Nothing saved and nothing worth saving: no row at all, so an untouched board grows
-  // no furniture it has no use for.
-  if (favorites.length === 0 && !canSave) return null;
-
   return (
     <div className="favs">
       {favorites.map((f) => (
@@ -206,24 +174,13 @@ export default function FilterFavorites(
           {f.name}
         </button>
       ))}
-      {canSave && (
-        <button
-          className="chip fav-act icon"
-          aria-label="Save these filters as a favourite" title="Save these filters"
-          onClick={beginNaming}
-        >
-          <Star size={13} aria-hidden="true" />
-        </button>
-      )}
-      {favorites.length > 0 && (
-        <button
-          className="chip fav-act icon"
-          aria-label="Edit favourites" title="Edit favourites"
-          onClick={() => { setError(null); setMode({ kind: "editing", renaming: null }); }}
-        >
-          <Pencil size={13} aria-hidden="true" />
-        </button>
-      )}
+      <button
+        className="chip fav-act icon"
+        aria-label="Edit favourites" title="Edit favourites"
+        onClick={() => { setError(null); setMode({ kind: "editing", renaming: null }); }}
+      >
+        <Pencil size={13} aria-hidden="true" />
+      </button>
     </div>
   );
 }

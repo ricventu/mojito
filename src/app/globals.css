@@ -376,26 +376,42 @@ button.chip:active { transform: scale(.96); }
 .fav-act { flex: none; width: 26px; height: 22px; padding: 0; color: var(--text-faint); }
 .fav-act:hover { color: var(--text); border-color: var(--border-hi); }
 
-/* Naming a new favourite, and renaming one: the row is replaced by the field rather
-   than growing a second one, which on a phone would push the whole board down. Wraps,
-   so the refusal message lands under the field instead of squeezing it.
-
-   Its width is capped below, with the edit rows'. */
-.fav-form { flex-wrap: wrap; }
-.fav-form .btn { flex: none; }
 .fav-input { flex: 1 1 140px; min-width: 0; padding: 7px 10px; font-size: 13px; }
-.fav-err { flex: 1 0 100%; color: var(--err); font: 600 11px/1.4 var(--sans); }
+/* Sits under the field it belongs to, in both places a name is typed — the save group
+   and an edit row are each a column, so no flex basis of its own. */
+.fav-err { color: var(--err); font: 600 11px/1.4 var(--sans); }
+
+/* ---- Saving the current filters (the sticky bar's star) ---- */
+/* Pinned to the right-hand end of .active-filters, which is a nowrap scrolling row:
+   `margin-left: auto` puts it at the end while the chips fit, and `sticky right: 0`
+   keeps it there once they do not — otherwise the one control that is always relevant
+   would be the first thing to scroll out of reach.
+   It carries the bar's own background and a left gutter because it is pinned over
+   scrolling content: without them a chip slides under the star and the two paint on
+   top of each other. The shadow fades a chip out as it passes behind. */
+.active-filters .af-action {
+  flex: none; margin-left: auto; position: sticky; right: 0;
+  display: flex; align-items: center; padding-left: 10px;
+  background: var(--surface); box-shadow: -10px 0 10px -6px var(--surface);
+}
+/* Naming the set: a column, because the bar cannot wrap and a refusal message has
+   nowhere to go beside the field. Wide enough to type in — on a phone that is the
+   whole bar, which is the right answer anyway: while you are naming a filter set,
+   reading the chips back is not what you are doing. */
+.fav-save { flex-direction: column; align-items: stretch; gap: 4px; width: min(420px, 100%); }
+.fav-save-row { display: flex; align-items: center; gap: 6px; }
+.fav-save-row .btn { flex: none; }
 
 /* Edit mode. A vertical list, not the chip row: two arrows, a name and a delete do not
    fit inside a chip on a 320px phone, and one row per favourite gives each control a
    real tap target. */
 .favs-edit { display: flex; flex-direction: column; gap: 6px; padding: 2px 0; }
 .fav-row { display: flex; align-items: center; gap: 6px; }
-/* Both editing surfaces are capped, and to the same width: the arrows, the name and the
-   ✕ have to read as one group, which they stop doing stretched across a 1456px desktop
-   toolbar — the button you must press ends up half a screen from the field you typed
-   in. Below the cap, which is every phone, each is the full width it needs. */
-.fav-form, .fav-row { max-width: 460px; }
+/* Capped: the arrows, the name and the ✕ have to read as one group, which they stop
+   doing stretched across a 1456px desktop toolbar — the ✕ you must press ends up half a
+   screen from the arrows. Below the cap, which is every phone, the row is the full
+   width it needs. */
+.fav-row { max-width: 460px; }
 .fav-row .btn.sm { width: 28px; height: 28px; padding: 0; flex: none; color: var(--text-dim); }
 .fav-row .btn.sm:hover:not(:disabled) { color: var(--text); }
 .fav-row .btn.sm:disabled { opacity: .4; cursor: default; }

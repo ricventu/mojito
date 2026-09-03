@@ -14,15 +14,32 @@ import type { ActiveFilter } from "@/lib/activeFilters";
  * spread across UnifiedList.
  */
 export default function ActiveFilters(
-  { filters, onClear, onClearAll }:
-  { filters: ActiveFilter[]; onClear: (filter: ActiveFilter) => void; onClearAll: () => void },
+  { filters, onClear, onClearAll, action }:
+  {
+    filters: ActiveFilter[];
+    onClear: (filter: ActiveFilter) => void;
+    onClearAll: () => void;
+    /**
+     * Pinned to the right-hand end of the row — the "save these filters" star and its
+     * naming field (RIC-306). It belongs here because this bar is the report of the
+     * very filters it saves, and because this is the one row of the toolbar that never
+     * scrolls away.
+     */
+    action?: React.ReactNode;
+  },
 ) {
-  if (filters.length === 0) return null;
+  // The action alone is reason enough to render. That is not a corner case: a board
+  // whose only deviation from the defaults is *showing* the Backlog (RIC-275) reports
+  // no chip at all — deliberately, see activeFilters — and is still a set worth
+  // naming, so without this the star would be unreachable in exactly that state.
+  if (filters.length === 0 && !action) return null;
   return (
     <div className="active-filters">
       {/* A row of lime chips would otherwise read as another FilterBar row rather than
-          as a warning that things are hidden. One word settles it. */}
-      <span className="af-lead">Filtered</span>
+          as a warning that things are hidden. One word settles it — and only when
+          there are chips: with none, nothing is being hidden and the word would be a
+          lie. */}
+      {filters.length > 0 && <span className="af-lead">Filtered</span>}
       {/* Keyed on the value too: `project` reports one entry per selected project
           (RIC-252), so the key alone is no longer unique across the row. */}
       {filters.map((f) => (
@@ -43,6 +60,7 @@ export default function ActiveFilters(
       {filters.length > 1 && (
         <button className="chip af-all" onClick={onClearAll}>Clear all</button>
       )}
+      {action}
     </div>
   );
 }

@@ -624,10 +624,33 @@ Mojito owns the whole lifecycle — there is no external plugin:
   are meant to be tapped several times in a row and a round trip before each repaint
   makes them feel broken. A failed save re-reads the server rather than restoring a
   remembered list.
-  `FilterFavorites` **leads the toolbar**, above the project select: one tap for a whole
-  filter set is the coarsest control there is, and RIC-226's order is coarsest-first. It
-  rides in as a `favorites?: React.ReactNode` slot, like `action`, so `FilterBar` stays
-  presentational. Rename, reorder and delete live behind a pencil rather than inside the
+  The feature is **two components in two places**, which is why the list is owned by
+  `UnifiedList` and handed to each: `FilterFavorites` (the chips and the pencil that
+  manages them) **leads the toolbar** above the project select — one tap for a whole
+  filter set is the coarsest control there is, and RIC-226's order is coarsest-first,
+  riding in as a `favorites?: React.ReactNode` slot like `action` so `FilterBar` stays
+  presentational — while `SaveFavorite` (the star, and the field that names a set) is
+  pinned to the right-hand end of the **sticky active-filters bar**, as that bar's own
+  `action` slot. The star is there because that bar *is* the report of the filters it
+  saves, with the chips it would name listed immediately to its left, and because it is
+  the one row of the toolbar that never scrolls away. Two calls to
+  `useFilterFavorites` would be two copies of the list, so a save from the star would
+  leave the chips a row above showing the list as it was — the same reason `page.tsx`
+  owns the one `useSelfUpdate` its two call sites share.
+  Two consequences in `ActiveFilters`. It now renders when there are chips **or** an
+  action, and that is not a corner case: the one board whose only deviation is *showing*
+  the Backlog reports no chip at all (deliberately — see **Backlog filter**) and is
+  still a set worth naming, so without it the star would be unreachable in exactly that
+  state. And the `Filtered` lead is conditional on there being chips, since with none
+  nothing is being hidden and the word would be a lie.
+  `.af-action` carries the sticky pin, the bar's own background and a left gutter — it
+  is pinned *over* horizontally scrolling content, and without a surface of its own a
+  chip slides under the star and the two paint on top of each other (observed in a
+  browser, then fixed). The naming field is a column inside that wrapper, because the
+  bar cannot wrap and a refusal message has nowhere to go beside the field; at phone
+  widths it takes the whole bar, which is the right answer anyway — while you are naming
+  a filter set, reading the chips back is not what you are doing.
+  Rename, reorder and delete live behind the pencil rather than inside the
   chips — three controls per chip do not fit a 320px phone, and keeping them out leaves a
   chip one unambiguous tap target, which is the whole point of a quick-access bar; edit
   mode is a **vertical list** for the same reason. Reordering is `↑`/`↓` and not
@@ -639,10 +662,9 @@ Mojito owns the whole lifecycle — there is no external plugin:
   `aria-current`, not `aria-pressed` — tapping it re-applies rather than toggling off.
   `.fav-form` and `.fav-row` share one `max-width`: unstretched they span a 1456px
   desktop toolbar and put the button you must press half a screen from the field you
-  typed in. The row renders **nothing at all** when there is nothing saved and nothing
-  worth saving, so an untouched board grows no furniture; it is inside the `!empty`
-  branch, so an empty board has no favourites row either — there is nothing for a filter
-  to hide there.
+  typed in. The chips row renders **nothing at all** with nothing saved, so an untouched
+  board grows no furniture; both halves are inside the `!empty` branch, so an empty
+  board has neither — there is nothing for a filter to hide there.
 - **Manual status move**: `MANUAL_STATUSES` (`src/server/statusModel.ts`) is the
   Backlog/Todo pair and the only thing `POST /api/tickets/[id]/status` accepts (RIC-275);
   `manualMoveTarget` in `src/lib/status.ts` is its presentation mirror, tied to it by

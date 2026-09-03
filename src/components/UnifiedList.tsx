@@ -7,6 +7,7 @@ import LaunchSheet from "./LaunchSheet";
 import NewSessionSheet from "./NewSessionSheet";
 import FilterBar from "./FilterBar";
 import FilterFavorites from "./FilterFavorites";
+import SaveFavorite from "./SaveFavorite";
 import ActiveFilters from "./ActiveFilters";
 import { activeFilters, removeFilter, type ActiveFilter } from "@/lib/activeFilters";
 import { backlogChip, cycleBacklog } from "@/lib/backlogFilter";
@@ -17,6 +18,7 @@ import StatusBadge from "./StatusBadge";
 import ProjectToolbar from "./ProjectToolbar";
 import { mineOnly, liveStatuses } from "@/lib/ticketFilter";
 import { ticketUrls } from "@/lib/ticketLink";
+import { useFilterFavorites } from "@/lib/useFilterFavorites";
 import { useProjects } from "@/lib/useProjects";
 import { useStacks } from "@/lib/useStacks";
 import { stackFor } from "@/lib/projectToolbar";
@@ -152,6 +154,13 @@ export default function UnifiedList(
   // Back returns to the board you came from rather than to a half-applied set.
   const applyFavorite = (f: ListFilters) => onFilters(f, "push");
 
+  // Owned here, not inside either component that shows it: the chips row leads the
+  // toolbar while the star that saves a new one sits on the sticky bar below it, and
+  // two calls to the hook would be two copies of the list — a save from the star would
+  // leave the chips showing the list as it was. Same reason page.tsx owns the one
+  // useSelfUpdate its two call sites share.
+  const { favorites, save: saveFavorites } = useFilterFavorites(token);
+
   const dismiss = async (s: SessionMeta) => {
     const label = s.ticket || s.title;
     const prompt = isActiveSession(s)
@@ -204,7 +213,10 @@ export default function UnifiedList(
           sessionsOnly={sessionsOnly} onSessionsOnly={setSessionsOnly}
           placeholder="Filter tickets and sessions…"
           favorites={
-            <FilterFavorites token={token} filters={filters} onApply={applyFavorite} />
+            <FilterFavorites
+              favorites={favorites} filters={filters}
+              onApply={applyFavorite} onSave={saveFavorites}
+            />
           }
           action={
             <>
@@ -226,7 +238,12 @@ export default function UnifiedList(
       {/* Guarded by !empty for the same reason FilterBar is: with no tickets and no
           sessions at all there is nothing for a filter to be hiding. */}
       {!empty && (
-        <ActiveFilters filters={chips} onClear={clearFilter} onClearAll={clearAllFilters} />
+        <ActiveFilters
+          filters={chips} onClear={clearFilter} onClearAll={clearAllFilters}
+          action={
+            <SaveFavorite favorites={favorites} filters={filters} onSave={saveFavorites} />
+          }
+        />
       )}
       {noMatches && (
         <p className="empty">
