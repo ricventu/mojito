@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { join, dirname } from "node:path";
+import { configDir } from "./config";
 import type { Effort } from "./types";
 import {
   mergeEffective, resolveModel, resolveEffort, sanitizeOverrides, type StageDefaults,
@@ -9,9 +9,7 @@ import {
 let cache: StageDefaults | undefined;
 
 export function configPath(env: NodeJS.ProcessEnv = process.env): string {
-  const dir = env.MOJITO_CONFIG_DIR
-    ?? join(env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "mojito");
-  return join(dir, "stage-defaults.json");
+  return join(configDir(env), "stage-defaults.json");
 }
 
 // Read the override layer. Missing file, corrupt JSON, or an invalid per-entry value (unknown

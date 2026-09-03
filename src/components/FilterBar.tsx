@@ -11,8 +11,8 @@ const BACKLOG_LABEL: Record<BacklogChip, string> = {
 };
 
 /**
- * The board's toolbar: project select + actions, then the status chips, then the text
- * field (RIC-226).
+ * The board's toolbar: the saved-favourites row (RIC-306), then project select +
+ * actions, then the status chips, then the text field (RIC-226).
  *
  * That order is deliberate. The search box used to lead, which put the control of last
  * resort — a typed query, once project and status are each one tap away — where the eye
@@ -24,7 +24,8 @@ const BACKLOG_LABEL: Record<BacklogChip, string> = {
  */
 export default function FilterBar(
   { query, onQuery, projects, active, onProject, statuses, activeStatus, onStatus,
-    backlog, onBacklog, mine, onMine, sessionsOnly, onSessionsOnly, placeholder, action }:
+    backlog, onBacklog, mine, onMine, sessionsOnly, onSessionsOnly, placeholder, action,
+    favorites }:
   {
     query: string;
     onQuery: (q: string) => void;
@@ -48,6 +49,12 @@ export default function FilterBar(
     onSessionsOnly?: (v: boolean) => void;
     placeholder?: string;
     action?: React.ReactNode;
+    /**
+     * The saved-favourites row (RIC-306), rendered above everything else. A slot like
+     * `action` rather than props of its own: this bar stays presentational, and the
+     * favourites carry their own server state and their own edit modes.
+     */
+    favorites?: React.ReactNode;
   },
 ) {
   const hasStatuses = statuses != null && onStatus != null
@@ -57,6 +64,9 @@ export default function FilterBar(
   const hasProjects = projects.length > 0 || active.length > 0;
   return (
     <div className="filter">
+      {/* Leads the toolbar: one tap for a whole filter set is the coarsest thing here,
+          and RIC-226's order is coarsest-first. */}
+      {favorites}
       {(hasProjects || action) && (
         <div className="filter-actions">
           {/* A select, not a chip row (RIC-225): the options are now every configured

@@ -341,8 +341,11 @@ button.chip:active { transform: scale(.96); }
 
 /* Selected filter chip — one uniform brand-lime "active" state across BOTH the
    project row and the status row, so selection reads the same everywhere
-   regardless of hue. Placed after the hue rules so it overrides their color/border. */
-.filter-chips .chip.on {
+   regardless of hue. Placed after the hue rules so it overrides their color/border.
+   The favourites row (RIC-306) joins it rather than declaring a lime of its own: the
+   chip standing for the filters now on screen is the same "this is what you are
+   looking at" as a selected status. */
+.filter-chips .chip.on, .favs .chip.on {
   color: var(--accent); background: var(--accent-soft);
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
@@ -357,6 +360,55 @@ button.chip:active { transform: scale(.96); }
   color: var(--text-dim); background: transparent;
   border-style: dashed; opacity: .55; text-decoration: line-through;
 }
+
+/* ---- Filter favourites (RIC-306) ---- */
+/* The quick-access row, leading the toolbar. Scrolls horizontally like .filter-chips
+   and hides its scrollbar for the same reason: on a phone a saved set or two always
+   fits, and the rest is a swipe rather than a row that reflows the whole toolbar. */
+.favs { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 2px 0; scrollbar-width: none; }
+.favs::-webkit-scrollbar { display: none; }
+.favs .chip { flex: none; white-space: nowrap; }
+/* A favourite's name is prose, not a mono label like a status or a project — and it
+   truncates rather than pushing the star and pencil off the row. */
+.fav-chip { max-width: 46vw; overflow: hidden; text-overflow: ellipsis; display: block; font-family: var(--sans); }
+/* The two icon chips that close the row. Square, and a shade dimmer than a favourite:
+   they act on the row rather than being part of it. */
+.fav-act { flex: none; width: 26px; height: 22px; padding: 0; color: var(--text-faint); }
+.fav-act:hover { color: var(--text); border-color: var(--border-hi); }
+
+/* Naming a new favourite, and renaming one: the row is replaced by the field rather
+   than growing a second one, which on a phone would push the whole board down. Wraps,
+   so the refusal message lands under the field instead of squeezing it. */
+.fav-form { flex-wrap: wrap; }
+.fav-form .btn { flex: none; }
+.fav-input { flex: 1 1 140px; min-width: 0; padding: 7px 10px; font-size: 13px; }
+.fav-err { flex: 1 0 100%; color: var(--err); font: 600 11px/1.4 var(--sans); }
+
+/* Edit mode. A vertical list, not the chip row: two arrows, a name and a delete do not
+   fit inside a chip on a 320px phone, and one row per favourite gives each control a
+   real tap target. */
+.favs-edit { display: flex; flex-direction: column; gap: 6px; padding: 2px 0; }
+.fav-row { display: flex; align-items: center; gap: 6px; }
+.fav-row .btn.sm { width: 28px; height: 28px; padding: 0; flex: none; color: var(--text-dim); }
+.fav-row .btn.sm:hover:not(:disabled) { color: var(--text); }
+.fav-row .btn.sm:disabled { opacity: .4; cursor: default; }
+/* `.btn:hover` brightens the border unconditionally, which on a disabled arrow reads
+   as "this does something" — the same override .proj-actions needs. */
+.fav-row .btn.sm:disabled:hover { border-color: var(--border-hi); }
+/* The name is the rename affordance, so it is a button — styled as the text it shows,
+   left-aligned and taking the slack between the arrows and the ✕. */
+.fav-name {
+  flex: 1 1 auto; min-width: 0; text-align: left; cursor: pointer;
+  background: transparent; border: 1px dashed var(--border-hi); border-radius: var(--r-sm);
+  padding: 6px 9px; color: var(--text); font: 500 13px/1.2 var(--sans);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fav-name:hover { border-color: var(--accent); }
+.fav-rename { flex: 1 1 auto; min-width: 0; display: flex; gap: 6px; }
+.fav-rename .btn { flex: none; }
+.fav-row .fav-del { color: var(--text-faint); }
+.fav-row .fav-del:hover { color: var(--err); border-color: color-mix(in srgb, var(--err) 40%, var(--border)); }
+.fav-done { display: flex; }
 
 /* ---- Active filter bar (sticky) ---- */
 /* Pinned, unlike .filter above, which scrolls away: with the filter bar off screen a

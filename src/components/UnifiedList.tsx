@@ -6,6 +6,7 @@ import { dismissSession } from "@/lib/dismissSession";
 import LaunchSheet from "./LaunchSheet";
 import NewSessionSheet from "./NewSessionSheet";
 import FilterBar from "./FilterBar";
+import FilterFavorites from "./FilterFavorites";
 import ActiveFilters from "./ActiveFilters";
 import { activeFilters, removeFilter, type ActiveFilter } from "@/lib/activeFilters";
 import { backlogChip, cycleBacklog } from "@/lib/backlogFilter";
@@ -147,6 +148,10 @@ export default function UnifiedList(
   // walk the filters on again one at a time.
   const clearAllFilters = () => onFilters(NO_FILTERS, "push");
 
+  // A saved favourite replaces the whole set at once (RIC-306) — one history entry, so
+  // Back returns to the board you came from rather than to a half-applied set.
+  const applyFavorite = (f: ListFilters) => onFilters(f, "push");
+
   const dismiss = async (s: SessionMeta) => {
     const label = s.ticket || s.title;
     const prompt = isActiveSession(s)
@@ -198,6 +203,9 @@ export default function UnifiedList(
           mine={mine} onMine={setMine}
           sessionsOnly={sessionsOnly} onSessionsOnly={setSessionsOnly}
           placeholder="Filter tickets and sessions…"
+          favorites={
+            <FilterFavorites token={token} filters={filters} onApply={applyFavorite} />
+          }
           action={
             <>
               <button className="btn primary sm" onClick={() => onNewTicket()}>+ Ticket</button>

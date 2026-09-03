@@ -3,6 +3,21 @@ import { join } from "node:path";
 import type { AppConfig } from "./types";
 
 /**
+ * Where Mojito's own configuration files live — `stage-defaults.json` and, since
+ * RIC-306, `filter-favorites.json`.
+ *
+ * One definition for the two readers rather than the same `MOJITO_CONFIG_DIR ??
+ * XDG_CONFIG_HOME` chain written twice. Note it is deliberately *not* what
+ * resolveProjectsPath below answers with: that one has always looked in a bare
+ * `~/.config/mojito`, and teaching it XDG would move an existing user's projects.json
+ * out from under them.
+ */
+export function configDir(env: NodeJS.ProcessEnv = process.env): string {
+  return env.MOJITO_CONFIG_DIR
+    ?? join(env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "mojito");
+}
+
+/**
  * Resolve the projects map path, in precedence order:
  * 1. `MOJITO_PROJECTS` env var
  * 2. `~/.config/mojito/projects.json` (default location)
