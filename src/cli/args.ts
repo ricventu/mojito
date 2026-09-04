@@ -4,13 +4,15 @@ export interface CliArgs {
   kind: "custom" | "shell";
   model: string;
   effort: Effort;
+  /** Bypass the installed web app and use the default browser. */
+  browser: boolean;
   print: boolean;
   help: boolean;
 }
 
 /** The New-session sheet's own defaults, so the two ways of opening a session agree. */
 export const CLI_DEFAULTS: CliArgs = {
-  kind: "custom", model: "opus", effort: "high", print: false, help: false,
+  kind: "custom", model: "opus", effort: "high", browser: false, print: false, help: false,
 };
 
 const EFFORTS: Effort[] = ["low", "medium", "high", "xhigh", "max"];
@@ -40,6 +42,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
     };
     switch (name) {
       case "--shell": case "-s": args.kind = "shell"; break;
+      case "--browser": args.browser = true; break;
       case "--print": args.print = true; break;
       case "--help": case "-h": args.help = true; break;
       case "--model": args.model = value(); break;

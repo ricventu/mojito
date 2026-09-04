@@ -6,12 +6,13 @@
  * src/cli/, which is why this file has no branch worth testing and that directory has
  * tests for all of them.
  */
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import nextEnv from "@next/env";
 import { runMojitoCli, type CliFetch } from "../src/cli/run";
+import { DEFAULT_APP, openAttempts } from "../src/cli/openTarget";
 import type { GitPaths } from "../src/cli/resolveProjectForPath";
 import { loadProjectMap, listMappedProjects } from "../src/server/projects";
 import { resolveProjectsPath } from "../src/server/config";
@@ -61,9 +62,16 @@ const code = await runMojitoCli(process.argv.slice(2), {
   gitPaths,
   projects: () => listMappedProjects(loadProjectMap(resolveProjectsPath())),
   fetch: fetch as unknown as CliFetch,
-  openUrl: (url) => {
-    const opener = process.platform === "darwin" ? "open" : "xdg-open";
-    spawn(opener, [url], { detached: true, stdio: "ignore" }).unref();
+  // Run the attempts in order until one is accepted: `open -a Mojito` deep-links into the
+  // installed web app, and exits non-zero on a machine that never installed it, which is
+  // what makes the plain `open` behind it a fallback rather than a second window.
+  // Synchronous because the exit status is the whole signal — a detached spawn has none.
+  openUrl: (url, { browserOnly }) => {
+    const attempts = openAttempts({ platform: process.platform, url, app: process.env.MOJITO_APP ?? DEFAULT_APP, browserOnly });
+    for (const [cmd, ...args] of attempts) {
+      if (spawnSync(cmd, args, { stdio: "ignore" }).status === 0) return;
+    }
+    console.log(`could not open ${url}`);
   },
   log: (line) => console.log(line),
 });

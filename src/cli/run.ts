@@ -15,7 +15,7 @@ export interface CliDeps {
   gitPaths: () => GitPaths;
   projects: () => { name: string; path: string }[];
   fetch: CliFetch;
-  openUrl: (url: string) => void;
+  openUrl: (url: string, opts: { browserOnly: boolean }) => void;
   log: (line: string) => void;
 }
 
@@ -28,7 +28,8 @@ const USAGE = `mojito — open a Mojito session in the current directory
   mojito --shell      a plain terminal instead
   mojito --model <m>  model for the claude session (default opus)
   mojito --effort <e> low | medium | high | xhigh | max (default high)
-  mojito --print      print the session url instead of opening the browser
+  mojito --browser    the default browser instead of the installed Mojito app
+  mojito --print      print the session url instead of opening anything
   mojito --help       this message`;
 
 /**
@@ -57,7 +58,10 @@ export async function runMojitoCli(argv: string[], deps: CliDeps): Promise<numbe
     return 1;
   }
   const port = Number(deps.env.MOJITO_PORT ?? DEFAULT_PORT);
-  const base = `http://127.0.0.1:${port}`;
+  // `localhost`, not `127.0.0.1`: the installed PWA's manifest scopes itself to
+  // http://localhost:<port>/, and a deep link on any other origin is out of scope, so
+  // macOS hands it to Safari instead of to the web app.
+  const base = `http://localhost:${port}`;
 
   const git = deps.gitPaths();
   const { projectName, worktree } = resolveProjectForPath(git, deps.projects());
@@ -113,7 +117,7 @@ export async function runMojitoCli(argv: string[], deps: CliDeps): Promise<numbe
   // browser history entry.
   const url = `${base}/session/${id}?token=${encodeURIComponent(token)}`;
   if (args.print) deps.log(url);
-  else deps.openUrl(url);
+  else deps.openUrl(url, { browserOnly: args.browser });
   return 0;
 }
 

@@ -33,7 +33,7 @@ describe("runMojitoCli", () => {
     const code = await runMojitoCli([], deps({}, calls, [], opened));
     expect(code).toBe(0);
     expect(body(calls)).toEqual({ kind: "custom", projectName: "Mojito", model: "opus", effort: "high" });
-    expect(opened).toEqual(["http://127.0.0.1:4711/session/mojito-custom-mojito-ab12?token=sekret"]);
+    expect(opened).toEqual(["http://localhost:4711/session/mojito-custom-mojito-ab12?token=sekret"]);
   });
 
   it("authenticates the launch with the token from .env.local", async () => {
@@ -46,7 +46,7 @@ describe("runMojitoCli", () => {
   it("checks health before launching anything", async () => {
     const calls: Call[] = [];
     await runMojitoCli([], deps({}, calls));
-    expect(calls[0].url).toBe("http://127.0.0.1:4711/api/health");
+    expect(calls[0].url).toBe("http://localhost:4711/api/health");
   });
 
   it("carries the cwd's worktree when it is a linked worktree of the mapped repo", async () => {
@@ -121,18 +121,37 @@ describe("runMojitoCli", () => {
     expect(out.join("\n")).toContain("no-repo");
   });
 
+  it("passes --browser through to the opener, which is the only thing that can honour it", async () => {
+    const seen: { url: string; browserOnly: boolean }[] = [];
+    await runMojitoCli(["--browser"], deps({ openUrl: (url, opts) => seen.push({ url, ...opts }) }));
+    expect(seen[0].browserOnly).toBe(true);
+  });
+
+  it("prefers the installed web app by default", async () => {
+    const seen: { browserOnly: boolean }[] = [];
+    await runMojitoCli([], deps({ openUrl: (_url, opts) => seen.push(opts) }));
+    expect(seen[0].browserOnly).toBe(false);
+  });
+
   it("prints the url instead of opening it on --print", async () => {
     const opened: string[] = []; const out: string[] = [];
     const code = await runMojitoCli(["--print"], deps({}, [], out, opened));
     expect(code).toBe(0);
     expect(opened).toEqual([]);
-    expect(out.join("\n")).toContain("http://127.0.0.1:4711/session/mojito-custom-mojito-ab12?token=sekret");
+    expect(out.join("\n")).toContain("http://localhost:4711/session/mojito-custom-mojito-ab12?token=sekret");
+  });
+
+  it("addresses the server as localhost, the origin the installed PWA's manifest scopes", async () => {
+    const calls: Call[] = []; const opened: string[] = [];
+    await runMojitoCli([], deps({}, calls, [], opened));
+    expect(calls.every((c) => c.url.startsWith("http://localhost:4711/"))).toBe(true);
+    expect(opened[0].startsWith("http://localhost:4711/")).toBe(true);
   });
 
   it("honours MOJITO_PORT, so the CLI and the server cannot disagree about the port", async () => {
     const calls: Call[] = [];
     await runMojitoCli([], deps({ env: { MOJITO_TOKEN: "sekret", MOJITO_PORT: "5000" } }, calls));
-    expect(calls[0].url).toBe("http://127.0.0.1:5000/api/health");
+    expect(calls[0].url).toBe("http://localhost:5000/api/health");
   });
 
   it("refuses without a token, naming the file it read", async () => {

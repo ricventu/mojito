@@ -889,6 +889,22 @@ Mojito owns the whole lifecycle — there is no external plugin:
   start the server. The url carries `?token=`, the phone-link path
   `resolveInitialToken` already stores and strips; `--print` emits it instead of opening,
   which is the way to keep the token out of a browser history entry and out of `ps`.
+  It opens **the installed app, not the browser**, where there is one: on macOS the PWA
+  is a Safari web app (`~/Applications/<name>.app`, bundle id
+  `com.apple.Safari.WebApp.<uuid>`, no executable of its own) and `open -a Mojito <url>`
+  deep-links into it — into an *existing* window when it has one, which is why the
+  session simply replaces the board you were looking at. `openAttempts`
+  (`src/cli/openTarget.ts`) is the pure half and answers an ordered list the glue runs
+  until one attempt exits 0: `open -a` exits non-zero when no app of that name is
+  installed, so the plain `open` behind it is the fallback rather than a second window —
+  and the exit status being the whole signal is why this one spawn is synchronous.
+  `MOJITO_APP` overrides the name (the manifest's own `name`, which is what
+  LaunchServices resolves), `--browser` skips the app deliberately, and off macOS the
+  list is just `xdg-open`: a Chromium PWA has no name to resolve. **This is what makes
+  `localhost` load-bearing** rather than a stylistic choice — the manifest scopes itself
+  to `http://localhost:<port>/`, so a `127.0.0.1` deep link is a different origin, out of
+  scope, and macOS hands it to Safari instead of to the web app. The token in the query
+  also settles the PWA's own token gate, which has its own storage container.
   Installed by `make install-cli`, which writes a two-line launcher into `~/.local/bin`
   (`BINDIR` overrides) with the **main checkout** baked in — never `$(PWD)`, since a
   worktree deliberately has no `.env.local` (RIC-207) and can be removed under it — and

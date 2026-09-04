@@ -49,3 +49,13 @@ describe("parseCliArgs", () => {
     expect(() => parseCliArgs(["--effort", "turbo"])).toThrow(/--effort must be one of/);
   });
 });
+
+describe("parseCliArgs --browser", () => {
+  it("takes --browser, for deliberately bypassing the installed web app", () => {
+    expect(parseCliArgs(["--browser"]).browser).toBe(true);
+  });
+
+  it("defaults to preferring the web app", () => {
+    expect(parseCliArgs([]).browser).toBe(false);
+  });
+});
