@@ -6,25 +6,32 @@ import type { SidebarView } from "@/lib/sidebarState";
 import type { SessionMeta } from "@/server/types";
 
 /**
- * The terminal's list of live sessions (RIC-313), so that switching between the several
- * running at once does not mean backing out to the board and finding the card again.
+ * The list of live sessions (RIC-313), so that switching between the several running at
+ * once does not mean hunting for the right card.
  *
- * It exists here and not on the board because the board *is* a list of sessions: every
- * one of them is already a card there, and a second copy of the same names beside it
- * would be furniture. The terminal is the one view where the other sessions are
- * unreachable without leaving.
+ * It began as the terminal's alone, on the grounds that the board *is* a list of
+ * sessions and a second copy of the same names would be furniture. That holds for a
+ * board with nothing hidden, and not otherwise: the Backlog is out by default (RIC-275),
+ * a project or status filter narrows further, and the session worth getting back to is
+ * exactly the one a chip might be hiding — while the sidebar is deliberately unfiltered.
+ * So the same list serves both views, and a pinned one simply stays where it is as you
+ * move between them (see useSidebar for the one shared pin).
  *
- * Deliberately unfiltered — it has no relationship with the board's filters (which are
- * the board's, and which a terminal url is built clean of), and the session you need to
- * get back to is exactly the one a status chip might be hiding. Nor is it filtered on the
- * session state: see sidebarSessions for why a "done" session belongs here most of all.
+ * Unfiltered, then, on both hosts: it has no relationship with the board's filters
+ * (which a terminal url is built clean of anyway). Nor is it filtered on the session
+ * state — see sidebarSessions for why a "done" session belongs here most of all.
+ *
+ * `place` is only ever how the element is positioned; every rule about *what* it shows
+ * is the same on both. See `.sess-side.board` in globals.css.
  */
 export default function SessionSidebar(
-  { sessions, currentId, view, onOpen, onTogglePin, onClose }:
+  { sessions, currentId, view, place, onOpen, onTogglePin, onClose }:
   {
     sessions: SessionMeta[];
+    /** The session this view is already on, or "" on the board, where there is none. */
     currentId: string;
     view: SidebarView;
+    place: "terminal" | "board";
     onOpen: (id: string) => void;
     onTogglePin: () => void;
     onClose: () => void;
@@ -32,9 +39,15 @@ export default function SessionSidebar(
 ) {
   const items = sidebarSessions(sessions);
   return (
-    <aside className="term-side" aria-label="Active sessions">
-      <div className="term-side-head">
-        <span className="term-side-title">Sessions</span>
+    <aside
+      // The terminal takes its arrangement from `.term-root`'s own `docked` class, since
+      // there the two states are two shapes of one flex row. The board has no such row,
+      // so it carries both flags itself.
+      className={`sess-side${place === "board" ? " board" : ""}${place === "board" && view.docked ? " docked" : ""}`}
+      aria-label="Active sessions"
+    >
+      <div className="sess-side-head">
+        <span className="sess-side-title">Sessions</span>
         <span className="grow" />
         {view.canPin && (
           <button
@@ -53,8 +66,8 @@ export default function SessionSidebar(
           <X size={15} aria-hidden="true" />
         </button>
       </div>
-      <div className="term-side-list">
-        {items.length === 0 && <p className="term-side-empty">No live sessions.</p>}
+      <div className="sess-side-list">
+        {items.length === 0 && <p className="sess-side-empty">No live sessions.</p>}
         {items.map((s) => {
           const item = sidebarItem(s);
           const current = s.id === currentId;

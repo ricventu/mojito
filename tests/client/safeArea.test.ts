@@ -103,13 +103,24 @@ describe("surfaces that touch a screen edge", () => {
   // edges are the screen's — so it has to put the top and left insets back itself, and
   // its scrolling list is then what sits on the home indicator, on `.acc`'s terms.
   it("insets the floating sidebar off the notch", () => {
-    const body = block(".term-root:not(.docked) .term-side");
+    const body = block(".term-root:not(.docked) .sess-side");
     expect(body).toContain("--sat");
     expect(body).toContain("--sal");
   });
 
   it("clears the home indicator with the sidebar's list, and not while the keyboard is up", () => {
-    expect(block(".term-side-list")).toContain("--sab");
-    expect(block(".term-root.kbd .term-side-list")).toMatch(/padding-bottom:\s*8px/);
+    expect(block(".sess-side-list")).toContain("--sab");
+    expect(block(".term-root.kbd .sess-side-list")).toMatch(/padding-bottom:\s*8px/);
+  });
+
+  // The board's copy of that sidebar is fixed against the viewport in *both* of its
+  // arrangements — the board scrolls the page, so there is no flex row for a docked one
+  // to be a cell of — which means it pays the top and left insets itself either way,
+  // where the terminal's docked one is laid out inside `.term-root`'s padding and pays
+  // nothing. Its list is the same `.sess-side-list` covered above.
+  it("insets the board's sidebar off the notch in both arrangements", () => {
+    const body = block(".sess-side.board");
+    expect(body).toContain("--sat");
+    expect(body).toContain("--sal");
   });
 });

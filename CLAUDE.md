@@ -280,14 +280,37 @@ Mojito owns the whole lifecycle — there is no external plugin:
   as ASCII rather than icons (see **Icons**): `>_` and `</>` say *terminal* and *code
   editor* in a way two lucide pictograms do not, and being phone-hidden they never sit
   next to the icon row anyway.
-- **Session sidebar**: the terminal carries a collapsible list of the live sessions
-  (RIC-313), so that switching between the several running at once does not mean backing
-  out to the board and finding the card again. It is **only in the terminal**: the board
-  *is* a list of sessions — every one of them is already a card there — and a second copy
-  of the same names beside it would be furniture, where the terminal is the one view from
-  which the other sessions are unreachable without leaving. Deliberately **unfiltered**,
-  since the session you need to get back to is exactly the one a status chip might be
-  hiding, and a terminal url is built clean of the board's filters anyway.
+- **Session sidebar**: the terminal *and the board* carry a collapsible list of the live
+  sessions (RIC-313), so that switching between the several running at once does not mean
+  backing out to the board and finding the card again. It shipped **terminal-only**, on
+  the grounds that the board *is* a list of sessions — every one of them is already a
+  card there — so a second copy of the same names beside it would be furniture. That
+  holds for a board with nothing hidden and not otherwise, which is what put it on both:
+  the Backlog is out by default (RIC-275), a project or status filter narrows further,
+  and the session worth getting back to is exactly the one a chip might be hiding —
+  while the sidebar is deliberately **unfiltered**, on both hosts (a terminal url is
+  built clean of the board's filters anyway). The classes lost their `term-` prefix for
+  it (`sess-side*`), since only the positioning differs between the two.
+  One pin serves both (`SIDEBAR_PIN_KEY`), so a pinned sidebar simply stays where it is
+  as you move between board and terminal — which is what asked for this. Each host calls
+  `useSidebar` itself rather than the page owning one instance: `page.tsx` returns the
+  terminal (or a doc) *instead of* the board, so the two hooks are never mounted
+  together, each mount reads the remembered pin fresh, and there is no second copy left
+  holding a stale value while the other is being toggled. It also means `useSidebar` is
+  now called from a component Next **prerenders**, so both of its `useState` initialisers
+  are guarded rather than deferred — deferring one would spend a frame undocked and cost
+  the terminal's pty a resize. Nothing of the sidebar reaches that prerender to mismatch
+  against: the app's first client render is the token gate, since the token itself
+  resolves in an effect.
+  The board's own arrangement is `position: fixed` in **both** states, where the
+  terminal's docked one is a cell of `.term-root`'s flex row: the board scrolls the page,
+  so a sidebar in that flow would scroll away with the cards. Docking therefore takes its
+  column out of the list's own padding (`.pad.side-docked`) rather than off a flex
+  sibling, and the board's copy pays `--sat`/`--sal` itself in both states. It is not
+  offered on an empty board — no tickets *and* no sessions means nothing to list, and the
+  toolbar that carries its toggle is not rendered there either. Picking a row from the
+  board **pushes** a history entry, unlike the terminal's in-place switch below: board →
+  terminal is somewhere you went and Back has to return to the board.
   `sidebarSessions` (`src/lib/sidebarSessions.ts`) is what it lists: **every session
   with a registration**, and emphatically *not* the ones `isActiveSession` calls active —
   the mistake it shipped with, and worth keeping written down. A ticket session goes to
@@ -305,8 +328,8 @@ Mojito owns the whole lifecycle — there is no external plugin:
   `terminalHeadModel`'s shape and for its reasons — the four kinds carry very different
   metadata, so every field is normalised to a string and the component branches on
   emptiness alone.
-  Picking a row **replaces** the history entry rather than pushing one (`goInPlace` in
-  `page.tsx`, the only caller): a switcher is not somewhere you went, so Back has to keep
+  Picking a row **in the terminal** replaces the history entry rather than pushing one
+  (`goInPlace` in `page.tsx`, the only caller): a switcher is not somewhere you went, so Back has to keep
   meaning "back to the board" however many sessions you flipped through — pushing had it
   walking back through the terminals visited instead, which is how it was reported.
   Replacing carries `navDepth`'s counter over untouched, so both of Back's answers stay
@@ -597,8 +620,11 @@ Mojito owns the whole lifecycle — there is no external plugin:
   the pure `removeFilter(filters, chip)`, not a Record of setters in `UnifiedList` — the
   rule is testable in the node-only setup that way, and one `onFilters` call keeps a
   removal to one history entry. The status chips stay chips: five values that never grow.
-  The select's place in the toolbar is the top row, beside the three actions
-  (RIC-226): the toolbar reads project select + `+ Ticket`/`+ Session`/`Clean up`,
+  The select's place in the toolbar is the top row, beside the actions
+  (RIC-226): the toolbar reads project select + the sessions-sidebar toggle (RIC-313,
+  leading the row as the one control there that navigates rather than creates, square
+  and exempt from the `flex: 1 1 0` below on the gear's own rule) +
+  `+ Ticket`/`+ Session`/`Clean up`,
   then the status chips, then the text field, then the saved-favourites row (RIC-306),
   then the sticky active-filter badges. The favourites close the toolbar rather than
   leading it: they are a shortcut *past* the controls above, not a coarser axis of

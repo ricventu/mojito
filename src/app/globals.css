@@ -310,7 +310,12 @@ section + section > .proj-head { margin-top: 24px; }
    above: on the wrapped line the three text actions split the width between them, and
    a 17px glyph given an equal quarter of the toolbar reads as a mis-click waiting to
    happen. 28px matches `.proj-actions`' buttons and the text buttons' own height. */
-.filter-actions .settings { flex: 0 0 auto; width: 28px; height: 28px; padding: 0; }
+/* The sessions sidebar's toggle leads the same row, and is square for the same reason
+   (RIC-313). It leads rather than closes it because it is the one control there that
+   navigates instead of creating — the terminal's own copy sits at the left of its
+   header too, right after Back. */
+.filter-actions .settings,
+.filter-actions .side-toggle { flex: 0 0 auto; width: 28px; height: 28px; padding: 0; }
 /* How many sessions are waiting for input — the badge that used to ride on the nav's
    Tickets tab, now the amber pill immediately left of the gear. Passive: the tab it
    sat on navigated to the board you were already on, so it never did anything either. */
@@ -742,8 +747,11 @@ button.chip:active { transform: scale(.96); }
 /* Two arrangements of one element, and which is which is entirely CSS's business —
    see sidebarState.ts for why only the pinned one is allowed to take width off the
    terminal. Neither transitions: a width animation would finish after the re-fit that
-   follows it, leaving the pty sized against a box that was still moving. */
-.term-side {
+   follows it, leaving the pty sized against a box that was still moving.
+   The classes lost their `term-` prefix when the board grew the same sidebar: the two
+   hosts share every rule below and differ only in how the element is positioned, which
+   is what `.sess-side.board` further down is for. */
+.sess-side {
   flex: none; width: 260px; min-width: 0;
   display: flex; flex-direction: column;
   background: var(--surface); border-right: 1px solid var(--border);
@@ -751,24 +759,48 @@ button.chip:active { transform: scale(.96); }
 /* Floating: over the terminal, inside the safe area. Absolute rather than fixed so it
    rides `.term-root`'s JS-set height and translate (see keyboardInset.ts) instead of
    extending under the keyboard on its own. */
-.term-root:not(.docked) .term-side {
+.term-root:not(.docked) .sess-side {
   position: absolute; z-index: 40;
   top: var(--sat); bottom: 0; left: var(--sal);
   width: min(280px, 82vw);
   border-right-color: var(--border-hi);
   box-shadow: 0 0 24px rgba(0, 0, 0, .5);
 }
-.term-side-backdrop { position: absolute; inset: 0; z-index: 35; background: rgba(0, 0, 0, .5); }
+.sess-side-backdrop { position: absolute; inset: 0; z-index: 35; background: rgba(0, 0, 0, .5); }
 
-.term-side-head { display: flex; align-items: center; gap: 6px; flex: none;
+/* On the board, *both* arrangements are `position: fixed` — not a cell of a flex row
+   like the terminal's docked one. The board scrolls the page itself, so a sidebar laid
+   out in that flow would scroll away with the cards; and `.term-root`'s trick of an
+   absolute child riding a JS-set height has nothing to ride here. Fixed against the
+   viewport, therefore, which means it pays the top and left insets itself exactly as
+   the floating one does. The docked width and border come from `.sess-side` above; only
+   the floating state overrides them. */
+.sess-side.board {
+  position: fixed; z-index: 40;
+  top: var(--sat); bottom: 0; left: var(--sal);
+}
+.sess-side.board:not(.docked) {
+  width: min(280px, 82vw);
+  border-right-color: var(--border-hi);
+  box-shadow: 0 0 24px rgba(0, 0, 0, .5);
+}
+/* Fixed for the same reason: `inset: 0` on an absolute backdrop would size it to the
+   whole scroll height of the board rather than to the screen. */
+.sess-side-backdrop.board { position: fixed; }
+/* What docking costs the board: a column of its own, taken out of the list's padding
+   rather than off a flex sibling. `.page` has already paid `--sal` outside this box, so
+   the inset is the sidebar's bare width plus the padding the cards keep. */
+.pad.side-docked { padding-left: calc(12px + 260px); }
+
+.sess-side-head { display: flex; align-items: center; gap: 6px; flex: none;
   padding: 10px 10px 10px 14px; border-bottom: 1px solid var(--border); }
-.term-side-title { font: 700 12px var(--mono); color: var(--text-dim);
+.sess-side-title { font: 700 12px var(--mono); color: var(--text-dim);
   text-transform: uppercase; letter-spacing: .06em; }
 /* The list is the only thing that scrolls, and it is what sits on the home indicator. */
-.term-side-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+.sess-side-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   padding: 8px 8px calc(8px + var(--sab)); display: flex; flex-direction: column; gap: 6px; }
-.term-root.kbd .term-side-list { padding-bottom: 8px; }
-.term-side-empty { margin: 4px 6px; color: var(--text-dim); font-size: 13px; }
+.term-root.kbd .sess-side-list { padding-bottom: 8px; }
+.sess-side-empty { margin: 4px 6px; color: var(--text-dim); font-size: 13px; }
 
 /* A real <button>: nothing interactive is nested inside a row, so this needs none of
    the `tapProps` treatment the board's cards do. */

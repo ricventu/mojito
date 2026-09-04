@@ -448,6 +448,7 @@ export default function TerminalView(
           sessions={sessions}
           currentId={session.id}
           view={sidebar.view}
+          place="terminal"
           onOpen={(id) => { sidebar.dismiss(); onOpenSession(id); }}
           onTogglePin={sidebar.togglePin}
           onClose={sidebar.toggle}
@@ -457,7 +458,7 @@ export default function TerminalView(
           own and dims nothing, and a backdrop over a terminal you can still see and type
           into would be a lie about which of the two has focus. */}
       {sidebar.view.overlay && (
-        <div className="term-side-backdrop" onClick={sidebar.dismiss} aria-hidden="true" />
+        <div className="sess-side-backdrop" onClick={sidebar.dismiss} aria-hidden="true" />
       )}
       <div className="term-main">
         {!kbdOpen && (

@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Settings } from "lucide-react";
+import { PanelLeft, Settings } from "lucide-react";
 import { apiFetch } from "@/lib/client";
 import { dismissSession } from "@/lib/dismissSession";
 import LaunchSheet from "./LaunchSheet";
@@ -16,6 +16,8 @@ import TicketCard from "./TicketCard";
 import SessionCard from "./SessionCard";
 import StatusBadge from "./StatusBadge";
 import ProjectToolbar from "./ProjectToolbar";
+import SessionSidebar from "./SessionSidebar";
+import { useSidebar } from "@/lib/useSidebar";
 import { mineOnly, liveStatuses } from "@/lib/ticketFilter";
 import { ticketUrls } from "@/lib/ticketLink";
 import { useFilterFavorites } from "@/lib/useFilterFavorites";
@@ -186,11 +188,55 @@ export default function UnifiedList(
   // waiting for me", which a narrowed board must not be able to understate.
   const needsInput = sessions.filter((s) => s.state === "needs-input").length;
 
+  // The board's own copy of the sessions sidebar (RIC-313). Owned here and not by the
+  // page because both halves of it are this component's — the list and the toggle in
+  // the toolbar — and, unlike the New ticket sheet, it is reachable from nowhere else.
+  // `false` for the keyboard: that signal exists to buy back rows in a terminal whose
+  // visible band the keyboard has cut to ~13 of them, and the board is an ordinary
+  // scrolling page with nothing to buy back. useSidebar explains why the pin this reads
+  // is the terminal's own, and why the two hooks can never disagree about it.
+  const sidebar = useSidebar(false);
+
   const empty = tickets.length === 0 && sessions.length === 0;
   const noMatches = !empty && ticketRows.length === 0 && looseSessions.length === 0;
 
+  // Not on an empty board: `empty` is no tickets *and* no sessions, so there is nothing
+  // for the sidebar to list, and the toolbar that would carry its toggle is not rendered
+  // there either.
+  const sideOpen = sidebar.view.visible && !empty;
+
   return (
-    <div className="pad">
+    // Docking takes a column out of the list's own padding — the board scrolls the page,
+    // so there is no flex sibling to take it off (see `.pad.side-docked`).
+    <div className={`pad${sideOpen && sidebar.view.docked ? " side-docked" : ""}`}>
+      {sideOpen && (
+        <SessionSidebar
+          sessions={sessions}
+          // Nothing is current on the board: it is not any one session's view.
+          currentId=""
+          view={sidebar.view}
+          place="board"
+          // A push, deliberately, where the terminal's copy replaces the history entry:
+          // board → terminal is somewhere you went and Back has to return here, where
+          // terminal → terminal is a switcher and must not stack up. The meta is already
+          // in hand — the sidebar lists this very array — so this is the same open the
+          // cards below do.
+          onOpen={(id) => {
+            const s = sessions.find((x) => x.id === id);
+            if (s) {
+              sidebar.dismiss();
+              onOpen(s);
+            }
+          }}
+          onTogglePin={sidebar.togglePin}
+          onClose={sidebar.toggle}
+        />
+      )}
+      {/* Only the floating arrangement gets one, for the terminal's own reason: a docked
+          sidebar takes a column of its own and dims nothing. */}
+      {sideOpen && sidebar.view.overlay && (
+        <div className="sess-side-backdrop board" onClick={sidebar.dismiss} aria-hidden="true" />
+      )}
       {empty && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <p className="empty">Nothing here yet.</p>
@@ -220,6 +266,18 @@ export default function UnifiedList(
           }
           action={
             <>
+              {/* Leads the row because it is the one control there that navigates rather
+                  than creates — the terminal's own copy sits at the left of its header
+                  for the same reason. */}
+              <button
+                className="btn ghost sm icon side-toggle"
+                aria-label={sidebar.view.visible ? "Hide sessions" : "Show sessions"}
+                title={sidebar.view.visible ? "Hide sessions" : "Show sessions"}
+                aria-expanded={sidebar.view.visible}
+                onClick={sidebar.toggle}
+              >
+                <PanelLeft size={15} aria-hidden="true" />
+              </button>
               <button className="btn primary sm" onClick={() => onNewTicket()}>+ Ticket</button>
               <button className="btn ghost sm" onClick={() => setNewSession({ project: null })}>+ Session</button>
               <button className="btn ghost sm" onClick={cleanup}>Clean up</button>
