@@ -12,25 +12,19 @@ function s(id: string, ticket: string, createdAt: string, state: SessionState = 
 const T = (h: number) => `2026-09-04T${String(h).padStart(2, "0")}:00:00.000Z`;
 
 describe("sidebarSessions", () => {
-  it("drops the sessions that are over", () => {
+  // The predicate this got wrong first time round. A ticket session goes to "done" on
+  // every Stop once its result file says ready-for-qa, and stays there for the whole of
+  // the QA gate — with its tmux up, because Mojito never ends a session and that one is
+  // the rework channel the gate depends on. Keying on the state hid exactly the session
+  // a switcher exists to switch to, and made the row flicker in and out at every turn.
+  // unifiedRows.ts settled the same question for the board's Sessions filter.
+  it("lists a finished session, whose tmux is still up", () => {
     const list = [
       s("a", "RIC-1", T(10), "done"),
-      s("b", "RIC-2", T(11), "failed"),
-      s("c", "RIC-3", T(9), "idle"),
+      s("b", "RIC-2", T(11), "running"),
+      s("c", "RIC-3", T(9), "failed"),
     ];
-    expect(sidebarSessions(list).map((x) => x.id)).toEqual(["c"]);
-  });
-
-  // You are looking at it: a sidebar that cannot say where you are is worse than one
-  // row longer, and a work session sits at "done" for the whole of the QA gate.
-  it("keeps the open session even once it is finished", () => {
-    const list = [s("a", "RIC-1", T(10), "done"), s("b", "RIC-2", T(11))];
-    expect(sidebarSessions(list, "a").map((x) => x.id)).toEqual(["b", "a"]);
-  });
-
-  it("ignores a current id that names nothing", () => {
-    const list = [s("b", "RIC-2", T(11))];
-    expect(sidebarSessions(list, "gone").map((x) => x.id)).toEqual(["b"]);
+    expect(sidebarSessions(list).map((x) => x.id)).toEqual(["b", "a", "c"]);
   });
 
   // The one thing worth interrupting for. Everything else is newest-first.

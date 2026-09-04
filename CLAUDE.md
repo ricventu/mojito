@@ -288,11 +288,19 @@ Mojito owns the whole lifecycle — there is no external plugin:
   which the other sessions are unreachable without leaving. Deliberately **unfiltered**,
   since the session you need to get back to is exactly the one a status chip might be
   hiding, and a terminal url is built clean of the board's filters anyway.
-  `sidebarSessions` (`src/lib/sidebarSessions.ts`) is what it lists — the active states
-  (`isActiveSession`) plus **the open session whatever its state**, because a work session
-  sits at "done" for the whole of the QA gate and a sidebar that highlights nothing there
-  is claiming the terminal you are reading does not exist. Ordered `needs-input` first and
-  then `orderSessions`' own newest-first: a session that starts waiting for an answer moves
+  `sidebarSessions` (`src/lib/sidebarSessions.ts`) is what it lists: **every session
+  with a registration**, and emphatically *not* the ones `isActiveSession` calls active —
+  the mistake it shipped with, and worth keeping written down. A ticket session goes to
+  `done` on every Stop once its result file says ready-for-qa (`hookHandler`), and sits
+  there for the whole of the QA gate with its tmux up, because Mojito never ends a session
+  and that one is the rework channel the gate depends on. Filtering on the state hid
+  exactly the session a switcher exists to switch to, and made the row flicker in and out
+  at every turn — reported as two windows disagreeing about the count, since each had
+  sampled a different side of the flip. A registration lasts as long as the session does,
+  and Kill/Dismiss/Clean up are what remove it, so having one is the honest criterion;
+  `unifiedRows` had already settled the same question the same way for the board's
+  Sessions filter, and says so at length. Ordered `needs-input` first and then
+  `orderSessions`' own newest-first: a session that starts waiting for an answer moves
   to the top under you, which is the point. `sidebarItem` is its row model, in
   `terminalHeadModel`'s shape and for its reasons — the four kinds carry very different
   metadata, so every field is normalised to a string and the component branches on

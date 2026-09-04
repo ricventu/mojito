@@ -16,7 +16,8 @@ import type { SessionMeta } from "@/server/types";
  *
  * Deliberately unfiltered — it has no relationship with the board's filters (which are
  * the board's, and which a terminal url is built clean of), and the session you need to
- * get back to is exactly the one a status chip might be hiding.
+ * get back to is exactly the one a status chip might be hiding. Nor is it filtered on the
+ * session state: see sidebarSessions for why a "done" session belongs here most of all.
  */
 export default function SessionSidebar(
   { sessions, currentId, view, onOpen, onTogglePin, onClose }:
@@ -29,7 +30,7 @@ export default function SessionSidebar(
     onClose: () => void;
   },
 ) {
-  const items = sidebarSessions(sessions, currentId);
+  const items = sidebarSessions(sessions);
   return (
     <aside className="term-side" aria-label="Active sessions">
       <div className="term-side-head">
