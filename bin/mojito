@@ -1,0 +1,9 @@
+#!/bin/sh
+# Launcher for the TypeScript entry point beside this file, run through the repo's own
+# tsx so the CLI can import src/cli and src/server directly.
+#
+# `make install-cli` writes a second launcher into ~/.local/bin that execs *this* one with
+# the main checkout's path baked in; this script resolves its own directory only for the
+# case of being called in place.
+dir=$(cd "$(dirname "$0")/.." && pwd)
+exec "$dir/node_modules/.bin/tsx" "$dir/bin/mojito.ts" "$@"

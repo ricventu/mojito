@@ -864,6 +864,37 @@ Mojito owns the whole lifecycle — there is no external plugin:
   surface that spends them, in the shape of the manifest test above: this is CSS that
   is invisible on a desktop and in the node-only test setup alike (both report every
   inset as 0), so nothing else in the tree would notice it going away.
+- **`mojito` CLI**: a shell command that opens a session in whatever directory you run it
+  in — `bin/mojito` (a `/bin/sh` wrapper that execs the repo's own `tsx`) over
+  `bin/mojito.ts`, with every rule in `src/cli/` and tested there: `parseCliArgs`,
+  `resolveProjectForPath`, and `runMojitoCli(argv, deps)` with git, fetch, the browser and
+  the env injected — the usual pure ÷ glue split, which is what lets the five outcomes
+  that matter be asserted in the node-only vitest setup. It adds **nothing** server-side:
+  it is a `POST /api/sessions` of the `custom`/`shell` shape the New session sheet already
+  sends, and the cwd rides in as the `worktree` pick RIC-243 added — already validated by
+  `resolveWorktreePick`, so a stale or unlinked path degrades to the repo root with
+  Mojito's own echoed warning and the CLI validates nothing itself. Which project that is
+  comes from matching git against `listMappedProjects`: the **toplevel** is tried first,
+  so a projects.json entry that is itself a linked worktree keeps its own name and sends
+  no pick, then the main checkout (`--git-common-dir`'s parent — a linked worktree's
+  common dir points at the checkout projects.json actually maps), with the toplevel riding
+  along as the pick whenever the two differ. An unmapped or non-git folder falls back to a
+  **General** session, which is the home directory and ignores `worktree` outright
+  (`resolveScopedCwd`) — so the CLI says `… is not a mapped project — opening a General
+  session in ~` rather than implying it opens where you are stood. Config comes from the
+  same `loadEnvConfig` the server uses, so the two cannot disagree about the port or the
+  token; note its precedence is process.env first, matching `loadConfig`. `/api/health`
+  (unauthenticated, 1.5s timeout) is probed **before** the launch, so a stopped Mojito
+  costs no POST and is reported as such instead of as a fetch stack trace — it does not
+  start the server. The url carries `?token=`, the phone-link path
+  `resolveInitialToken` already stores and strips; `--print` emits it instead of opening,
+  which is the way to keep the token out of a browser history entry and out of `ps`.
+  Installed by `make install-cli`, which writes a two-line launcher into `~/.local/bin`
+  (`BINDIR` overrides) with the **main checkout** baked in — never `$(PWD)`, since a
+  worktree deliberately has no `.env.local` (RIC-207) and can be removed under it — and
+  checks its own exit statuses, `.SHELLFLAGS` being ignored by macOS's Make 3.81.
+  `tests/cli/packaging.test.ts` guards the parts nothing else would notice: the wrapper's
+  +x bit, that it execs the repo's tsx, and both of those Makefile rules.
 - **Projects map**: `~/.config/mojito/projects.json` (Linear team key → project name →
   repo path), resolved by `resolveProjectsPath` in `src/server/config.ts`: env
   `MOJITO_PROJECTS` → `~/.config/mojito/projects.json`.

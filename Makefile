@@ -47,6 +47,23 @@ help:
 	@echo "  make restart  prod deploy: next build, then restart $(SERVICE) (systemd --user) + health check"
 	@echo "  make https    put Mojito behind the Tailscale HTTPS hostname (needed to install it in Chrome)"
 	@echo "  make https-off  tear that down again"
+	@echo "  make install-cli  install the \`mojito\` command (open a session in the current folder)"
+
+## install-cli: write ~/.local/bin/mojito (override with BINDIR), a launcher for
+## `bin/mojito` that opens a Mojito session in whatever directory you run it from.
+## The launcher bakes the MAIN checkout's path, never $(PWD): a worktree deliberately
+## has no .env.local (RIC-207) and can be removed at any time, so a launcher pointing
+## at one would lose both the token and the file. Re-run it if the checkout moves.
+BINDIR ?= $(HOME)/.local/bin
+install-cli:
+	@ROOT=$$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || { echo "not a git checkout"; exit 1; }; \
+	ROOT=$${ROOT%/.git}; \
+	if [ ! -x "$$ROOT/bin/mojito" ]; then echo "missing $$ROOT/bin/mojito"; exit 1; fi; \
+	mkdir -p "$(BINDIR)" || exit 1; \
+	printf '#!/bin/sh\nexec "%s/bin/mojito" "$$@"\n' "$$ROOT" > "$(BINDIR)/mojito" || exit 1; \
+	chmod +x "$(BINDIR)/mojito" || exit 1; \
+	echo "installed $(BINDIR)/mojito -> $$ROOT/bin/mojito"; \
+	case ":$$PATH:" in *":$(BINDIR):"*) ;; *) echo "note: $(BINDIR) is not on your PATH";; esac
 
 ## start: dev server, Mac kept awake via caffeinate; prints every reachable URL
 ## (local, Wi-Fi/LAN, and — when the tailnet is up — the Tailscale direct IP, which
