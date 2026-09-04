@@ -305,6 +305,14 @@ Mojito owns the whole lifecycle — there is no external plugin:
   `terminalHeadModel`'s shape and for its reasons — the four kinds carry very different
   metadata, so every field is normalised to a string and the component branches on
   emptiness alone.
+  Picking a row **replaces** the history entry rather than pushing one (`goInPlace` in
+  `page.tsx`, the only caller): a switcher is not somewhere you went, so Back has to keep
+  meaning "back to the board" however many sessions you flipped through — pushing had it
+  walking back through the terminals visited instead, which is how it was reported.
+  Replacing carries `navDepth`'s counter over untouched, so both of Back's answers stay
+  correct: a terminal reached from the board still steps back to it, and one opened from a
+  deep link (depth 0, nothing of ours behind it) still falls back to the list rather than
+  leaving Mojito.
   The pin is `sidebarView` (`src/lib/sidebarState.ts`), whose one asymmetry carries the
   whole design: **docked only when pinned, an overlay every other time it is on screen**.
   Docking takes a column off the terminal, so the pty is resized and tmux repaints

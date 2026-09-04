@@ -57,6 +57,11 @@ export default function Home() {
   // Go to another view, carrying the filters: they ride along on every path, so
   // leaving the list for a terminal or a doc and coming back does not drop them.
   const go = useCallback((next: AppView) => navigate({ view: next, filters }), [navigate, filters]);
+  // The same, without a history entry. Switching sessions from the terminal's sidebar is
+  // the one navigation that takes this: a switcher is not somewhere you went, so Back has
+  // to stay pointed at the board however many sessions you flipped through — see
+  // onOpenSession below.
+  const goInPlace = useCallback((next: AppView) => replace({ view: next, filters }), [replace, filters]);
   const setFilters = useCallback(
     (next: ListFilters, mode: "push" | "replace") =>
       (mode === "push" ? navigate : replace)({ view, filters: next }),
@@ -150,10 +155,13 @@ export default function Home() {
         tickets={tickets}
         docs={view.docs}
         onNewTicket={() => setNewTicket({ project: null })}
-        // Switching sessions from the sidebar is a plain navigation, so it pushes an
-        // entry like every other one and Back walks back through the terminals visited.
-        // `docs: null` because the overlay belongs to the session it was opened on.
-        onOpenSession={(id) => go({ kind: "session", id, docs: null })}
+        // Replaces the entry rather than pushing one: the sidebar is a switcher, so Back
+        // must return to the board as it always did, not walk back through the terminals
+        // visited on the way. Replacing carries the depth over untouched, so a terminal
+        // reached from the board still steps back to it, and one opened from a deep link
+        // still falls back to the list. `docs: null` because the overlay belongs to the
+        // session it was opened on.
+        onOpenSession={(id) => goInPlace({ kind: "session", id, docs: null })}
         onOpenDocs={() => go({ kind: "session", id: view.id, docs: { doc: null } })}
         onSelectDoc={(doc) => go({ kind: "session", id: view.id, docs: { doc } })}
         onBack={() => {
