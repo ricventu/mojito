@@ -11,16 +11,17 @@ const BACKLOG_LABEL: Record<BacklogChip, string> = {
 };
 
 /**
- * The board's toolbar: the saved-favourites row (RIC-306), then project select +
- * actions, then the status chips, then the text field (RIC-226).
+ * The board's toolbar: project select + actions, then the status chips, then the text
+ * field (RIC-226), and the saved-favourites row (RIC-306) last.
  *
  * That order is deliberate. The search box used to lead, which put the control of last
  * resort — a typed query, once project and status are each one tap away — where the eye
  * lands first, and pushed the three actions and the project select down below it. Now
- * the row that *changes what the board shows* leads, the two narrowing axes follow in
- * the order of how coarse they are, and the free-text field closes the group; the
- * sticky active-filter badges (rendered after this by the list) read as the summary of
- * everything above them.
+ * the two narrowing axes come in the order of how coarse they are and the free-text
+ * field closes them; the sticky active-filter badges (rendered after this by the list)
+ * read as the summary of everything above them. The favourites row sits *below* the
+ * controls it stands in for: it is the shortcut, not the axis — the eye lands on the
+ * filters proper, and the saved sets sit next to the badges that report them.
  */
 export default function FilterBar(
   { query, onQuery, projects, active, onProject, statuses, activeStatus, onStatus,
@@ -50,7 +51,7 @@ export default function FilterBar(
     placeholder?: string;
     action?: React.ReactNode;
     /**
-     * The saved-favourites row (RIC-306), rendered above everything else. A slot like
+     * The saved-favourites row (RIC-306), rendered below everything else. A slot like
      * `action` rather than props of its own: this bar stays presentational, and the
      * favourites carry their own server state and their own edit modes.
      */
@@ -64,9 +65,6 @@ export default function FilterBar(
   const hasProjects = projects.length > 0 || active.length > 0;
   return (
     <div className="filter">
-      {/* Leads the toolbar: one tap for a whole filter set is the coarsest thing here,
-          and RIC-226's order is coarsest-first. */}
-      {favorites}
       {(hasProjects || action) && (
         <div className="filter-actions">
           {/* A select, not a chip row (RIC-225): the options are now every configured
@@ -155,6 +153,9 @@ export default function FilterBar(
         value={query}
         onChange={(e) => onQuery(e.target.value)}
       />
+      {/* Closes the toolbar: a favourite is a shortcut past the controls above, so it
+          reads as a footer to them rather than as another axis at the top. */}
+      {favorites}
     </div>
   );
 }

@@ -533,9 +533,11 @@ Mojito owns the whole lifecycle — there is no external plugin:
   removal to one history entry. The status chips stay chips: five values that never grow.
   The select's place in the toolbar is the top row, beside the three actions
   (RIC-226): the toolbar reads project select + `+ Ticket`/`+ Session`/`Clean up`,
-  then the status chips, then the text field, then the sticky active-filter badges —
-  with the saved-favourites row above all of it since RIC-306, which is the same rule
-  taken one step coarser.
+  then the status chips, then the text field, then the saved-favourites row (RIC-306),
+  then the sticky active-filter badges. The favourites close the toolbar rather than
+  leading it: they are a shortcut *past* the controls above, not a coarser axis of
+  their own, and sitting last they land beside the badges that report the set they
+  apply.
   The search box used to lead, which spent the first row on the control of last
   resort — project and status are one tap each — and pushed the actions down. Where
   four controls do not fit (`.filter-actions` is a wrapping flex row, the select
@@ -626,16 +628,17 @@ Mojito owns the whole lifecycle — there is no external plugin:
   remembered list.
   The feature is **two components in two places**, which is why the list is owned by
   `UnifiedList` and handed to each: `FilterFavorites` (the chips and the pencil that
-  manages them) **leads the toolbar** above the project select — one tap for a whole
-  filter set is the coarsest control there is, and RIC-226's order is coarsest-first,
-  riding in as a `favorites?: React.ReactNode` slot like `action` so `FilterBar` stays
-  presentational — while `SaveFavorite` (the star, and the field that names a set) is
+  manages them) **closes the toolbar** below the search field — a favourite is a
+  shortcut past every control above it rather than another narrowing axis, so it reads
+  as a footer to them and sits next to the active-filter badges that report whichever
+  set is on; it rides in as a `favorites?: React.ReactNode` slot like `action` so
+  `FilterBar` stays presentational — while `SaveFavorite` (the star, and the field that names a set) is
   pinned to the right-hand end of the **sticky active-filters bar**, as that bar's own
   `action` slot. The star is there because that bar *is* the report of the filters it
   saves, with the chips it would name listed immediately to its left, and because it is
   the one row of the toolbar that never scrolls away. Two calls to
   `useFilterFavorites` would be two copies of the list, so a save from the star would
-  leave the chips a row above showing the list as it was — the same reason `page.tsx`
+  leave the chips a row below showing the list as it was — the same reason `page.tsx`
   owns the one `useSelfUpdate` its two call sites share.
   Two consequences in `ActiveFilters`. It now renders when there are chips **or** an
   action, and that is not a corner case: the one board whose only deviation is *showing*

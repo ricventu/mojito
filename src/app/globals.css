@@ -362,7 +362,7 @@ button.chip:active { transform: scale(.96); }
 }
 
 /* ---- Filter favourites (RIC-306) ---- */
-/* The quick-access row, leading the toolbar. Scrolls horizontally like .filter-chips
+/* The quick-access row, closing the toolbar. Scrolls horizontally like .filter-chips
    and hides its scrollbar for the same reason: on a phone a saved set or two always
    fits, and the rest is a swipe rather than a row that reflows the whole toolbar. */
 .favs { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 2px 0; scrollbar-width: none; }
