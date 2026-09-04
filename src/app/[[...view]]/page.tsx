@@ -144,9 +144,16 @@ export default function Home() {
       <TerminalView
         token={token}
         session={openSession}
+        // Unfiltered on purpose: the sidebar's list has nothing to do with the board's
+        // filters, which a terminal url is deliberately built clean of anyway.
+        sessions={sessions}
         tickets={tickets}
         docs={view.docs}
         onNewTicket={() => setNewTicket({ project: null })}
+        // Switching sessions from the sidebar is a plain navigation, so it pushes an
+        // entry like every other one and Back walks back through the terminals visited.
+        // `docs: null` because the overlay belongs to the session it was opened on.
+        onOpenSession={(id) => go({ kind: "session", id, docs: null })}
         onOpenDocs={() => go({ kind: "session", id: view.id, docs: { doc: null } })}
         onSelectDoc={(doc) => go({ kind: "session", id: view.id, docs: { doc } })}
         onBack={() => {

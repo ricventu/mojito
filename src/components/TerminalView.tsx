@@ -13,8 +13,9 @@ import { WebglAddon } from "@xterm/addon-webgl";
 // webpack's, and the build runs on Turbopack since Next 16 (RIC-227) — the global
 // import is kept because it is the plainer arrangement, not because it is still
 // forced. Treat the diagnosis as history, not as a Turbopack constraint.
-import { ChevronLeft, FileText, Plus, X } from "lucide-react";
+import { ChevronLeft, FileText, PanelLeft, Plus, X } from "lucide-react";
 import AccessoryBar from "./AccessoryBar";
+import SessionSidebar from "./SessionSidebar";
 import DocsView from "./DocsView";
 import StateBadge from "./StateBadge";
 import TicketLink from "./TicketLink";
@@ -32,15 +33,19 @@ import { restoreTerminalPlatform } from "@/lib/terminalPlatform";
 import { keepSettling } from "@/lib/viewportSettle";
 import { terminalTabTitle } from "@/lib/terminalTabTitle";
 import { terminalHeadModel } from "@/lib/terminalHeader";
+import { useSidebar } from "@/lib/useSidebar";
 import { readAsDataUrl } from "@/lib/readAsDataUrl";
 import { quoteArg } from "@/lib/quoteArg";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 
 export default function TerminalView(
-  { token, session, tickets, docs, onNewTicket, onOpenDocs, onSelectDoc, onBack }:
+  { token, session, sessions, tickets, docs, onNewTicket, onOpenDocs, onSelectDoc, onOpenSession, onBack }:
   {
     token: string;
     session: SessionMeta;
+    // Every session the board knows about, for the sidebar (RIC-313) — unfiltered, since
+    // the one you need to get back to is exactly the one a board filter might be hiding.
+    sessions: SessionMeta[];
     tickets: TicketSummary[];
     // The docs overlay is a url of its own (/session/<id>/docs), so the browser's Back
     // closes it instead of leaving the terminal — and the terminal stays mounted
@@ -51,6 +56,8 @@ export default function TerminalView(
     onNewTicket: () => void;
     onOpenDocs: () => void;
     onSelectDoc: (path: string) => void;
+    /** Switch this view to another live session — navigation is the page's, not ours. */
+    onOpenSession: (id: string) => void;
     onBack: () => void;
   },
 ) {
@@ -67,6 +74,9 @@ export default function TerminalView(
   const kbdOpenRef = useRef(false);
   // Set by the mount effect so the re-fit below can reach into its closure.
   const refitRef = useRef<() => void>(() => {});
+  // The list of live sessions beside the terminal (RIC-313). It takes `kbdOpen` because
+  // it hides on the same signal the header does — see sidebarState.ts.
+  const sidebar = useSidebar(kbdOpen);
 
   useEffect(() => {
     // React StrictMode (dev) mounts this effect, runs its cleanup, and remounts
@@ -275,10 +285,13 @@ export default function TerminalView(
 
   // Showing or hiding the chrome changes the terminal's box, so re-fit once React
   // has committed the new layout — the pty must learn about the rows we just
-  // handed back to it.
+  // handed back to it. A *docked* sidebar is chrome of the same kind, one axis over:
+  // it takes a column off the terminal, so the pty has to learn about the columns too.
+  // The overlay one deliberately is not here — it floats, changing nothing to re-fit
+  // against, which is why an unpinned sidebar costs a peek nothing (see sidebarState).
   useEffect(() => {
     refitRef.current();
-  }, [kbdOpen]);
+  }, [kbdOpen, sidebar.view.docked]);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -422,65 +435,101 @@ export default function TerminalView(
   return (
     // `kbd` is presentational only: it drops the bottom safe-area inset, which the
     // keyboard covers anyway (see globals.css). The geometry itself is set from JS above.
-    <div className={`term-root${kbdOpen ? " kbd" : ""}`} ref={rootRef}>
-      {!kbdOpen && (
-      <header className="term-head">
-        <button className="back icon" aria-label="Back" onClick={onBack}>
-          <ChevronLeft size={20} aria-hidden="true" />
-        </button>
-        <div className="term-ident">
-          {/* The id is the ticket's name here, so it is what opens the issue on Linear;
-              plain text when there is no url for it (a custom session, or a ticket that
-              has left the open list) — see TicketLink. */}
-          {head.id && <TicketLink id={head.id} url={head.ticketUrl} />}
-          {head.status && <span className="status">{head.status}</span>}
-          {head.title && <span className="title">{head.title}</span>}
-        </div>
-        <div className="term-actions">
-          {/* Open the directory this session runs in — its worktree, or the repo root —
-              in Warp or VS Code. Anchors, not buttons: the browser hands a warp:// /
-              vscode:// url to the OS itself, so there is nothing for Mojito to spawn
-              (see openInApp.ts). They do nothing from a phone, which no page can know
-              in advance, so they are rendered wherever there is a path at all. */}
-          {head.warp && (
-            <a className="btn sm" href={head.warp} aria-label="Open in Warp" title="Open in Warp">
-              &gt;_
-            </a>
-          )}
-          {head.vscode && (
-            <a className="btn sm" href={head.vscode} aria-label="Open in VS Code" title="Open in VS Code">
-              &lt;/&gt;
-            </a>
-          )}
-          <button className="btn sm icon" aria-label="New ticket" title="New ticket" onClick={onNewTicket}>
-            <Plus size={15} aria-hidden="true" />
-          </button>
-          <button className="btn sm icon" aria-label="Documents" title="Documents" onClick={onOpenDocs}>
-            <FileText size={15} aria-hidden="true" />
-          </button>
-          <StateBadge state={session.state} />
-          {/* Icon at every width. The Kill/Dismiss distinction it used to spell out
-              on desktop now rides on `title`/`aria-label` and on `.danger`'s colour —
-              see terminalHeader.ts for which of the two this session gets. */}
-          <button
-            className={`btn sm kill icon${head.killDanger ? " danger" : ""}`}
-            aria-label={head.killLabel}
-            title={head.killLabel}
-            onClick={kill}
-          >
-            <X size={15} aria-hidden="true" />
-          </button>
-        </div>
-      </header>
+    // `docked` is what turns the sidebar from a floating drawer into a column of the row
+    // this element lays out — the two arrangements are entirely a CSS matter, and JS only
+    // has to know which one is on because a docked one resizes the pty (see the re-fit
+    // effect above).
+    <div
+      className={`term-root${kbdOpen ? " kbd" : ""}${sidebar.view.docked ? " docked" : ""}`}
+      ref={rootRef}
+    >
+      {sidebar.view.visible && (
+        <SessionSidebar
+          sessions={sessions}
+          currentId={session.id}
+          view={sidebar.view}
+          onOpen={(id) => { sidebar.dismiss(); onOpenSession(id); }}
+          onTogglePin={sidebar.togglePin}
+          onClose={sidebar.toggle}
+        />
       )}
-      <div ref={holder} className="term-body" />
-      {imgErr && <div className="term-img-err err-text">{imgErr}</div>}
-      <AccessoryBar
-        onSend={send}
-        onInsertText={(t) => termRef.current?.paste(t)}
-        onPickImages={pickImages}
-        onReadScreen={readScreen}
-      />
+      {/* Only the floating arrangement gets one: a docked sidebar takes a column of its
+          own and dims nothing, and a backdrop over a terminal you can still see and type
+          into would be a lie about which of the two has focus. */}
+      {sidebar.view.overlay && (
+        <div className="term-side-backdrop" onClick={sidebar.dismiss} aria-hidden="true" />
+      )}
+      <div className="term-main">
+        {!kbdOpen && (
+        <header className="term-head">
+          <button className="back icon" aria-label="Back" onClick={onBack}>
+            <ChevronLeft size={20} aria-hidden="true" />
+          </button>
+          {/* Deliberately not bound to Escape as well: Esc belongs to claude's TUI, and a
+              terminal that swallows it to close a list is a worse terminal. */}
+          <button
+            className="btn sm icon"
+            aria-label={sidebar.view.visible ? "Hide sessions" : "Show sessions"}
+            title={sidebar.view.visible ? "Hide sessions" : "Show sessions"}
+            aria-expanded={sidebar.view.visible}
+            onClick={sidebar.toggle}
+          >
+            <PanelLeft size={15} aria-hidden="true" />
+          </button>
+          <div className="term-ident">
+            {/* The id is the ticket's name here, so it is what opens the issue on Linear;
+                plain text when there is no url for it (a custom session, or a ticket that
+                has left the open list) — see TicketLink. */}
+            {head.id && <TicketLink id={head.id} url={head.ticketUrl} />}
+            {head.status && <span className="status">{head.status}</span>}
+            {head.title && <span className="title">{head.title}</span>}
+          </div>
+          <div className="term-actions">
+            {/* Open the directory this session runs in — its worktree, or the repo root —
+                in Warp or VS Code. Anchors, not buttons: the browser hands a warp:// /
+                vscode:// url to the OS itself, so there is nothing for Mojito to spawn
+                (see openInApp.ts). They do nothing from a phone, which no page can know
+                in advance, so they are rendered wherever there is a path at all. */}
+            {head.warp && (
+              <a className="btn sm" href={head.warp} aria-label="Open in Warp" title="Open in Warp">
+                &gt;_
+              </a>
+            )}
+            {head.vscode && (
+              <a className="btn sm" href={head.vscode} aria-label="Open in VS Code" title="Open in VS Code">
+                &lt;/&gt;
+              </a>
+            )}
+            <button className="btn sm icon" aria-label="New ticket" title="New ticket" onClick={onNewTicket}>
+              <Plus size={15} aria-hidden="true" />
+            </button>
+            <button className="btn sm icon" aria-label="Documents" title="Documents" onClick={onOpenDocs}>
+              <FileText size={15} aria-hidden="true" />
+            </button>
+            <StateBadge state={session.state} />
+            {/* Icon at every width. The Kill/Dismiss distinction it used to spell out
+                on desktop now rides on `title`/`aria-label` and on `.danger`'s colour —
+                see terminalHeader.ts for which of the two this session gets. */}
+            <button
+              className={`btn sm kill icon${head.killDanger ? " danger" : ""}`}
+              aria-label={head.killLabel}
+              title={head.killLabel}
+              onClick={kill}
+            >
+              <X size={15} aria-hidden="true" />
+            </button>
+          </div>
+        </header>
+        )}
+        <div ref={holder} className="term-body" />
+        {imgErr && <div className="term-img-err err-text">{imgErr}</div>}
+        <AccessoryBar
+          onSend={send}
+          onInsertText={(t) => termRef.current?.paste(t)}
+          onPickImages={pickImages}
+          onReadScreen={readScreen}
+        />
+      </div>
       {docs && (
         <DocsView
           token={token}

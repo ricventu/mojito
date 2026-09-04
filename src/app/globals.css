@@ -716,8 +716,10 @@ button.chip:active { transform: scale(.96); }
   left: 0;
   right: 0;
   height: 100dvh;
+  /* A row, not a column: the sidebar is the first cell of it when docked (RIC-313).
+     `.term-main` is the column everything else used to be laid out in directly. */
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   overscroll-behavior: none;
   /* The top inset lives here and not on `.term-head` because the header is unmounted
      while the keyboard is up (see TerminalView) — on the header it would take the
@@ -729,6 +731,69 @@ button.chip:active { transform: scale(.96); }
   padding-right: var(--sar);
   background: var(--surface);
 }
+
+/* Header, terminal and accessory bar — the column `.term-root` itself used to be.
+   `min-width: 0` for the reason `.term-ident` needs it: without it a flex item refuses
+   to shrink below its content, and the terminal would push a docked sidebar off the
+   left edge of a fixed element that cannot be scrolled back. */
+.term-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* ---- The live-session sidebar (RIC-313) ---- */
+/* Two arrangements of one element, and which is which is entirely CSS's business —
+   see sidebarState.ts for why only the pinned one is allowed to take width off the
+   terminal. Neither transitions: a width animation would finish after the re-fit that
+   follows it, leaving the pty sized against a box that was still moving. */
+.term-side {
+  flex: none; width: 260px; min-width: 0;
+  display: flex; flex-direction: column;
+  background: var(--surface); border-right: 1px solid var(--border);
+}
+/* Floating: over the terminal, inside the safe area. Absolute rather than fixed so it
+   rides `.term-root`'s JS-set height and translate (see keyboardInset.ts) instead of
+   extending under the keyboard on its own. */
+.term-root:not(.docked) .term-side {
+  position: absolute; z-index: 40;
+  top: var(--sat); bottom: 0; left: var(--sal);
+  width: min(280px, 82vw);
+  border-right-color: var(--border-hi);
+  box-shadow: 0 0 24px rgba(0, 0, 0, .5);
+}
+.term-side-backdrop { position: absolute; inset: 0; z-index: 35; background: rgba(0, 0, 0, .5); }
+
+.term-side-head { display: flex; align-items: center; gap: 6px; flex: none;
+  padding: 10px 10px 10px 14px; border-bottom: 1px solid var(--border); }
+.term-side-title { font: 700 12px var(--mono); color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: .06em; }
+/* The list is the only thing that scrolls, and it is what sits on the home indicator. */
+.term-side-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: 8px 8px calc(8px + var(--sab)); display: flex; flex-direction: column; gap: 6px; }
+.term-root.kbd .term-side-list { padding-bottom: 8px; }
+.term-side-empty { margin: 4px 6px; color: var(--text-dim); font-size: 13px; }
+
+/* A real <button>: nothing interactive is nested inside a row, so this needs none of
+   the `tapProps` treatment the board's cards do. */
+.side-item {
+  display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left;
+  padding: 8px 10px; border-radius: var(--r-sm); cursor: pointer;
+  background: var(--surface-hi); border: 1px solid var(--border); color: var(--text);
+  font: inherit;
+}
+.side-item:hover { border-color: var(--border-hi); }
+.side-item:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+/* Where you are. The same lime a selected chip wears, so "current" reads the same way
+   across the app — with aria-current carrying it for anyone not reading colour. */
+.side-item.current { border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent-soft); }
+/* And the one row worth interrupting for, in the board card's own attention gradient. */
+.side-item.attn { border-color: color-mix(in srgb, var(--attn) 45%, var(--border));
+  background: linear-gradient(90deg, var(--attn-bg), var(--surface-hi) 70%); }
+.side-item-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.side-item-label { font: 700 13px var(--mono); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-item-detail { font-size: 12px; line-height: 1.35; color: var(--text-dim);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.side-item-proj { font: 11px var(--mono); color: var(--text-faint);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* The terminal is anchored to the BOTTOM of its box, with the overflow clipped
    at the top.

@@ -280,6 +280,56 @@ Mojito owns the whole lifecycle — there is no external plugin:
   as ASCII rather than icons (see **Icons**): `>_` and `</>` say *terminal* and *code
   editor* in a way two lucide pictograms do not, and being phone-hidden they never sit
   next to the icon row anyway.
+- **Session sidebar**: the terminal carries a collapsible list of the live sessions
+  (RIC-313), so that switching between the several running at once does not mean backing
+  out to the board and finding the card again. It is **only in the terminal**: the board
+  *is* a list of sessions — every one of them is already a card there — and a second copy
+  of the same names beside it would be furniture, where the terminal is the one view from
+  which the other sessions are unreachable without leaving. Deliberately **unfiltered**,
+  since the session you need to get back to is exactly the one a status chip might be
+  hiding, and a terminal url is built clean of the board's filters anyway.
+  `sidebarSessions` (`src/lib/sidebarSessions.ts`) is what it lists — the active states
+  (`isActiveSession`) plus **the open session whatever its state**, because a work session
+  sits at "done" for the whole of the QA gate and a sidebar that highlights nothing there
+  is claiming the terminal you are reading does not exist. Ordered `needs-input` first and
+  then `orderSessions`' own newest-first: a session that starts waiting for an answer moves
+  to the top under you, which is the point. `sidebarItem` is its row model, in
+  `terminalHeadModel`'s shape and for its reasons — the four kinds carry very different
+  metadata, so every field is normalised to a string and the component branches on
+  emptiness alone.
+  The pin is `sidebarView` (`src/lib/sidebarState.ts`), whose one asymmetry carries the
+  whole design: **docked only when pinned, an overlay every other time it is on screen**.
+  Docking takes a column off the terminal, so the pty is resized and tmux repaints
+  claude's entire TUI — worth paying once for a sidebar you asked to keep, and not at all
+  for a peek at a list, so an unpinned one floats and costs the geometry nothing. That is
+  also why exactly one thing about it reaches JS: `docked` joins `kbdOpen` in the deps of
+  the re-fit effect TerminalView already had for showing and hiding its header, and which
+  arrangement is which is otherwise entirely CSS's business (`.term-root.docked`).
+  Neither arrangement transitions its width — an animation would finish *after* the
+  re-fit that follows it, leaving the pty sized against a box that was still moving.
+  The keyboard hides it outright, pinned or not, on the signal that unmounts the header
+  and for the same reason: ~13 visible rows on a phone cannot spare a column either.
+  Below `SIDEBAR_DOCK_QUERY` (900px) there is no room to dock, so the pin control is not
+  offered at all rather than offered and inert. One toggle in the header, meaning "is it
+  on screen?", and collapsing a docked sidebar drops the pin with it — leaving it set
+  would simply re-dock the thing the next time it was opened. Unpinning goes the other
+  way and leaves it up as an overlay, since the pin says *how* it is shown, not whether.
+  Deliberately **not** bound to Escape: Esc belongs to claude's TUI, and a terminal that
+  swallows it to close a list is a worse terminal — the backdrop, the toggle and the
+  sidebar's own ✕ are the ways out. The pin is remembered in `localStorage`
+  (`mojito-sidebar-pinned`, best effort like `filterMemory`'s) and **not** in the url,
+  unlike everything RIC-204 moved into the address bar: which view is open and how the
+  board is filtered are what a link *means*, where whether this browser keeps a column of
+  sessions open is this browser's preference. `useSidebar` is the glue half — storage,
+  `matchMedia`, and the transient open flag — and reads both initial values in `useState`
+  initialisers rather than a mount effect, which would render one frame unpinned and then
+  re-render into a dock, spending a pty resize on nothing. That is only safe because
+  TerminalView is loaded `ssr: false`; do not lift the hook into a component that is not.
+  Two placements to know: `.term-root` is now a **row** (`.term-main` is the column it
+  used to be directly), and the floating arrangement is positioned against that element's
+  padding box — whose edges are the screen's — so it pays `--sat`/`--sal` itself and its
+  scrolling list pays `--sab` on `.acc`'s terms (`tests/client/safeArea.test.ts` covers
+  both, as it does every other surface that touches an edge).
 - **Terminal geometry**: the pty's size is the *terminal's* size, always — one invariant,
   and `syncGeometry` (`src/lib/terminalFit.ts`) is the only place it is maintained. It
   separates two things that used to be one early return. **Re-fitting** (re-measuring

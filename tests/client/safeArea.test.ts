@@ -97,4 +97,19 @@ describe("surfaces that touch a screen edge", () => {
   it("drops the terminal's bottom inset while the keyboard is up", () => {
     expect(block(".term-root.kbd .acc")).toMatch(/padding-bottom:\s*8px/);
   });
+
+  // The docked sidebar is laid out *inside* `.term-root`'s padding and so pays nothing
+  // of its own. The floating one is positioned against that element's padding box, whose
+  // edges are the screen's — so it has to put the top and left insets back itself, and
+  // its scrolling list is then what sits on the home indicator, on `.acc`'s terms.
+  it("insets the floating sidebar off the notch", () => {
+    const body = block(".term-root:not(.docked) .term-side");
+    expect(body).toContain("--sat");
+    expect(body).toContain("--sal");
+  });
+
+  it("clears the home indicator with the sidebar's list, and not while the keyboard is up", () => {
+    expect(block(".term-side-list")).toContain("--sab");
+    expect(block(".term-root.kbd .term-side-list")).toMatch(/padding-bottom:\s*8px/);
+  });
 });
