@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     registry: getRegistry(),
     bus: getBus(),
     readResult: (sessionId) => readSessionResult(cfg.stateDir, sessionId),
-    moveToQa: (ticket) => setIssueStatus(cfg.linearApiKey, ticket, "To QA"),
+    moveToQa: (ticket) => setIssueStatus(cfg.linearApiKey, ticket, "In Review"),
     moveToDone: (ticket) => setIssueStatus(cfg.linearApiKey, ticket, "Done"),
     clearResult: (sessionId) => clearSessionResult(cfg.stateDir, sessionId),
     readTranscriptTitle,

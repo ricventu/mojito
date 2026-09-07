@@ -21,7 +21,7 @@ export function statusSlug(status: string): string {
 
 // One id covers every status a work session can be launched from. Two reasons, both
 // load-bearing: a launch-time board move (Backlog/Todo -> In Progress) must not change the
-// session's tmux name mid-flight, and a session relaunched while the ticket sits at To QA
+// session's tmux name mid-flight, and a session relaunched while the ticket sits at In Review
 // (its predecessor died) must take the id that predecessor had. Otherwise the duplicate
 // guard and the "open running session" lookup each see a different session for one ticket.
 const WORK_ID_STATES = [...WORK_STATES, ...GATE_STATES];
@@ -53,7 +53,7 @@ export function stackSessionName(slug: string): string {
 
 // The conflict-resolution session Mojito launches when the QA-approve merge hits a
 // conflict. Its own id so it never collides with the ticket's work session (which may
-// still be registered) nor with the To QA gate id.
+// still be registered) nor with the In Review gate id.
 export function conflictSessionName(ticket: string): string {
   validateTicket(ticket);
   return `mojito-${ticket}-conflict`;

@@ -32,14 +32,14 @@ describe("mapHook", () => {
     expect(o.alert).toBeNull();
   });
 
-  it("stop when ready is done, with a ready-for-QA message", () => {
+  it("stop when ready is done, with a ready-for-review message", () => {
     const o = mapHook("Stop", true, "running");
     expect(o.state).toBe("done");
     expect(o.alert?.kind).toBe("stage-done");
-    expect(o.alert?.message).toBe("ready for QA");
+    expect(o.alert?.message).toBe("ready for review");
   });
 
-  it("stop when not ready for QA means claude is waiting", () => {
+  it("stop when not ready for review means claude is waiting", () => {
     const o = mapHook("Stop", false, "running");
     expect(o.state).toBe("needs-input");
     expect(o.alert?.kind).toBe("needs-input");
@@ -49,7 +49,7 @@ describe("mapHook", () => {
     expect(mapHook("SessionEnd", false, "running").state).toBe("failed");
     const o = mapHook("SessionEnd", true, "running");
     expect(o.state).toBe("done");
-    expect(o.alert?.message).toBe("ready for QA");
+    expect(o.alert?.message).toBe("ready for review");
   });
 
   // RIC-117 follow-up: terminal states (done/failed) are sticky against passive idle

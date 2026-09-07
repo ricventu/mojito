@@ -3,9 +3,9 @@ import { join } from "node:path";
 
 // What a ticket session reports back at the end of a round. Written by the spawned session
 // (the launch prompt names this exact path); read by the Stop/SessionEnd hook. It exists only
-// to move the ticket's status: "ready-for-qa" (work sessions) moves it to To QA, "merged"
+// to move the ticket's status: "ready-for-qa" (work sessions) moves it to In Review, "merged"
 // (only the merge-fix session, finishing an already-approved merge) moves it to Done. Anything
-// a session wants to *say* it says in its terminal, which stays open for the human at To QA.
+// a session wants to *say* it says in its terminal, which stays open for the human at In Review.
 export interface SessionResult {
   outcome: "ready-for-qa" | "merged";
 }

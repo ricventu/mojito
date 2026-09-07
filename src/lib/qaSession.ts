@@ -1,4 +1,4 @@
-// Which session affordances the To QA gate offers, given the ticket's work session. Pure so it
+// Which session affordances the In Review gate offers, given the ticket's work session. Pure so it
 // can be tested without a render harness, following qaGateModel and terminalHeadModel.
 
 export interface QaSessionModel {

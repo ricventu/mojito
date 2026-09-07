@@ -188,10 +188,10 @@ describe("liveStatuses", () => {
 
   it("maps each identifier to the ticket's current status", () => {
     const map = liveStatuses([
-      ticket({ identifier: "RIC-1", statusName: "To QA" }),
+      ticket({ identifier: "RIC-1", statusName: "In Review" }),
       ticket({ identifier: "RIC-2", statusName: "In Progress" }),
     ]);
-    expect(map.get("RIC-1")).toBe("To QA");
+    expect(map.get("RIC-1")).toBe("In Review");
     expect(map.get("RIC-2")).toBe("In Progress");
     expect(map.get("RIC-3")).toBeUndefined();
   });

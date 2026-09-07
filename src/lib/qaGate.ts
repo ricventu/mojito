@@ -1,4 +1,4 @@
-// Which verdicts the To QA gate offers, given what the server says is left to merge. Pure so it
+// Which verdicts the In Review gate offers, given what the server says is left to merge. Pure so it
 // can be tested without a render harness, following terminalHeadModel and holdsSheetOpen.
 export type MergeState = "checking" | "nothing-to-merge" | "mergeable";
 

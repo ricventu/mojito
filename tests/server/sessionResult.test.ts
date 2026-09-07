@@ -18,7 +18,7 @@ describe("sessionResult", () => {
     expect(readSessionResult(stateDir, "s3")).toEqual({ outcome: "merged" });
   });
   // The result file is a status signal, nothing more: a session with something to say says it
-  // in its terminal, which stays open at To QA.
+  // in its terminal, which stays open at In Review.
   it("drops a notes field instead of carrying it", () => {
     const stateDir = dir();
     writeFileSync(resultPath(stateDir, "s4"), JSON.stringify({ outcome: "ready-for-qa", notes: "built X" }));

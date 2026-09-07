@@ -39,11 +39,11 @@ export function mapHook(event: HookEventName, ready: boolean, currentState: Sess
       return { state: "running", alert: null };
     case "Stop":
       return ready
-        ? { state: "done", alert: { kind: "stage-done", message: "ready for QA" } }
+        ? { state: "done", alert: { kind: "stage-done", message: "ready for review" } }
         : { state: "needs-input", alert: { kind: "needs-input", message: "claude is waiting for you" } };
     case "SessionEnd":
       return ready
-        ? { state: "done", alert: { kind: "stage-done", message: "ready for QA" } }
+        ? { state: "done", alert: { kind: "stage-done", message: "ready for review" } }
         : { state: "failed", alert: { kind: "failed", message: "session ended unexpectedly" } };
   }
 }

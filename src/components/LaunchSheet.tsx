@@ -68,10 +68,10 @@ export default function LaunchSheet(
   // read of the ticket's status in this component goes through it, so a moved ticket
   // launches with the status it now has rather than the one it was picked at.
   const [status, setStatus] = useState(ticket.statusName);
-  const isToQa = status === "To QA";
-  // A To QA launch is a work session (Task 7 gives it the work id), so it takes the work
+  const isInReview = status === "In Review";
+  // An In Review launch is a work session (Task 7 gives it the work id), so it takes the work
   // profile rather than the app-wide fallback.
-  const stageKey = isToQa ? "In Progress" : status;
+  const stageKey = isInReview ? "In Progress" : status;
   const { defaults } = useStageDefaults(token);
   // Pre-fill the model + effort optimal for this ticket's stage (overridable via the selectors).
   const [model, setModel] = useState<string>(() => resolveModel(stageKey));
@@ -113,7 +113,7 @@ export default function LaunchSheet(
   // Ask the server whether anything is left to merge before offering to merge it. A failed or
   // unreachable check degrades to the ordinary approve buttons — never to a dead gate.
   useEffect(() => {
-    if (!isToQa) return;
+    if (!isInReview) return;
     let live = true;
     (async () => {
       try {
@@ -126,7 +126,7 @@ export default function LaunchSheet(
       }
     })();
     return () => { live = false; };
-  }, [isToQa, token, ticket.identifier, ticket.project]);
+  }, [isInReview, token, ticket.identifier, ticket.project]);
   // One state for all three launch buttons, mirroring how a single verdictPending covers
   // the three verdict buttons. The ticket launch is the slow one: its POST runs a Linear
   // fetch and then downloads the ticket's assets before it answers, seconds during which
@@ -149,14 +149,14 @@ export default function LaunchSheet(
   const existing = sessions.find((s) => s.id === existingId);
   // The single active-state definition, not a fourth hand-copied list of states.
   const existingActive = existing != null && isActiveSession(existing);
-  // What the To QA branch offers for the work session: open it while it is registered, and
+  // What the In Review branch offers for the work session: open it while it is registered, and
   // start a replacement whenever it is not alive. start() clears a dead registration first,
   // so both can be on screen at once.
   const qaSession = qaSessionModel({ registered: existing != null, active: existingActive });
   // Null for every status but the manual pair, which is how the button hides itself.
   const moveTarget = manualMoveTarget(status);
 
-  // The To QA verdict is resolved server-side: approve merges (or opens an MR) with no
+  // The In Review verdict is resolved server-side: approve merges (or opens an MR) with no
   // session at all, and only a merge conflict spawns one. projectName and title are sent
   // because the server needs them to locate the worktree and to seed a fix session.
   const submitVerdict = async (arg: "approve-local" | "approve-mr" | "mark-done") => {
@@ -467,7 +467,7 @@ export default function LaunchSheet(
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <h3><TicketLink id={ticket.identifier} url={ticket.url} /> <span className="chip">{status}</span></h3>
         {ticket.title && <p className="sheet-title">{ticket.title}</p>}
-        {isToQa ? (
+        {isInReview ? (
           <>
             <QaVerdictButtons
               pending={verdictPending}
@@ -476,8 +476,8 @@ export default function LaunchSheet(
               onMarkDone={() => submitVerdict("mark-done")}
             />
             {err && <p className="err-text">{err}</p>}
-            {/* QA rework happens in the session that built the branch, so the sheet's job at
-                To QA is to get you into it — or to replace it if it died. */}
+            {/* Review rework happens in the session that built the branch, so the sheet's job
+                at In Review is to get you into it — or to replace it if it died. */}
             {qaSession.open && existing && (
               <button className="btn ghost block" style={{ marginTop: 12 }} onClick={() => onOpen(existing)}>
                 Open session (<StateBadge state={existing.state} />)
@@ -528,7 +528,7 @@ export default function LaunchSheet(
           {mine ? "Unassign" : "Assign to me"}
         </button>
         <button className="btn ghost block" style={{ marginTop: 12 }} onClick={onOpenDocs}>Docs</button>
-        {!isToQa && err && <p className="err-text">{err}</p>}
+        {!isInReview && err && <p className="err-text">{err}</p>}
       </div>
     </div>
   );

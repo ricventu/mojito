@@ -26,11 +26,11 @@ export type QaVerdictResult =
   | { done: "marked-done" };
 
 /**
- * Resolve a To QA verdict. Approve runs the server-side merge (zero tokens on the clean
+ * Resolve an In Review verdict. Approve runs the server-side merge (zero tokens on the clean
  * path) and only launches a session when that merge hits a conflict. mark-done skips git
  * entirely for a branch that already landed outside Mojito (or never took one), writing
  * Done straight after re-checking that there is truly nothing left to merge. There is no
- * reject: a ticket that fails QA is reworked by talking to the session that built it, which
+ * reject: a ticket that fails review is reworked by talking to the session that built it, which
  * is still alive in tmux — Mojito is not in that loop at all.
  */
 export async function resolveQaVerdict(
@@ -58,7 +58,7 @@ export async function resolveQaVerdict(
     case "conflict":
     case "error": {
       // The merge is approved but could not complete on its own (conflict, diverged
-      // default branch, dirty worktree, ...). The ticket stays at To QA and the
+      // default branch, dirty worktree, ...). The ticket stays at In Review and the
       // merge-fix session finishes the job — its "merged" result moves it to Done.
       const sessionId = await deps.launchMergeFix(outcome.detail, mode);
       return { done: "fix-session", sessionId, detail: outcome.detail };

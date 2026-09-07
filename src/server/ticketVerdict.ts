@@ -16,7 +16,7 @@ export interface TicketVerdictDeps {
 }
 
 /**
- * Resolve a To QA verdict keyed by ticket (no session required). Validates the arg and the
+ * Resolve an In Review verdict keyed by ticket (no session required). Validates the arg and the
  * live status, delegates the merge/launch work to resolveVerdict, then clears the ticket's
  * work session if it is already dead. On any failure that cleanup is skipped so the caller
  * can retry.
@@ -29,7 +29,7 @@ export async function resolveTicketVerdict(
   if (!QA_ARGS.includes(arg as QaArg)) return { ok: false, code: 400, error: "invalid arg" };
 
   const status = await deps.getIssueStatus(ticket);
-  if (status !== "To QA") return { ok: false, code: 409, error: "ticket is not at To QA" };
+  if (status !== "In Review") return { ok: false, code: 409, error: "ticket is not at In Review" };
 
   let result: QaVerdictResult;
   try {

@@ -40,9 +40,9 @@ describe("sessionStatuses", () => {
   it("surfaces custom sessions as the CUSTOM_STATUS bucket, sorted last", () => {
     const sessions = [
       session({ kind: "custom", launchStatus: "" }),
-      session({ launchStatus: "To QA" }),
+      session({ launchStatus: "In Review" }),
     ];
-    expect(sessionStatuses(sessions)).toEqual(["To QA", CUSTOM_STATUS]);
+    expect(sessionStatuses(sessions)).toEqual(["In Review", CUSTOM_STATUS]);
   });
 
   it("collapses multiple custom sessions into a single CUSTOM_STATUS entry", () => {
@@ -60,17 +60,17 @@ describe("sessionStatuses", () => {
     const sessions = [
       session({ kind: "intake", launchStatus: "" }),
       session({ kind: "custom", launchStatus: "" }),
-      session({ launchStatus: "To QA" }),
+      session({ launchStatus: "In Review" }),
     ];
-    expect(sessionStatuses(sessions)).toEqual(["To QA", CUSTOM_STATUS, INTAKE_STATUS]);
+    expect(sessionStatuses(sessions)).toEqual(["In Review", CUSTOM_STATUS, INTAKE_STATUS]);
   });
 
   it("surfaces shell sessions as the TERMINAL_STATUS bucket, sorted last", () => {
     const sessions = [
       session({ kind: "shell", launchStatus: "" }),
-      session({ launchStatus: "To QA" }),
+      session({ launchStatus: "In Review" }),
     ];
-    expect(sessionStatuses(sessions)).toEqual(["To QA", TERMINAL_STATUS]);
+    expect(sessionStatuses(sessions)).toEqual(["In Review", TERMINAL_STATUS]);
   });
 
   it("sorts unknown statuses last with alphabetical tie-break", () => {
@@ -86,7 +86,7 @@ describe("sessionStatuses", () => {
 describe("filterSessions", () => {
   const sessions = [
     session({ id: "a", ticket: "RIC-1", launchStatus: "In Progress", projectName: "Mojito", title: "Alpha" }),
-    session({ id: "b", ticket: "RIC-2", launchStatus: "To QA", projectName: "Lime", title: "Beta" }),
+    session({ id: "b", ticket: "RIC-2", launchStatus: "In Review", projectName: "Lime", title: "Beta" }),
     session({ id: "c", ticket: "RIC-3", launchStatus: "In Progress", projectName: null, title: "Gamma" }),
   ];
 
@@ -143,15 +143,15 @@ describe("filterSessions", () => {
   it("filters by query across ticket, title, status, model and message", () => {
     expect(filterSessions(sessions, { query: "beta", project: [], status: null }).map((s) => s.id)).toEqual(["b"]);
     expect(filterSessions(sessions, { query: "ric-3", project: [], status: null }).map((s) => s.id)).toEqual(["c"]);
-    expect(filterSessions(sessions, { query: "to qa", project: [], status: null }).map((s) => s.id)).toEqual(["b"]);
+    expect(filterSessions(sessions, { query: "in review", project: [], status: null }).map((s) => s.id)).toEqual(["b"]);
   });
 
   it("combines criteria with AND semantics", () => {
     // status matches a & c, project narrows to Mojito → only a
     const out = filterSessions(sessions, { query: "", project: ["Mojito"], status: "In Progress" });
     expect(out.map((s) => s.id)).toEqual(["a"]);
-    // no session is both To QA and in Mojito
-    expect(filterSessions(sessions, { query: "", project: ["Mojito"], status: "To QA" })).toEqual([]);
+    // no session is both In Review and in Mojito
+    expect(filterSessions(sessions, { query: "", project: ["Mojito"], status: "In Review" })).toEqual([]);
   });
 
   it("does not throw on sessions missing optional fields", () => {
@@ -161,10 +161,10 @@ describe("filterSessions", () => {
 });
 
 describe("live ticket statuses", () => {
-  const live = new Map([["RIC-1", "To QA"]]);
+  const live = new Map([["RIC-1", "In Review"]]);
 
   it("reads a ticket session's status off its ticket, not off the stale launchStatus", () => {
-    expect(sessionStatus(session({ ticket: "RIC-1", launchStatus: "Todo" }), live)).toBe("To QA");
+    expect(sessionStatus(session({ ticket: "RIC-1", launchStatus: "Todo" }), live)).toBe("In Review");
   });
 
   it("falls back to launchStatus when the ticket is not among the known ones", () => {
@@ -179,13 +179,13 @@ describe("live ticket statuses", () => {
 
   it("derives the status chips from the live status", () => {
     const sessions = [session({ ticket: "RIC-1", launchStatus: "Todo" })];
-    expect(sessionStatuses(sessions, live)).toEqual(["To QA"]);
+    expect(sessionStatuses(sessions, live)).toEqual(["In Review"]);
   });
 
   it("drops a session whose launch status matches the filter but whose ticket has moved on", () => {
     const sessions = [session({ id: "a", ticket: "RIC-1", launchStatus: "Todo" })];
     expect(filterSessions(sessions, { query: "", project: [], status: "Todo" }, live)).toEqual([]);
-    expect(filterSessions(sessions, { query: "", project: [], status: "To QA" }, live).map((s) => s.id))
+    expect(filterSessions(sessions, { query: "", project: [], status: "In Review" }, live).map((s) => s.id))
       .toEqual(["a"]);
   });
 });

@@ -336,7 +336,7 @@ const baseConflictReq = {
 };
 
 describe("launchMergeFixSession", () => {
-  it("launches a ticket-kind session at To QA under the -conflict id, seeded with the merge-fix prompt", async () => {
+  it("launches a ticket-kind session at In Review under the -conflict id, seeded with the merge-fix prompt", async () => {
     let command = "";
     const d = deps({ newSession: vi.fn(async (_n: string, _c: string, cmd: string) => { command = cmd; }) });
     const res = await launchMergeFixSession(baseConflictReq, d);
@@ -344,7 +344,7 @@ describe("launchMergeFixSession", () => {
     const meta = (res as { ok: true; meta: SessionMeta }).meta;
     expect(meta).toMatchObject({
       kind: "ticket", id: "mojito-RIC-120-conflict", ticket: "RIC-120",
-      launchStatus: "To QA", state: "starting", cwd: "/code/lime",
+      launchStatus: "In Review", state: "starting", cwd: "/code/lime",
     });
     expect(meta.id.endsWith("-conflict")).toBe(true);
     // The merge-fix prompt, not the work prompt, and no lime slash command.
@@ -357,12 +357,12 @@ describe("launchMergeFixSession", () => {
     expect(command).not.toContain("/lime-");
   });
 
-  it("writes a launch context at To QA carrying the description and no labels", async () => {
+  it("writes a launch context at In Review carrying the description and no labels", async () => {
     const d = deps();
     await launchMergeFixSession(baseConflictReq, d);
     const p = join(dir, "context", "mojito-RIC-120-conflict.json");
     expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({
-      identifier: "RIC-120", statusName: "To QA", title: "some ticket title",
+      identifier: "RIC-120", statusName: "In Review", title: "some ticket title",
       project: "Mojito", labels: [], description: "Let the user do the thing.",
     });
   });

@@ -78,7 +78,7 @@ describe("favoriteFilters", () => {
 
   it("round-trips every filter, the Backlog flag included", () => {
     const all: ListFilters = {
-      query: "auth bug", project: ["Mojito", "Fornace"], status: "To QA",
+      query: "auth bug", project: ["Mojito", "Fornace"], status: "In Review",
       mine: true, sessionsOnly: true, backlog: true,
     };
     expect(favoriteFilters(addFavorite([], "All", all)[0])).toEqual(all);

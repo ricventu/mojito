@@ -3,7 +3,7 @@
 // Everything else is a session-level decision, exactly as in a hand-started session: which
 // skills, how much design up front, and whether the work is worth a worktree and a branch at
 // all (a one-line fix is not). A ticket that ends up with no branch of its own is not a
-// problem for the QA gate — it answers "nothing to merge" and offers Mark Done.
+// problem for the review gate — it answers "nothing to merge" and offers Mark Done.
 //
 // The prompt says NOTHING about how the session may use Linear, deliberately (RIC-184).
 // It used to ban Linear outright, which killed the follow-up tickets that surface
@@ -19,8 +19,8 @@ so you never have to spend tokens re-reading it.
 {{ASSETS_PARAGRAPH}}Result file — REQUIRED. As the very last action of a round, write {{RESULT_PATH}}
 with exactly this JSON object:
   {"outcome": "ready-for-qa"}
-It is the only signal Mojito has to move {{TICKET}} to To QA. Your session stays
-alive afterwards: when the human comes back with QA feedback, work it and write the
+It is the only signal Mojito has to move {{TICKET}} to In Review. Your session stays
+alive afterwards: when the human comes back with review feedback, work it and write the
 file again at the end of that round.`;
 
 // Interpolated only when the launch actually downloaded something (see buildWorkPrompt).

@@ -3,7 +3,7 @@ import type { MergeOutcome } from "@/server/merge";
 
 // vi.mock is hoisted above the imports, so every spy has to be hoisted with it.
 const h = vi.hoisted(() => ({
-  getIssueStatus: vi.fn(async () => "To QA"),
+  getIssueStatus: vi.fn(async () => "In Review"),
   setIssueStatus: vi.fn(async () => {}),
   // attachments typed explicitly, not left to infer as never[], so a later
   // mockImplementation can hand back a non-empty attachments array.
@@ -79,7 +79,7 @@ const approve = { arg: "approve-local", projectName: "Mojito", title: "Some tick
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.getIssueStatus.mockImplementation(async () => "To QA");
+  h.getIssueStatus.mockImplementation(async () => "In Review");
   h.getIssueContent.mockImplementation(async () => ({ description: "the ticket description", attachments: [] }));
   h.downloadLinearAsset.mockImplementation(async () => ({ bytes: Buffer.from([1]), contentType: "image/png" }));
   h.prepareTicketAssets.mockImplementation(async (input) => ({ assets: [], attachments: input.attachments }));
@@ -112,7 +112,7 @@ describe("/api/tickets/[id]/verdict", () => {
     expect(h.mergeTicketBranch).not.toHaveBeenCalled();
   });
 
-  it("409 when the ticket is not at To QA", async () => {
+  it("409 when the ticket is not at In Review", async () => {
     h.getIssueStatus.mockImplementation(async () => "In Progress");
     expect((await POST(req(approve), params())).status).toBe(409);
     expect(h.mergeTicketBranch).not.toHaveBeenCalled();

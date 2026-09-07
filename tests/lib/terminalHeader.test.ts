@@ -80,8 +80,8 @@ describe("terminalHeadModel: live status", () => {
   // by hand in Linear, which Mojito has no event for. A live status passed in from the
   // polled ticket list always wins over the snapshot.
   it("prefers a live status over the launch-time snapshot", () => {
-    const m = terminalHeadModel(base, { statusName: "To QA" });
-    expect(m.status).toBe("To QA");
+    const m = terminalHeadModel(base, { statusName: "In Review" });
+    expect(m.status).toBe("In Review");
   });
 
   it("falls back to the snapshot when no live status is available (ticket not in the open list, or a custom/shell session)", () => {

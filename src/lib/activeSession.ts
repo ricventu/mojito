@@ -22,7 +22,7 @@ export function isActiveState(state: SessionState): boolean {
  * four states out for itself.
  *
  * Not what the Sessions filter keys on: "done" means the stage was handed off, not that
- * the tmux is gone, so this would hide a To QA ticket's still-live work session. See
+ * the tmux is gone, so this would hide an In Review ticket's still-live work session. See
  * buildUnifiedRows.
  */
 export function isActiveSession(s: SessionMeta): boolean {

@@ -4,7 +4,7 @@ import { QaVerdictError } from "@/server/qaVerdict";
 
 function deps(over: Record<string, unknown> = {}) {
   return {
-    getIssueStatus: vi.fn(async () => "To QA"),
+    getIssueStatus: vi.fn(async () => "In Review"),
     resolveVerdict: vi.fn(async () => ({ done: "merged", commit: "abc1234" }) as const),
     retireStaleSession: vi.fn(async () => {}),
     ...over,
@@ -12,7 +12,7 @@ function deps(over: Record<string, unknown> = {}) {
 }
 
 describe("resolveTicketVerdict", () => {
-  it("approve-local at To QA resolves the verdict, returns its result, then clears a stale session", async () => {
+  it("approve-local at In Review resolves the verdict, returns its result, then clears a stale session", async () => {
     const d = deps();
     const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
     expect(res).toEqual({ ok: true, result: { done: "merged", commit: "abc1234" } });
@@ -26,10 +26,10 @@ describe("resolveTicketVerdict", () => {
     expect(res).toEqual({ ok: true, result: { done: "mr-created", url: "https://x/mr/1" } });
   });
 
-  it("returns 409 and touches nothing when the ticket is not at To QA", async () => {
+  it("returns 409 and touches nothing when the ticket is not at In Review", async () => {
     const d = deps({ getIssueStatus: vi.fn(async () => "In Progress") });
     const res = await resolveTicketVerdict({ ticket: "RIC-110", arg: "approve-local" }, d);
-    expect(res).toEqual({ ok: false, code: 409, error: "ticket is not at To QA" });
+    expect(res).toEqual({ ok: false, code: 409, error: "ticket is not at In Review" });
     expect(d.resolveVerdict).not.toHaveBeenCalled();
     expect(d.retireStaleSession).not.toHaveBeenCalled();
   });

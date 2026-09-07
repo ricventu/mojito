@@ -13,8 +13,8 @@ const session = (filters: Partial<ListFilters> = {}): AppLocation => ({
 
 describe("seedFilters", () => {
   it("restores the remembered filters when the board opens bare", () => {
-    expect(seedFilters(list(), "project=Mojito&status=To+QA")).toEqual({
-      ...NO_FILTERS, project: ["Mojito"], status: "To QA",
+    expect(seedFilters(list(), "project=Mojito&status=In+Review")).toEqual({
+      ...NO_FILTERS, project: ["Mojito"], status: "In Review",
     });
   });
 

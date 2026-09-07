@@ -2,7 +2,7 @@
 
 Mojito is a Next.js + TypeScript app (GUI + local server) that manages Linear tickets
 per project and runs them through a collapsed lifecycle:
-`Backlog/Todo → In Progress → To QA → Done`.
+`Backlog/Todo → In Progress → In Review → Done`.
 
 Mojito owns the whole lifecycle — there is no external plugin:
 
@@ -158,7 +158,7 @@ Mojito owns the whole lifecycle — there is no external plugin:
   `<stateDir>/results/<id>.json` (`{outcome: "ready-for-qa" | "merged"}`), a bare status
   signal with no notes. The Stop hook reads it (`src/server/hookHandler.ts`) and Mojito
   moves the status.
-- **QA gate**: approve runs the server-side rebase+merge (`src/server/merge.ts`,
+- **Review gate**: approve runs the server-side rebase+merge (`src/server/merge.ts`,
   zero tokens on the clean path; a Claude session only on conflict). When there is
   nothing to merge — the branch already landed outside Mojito, or the checkout holding
   the work sits on the default branch (`hasNothingToMerge` in
@@ -166,8 +166,11 @@ Mojito owns the whole lifecycle — there is no external plugin:
   Done straight and runs no git. That answer always comes from git: anything undecidable
   (no resolvable main checkout, a failing git call) answers "there IS something to merge",
   because a wrong `true` writes Done over unmerged commits. There is no reject:
-  a ticket that fails QA is reworked by typing into its still-live work session, and the
-  ticket parks at To QA meanwhile.
+  a ticket that fails review is reworked by typing into its still-live work session, and
+  the ticket parks at In Review meanwhile. The status is `In Review`; the code's own name
+  for the gate is still QA (`qaGate.ts`, `qaVerdict.ts`, `QA_ARGS`, `moveToQa`) and so is
+  the result-file literal `ready-for-qa`, which is a wire contract with a prompt already
+  handed to running sessions — renaming it would make an in-flight hand-off unreadable.
 - **Startup stall**: every state Mojito shows comes from a Claude Code hook, and the first
   of them (SessionStart) only fires once claude has booted — so anything that blocks it
   *before* boot leaves no hook at all and the session pinned at its launch-time "starting"
@@ -188,7 +191,7 @@ Mojito owns the whole lifecycle — there is no external plugin:
   session arms nothing: it fires no hooks ever, which is why it launches at "running".
 - **Session lifetime**: Mojito never ends a session by itself. The only path that closes
   one is an explicit user action — `DELETE /api/sessions/[id]` → `closeSession`, behind the
-  Kill button. Automatic paths (a QA verdict, a relaunch from the sheet) may drop only the
+  Kill button. Automatic paths (a review verdict, a relaunch from the sheet) may drop only the
   *registration* of a session whose tmux is already gone, via `retireDeadSession`
   (`src/server/retireSession.ts`); a launch that finds the tmux name still held answers 409
   and tells the user to kill it first. This replaced `supersedeSession`, which closed the
@@ -250,14 +253,14 @@ Mojito owns the whole lifecycle — there is no external plugin:
 - **Status model**: `src/server/statusModel.ts` is authoritative; `src/lib/status.ts`
   mirrors it for presentation and a sync-guard test ties them together. Work-phase
   sessions share a single tmux id `mojito-<ticket>-work` across Backlog/Todo/In
-  Progress/To QA (see `tmuxName` in `src/server/sessionKey.ts`), so a session relaunched
+  Progress/In Review (see `tmuxName` in `src/server/sessionKey.ts`), so a session relaunched
   while the ticket sits at the gate takes its predecessor's id; the conflict session is
   `mojito-<ticket>-conflict`. A session's `launchStatus` is written once at launch and
   never rewritten, so the list never filters or groups a session on it while its ticket
   can answer: `liveStatuses` (`src/lib/ticketFilter.ts`) maps identifier → current status
   off the *unscoped* ticket list, and `sessionStatus`/`filterSessions`/`mergedStatuses`
   take it. Without that, a status chip manufactured orphans — a Todo chip dropped a
-  ticket already at To QA while keeping its session, which then had nothing to nest under
+  ticket already at In Review while keeping its session, which then had nothing to nest under
   and surfaced alone in "No ticket". `launchStatus` stays the fallback for a session whose
   ticket was never fetched or is gone, which is the case the loose group exists for.
 - **Terminal header**: `terminalHeadModel` (`src/lib/terminalHeader.ts`) is everything the
@@ -315,7 +318,7 @@ Mojito owns the whole lifecycle — there is no external plugin:
   with a registration**, and emphatically *not* the ones `isActiveSession` calls active —
   the mistake it shipped with, and worth keeping written down. A ticket session goes to
   `done` on every Stop once its result file says ready-for-qa (`hookHandler`), and sits
-  there for the whole of the QA gate with its tmux up, because Mojito never ends a session
+  there for the whole of the review gate with its tmux up, because Mojito never ends a session
   and that one is the rework channel the gate depends on. Filtering on the state hid
   exactly the session a switcher exists to switch to, and made the row flicker in and out
   at every turn — reported as two windows disagreeing about the count, since each had
@@ -777,7 +780,7 @@ Mojito owns the whole lifecycle — there is no external plugin:
   `manualMoveTarget` in `src/lib/status.ts` is its presentation mirror, tied to it by
   `tests/lib/status.test.ts`. Validated against that pair rather than `KNOWN_STATUSES`
   because every other transition in the lifecycle is Mojito's own — a launch writes In
-  Progress, the result file writes To QA, a verdict writes Done — and each carries
+  Progress, the result file writes In Review, a verdict writes Done — and each carries
   preconditions a bare status name cannot express: an open target here would be a way to
   write Done over unmerged work. Backlog and Todo are the pair nothing moves between on
   its own, which is why they are the pair offered by hand. The button lives in the launch

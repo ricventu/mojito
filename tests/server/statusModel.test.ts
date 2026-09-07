@@ -4,7 +4,7 @@ import { WORK_STATES, GATE_STATES, TERMINAL_STATES, KNOWN_STATUSES, MANUAL_STATU
 describe("statusModel", () => {
   it("KNOWN_STATUSES is exactly the collapsed lifecycle, in order", () => {
     expect(KNOWN_STATUSES).toEqual([
-      "Backlog", "Todo", "In Progress", "To QA", "Done", "Canceled", "Duplicate",
+      "Backlog", "Todo", "In Progress", "In Review", "Done", "Canceled", "Duplicate",
     ]);
   });
 
@@ -12,8 +12,8 @@ describe("statusModel", () => {
     expect(WORK_STATES).toEqual(["Backlog", "Todo", "In Progress"]);
   });
 
-  it("GATE_STATES is only the To QA human-approval gate", () => {
-    expect(GATE_STATES).toEqual(["To QA"]);
+  it("GATE_STATES is only the In Review human-approval gate", () => {
+    expect(GATE_STATES).toEqual(["In Review"]);
   });
 
   it("TERMINAL_STATES are the statuses that end the lifecycle", () => {

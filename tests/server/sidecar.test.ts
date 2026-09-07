@@ -69,7 +69,7 @@ describe("sidecar", () => {
     const sdir = join(dir, "sessions");
     mkdirSync(sdir, { recursive: true });
     writeFileSync(join(sdir, "mojito-RIC-120-rebase.json"), JSON.stringify({
-      kind: "rebase", id: "mojito-RIC-120-rebase", ticket: "RIC-120", launchStatus: "To QA",
+      kind: "rebase", id: "mojito-RIC-120-rebase", ticket: "RIC-120", launchStatus: "In Review",
       model: "opus", effort: "xhigh", state: "done", cwd: "/x",
       createdAt: "2026-07-11T00:00:00.000Z", title: "t", labels: [],
     }));

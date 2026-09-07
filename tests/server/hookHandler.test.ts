@@ -130,7 +130,7 @@ describe("handleHook — ticket sessions", () => {
     expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("done");
   });
 
-  it("a merged result moves the ticket to Done, not To QA, and clears the file", async () => {
+  it("a merged result moves the ticket to Done, not In Review, and clears the file", async () => {
     const { registry } = seed();
     const bus = new EventBus();
     const moveToQa = vi.fn(noopMoveToQa);
@@ -255,7 +255,7 @@ describe("handleHook — ticket sessions", () => {
     expect(registry.get("mojito-RIC-46-in-progress")?.state).toBe("done");
   });
 
-  // The QA rework loop: a session that reached To QA stays alive, the human types feedback into
+  // The QA rework loop: a session that reached In Review stays alive, the human types feedback into
   // it, and the next round has to move the board again. This test pins the load-bearing mechanism:
   // PostToolUse revives a "done" session back to "running", so the subsequent Stop hook can call
   // moveToQa again. (The clearResult mechanism that prevents re-firing old files is tested separately.)

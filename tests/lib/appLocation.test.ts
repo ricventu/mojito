@@ -179,7 +179,7 @@ describe("formatLocation", () => {
 describe("round trip", () => {
   const cases: AppLocation[] = [
     list(),
-    list({ query: "a&b=c", project: ["My Project"], status: "To QA", mine: true, sessionsOnly: true }),
+    list({ query: "a&b=c", project: ["My Project"], status: "In Review", mine: true, sessionsOnly: true }),
     list({ project: ["Mojito", "A, B", "No project"] }),
     { view: { kind: "session", id: "mojito-RIC-204-work", docs: null }, filters: { ...NO_FILTERS, mine: true } },
     { view: { kind: "session", id: "s1", docs: { doc: null } }, filters: NO_FILTERS },
@@ -222,8 +222,8 @@ describe("sessionUrl", () => {
 // filter set (see filterMemory) cannot drift into two formats.
 describe("filterSearch / parseFilters", () => {
   it("writes the filters as the query the address bar would carry", () => {
-    expect(filterSearch({ ...NO_FILTERS, project: ["Mojito"], status: "To QA" }))
-      .toBe("project=Mojito&status=To+QA");
+    expect(filterSearch({ ...NO_FILTERS, project: ["Mojito"], status: "In Review" }))
+      .toBe("project=Mojito&status=In+Review");
   });
 
   it("writes nothing at all for the unfiltered board", () => {

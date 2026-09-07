@@ -40,8 +40,8 @@ describe("activeFilters", () => {
   });
 
   it("reports a status under its own name", () => {
-    expect(activeFilters(state({ status: "To QA" })))
-      .toEqual([{ key: "status", label: "To QA" }]);
+    expect(activeFilters(state({ status: "In Review" })))
+      .toEqual([{ key: "status", label: "In Review" }]);
   });
 
   it("labels the Mine toggle", () => {
@@ -62,14 +62,14 @@ describe("activeFilters", () => {
 
   it("orders every filter query-first, so the one that scrolls away leads", () => {
     const all = state({
-      query: "182", project: ["Mojito"], status: "To QA", mine: true, sessionsOnly: true,
+      query: "182", project: ["Mojito"], status: "In Review", mine: true, sessionsOnly: true,
     });
     expect(activeFilters(all).map((f) => f.key))
       .toEqual(["query", "project", "status", "mine", "sessions"]);
   });
 
   it("keeps the project chips together, one per name, ahead of status", () => {
-    const all = state({ query: "182", project: ["Mojito", "Fornace"], status: "To QA" });
+    const all = state({ query: "182", project: ["Mojito", "Fornace"], status: "In Review" });
     expect(activeFilters(all).map((f) => f.key))
       .toEqual(["query", "project", "project", "status"]);
   });
@@ -88,7 +88,7 @@ describe("removeFilter", () => {
   const all = (): ListFilters => ({
     query: "182",
     project: ["Mojito", "Fornace", "Viessmann"],
-    status: "To QA",
+    status: "In Review",
     mine: true,
     sessionsOnly: true,
     backlog: true,
@@ -121,7 +121,7 @@ describe("removeFilter", () => {
   });
 
   it("clears the status back to null, not to the empty string", () => {
-    expect(removeFilter(all(), { key: "status", label: "To QA" }))
+    expect(removeFilter(all(), { key: "status", label: "In Review" }))
       .toEqual({ ...all(), status: null });
   });
 

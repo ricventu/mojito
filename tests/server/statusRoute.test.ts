@@ -48,7 +48,7 @@ describe("/api/tickets/[id]/status", () => {
   // transition belongs to a launch or a QA verdict, which own their own preconditions.
   // An open `status` here would be a way to write Done over unmerged work.
   it("400 on a status outside the manual pair", async () => {
-    for (const status of ["In Progress", "To QA", "Done", "Canceled", "", "Backlog "]) {
+    for (const status of ["In Progress", "In Review", "Done", "Canceled", "", "Backlog "]) {
       expect((await POST(req({ status }), params())).status, `status ${status}`).toBe(400);
     }
     expect((await POST(req({ status: 1 }), params())).status).toBe(400);

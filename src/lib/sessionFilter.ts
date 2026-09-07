@@ -19,7 +19,7 @@ export { CUSTOM_STATUS, INTAKE_STATUS, TERMINAL_STATUS };
  *
  * `live` (see liveStatuses) makes that last part honest. `launchStatus` is written once
  * at launch and never again, so a session launched from Todo still says Todo after the
- * ticket reached To QA — which put the session under a Todo status chip its own ticket
+ * ticket reached In Review — which put the session under a Todo status chip its own ticket
  * no longer matched, orphaning it into the "No ticket" group. The ticket's current
  * status wins whenever the ticket is among the known ones; a session whose ticket is
  * not (never fetched, or gone) keeps the launch status as its only answer.

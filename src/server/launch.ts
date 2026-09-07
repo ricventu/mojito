@@ -321,7 +321,7 @@ export interface MergeFixLaunchRequest {
  * not complete (rebase conflict, diverged default branch, dirty worktree, ...; see
  * mergeTicketBranch). The merge is already approved, so the session finishes it in the
  * approved mode and reports "merged" through the standard result file — the hook then
- * moves the ticket to Done. The launch context carries statusName "To QA" and the
+ * moves the ticket to Done. The launch context carries statusName "In Review" and the
  * ticket's own `-conflict` session id.
  */
 export async function launchMergeFixSession(
@@ -350,7 +350,7 @@ export async function launchMergeFixSession(
 
   const contextPath = writeLaunchContext(deps.stateDir, id, {
     identifier: req.ticket,
-    statusName: "To QA",
+    statusName: "In Review",
     title: req.title,
     project: req.projectName,
     labels: [],
@@ -371,7 +371,7 @@ export async function launchMergeFixSession(
     kind: "ticket",
     id,
     ticket: req.ticket,
-    launchStatus: "To QA",
+    launchStatus: "In Review",
     model: req.model,
     effort: req.effort,
     state: "starting",

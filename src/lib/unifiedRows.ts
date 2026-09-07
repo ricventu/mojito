@@ -50,7 +50,7 @@ export interface UnifiedFilter {
  *
  * `live` (build it with liveStatuses over the *unscoped* ticket list) is what keeps the
  * status chip from manufacturing orphans: without it a session is judged on the status
- * it was launched from, so a Todo chip kept the session of a ticket already at To QA and
+ * it was launched from, so a Todo chip kept the session of a ticket already at In Review and
  * dropped the ticket itself — the session then had nothing to nest under and showed up
  * alone under "No ticket". With it both sides answer for the same status.
  */
@@ -75,7 +75,7 @@ export function buildUnifiedRows(
   // "Has a session", not "has a running session". The state cannot stand in for liveness
   // here: a work session that handed its stage to QA sits at "done" while its tmux is
   // still up — Mojito never ends a session, and that one is the rework channel the gate
-  // depends on — so keying on isActiveSession hid exactly the To QA tickets the filter
+  // depends on — so keying on isActiveSession hid exactly the In Review tickets the filter
   // exists to surface. A registration lasts as long as the session does; Kill, Dismiss
   // and Clean up are what remove it, so having one is the honest criterion.
   if (sessionsOnly) ticketRows = ticketRows.filter((r) => r.sessions.length > 0);

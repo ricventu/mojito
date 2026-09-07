@@ -59,7 +59,7 @@ describe("status metadata", () => {
 
 // RIC-275: the launch sheet's one manual status move. Backlog and Todo are the two
 // states nothing in the lifecycle moves a ticket between on its own — every other
-// transition is Mojito's (a launch, a QA verdict), which is why only these two are
+// transition is Mojito's (a launch, a review verdict), which is why only these two are
 // offered by hand.
 describe("manualMoveTarget", () => {
   it("offers Todo from Backlog and Backlog from Todo", () => {
@@ -68,7 +68,7 @@ describe("manualMoveTarget", () => {
   });
 
   it("offers nothing from any other status", () => {
-    for (const s of ["In Progress", "To QA", "Done", "Canceled", "Duplicate", "Whatever", ""]) {
+    for (const s of ["In Progress", "In Review", "Done", "Canceled", "Duplicate", "Whatever", ""]) {
       expect(manualMoveTarget(s), `target for ${s}`).toBeNull();
     }
   });

@@ -116,13 +116,13 @@ describe("linear client", () => {
 
 describe("linear mutations", () => {
   it("resolves an issue ref (node id + team id + status)", async () => {
-    const f = fakeFetch({ issues: { nodes: [{ id: "issue-uuid", state: { name: "To QA" }, team: { id: "team-uuid" } }] } });
-    expect(await getIssueRef("k", "RIC-110", f)).toEqual({ id: "issue-uuid", teamId: "team-uuid", statusName: "To QA" });
+    const f = fakeFetch({ issues: { nodes: [{ id: "issue-uuid", state: { name: "In Review" }, team: { id: "team-uuid" } }] } });
+    expect(await getIssueRef("k", "RIC-110", f)).toEqual({ id: "issue-uuid", teamId: "team-uuid", statusName: "In Review" });
   });
 
   it("sets issue status by resolving the target state name to an id", async () => {
     const f = seqFetch([
-      { issues: { nodes: [{ id: "issue-uuid", state: { name: "To QA" }, team: { id: "team-uuid" } }] } },
+      { issues: { nodes: [{ id: "issue-uuid", state: { name: "In Review" }, team: { id: "team-uuid" } }] } },
       { team: { states: { nodes: [{ id: "s1", name: "Backlog" }, { id: "s2", name: "Done" }] } } },
       { issueUpdate: { success: true } },
     ]);
@@ -135,7 +135,7 @@ describe("linear mutations", () => {
 
   it("throws when the target state does not exist in the team", async () => {
     const f = seqFetch([
-      { issues: { nodes: [{ id: "issue-uuid", state: { name: "To QA" }, team: { id: "team-uuid" } }] } },
+      { issues: { nodes: [{ id: "issue-uuid", state: { name: "In Review" }, team: { id: "team-uuid" } }] } },
       { team: { states: { nodes: [{ id: "s1", name: "Backlog" }] } } },
     ]);
     await expect(setIssueStatus("k", "RIC-110", "Done", f)).rejects.toThrow(/Done/);
