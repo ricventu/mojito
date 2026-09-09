@@ -70,8 +70,8 @@ describe("PUT /api/config/filter-favorites", () => {
   });
 
   it("keeps the order it was given — reordering is a PUT of the whole list", async () => {
-    await PUT(req("PUT", { favorites: [{ name: "a", search: "mine=1" }, { name: "b", search: "sessions=1" }] }));
-    await PUT(req("PUT", { favorites: [{ name: "b", search: "sessions=1" }, { name: "a", search: "mine=1" }] }));
+    await PUT(req("PUT", { favorites: [{ name: "a", search: "mine=1" }, { name: "b", search: "q=foo" }] }));
+    await PUT(req("PUT", { favorites: [{ name: "b", search: "q=foo" }, { name: "a", search: "mine=1" }] }));
     expect(readFavorites().map((f) => f.name)).toEqual(["b", "a"]);
   });
 
@@ -95,9 +95,9 @@ describe("PUT /api/config/filter-favorites", () => {
 
   it("normalizes what it stores, so an unknown parameter cannot be saved", async () => {
     const res = await PUT(req("PUT", {
-      favorites: [{ name: " Mine ", search: "sessions=1&mine=1&doc=README.md" }],
+      favorites: [{ name: " Mine ", search: "mine=1&doc=README.md" }],
     }));
-    expect(await res.json()).toEqual({ favorites: [{ name: "Mine", search: "mine=1&sessions=1" }] });
+    expect(await res.json()).toEqual({ favorites: [{ name: "Mine", search: "mine=1" }] });
   });
 
   it("stores an empty list, which is how the last favourite is deleted", async () => {

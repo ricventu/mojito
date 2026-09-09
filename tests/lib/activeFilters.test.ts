@@ -5,7 +5,7 @@ import type { ListFilters } from "@/lib/appLocation";
 // Every filter off — the landing state once Mine defaults off (Task 3). Each test
 // overrides only the filter it is about.
 function state(p: Partial<ListFilters> = {}): ListFilters {
-  return { query: "", project: [], status: null, mine: false, sessionsOnly: false, backlog: false, ...p };
+  return { query: "", project: [], status: null, mine: false, backlog: false, ...p };
 }
 
 describe("activeFilters", () => {
@@ -48,11 +48,6 @@ describe("activeFilters", () => {
     expect(activeFilters(state({ mine: true }))).toEqual([{ key: "mine", label: "Mine" }]);
   });
 
-  it("labels the Sessions toggle", () => {
-    expect(activeFilters(state({ sessionsOnly: true })))
-      .toEqual([{ key: "sessions", label: "Sessions" }]);
-  });
-
   it("counts an empty-string project or status as set, since only [] and null are unset", () => {
     expect(activeFilters(state({ project: [""], status: "" }))).toEqual([
       { key: "project", label: "", value: "" },
@@ -62,10 +57,10 @@ describe("activeFilters", () => {
 
   it("orders every filter query-first, so the one that scrolls away leads", () => {
     const all = state({
-      query: "182", project: ["Mojito"], status: "In Review", mine: true, sessionsOnly: true,
+      query: "182", project: ["Mojito"], status: "In Review", mine: true,
     });
     expect(activeFilters(all).map((f) => f.key))
-      .toEqual(["query", "project", "status", "mine", "sessions"]);
+      .toEqual(["query", "project", "status", "mine"]);
   });
 
   it("keeps the project chips together, one per name, ahead of status", () => {
@@ -90,7 +85,6 @@ describe("removeFilter", () => {
     project: ["Mojito", "Fornace", "Viessmann"],
     status: "In Review",
     mine: true,
-    sessionsOnly: true,
     backlog: true,
   });
 
@@ -125,11 +119,9 @@ describe("removeFilter", () => {
       .toEqual({ ...all(), status: null });
   });
 
-  it("turns the Mine and Sessions toggles off", () => {
+  it("turns the Mine toggle off", () => {
     expect(removeFilter(all(), { key: "mine", label: "Mine" }))
       .toEqual({ ...all(), mine: false });
-    expect(removeFilter(all(), { key: "sessions", label: "Sessions" }))
-      .toEqual({ ...all(), sessionsOnly: false });
   });
 
   it("never mutates the filters it is given", () => {
@@ -145,7 +137,7 @@ describe("removeFilter", () => {
     let filters = all();
     for (const chip of activeFilters(filters)) filters = removeFilter(filters, chip);
     expect(filters).toEqual({
-      query: "", project: [], status: null, mine: false, sessionsOnly: false, backlog: true,
+      query: "", project: [], status: null, mine: false, backlog: true,
     });
   });
 });

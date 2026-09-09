@@ -39,19 +39,15 @@ describe("projectActions", () => {
     expect(projectActions(null, true)).toEqual([]);
   });
 
-  it("offers start/stop/logs plus git on a stopped stack", () => {
-    expect(projectActions(row(), false)).toEqual([...HEAD, "start", "stop", "logs", "pull", "push", "claude-deploy"]);
+  it("offers only git actions on a stopped stack", () => {
+    expect(projectActions(row(), false)).toEqual([...HEAD, "pull", "push", "claude-deploy"]);
   });
 
-  it("drops Start once the stack is running, and keeps Stop", () => {
+  it("offers the same actions regardless of stack status", () => {
     expect(projectActions(row({ status: "running" }), false))
-      .toEqual([...HEAD, "stop", "logs", "pull", "push", "claude-deploy"]);
-  });
-
-  // Detection can read "crashed" while orphan processes still hold the ports.
-  it("keeps Stop on a crashed stack", () => {
+      .toEqual([...HEAD, "pull", "push", "claude-deploy"]);
     expect(projectActions(row({ status: "crashed" }), false))
-      .toEqual([...HEAD, "start", "stop", "logs", "pull", "push", "claude-deploy"]);
+      .toEqual([...HEAD, "pull", "push", "claude-deploy"]);
   });
 
   it("offers only the git actions to a project with no start.sh", () => {
@@ -100,7 +96,7 @@ describe("projectActions", () => {
   // relative path would open whatever directory the receiving app considers current.
   it("drops Warp and VS Code when the mapped path is not absolute", () => {
     expect(projectActions(row({ path: "relative/repo" }), false))
-      .toEqual(["ticket", "session", "start", "stop", "logs", "pull", "push", "claude-deploy"]);
+      .toEqual(["ticket", "session", "pull", "push", "claude-deploy"]);
     expect(projectActions(row({ path: "" }), false)).not.toContain("warp");
   });
 });

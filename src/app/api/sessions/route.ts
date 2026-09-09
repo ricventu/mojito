@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getConfig, getRegistry, getBus } from "@/server/app";
 import { tokenFromHeaders } from "@/server/auth";
-import { launchSession, launchCustomSession, launchShellSession } from "@/server/launch";
+import { launchSession, launchCustomSession, launchShellSession, type ClaudeCommand } from "@/server/launch";
 import { getIssueContent, downloadLinearAsset, setIssueStatus, type IssueContent } from "@/server/linear";
 import { prepareTicketAssets, MAX_ASSET_BYTES } from "@/server/ticketAssets";
 import { tmuxName } from "@/server/sessionKey";
@@ -23,9 +23,11 @@ export async function POST(req: Request) {
   // match" and silently fall back — so a malformed body stops here instead. Applies to
   // every kind, and to both the ticket-scoped and project-scoped shapes of custom/shell.
   const picked = typeof body.worktree === "string" && body.worktree ? { worktree: body.worktree } : {};
+  const cmd: ClaudeCommand | undefined = body.command === "qwen" ? "qwen" : body.command === "cqwen" ? "cqwen" : undefined;
   if (body.kind === "custom") {
     const res = await launchCustomSession(
       { projectName: body.projectName ?? null, model: body.model ?? "opus", effort: body.effort ?? "high",
+        command: cmd,
         ...picked,
         ...(typeof body.ticket === "string" && body.ticket
           ? { ticket: body.ticket, status: body.status ?? "", title: body.title ?? "",
@@ -33,7 +35,8 @@ export async function POST(req: Request) {
               createWorktree: Boolean(body.createWorktree), baseBranch: body.baseBranch }
           : {}) },
       { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token,
-        projectsPath: cfg.projectsPath, hasSession, newSession, pipePane, bus: getBus() },
+        projectsPath: cfg.projectsPath, hasSession, newSession, pipePane, bus: getBus(),
+        cqwenEnv: { baseUrl: cfg.cqwenBaseUrl, apiKey: cfg.cqwenApiKey, model: cfg.cqwenModel } },
     );
     if (!res.ok) return NextResponse.json({ error: res.reason }, { status: 422 });
     return NextResponse.json(res.meta, { status: 201 });
@@ -78,12 +81,14 @@ export async function POST(req: Request) {
   });
   const res = await launchSession(
     { ticket: body.ticket, status: body.status, model: body.model ?? "opus", effort: body.effort ?? "high",
+      command: cmd,
       projectName: body.projectName ?? null,
       title: body.title ?? "", labels: Array.isArray(body.labels) ? body.labels : [],
       description: content.description, assets: prepared.assets, attachments: prepared.attachments,
       createWorktree: Boolean(body.createWorktree), baseBranch: body.baseBranch, ...picked },
     { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token, projectsPath: cfg.projectsPath,
-      hasSession, newSession, pipePane, bus: getBus() },
+      hasSession, newSession, pipePane, bus: getBus(),
+      cqwenEnv: { baseUrl: cfg.cqwenBaseUrl, apiKey: cfg.cqwenApiKey, model: cfg.cqwenModel } },
   );
   if (!res.ok) {
     const status = res.reason === "duplicate" ? 409 : 422;

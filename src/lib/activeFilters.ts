@@ -1,7 +1,7 @@
 import type { ListFilters } from "./appLocation";
 
 /** Identifies which of the unified list's five filters an entry came from. */
-export type FilterKey = "query" | "project" | "status" | "mine" | "sessions";
+export type FilterKey = "query" | "project" | "status" | "mine";
 
 /** One filter currently narrowing the list, and the text that names it to the user. */
 export interface ActiveFilter {
@@ -45,7 +45,7 @@ export interface ActiveFilter {
  * bar refusing to undo what it reports. Clear all still drops the lot at once.
  */
 export function activeFilters(
-  { query, project, status, mine, sessionsOnly }: ListFilters,
+  { query, project, status, mine }: ListFilters,
 ): ActiveFilter[] {
   const active: ActiveFilter[] = [];
   const trimmed = query.trim();
@@ -53,7 +53,6 @@ export function activeFilters(
   for (const p of project) active.push({ key: "project", label: p, value: p });
   if (status !== null) active.push({ key: "status", label: status });
   if (mine) active.push({ key: "mine", label: "Mine" });
-  if (sessionsOnly) active.push({ key: "sessions", label: "Sessions" });
   return active;
 }
 
@@ -78,7 +77,6 @@ export function removeFilter(filters: ListFilters, { key, value }: ActiveFilter)
     }),
     status: () => ({ ...filters, status: null }),
     mine: () => ({ ...filters, mine: false }),
-    sessions: () => ({ ...filters, sessionsOnly: false }),
   };
   return without[key]();
 }

@@ -30,9 +30,6 @@ export type ProjectAction =
   | "vscode"
   | "ticket"
   | "session"
-  | "start"
-  | "stop"
-  | "logs"
   | "pull"
   | "deploy"
   | "push"
@@ -93,10 +90,6 @@ export function projectActions(stack: StackRow | null, canDeploy: boolean): Proj
   if (links.warp) actions.push("warp");
   if (links.vscode) actions.push("vscode");
   actions.push("ticket", "session");
-  if (stack.hasStack) {
-    if (stack.status !== "running") actions.push("start");
-    actions.push("stop", "logs");
-  }
   if (stack.pullable) actions.push("pull");
   if (stack.self && canDeploy) actions.push("deploy");
   actions.push("push", "claude-deploy");

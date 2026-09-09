@@ -50,7 +50,7 @@ describe("cycleBacklog", () => {
   // Only the two values the chip owns move; a project selection or Mine is none of its
   // business, and rebuilding the whole set would silently clear them.
   it("leaves the other filters alone", () => {
-    const start = filters({ query: "alpha", project: ["Mojito"], mine: true, sessionsOnly: true });
+    const start = filters({ query: "alpha", project: ["Mojito"], mine: true });
     expect(cycleBacklog(start)).toEqual({ ...start, status: "Backlog" });
   });
 

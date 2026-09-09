@@ -17,6 +17,8 @@ import { resultPath, clearSessionResult } from "./sessionResult";
 import type { TicketAsset, TicketAttachment } from "./ticketAssets";
 import { watchStartupStall, type StallDeps } from "./startupStall";
 
+export type ClaudeCommand = "claude" | "qwen" | "cqwen";
+
 export interface LaunchRequest {
   ticket: string;
   status: string;
@@ -28,6 +30,8 @@ export interface LaunchRequest {
   description: string;
   assets?: TicketAsset[];
   attachments?: TicketAttachment[];
+  // Which CLI binary to use for launching the session
+  command?: ClaudeCommand;
   // Answer to the "create a worktree for this ticket?" prompt the launch sheet asks
   // whenever the ticket has none yet — absent/false means resolve-or-repo-root, same as
   // before this existed. baseBranch is required for createWorktree to take effect.
@@ -68,6 +72,8 @@ export interface LaunchDeps extends Pick<StallDeps, "bus" | "stallGraceMs" | "sc
   // project's repo root, or a worktree of it the human picked (RIC-243).
   resolveProjectCwd?: (req: { projectName: string; worktree?: string }) => ResolvedCwd | null;
   nowIso?: () => string;
+  // cqwen environment variables for building the command
+  cqwenEnv?: { baseUrl?: string; apiKey?: string; model?: string };
 }
 
 // A picked worktree, or the repo root. The pick is client-supplied and names the directory
@@ -150,13 +156,29 @@ function withWarning(command: string, warning?: string): string {
 }
 
 export function buildClaudeCommand(
-  req: { model: string; effort: Effort },
+  req: { model: string; effort: Effort; command?: ClaudeCommand },
   settingsPath: string,
   prompt: string,
+  cqwenEnv?: { baseUrl?: string; apiKey?: string; model?: string },
 ): string {
   const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
   if (prompt.startsWith("-")) throw new Error("prompt must not start with '-'");
-  return `claude --model ${q(req.model)} --effort ${q(req.effort)} --settings ${q(settingsPath)} ${q(prompt)}`;
+  const cmd = req.command === "qwen" ? "qwen" : req.command === "cqwen" ? "cqwen" : "claude";
+  // Qwen and cqwen don't support --effort or --settings flags; cqwen is an alias that sets env vars
+  if (cmd === "qwen") {
+    return `${cmd} --model ${q(req.model)} ${q(prompt)}`;
+  }
+  if (cmd === "cqwen") {
+    // Expand the alias: cqwen sets ANTHROPIC_* env vars and runs claude
+    const baseUrl = cqwenEnv?.baseUrl ?? "https://dashscope-intl.aliyuncs.com/apps/anthropic";
+    const model = cqwenEnv?.model ?? "qwen3.7-plus";
+    const envParts: string[] = [];
+    envParts.push(`ANTHROPIC_BASE_URL='${baseUrl}'`);
+    if (cqwenEnv?.apiKey) envParts.push(`ANTHROPIC_API_KEY='${cqwenEnv.apiKey}'`);
+    envParts.push(`ANTHROPIC_MODEL='${model}'`);
+    return `${envParts.join(" ")} claude ${q(prompt)}`;
+  }
+  return `${cmd} --model ${q(req.model)} --effort ${q(req.effort)} --settings ${q(settingsPath)} ${q(prompt)}`;
 }
 
 export async function launchSession(
@@ -197,10 +219,8 @@ export async function launchSession(
     ticket: req.ticket,
     contextPath,
     resultPath: resultPath(deps.stateDir, id),
-    // Same condition that decides whether the keys land in the context file, so prompt and
-    // context can never disagree about what the session will find.
     hasAssets: Boolean(req.assets?.length || req.attachments?.length),
-  }));
+  }), deps.cqwenEnv);
   await deps.newSession(id, cwd, withWarning(command, warning));
   await deps.pipePane(id, logfilePath(deps.stateDir, id));
 
@@ -227,6 +247,8 @@ export interface CustomLaunchRequest {
   projectName: string | null;
   model: string;
   effort: Effort;
+  // Which CLI binary to use for launching the session
+  command?: ClaudeCommand;
   // Ticket-scoped custom session (RIC-128). When `ticket` is set, cwd resolves through the
   // ticket→worktree chain (no launch-context file — a bare interactive session has a human
   // driving it and needs no machine contract). Absent = project-scoped (RIC-115).
@@ -248,9 +270,32 @@ export interface CustomLaunchRequest {
   intake?: boolean;
 }
 
-export function buildCustomClaudeCommand(req: CustomLaunchRequest, settingsPath: string): string {
+export function buildCustomClaudeCommand(req: CustomLaunchRequest, settingsPath: string, cqwenEnv?: { baseUrl?: string; apiKey?: string; model?: string }): string {
   const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
-  const base = `claude --model ${q(req.model)} --effort ${q(req.effort)} --settings ${q(settingsPath)}`;
+  const cmd = req.command === "qwen" ? "qwen" : req.command === "cqwen" ? "cqwen" : "claude";
+  // Qwen and cqwen don't support --effort or --settings flags; cqwen is an alias that sets env vars
+  if (cmd === "qwen") {
+    const base = `${cmd} --model ${q(req.model)}`;
+    if (req.prompt && req.prompt.startsWith("-")) {
+      throw new Error("prompt must not start with '-'");
+    }
+    return req.prompt ? `${base} ${q(req.prompt)}` : base;
+  }
+  if (cmd === "cqwen") {
+    // Expand the alias: cqwen sets ANTHROPIC_* env vars and runs claude
+    if (req.prompt && req.prompt.startsWith("-")) {
+      throw new Error("prompt must not start with '-'");
+    }
+    const baseUrl = cqwenEnv?.baseUrl ?? "https://dashscope-intl.aliyuncs.com/apps/anthropic";
+    const model = cqwenEnv?.model ?? "qwen3.7-plus";
+    const envParts: string[] = [];
+    envParts.push(`ANTHROPIC_BASE_URL='${baseUrl}'`);
+    if (cqwenEnv?.apiKey) envParts.push(`ANTHROPIC_API_KEY='${cqwenEnv.apiKey}'`);
+    envParts.push(`ANTHROPIC_MODEL='${model}'`);
+    const base = `${envParts.join(" ")} claude`;
+    return req.prompt ? `${base} ${q(req.prompt)}` : base;
+  }
+  const base = `${cmd} --model ${q(req.model)} --effort ${q(req.effort)} --settings ${q(settingsPath)}`;
   if (req.prompt && req.prompt.startsWith("-")) {
     throw new Error("prompt must not start with '-'");
   }
@@ -279,7 +324,7 @@ export async function launchCustomSession(
 
   // A custom session — ticket-scoped or project-scoped — is a bare interactive session
   // with a human driving it; it needs no machine-readable context file.
-  const command = buildCustomClaudeCommand(req, settingsPath);
+  const command = buildCustomClaudeCommand(req, settingsPath, deps.cqwenEnv);
   await deps.newSession(id, cwd, withWarning(command, warning));
   await deps.pipePane(id, logfilePath(deps.stateDir, id));
 

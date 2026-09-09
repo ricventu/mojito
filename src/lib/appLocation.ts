@@ -25,7 +25,6 @@ export interface ListFilters {
   project: string[];
   status: string | null;
   mine: boolean;
-  sessionsOnly: boolean;
   /** Whether Backlog tickets are shown. Off by default — see above. */
   backlog: boolean;
 }
@@ -39,7 +38,6 @@ export const NO_FILTERS: ListFilters = {
   project: [],
   status: null,
   mine: false,
-  sessionsOnly: false,
   backlog: false,
 };
 
@@ -77,7 +75,6 @@ function writeFilters(params: URLSearchParams, filters: ListFilters): void {
   for (const project of filters.project) params.append("project", project);
   if (filters.status !== null) params.set("status", filters.status);
   if (filters.mine) params.set("mine", "1");
-  if (filters.sessionsOnly) params.set("sessions", "1");
   // Written when Backlog is *shown*, the opposite polarity to the two above: hidden is
   // the default, and a default is never written — see ListFilters.
   if (filters.backlog) params.set("backlog", "1");
@@ -111,7 +108,6 @@ function readFilters(params: URLSearchParams): ListFilters {
     // `=== "1"` rather than a truthiness check, so an unrecognised value reads as
     // off — same rule the localStorage-backed toggles used before the URL owned them.
     mine: params.get("mine") === "1",
-    sessionsOnly: params.get("sessions") === "1",
     backlog: params.get("backlog") === "1",
   };
 }

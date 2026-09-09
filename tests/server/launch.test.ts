@@ -58,6 +58,38 @@ describe("buildClaudeCommand", () => {
   it("rejects a prompt starting with '-' (argv flag smuggling guard)", () => {
     expect(() => buildClaudeCommand(baseReq, "/s/x.json", "-h")).toThrow();
   });
+
+  it("builds a qwen command without --effort or --settings flags", () => {
+    const cmd = buildClaudeCommand({ ...baseReq, command: "qwen", model: "qwen3.7-plus" }, "/state/settings/x.json", "work on RIC-46");
+    expect(cmd).toBe("qwen --model 'qwen3.7-plus' 'work on RIC-46'");
+    expect(cmd).not.toContain("--effort");
+    expect(cmd).not.toContain("--settings");
+  });
+
+  it("escapes single quotes in the prompt for qwen command", () => {
+    const cmd = buildClaudeCommand({ ...baseReq, command: "qwen", model: "qwen3.7-plus" }, "/s/x.json", "it's fine");
+    expect(cmd).toContain("'it'\\''s fine'");
+  });
+
+  it("builds a cqwen command with ANTHROPIC_API_KEY when provided", () => {
+    const cmd = buildClaudeCommand({ ...baseReq, command: "cqwen" }, "/state/settings/x.json", "work on RIC-46",
+      { baseUrl: "https://example.com", apiKey: "sk-test-key", model: "qwen-custom" });
+    expect(cmd).toContain("ANTHROPIC_BASE_URL='https://example.com'");
+    expect(cmd).toContain("ANTHROPIC_API_KEY='sk-test-key'");
+    expect(cmd).toContain("ANTHROPIC_MODEL='qwen-custom'");
+    expect(cmd).not.toContain("--model");
+    expect(cmd).not.toContain("--effort");
+    expect(cmd).not.toContain("--settings");
+  });
+
+  it("builds a cqwen command without ANTHROPIC_API_KEY when not provided", () => {
+    const cmd = buildClaudeCommand({ ...baseReq, command: "cqwen" }, "/state/settings/x.json", "work on RIC-46");
+    expect(cmd).toBe("ANTHROPIC_BASE_URL='https://dashscope-intl.aliyuncs.com/apps/anthropic' ANTHROPIC_MODEL='qwen3.7-plus' claude 'work on RIC-46'");
+    expect(cmd).not.toContain("ANTHROPIC_API_KEY");
+    expect(cmd).not.toContain("--model");
+    expect(cmd).not.toContain("--effort");
+    expect(cmd).not.toContain("--settings");
+  });
 });
 
 describe("launchSession", () => {
@@ -246,6 +278,59 @@ describe("buildCustomClaudeCommand", () => {
     });
     it("rejects a prompt starting with '-' (argv flag smuggling guard)", () => {
       expect(() => buildCustomClaudeCommand({ ...base, prompt: "-h" }, "/s/x.json")).toThrow();
+    });
+  });
+
+  describe("qwen command", () => {
+    it("builds a bare qwen command without --effort or --settings", () => {
+      const cmd = buildCustomClaudeCommand({ projectName: null, model: "qwen3.7-plus", effort: "high", command: "qwen" as const }, "/s/x.json");
+      expect(cmd).toBe("qwen --model 'qwen3.7-plus'");
+      expect(cmd).not.toContain("--effort");
+      expect(cmd).not.toContain("--settings");
+    });
+
+    it("appends the prompt as a single quoted positional arg for qwen", () => {
+      const cmd = buildCustomClaudeCommand({ projectName: "Factorybook", model: "qwen3.7-plus", effort: "high", command: "qwen" as const, prompt: "align the branch" }, "/s/x.json");
+      expect(cmd).toBe("qwen --model 'qwen3.7-plus' 'align the branch'");
+    });
+
+    it("escapes single quotes in the prompt for qwen", () => {
+      const cmd = buildCustomClaudeCommand({ projectName: "Factorybook", model: "qwen3.7-plus", effort: "high", command: "qwen" as const, prompt: "it's fine" }, "/s/x.json");
+      expect(cmd).toBe("qwen --model 'qwen3.7-plus' 'it'\\''s fine'");
+    });
+
+    it("rejects a prompt starting with '-' for qwen", () => {
+      expect(() => buildCustomClaudeCommand({ projectName: "Factorybook", model: "qwen3.7-plus", effort: "high", command: "qwen" as const, prompt: "-h" }, "/s/x.json")).toThrow();
+    });
+
+    it("builds a cqwen command with ANTHROPIC_API_KEY when provided", () => {
+      const cmd = buildCustomClaudeCommand({ projectName: null, model: "opus", effort: "high", command: "cqwen" as const }, "/s/x.json",
+        { baseUrl: "https://example.com", apiKey: "sk-test-key", model: "qwen-custom" });
+      expect(cmd).toContain("ANTHROPIC_BASE_URL='https://example.com'");
+      expect(cmd).toContain("ANTHROPIC_API_KEY='sk-test-key'");
+      expect(cmd).toContain("ANTHROPIC_MODEL='qwen-custom'");
+      expect(cmd).not.toContain("--model");
+      expect(cmd).not.toContain("--effort");
+      expect(cmd).not.toContain("--settings");
+    });
+
+    it("builds a bare cqwen command without ANTHROPIC_API_KEY when not provided", () => {
+      const cmd = buildCustomClaudeCommand({ projectName: null, model: "opus", effort: "high", command: "cqwen" as const }, "/s/x.json");
+      expect(cmd).toBe("ANTHROPIC_BASE_URL='https://dashscope-intl.aliyuncs.com/apps/anthropic' ANTHROPIC_MODEL='qwen3.7-plus' claude");
+      expect(cmd).not.toContain("ANTHROPIC_API_KEY");
+      expect(cmd).not.toContain("--model");
+      expect(cmd).not.toContain("--effort");
+      expect(cmd).not.toContain("--settings");
+    });
+
+    it("appends the prompt as a single quoted positional arg for cqwen with env vars", () => {
+      const cmd = buildCustomClaudeCommand({ projectName: "Factorybook", model: "opus", effort: "high", command: "cqwen" as const, prompt: "align the branch" }, "/s/x.json",
+        { baseUrl: "https://example.com", apiKey: "sk-test-key", model: "qwen-custom" });
+      expect(cmd).toBe("ANTHROPIC_BASE_URL='https://example.com' ANTHROPIC_API_KEY='sk-test-key' ANTHROPIC_MODEL='qwen-custom' claude 'align the branch'");
+    });
+
+    it("rejects a prompt starting with '-' for cqwen", () => {
+      expect(() => buildCustomClaudeCommand({ projectName: "Factorybook", model: "opus", effort: "high", command: "cqwen" as const, prompt: "-h" }, "/s/x.json")).toThrow();
     });
   });
 });

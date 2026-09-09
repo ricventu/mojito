@@ -44,7 +44,7 @@ describe("buildUnifiedRows", () => {
   it("returns a row per ticket with no sessions attached when there are none", () => {
     const rows = buildUnifiedRows({
       tickets: [ticket({ identifier: "RIC-1" })], sessions: [],
-      filter: NO_FILTER, sessionsOnly: false,
+      filter: NO_FILTER,
     });
     expect(rows.ticketRows).toHaveLength(1);
     expect(rows.ticketRows[0].sessions).toEqual([]);
@@ -55,7 +55,7 @@ describe("buildUnifiedRows", () => {
     const rows = buildUnifiedRows({
       tickets: [ticket({ identifier: "RIC-1" }), ticket({ identifier: "RIC-2" })],
       sessions: [session({ id: "a", ticket: "RIC-2" })],
-      filter: NO_FILTER, sessionsOnly: false,
+      filter: NO_FILTER,
     });
     expect(rows.ticketRows[0].sessions).toEqual([]);
     expect(rows.ticketRows[1].sessions.map((s) => s.id)).toEqual(["a"]);
@@ -69,7 +69,7 @@ describe("buildUnifiedRows", () => {
         session({ id: "old", createdAt: "2026-08-01T10:00:00.000Z" }),
         session({ id: "new", createdAt: "2026-08-09T10:00:00.000Z" }),
       ],
-      filter: NO_FILTER, sessionsOnly: false,
+      filter: NO_FILTER,
     });
     expect(rows.ticketRows[0].sessions.map((s) => s.id)).toEqual(["new", "old"]);
   });
@@ -78,7 +78,7 @@ describe("buildUnifiedRows", () => {
     const rows = buildUnifiedRows({
       tickets: [ticket({ identifier: "RIC-1" })],
       sessions: [session({ id: "shell", kind: "shell", ticket: "", launchStatus: "" })],
-      filter: NO_FILTER, sessionsOnly: false,
+      filter: NO_FILTER,
     });
     expect(rows.ticketRows[0].sessions).toEqual([]);
     expect(rows.looseSessions.map((s) => s.id)).toEqual(["shell"]);
@@ -90,7 +90,7 @@ describe("buildUnifiedRows", () => {
     const rows = buildUnifiedRows({
       tickets: [ticket({ identifier: "RIC-1", title: "Alpha", statusName: "Todo" })],
       sessions: [session({ id: "a", ticket: "RIC-1", model: "fable" })],
-      filter: { query: "fable", project: [], status: null }, sessionsOnly: false,
+      filter: { query: "fable", project: [], status: null },
     });
     expect(rows.ticketRows).toEqual([]);
     expect(rows.looseSessions.map((s) => s.id)).toEqual(["a"]);
@@ -103,7 +103,7 @@ describe("buildUnifiedRows", () => {
     const rows = buildUnifiedRows({
       tickets: [ticket({ identifier: "RIC-1", title: "Alpha" })],
       sessions: [session({ id: "a", ticket: "RIC-1" })],
-      filter: { query: "zzz", project: [], status: null }, sessionsOnly: false,
+      filter: { query: "zzz", project: [], status: null },
     });
     expect(rows.ticketRows).toEqual([]);
     expect(rows.looseSessions).toEqual([]);
@@ -115,7 +115,7 @@ describe("buildUnifiedRows", () => {
     const rows = buildUnifiedRows({
       tickets: [ticket({ identifier: "RIC-1", statusName: "Todo" })],
       sessions: [session({ id: "a", ticket: "RIC-1", launchStatus: "In Progress" })],
-      filter: { query: "", project: [], status: "In Progress" }, sessionsOnly: false,
+      filter: { query: "", project: [], status: "In Progress" },
     });
     expect(rows.ticketRows).toEqual([]);
     expect(rows.looseSessions.map((s) => s.id)).toEqual(["a"]);
@@ -125,7 +125,7 @@ describe("buildUnifiedRows", () => {
     const rows = buildUnifiedRows({
       tickets: [ticket({ identifier: "RIC-1", statusName: "Todo" })],
       sessions: [session({ id: "a", ticket: "RIC-1", launchStatus: "Todo" })],
-      filter: { query: "", project: [], status: "In Progress" }, sessionsOnly: false,
+      filter: { query: "", project: [], status: "In Progress" },
     });
     expect(rows.ticketRows).toEqual([]);
     expect(rows.looseSessions).toEqual([]);
@@ -139,7 +139,7 @@ describe("buildUnifiedRows", () => {
     const rows = buildUnifiedRows({
       tickets: [ticket({ identifier: "RIC-1", statusName: "Todo" })],
       sessions: [session({ id: "a", ticket: "RIC-1", launchStatus: "In Progress" })],
-      filter: { query: "", project: [], status: "Todo" }, sessionsOnly: false,
+      filter: { query: "", project: [], status: "Todo" },
     });
     expect(rows.ticketRows[0].sessions.map((s) => s.id)).toEqual(["a"]);
     expect(rows.looseSessions).toEqual([]);
@@ -151,7 +151,7 @@ describe("buildUnifiedRows", () => {
     const rows = buildUnifiedRows({
       tickets: [ticket({ identifier: "RIC-1", statusName: "In Progress" })],
       sessions: [session({ id: "a", ticket: "RIC-1", launchStatus: "Todo" })],
-      filter: { query: "", project: [], status: "In Progress" }, sessionsOnly: false,
+      filter: { query: "", project: [], status: "In Progress" },
     });
     expect(rows.ticketRows[0].sessions.map((s) => s.id)).toEqual(["a"]);
     expect(rows.looseSessions).toEqual([]);
@@ -163,7 +163,7 @@ describe("buildUnifiedRows", () => {
     const rows = buildUnifiedRows({
       tickets: [],
       sessions: [session({ id: "a", ticket: "RIC-1" })],
-      filter: NO_FILTER, sessionsOnly: false,
+      filter: NO_FILTER,
     });
     expect(rows.ticketRows).toEqual([]);
     expect(rows.looseSessions.map((s) => s.id)).toEqual(["a"]);
@@ -175,76 +175,11 @@ describe("buildUnifiedRows", () => {
       session({ id: "b", ticket: "", kind: "custom", projectName: "Other", title: "beta" }),
     ];
     expect(buildUnifiedRows({
-      tickets: [], sessions, filter: { query: "", project: ["Other"], status: null }, sessionsOnly: false,
+      tickets: [], sessions, filter: { query: "", project: ["Other"], status: null },
     }).looseSessions.map((s) => s.id)).toEqual(["b"]);
     expect(buildUnifiedRows({
-      tickets: [], sessions, filter: { query: "alpha", project: [], status: null }, sessionsOnly: false,
+      tickets: [], sessions, filter: { query: "alpha", project: [], status: null },
     }).looseSessions.map((s) => s.id)).toEqual(["a"]);
-  });
-});
-
-describe("buildUnifiedRows with sessionsOnly", () => {
-  it("drops tickets that have no session at all", () => {
-    const rows = buildUnifiedRows({
-      tickets: [ticket({ identifier: "RIC-1" }), ticket({ identifier: "RIC-2" })],
-      sessions: [session({ id: "a", ticket: "RIC-2", state: "running" })],
-      filter: NO_FILTER, sessionsOnly: true,
-    });
-    expect(rows.ticketRows.map((r) => r.ticket.identifier)).toEqual(["RIC-2"]);
-  });
-
-  // The reason the filter cannot key on the state: a work session that handed its stage
-  // to QA sits at "done" with its tmux still up — it is the rework channel the gate
-  // depends on, so a In Review ticket must stay visible under the Sessions filter.
-  it("keeps a ticket whose only session is done", () => {
-    const rows = buildUnifiedRows({
-      tickets: [ticket({ identifier: "RIC-1", statusName: "In Review" })],
-      sessions: [session({ id: "a", ticket: "RIC-1", state: "done" })],
-      filter: NO_FILTER, sessionsOnly: true,
-    });
-    expect(rows.ticketRows.map((r) => r.ticket.identifier)).toEqual(["RIC-1"]);
-  });
-
-  it("keeps a ticket whose only session failed", () => {
-    const rows = buildUnifiedRows({
-      tickets: [ticket({ identifier: "RIC-1" })],
-      sessions: [session({ id: "a", ticket: "RIC-1", state: "failed" })],
-      filter: NO_FILTER, sessionsOnly: true,
-    });
-    expect(rows.ticketRows.map((r) => r.ticket.identifier)).toEqual(["RIC-1"]);
-  });
-
-  it("keeps a ticket whose only session needs input", () => {
-    const rows = buildUnifiedRows({
-      tickets: [ticket({ identifier: "RIC-1" })],
-      sessions: [session({ id: "a", ticket: "RIC-1", state: "needs-input" })],
-      filter: NO_FILTER, sessionsOnly: true,
-    });
-    expect(rows.ticketRows.map((r) => r.ticket.identifier)).toEqual(["RIC-1"]);
-  });
-
-  it("keeps loose sessions whatever their state", () => {
-    const rows = buildUnifiedRows({
-      tickets: [],
-      sessions: [
-        session({ id: "live", ticket: "", kind: "shell", state: "running", launchStatus: "" }),
-        session({ id: "dead", ticket: "", kind: "shell", state: "failed", launchStatus: "" }),
-      ],
-      filter: NO_FILTER, sessionsOnly: true,
-    });
-    expect(rows.looseSessions.map((s) => s.id)).toEqual(["live", "dead"]);
-  });
-
-  it("still narrows loose sessions by the other criteria", () => {
-    const rows = buildUnifiedRows({
-      tickets: [],
-      sessions: [
-        session({ id: "here", ticket: "", kind: "shell", state: "done", launchStatus: "", projectName: "Mojito" }),
-        session({ id: "elsewhere", ticket: "", kind: "shell", state: "done", launchStatus: "", projectName: "Other" }),
-      ],
-      filter: { query: "", project: ["Mojito"], status: null }, sessionsOnly: true,
-    });
-    expect(rows.looseSessions.map((s) => s.id)).toEqual(["here"]);
   });
 });
 
@@ -259,7 +194,7 @@ describe("buildUnifiedRows — the Backlog exclusion", () => {
     const rows = buildUnifiedRows({
       tickets: [ticket({ identifier: "RIC-1", statusName: "Backlog" })],
       sessions: [session({ id: "a", ticket: "RIC-1", launchStatus: "Backlog" })],
-      filter: HIDDEN, sessionsOnly: false,
+      filter: HIDDEN,
       live: liveStatuses([ticket({ identifier: "RIC-1", statusName: "Backlog" })]),
     });
     expect(rows.ticketRows).toEqual([]);
@@ -272,7 +207,7 @@ describe("buildUnifiedRows — the Backlog exclusion", () => {
       ticket({ identifier: "RIC-2", statusName: "Todo" }),
     ];
     const rows = buildUnifiedRows({
-      tickets, sessions: [], filter: HIDDEN, sessionsOnly: false, live: liveStatuses(tickets),
+      tickets, sessions: [], filter: HIDDEN, live: liveStatuses(tickets),
     });
     expect(rows.ticketRows.map((r) => r.ticket.identifier)).toEqual(["RIC-2"]);
   });
@@ -283,7 +218,7 @@ describe("buildUnifiedRows — the Backlog exclusion", () => {
       ticket({ identifier: "RIC-2", statusName: "Todo" }),
     ];
     const rows = buildUnifiedRows({
-      tickets, sessions: [], filter: { ...HIDDEN, backlog: true }, sessionsOnly: false,
+      tickets, sessions: [], filter: { ...HIDDEN, backlog: true },
       live: liveStatuses(tickets),
     });
     expect(rows.ticketRows.map((r) => r.ticket.identifier)).toEqual(["RIC-1", "RIC-2"]);
@@ -441,7 +376,7 @@ describe("live ticket statuses", () => {
     const sessions = [session({ id: "a", ticket: "RIC-218", launchStatus: "Todo" })];
     const rows = buildUnifiedRows({
       tickets, sessions, filter: { query: "", project: [], status: "Todo" },
-      sessionsOnly: false, live: liveStatuses(tickets),
+      live: liveStatuses(tickets),
     });
     expect(rows.ticketRows).toEqual([]);
     expect(rows.looseSessions).toEqual([]);
@@ -452,7 +387,7 @@ describe("live ticket statuses", () => {
     const sessions = [session({ id: "a", ticket: "RIC-218", launchStatus: "Todo" })];
     const rows = buildUnifiedRows({
       tickets: [], sessions, filter: { query: "", project: [], status: "In Review" },
-      sessionsOnly: false, live: liveStatuses(tickets),
+      live: liveStatuses(tickets),
     });
     expect(rows.looseSessions.map((s) => s.id)).toEqual(["a"]);
   });

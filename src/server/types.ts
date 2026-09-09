@@ -54,4 +54,8 @@ export interface AppConfig {
   linearApiKey: string;
   stateDir: string;
   projectsPath: string;
+  qwenModel: string;
+  cqwenBaseUrl?: string;
+  cqwenApiKey?: string;
+  cqwenModel?: string;
 }

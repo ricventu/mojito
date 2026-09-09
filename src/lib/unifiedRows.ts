@@ -55,11 +55,10 @@ export interface UnifiedFilter {
  * alone under "No ticket". With it both sides answer for the same status.
  */
 export function buildUnifiedRows(
-  { tickets, sessions, filter, sessionsOnly, live }: {
+  { tickets, sessions, filter, live }: {
     tickets: TicketSummary[];
     sessions: SessionMeta[];
     filter: UnifiedFilter;
-    sessionsOnly: boolean;
     live?: LiveStatuses;
   },
 ): UnifiedRows {
@@ -72,13 +71,6 @@ export function buildUnifiedRows(
   });
   let looseSessions = filterSessions(sessions.filter((s) => !nested.has(s.id)), filter, live);
 
-  // "Has a session", not "has a running session". The state cannot stand in for liveness
-  // here: a work session that handed its stage to QA sits at "done" while its tmux is
-  // still up — Mojito never ends a session, and that one is the rework channel the gate
-  // depends on — so keying on isActiveSession hid exactly the In Review tickets the filter
-  // exists to surface. A registration lasts as long as the session does; Kill, Dismiss
-  // and Clean up are what remove it, so having one is the honest criterion.
-  if (sessionsOnly) ticketRows = ticketRows.filter((r) => r.sessions.length > 0);
   return { ticketRows, looseSessions };
 }
 

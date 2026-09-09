@@ -1,12 +1,12 @@
 "use client";
 import { useState } from "react";
 import {
-  ArrowDownToLine, ArrowUpToLine, Bot, FileTerminal, Play, Plus, Rocket, ScrollText, Square, X,
+  ArrowDownToLine, ArrowUpToLine, Bot, FileTerminal, Plus, Rocket, X,
 } from "lucide-react";
 import { apiFetch } from "@/lib/client";
 import { projectActions, projectLinks, type ProjectAction } from "@/lib/projectToolbar";
 import {
-  pullMessage, pushMessage, syntheticStackSession,
+  pullMessage, pushMessage,
   type PullResponse, type PushResponse, type StackRow,
 } from "@/lib/stacks";
 import type { SelfUpdate } from "@/lib/useSelfUpdate";
@@ -70,9 +70,6 @@ const LABELS: Record<ProjectAction, string> = {
   vscode: "Open in VS Code",
   ticket: "New ticket",
   session: "New session",
-  start: "Start stack",
-  stop: "Stop stack",
-  logs: "Stack logs",
   pull: "Pull",
   deploy: "Pull & deploy",
   push: "Push",
@@ -83,14 +80,11 @@ const LABELS: Record<ProjectAction, string> = {
 // Warp and VS Code are not here: like the terminal header's, their labels are
 // deliberately ASCII (`>_`, `</>`) rather than lucide glyphs — see the Icons note in
 // CLAUDE.md.
-const ICONS: Record<Exclude<ProjectAction, "warp" | "vscode">, typeof Play> = {
+const ICONS: Record<Exclude<ProjectAction, "warp" | "vscode">, typeof Plus> = {
   ticket: Plus,
   // Not a terminal glyph: Warp's `>_` sits three squares away, and a session here is as
   // often a claude one as a shell.
   session: Bot,
-  start: Play,
-  stop: Square,
-  logs: ScrollText,
   pull: ArrowDownToLine,
   deploy: Rocket,
   push: ArrowUpToLine,
@@ -121,7 +115,6 @@ function StackActions({ stack, token, refresh, onOpenSession, onNewTicket, onNew
     try { await fn(); } finally { setBusy(false); }
   };
 
-  const act = (path: string) => run(async () => { await post(path); refresh(); });
   const pull = () => run(async () => {
     const res = await post("pull");
     setNote(pullMessage((await res.json()) as PullResponse));
@@ -159,9 +152,6 @@ function StackActions({ stack, token, refresh, onOpenSession, onNewTicket, onNew
   const onAction: Record<Exclude<ProjectAction, "warp" | "vscode">, () => void> = {
     ticket: onNewTicket,
     session: onNewSession,
-    start: () => act("start"),
-    stop: () => act("stop"),
-    logs: () => onOpenSession(syntheticStackSession(stack.slug, stack.project)),
     pull,
     deploy: selfUpdate.run,
     push,

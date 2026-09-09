@@ -76,6 +76,8 @@ export default function LaunchSheet(
   // Pre-fill the model + effort optimal for this ticket's stage (overridable via the selectors).
   const [model, setModel] = useState<string>(() => resolveModel(stageKey));
   const [effort, setEffort] = useState<string>(() => resolveEffort(stageKey));
+  const [command, setCommand] = useState<"claude" | "qwen" | "cqwen">("claude");
+  const [qwenModel, setQwenModel] = useState("qwen3.7-plus");
   const [touched, setTouched] = useState(false);
   // Re-seed both selectors from the effective (possibly user-edited) defaults once they load,
   // unless the user has already changed a selector this session.
@@ -85,6 +87,23 @@ export default function LaunchSheet(
     setEffort(resolveEffort(stageKey, defaults));
   }, [defaults, stageKey, touched]);
   const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const res = await apiFetch(token, "/api/config/qwen-model");
+        if (live && res.ok) {
+          const data = await res.json();
+          if (typeof data.model === "string") setQwenModel(data.model);
+        }
+      } catch {
+        if (live) setQwenModel("qwen3.7-plus");
+      }
+    })();
+    return () => { live = false; };
+  }, [token]);
+
   const [verdictPending, setVerdictPending] = useState<"approve-local" | "approve-mr" | "mark-done" | null>(null);
   const [mergeState, setMergeState] = useState<MergeState>("checking");
   // Whether the ticket already has a worktree, checked once per ticket. "loading" lets the
@@ -276,7 +295,8 @@ export default function LaunchSheet(
       // obstacle (launchSession overwrites it); only a LIVE tmux is, and that answers 409 below.
       const res = await apiFetch(token, "/api/sessions", {
         method: "POST",
-        body: JSON.stringify({ ticket: ticket.identifier, status, model, effort,
+        body: JSON.stringify({ ticket: ticket.identifier, status, model: command === "qwen" ? qwenModel : model, effort: command === "claude" ? effort : undefined,
+          command: command === "qwen" ? "qwen" : command === "cqwen" ? "cqwen" : undefined,
           projectName: ticket.project, title: ticket.title, labels: ticket.labels,
           ...launchWorktreeFields(wtAnswer) }),
       });
@@ -302,7 +322,8 @@ export default function LaunchSheet(
       const res = await apiFetch(token, "/api/sessions", {
         method: "POST",
         body: JSON.stringify({ kind: "custom", ticket: ticket.identifier, status,
-          projectName: ticket.project, title: ticket.title, labels: ticket.labels, model, effort,
+          projectName: ticket.project, title: ticket.title, labels: ticket.labels, model: command === "qwen" ? qwenModel : model, effort: command === "claude" ? effort : undefined,
+          command: command === "qwen" ? "qwen" : command === "cqwen" ? "cqwen" : undefined,
           ...launchWorktreeFields(wtAnswer) }),
       });
       if (!res.ok) { setErr(await apiError(res, "launch failed")); return; }
@@ -338,14 +359,25 @@ export default function LaunchSheet(
   // Divs, not labels: the fields are buttons now (see ui/choice), which a <label>
   // cannot be the label of.
   const selectors = (
-    <div className="two">
-      <div className="field"><span className="lbl">Model</span>
-        <Choice label="Model" value={model} options={MODELS}
-          onChange={(v) => { setModel(v); setTouched(true); }} /></div>
-      <div className="field"><span className="lbl">Effort</span>
-        <Choice label="Effort" value={effort} options={EFFORTS}
-          onChange={(v) => { setEffort(v); setTouched(true); }} /></div>
-    </div>
+    <>
+      <div className="field"><span className="lbl">Command</span>
+        <div className="btns">
+          <button className={`btn ${command === "claude" ? "primary" : "ghost"}`} onClick={() => setCommand("claude")}>claude</button>
+          <button className={`btn ${command === "qwen" ? "primary" : "ghost"}`} onClick={() => setCommand("qwen")}>qwen</button>
+          <button className={`btn ${command === "cqwen" ? "primary" : "ghost"}`} onClick={() => setCommand("cqwen")}>cqwen</button>
+        </div>
+      </div>
+      <div className="two">
+        <div className="field"><span className="lbl">Model</span>
+          <Choice label="Model" value={command === "qwen" ? qwenModel : model} options={command === "qwen" ? [qwenModel] : MODELS}
+            disabled={command !== "claude"}
+            onChange={(v) => { if (command === "claude") { setModel(v); setTouched(true); } }} /></div>
+        <div className="field"><span className="lbl">Effort</span>
+          <Choice label="Effort" value={effort} options={EFFORTS}
+            disabled={command !== "claude"}
+            onChange={(v) => { if (command === "claude") { setEffort(v); setTouched(true); } }} /></div>
+      </div>
+    </>
   );
   // One tap per action: a bare Claude session or a plain terminal in the ticket's
   // worktree — direct, self-describing buttons instead of a mode toggle.

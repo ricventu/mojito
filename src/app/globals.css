@@ -255,6 +255,9 @@ section + section > .proj-head { margin-top: 24px; }
   /* Same trade as the terminal header's: a phone has no handler for either scheme, so
      the taps end in an OS error, and seven squares do not fit beside a project name. */
   .proj-actions a.btn.sm { display: none; }
+  /* The rule line (flex: 1) would fill the entire row and push the actions off-screen;
+     hide it so the buttons sit flush after the project name. */
+  .sect-rule { display: none; }
 }
 
 /* What an action had to say for itself: a git result, or a deploy in flight. Takes a
@@ -281,49 +284,32 @@ section + section > .proj-head { margin-top: 24px; }
 }
 
 /* ---- Filter bar (tickets / sessions) ---- */
-/* One column of rows, in the order FilterBar renders them (RIC-226): project select +
-   actions, status chips, search field. `gap` carries the whole vertical rhythm, so no
-   row needs a margin of its own. */
+/* Search row: actions (sidebar toggle, settings, etc.) on the left, search fills the
+   rest. Below it: project chips, then status chips. */
 .filter { margin: 2px 2px 8px; display: flex; flex-direction: column; gap: 8px; }
-.filter .search { width: 100%; box-sizing: border-box; -webkit-appearance: none; appearance: none; }
-
-/* The project select and the three actions share the top row, wrapping as one flex
-   line where there is room for four controls. Below that the select claims a whole
-   line (flex-basis: 100%) and the buttons split the next one, rather than squeezing
-   the one control whose entire job is naming the selected projects down to an
-   ellipsis. */
-.filter-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.filter-actions .btn { flex: 1 1 0; min-width: 0; }
-.filter-select { flex: 1 1 100%; }
-/* On the shared line the buttons take only the width of their labels and the select
-   keeps the slack — they are three destinations, not the row's subject, and stretched
-   to a quarter of the toolbar each they read as the loudest thing on the board.
-   `align-items: center` above is what leaves them at their own height beside the
-   42px select instead of stretching to it. On their own line (below the breakpoint)
-   they keep `flex: 1 1 0` and split it: there the width is a tap target. */
-@media (min-width: 560px) {
-  .filter-select { flex: 1 1 200px; }
-  .filter-actions .btn { flex: 0 1 auto; }
-}
-/* The settings gear closes the row, top-right of the whole board (RIC-253, which
-   retired the bottom nav it used to sit in). Square and exempt from the `flex: 1 1 0`
-   above: on the wrapped line the three text actions split the width between them, and
-   a 17px glyph given an equal quarter of the toolbar reads as a mis-click waiting to
-   happen. 28px matches `.proj-actions`' buttons and the text buttons' own height. */
-/* The sessions sidebar's toggle leads the same row, and is square for the same reason
-   (RIC-313). It leads rather than closes it because it is the one control there that
-   navigates instead of creating — the terminal's own copy sits at the left of its
-   header too, right after Back. */
-.filter-actions .settings,
-.filter-actions .side-toggle { flex: 0 0 auto; width: 28px; height: 28px; padding: 0; }
-/* How many sessions are waiting for input — the badge that used to ride on the nav's
-   Tickets tab, now the amber pill immediately left of the gear. Passive: the tab it
-   sat on navigated to the board you were already on, so it never did anything either. */
-.filter-actions .count {
+.filter-search-row { display: flex; align-items: center; gap: 8px; }
+.filter-search-row .search { flex: 1; min-width: 0; box-sizing: border-box; -webkit-appearance: none; appearance: none; height: 32px; padding: 0 10px; font: 13px var(--mono); border-radius: 8px; }
+.filter-search-row .btn { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; height: 32px; border-radius: 8px; }
+.filter-search-row .btn .btn-label { font: 600 12px/1 var(--mono); }
+.filter-search-row .settings,
+.filter-search-row .side-toggle { flex: 0 0 auto; width: 32px; height: 32px; padding: 0; }
+.filter-search-row .count {
   flex: none; display: inline-flex; align-items: center; justify-content: center;
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
   background: var(--attn); color: #1a1206; font: 700 11px var(--mono);
 }
+@media (max-width: 480px) {
+  .filter-search-row .btn .btn-label { display: none; }
+  .filter-search-row .btn { width: 32px; height: 32px; padding: 0; justify-content: center; }
+  .filter-search-row .settings,
+  .filter-search-row .side-toggle { width: 32px; height: 32px; }
+}
+
+/* Project chips: scroll horizontally — the list can grow beyond what fits. */
+.filter-actions { display: flex; align-items: center; }
+.filter-actions .chip-row { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0; scrollbar-width: none; flex: 1; min-width: 0; }
+.filter-actions .chip-row::-webkit-scrollbar { display: none; }
+.filter-actions .chip-row .chip { flex: none; white-space: nowrap; }
 
 .filter-chips { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0; scrollbar-width: none; }
 .filter-chips::-webkit-scrollbar { display: none; }
@@ -331,6 +317,11 @@ section + section > .proj-head { margin-top: 24px; }
 /* The Sessions toggle leads the status row but belongs to a different axis than the
    status chips beside it — extra space keeps the two from reading as one group. */
 .filter-chips .chip.lead { margin-right: 14px; }
+.filter-chips .chip.trail { margin-left: 14px; }
+/* A vertical bar between chip groups that belong to different axes. */
+.filter-chips .chip-divider {
+  flex: none; width: 1px; height: 20px; background: var(--border); margin: 0 4px; align-self: center;
+}
 
 /* ---- Chips (labels / meta) ---- */
 .chip {

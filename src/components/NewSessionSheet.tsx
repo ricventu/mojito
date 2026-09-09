@@ -29,7 +29,9 @@ export default function NewSessionSheet(
 ) {
   const { projects, project, setProject, projectName } = useProjectPicker(token, defaultProject);
   const [mode, setMode] = useState<"claude" | "terminal">("claude");
+  const [command, setCommand] = useState<"claude" | "qwen" | "cqwen">("claude");
   const [model, setModel] = useState("opus");
+  const [qwenModel, setQwenModel] = useState("qwen3.7-plus");
   const [effort, setEffort] = useState("high");
   const [err, setErr] = useState<string | null>(null);
   // The worktrees of the selected project's repo, and which one to open in (RIC-243).
@@ -56,12 +58,28 @@ export default function NewSessionSheet(
     return () => { live = false; };
   }, [token, projectName]);
 
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const res = await apiFetch(token, "/api/config/qwen-model");
+        if (live && res.ok) {
+          const data = await res.json();
+          if (typeof data.model === "string") setQwenModel(data.model);
+        }
+      } catch {
+        if (live) setQwenModel("qwen3.7-plus");
+      }
+    })();
+    return () => { live = false; };
+  }, [token]);
+
   const start = async () => {
     // Only a real pick travels; REPO_ROOT is the empty string the server reads as "no pick".
     const picked = worktree ? { worktree } : {};
     const body = mode === "terminal"
       ? { kind: "shell", projectName, ...picked }
-      : { kind: "custom", projectName, model, effort, ...picked };
+      : { kind: "custom", projectName, model: command === "qwen" ? qwenModel : model, effort: command === "claude" ? effort : undefined, command: command === "qwen" ? "qwen" : command === "cqwen" ? "cqwen" : undefined, ...picked };
     const res = await apiFetch(token, "/api/sessions", {
       method: "POST",
       body: JSON.stringify(body),
@@ -100,12 +118,23 @@ export default function NewSessionSheet(
           </div>
         )}
         {mode === "claude" && (
-          <div className="two">
-            <div className="field"><span className="lbl">Model</span>
-              <Choice label="Model" value={model} onChange={setModel} options={MODELS} /></div>
-            <div className="field"><span className="lbl">Effort</span>
-              <Choice label="Effort" value={effort} onChange={setEffort} options={EFFORTS} /></div>
-          </div>
+          <>
+            <div className="field"><span className="lbl">Command</span>
+              <div className="btns">
+                <button className={`btn ${command === "claude" ? "primary" : "ghost"}`} onClick={() => setCommand("claude")}>claude</button>
+                <button className={`btn ${command === "qwen" ? "primary" : "ghost"}`} onClick={() => setCommand("qwen")}>qwen</button>
+                <button className={`btn ${command === "cqwen" ? "primary" : "ghost"}`} onClick={() => setCommand("cqwen")}>cqwen</button>
+              </div>
+            </div>
+            <div className="two">
+              <div className="field"><span className="lbl">Model</span>
+                <Choice label="Model" value={command === "qwen" ? qwenModel : model} onChange={command === "claude" ? setModel : () => {}} options={command === "qwen" ? [qwenModel] : MODELS}
+                  disabled={command !== "claude"} /></div>
+              <div className="field"><span className="lbl">Effort</span>
+                <Choice label="Effort" value={effort} onChange={command === "claude" ? setEffort : () => {}} options={EFFORTS}
+                  disabled={command !== "claude"} /></div>
+            </div>
+          </>
         )}
         <button className="btn primary block" onClick={start}>{mode === "terminal" ? "Start terminal" : "Start session"}</button>
         {err && <p className="err-text">{err}</p>}

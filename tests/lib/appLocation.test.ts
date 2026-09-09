@@ -21,9 +21,9 @@ describe("parseLocation", () => {
   });
 
   it("reads every filter out of the query", () => {
-    const { filters } = parseLocation("/", "?q=filtri&project=Mojito&status=In+Progress&mine=1&sessions=1&backlog=1");
+    const { filters } = parseLocation("/", "?q=filtri&project=Mojito&status=In+Progress&mine=1&backlog=1");
     expect(filters).toEqual({
-      query: "filtri", project: ["Mojito"], status: "In Progress", mine: true, sessionsOnly: true,
+      query: "filtri", project: ["Mojito"], status: "In Progress", mine: true,
       backlog: true,
     });
   });
@@ -126,9 +126,9 @@ describe("formatLocation", () => {
 
   it("writes the filters in a stable order", () => {
     expect(formatLocation(list({
-      query: "filtri", project: ["Mojito"], status: "In Progress", mine: true, sessionsOnly: true,
+      query: "filtri", project: ["Mojito"], status: "In Progress", mine: true,
       backlog: true,
-    }))).toBe("/?q=filtri&project=Mojito&status=In+Progress&mine=1&sessions=1&backlog=1");
+    }))).toBe("/?q=filtri&project=Mojito&status=In+Progress&mine=1&backlog=1");
   });
 
   // Backlog hidden is the default board, so the clean url stays a bare `/` even though
@@ -179,7 +179,7 @@ describe("formatLocation", () => {
 describe("round trip", () => {
   const cases: AppLocation[] = [
     list(),
-    list({ query: "a&b=c", project: ["My Project"], status: "In Review", mine: true, sessionsOnly: true }),
+    list({ query: "a&b=c", project: ["My Project"], status: "In Review", mine: true }),
     list({ project: ["Mojito", "A, B", "No project"] }),
     { view: { kind: "session", id: "mojito-RIC-204-work", docs: null }, filters: { ...NO_FILTERS, mine: true } },
     { view: { kind: "session", id: "s1", docs: { doc: null } }, filters: NO_FILTERS },
@@ -243,7 +243,7 @@ describe("filterSearch / parseFilters", () => {
   it("survives a round trip through the query", () => {
     const filters = {
       query: "a&b=c", project: ["Mojito", "A, B"], status: "In Progress",
-      mine: true, sessionsOnly: true, backlog: true,
+      mine: true, backlog: true,
     };
     expect(parseFilters(filterSearch(filters))).toEqual(filters);
   });

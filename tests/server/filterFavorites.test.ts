@@ -37,7 +37,7 @@ describe("readFavorites", () => {
   it("keeps the stored order — the row's order is the user's", () => {
     writeFavorites([
       { name: "b", search: "mine=1" },
-      { name: "a", search: "sessions=1" },
+      { name: "a", search: "q=test" },
     ]);
     _resetFilterFavoritesCache();
     expect(readFavorites().map((f) => f.name)).toEqual(["b", "a"]);
@@ -60,10 +60,10 @@ describe("readFavorites", () => {
   it("normalizes a hand-edited file through the same guard the endpoint uses", () => {
     writeFavorites([]);
     writeFileSync(favoritesPath(), JSON.stringify([
-      { name: "  Mine  ", search: "sessions=1&mine=1&doc=README.md" },
+      { name: "  Mine  ", search: "mine=1&doc=README.md" },
     ]));
     _resetFilterFavoritesCache();
-    expect(readFavorites()).toEqual([{ name: "Mine", search: "mine=1&sessions=1" }]);
+    expect(readFavorites()).toEqual([{ name: "Mine", search: "mine=1" }]);
   });
 });
 

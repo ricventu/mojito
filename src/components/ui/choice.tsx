@@ -14,15 +14,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
  * than inside a <label>, since the trigger is a <button> and buttons are not labelable.
  */
 export function Choice(
-  { label, value, onChange, options }: {
+  { label, value, onChange, options, disabled }: {
     label: string;
     value: string;
     onChange: (value: string) => void;
     options: readonly string[];
+    disabled?: boolean;
   },
 ) {
   return (
-    <Select value={value} onValueChange={onChange}>
+    <Select value={value} onValueChange={onChange} disabled={disabled}>
       <SelectTrigger aria-label={label}><SelectValue /></SelectTrigger>
       <SelectContent>
         {options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}

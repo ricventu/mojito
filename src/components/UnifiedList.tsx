@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { PanelLeft, Settings } from "lucide-react";
+import { Bot, PanelLeft, Plus, Settings, Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/client";
 import { dismissSession } from "@/lib/dismissSession";
 import LaunchSheet from "./LaunchSheet";
@@ -81,7 +81,7 @@ export default function UnifiedList(
   // which is what lets activeFilters treat Mine like every other filter instead of
   // special-casing the one that would otherwise put a chip in the sticky bar on every
   // single visit, and what keeps the unfiltered board a bare `/`.
-  const { query, project, status, mine, sessionsOnly, backlog } = filters;
+  const { query, project, status, mine, backlog } = filters;
   const setFilter = <K extends keyof ListFilters>(key: K, value: ListFilters[K]) =>
     onFilters({ ...filters, [key]: value }, "push");
   // Replace, not push: a pushed entry per keystroke would leave Back retyping the
@@ -91,7 +91,6 @@ export default function UnifiedList(
   const setProject = (p: string[]) => setFilter("project", p);
   const setStatus = (s: string | null) => setFilter("status", s);
   const setMine = (v: boolean) => setFilter("mine", v);
-  const setSessionsOnly = (v: boolean) => setFilter("sessionsOnly", v);
   // Not a setter: the Backlog chip moves two values together, and which pair a tap
   // lands on is cycleBacklog's — pure, so the rule is testable without a DOM.
   const nextBacklog = () => onFilters(cycleBacklog(filters), "push");
@@ -117,9 +116,9 @@ export default function UnifiedList(
 
   const { ticketRows, looseSessions } = useMemo(
     () => buildUnifiedRows({
-      tickets: scoped, sessions, filter: { query, project, status, backlog }, sessionsOnly, live,
+      tickets: scoped, sessions, filter: { query, project, status, backlog }, live,
     }),
-    [scoped, sessions, query, project, status, backlog, sessionsOnly, live],
+    [scoped, sessions, query, project, status, backlog, live],
   );
 
   // Every mapped project's stack state, for the toolbars on the project dividers
@@ -256,7 +255,6 @@ export default function UnifiedList(
           statuses={statuses} activeStatus={status} onStatus={setStatus}
           backlog={backlogChip(filters)} onBacklog={nextBacklog}
           mine={mine} onMine={setMine}
-          sessionsOnly={sessionsOnly} onSessionsOnly={setSessionsOnly}
           placeholder="Filter tickets and sessions…"
           favorites={
             <FilterFavorites
@@ -278,9 +276,18 @@ export default function UnifiedList(
               >
                 <PanelLeft size={15} aria-hidden="true" />
               </button>
-              <button className="btn primary sm" onClick={() => onNewTicket()}>+ Ticket</button>
-              <button className="btn ghost sm" onClick={() => setNewSession({ project: null })}>+ Session</button>
-              <button className="btn ghost sm" onClick={cleanup}>Clean up</button>
+              <button className="btn ghost sm" onClick={() => onNewTicket()} aria-label="New ticket" title="New ticket">
+                <Plus size={15} aria-hidden="true" />
+                <span className="btn-label">Ticket</span>
+              </button>
+              <button className="btn ghost sm" onClick={() => setNewSession({ project: null })} aria-label="New session" title="New session">
+                <Bot size={15} aria-hidden="true" />
+                <span className="btn-label">Session</span>
+              </button>
+              <button className="btn ghost sm" onClick={cleanup} aria-label="Clean up" title="Clean up">
+                <Trash2 size={15} aria-hidden="true" />
+                <span className="btn-label">Clean up</span>
+              </button>
               {needsInput > 0 && (
                 <span className="count" title={`${needsInput} session${needsInput === 1 ? "" : "s"} waiting for input`}>
                   {needsInput}
@@ -304,9 +311,7 @@ export default function UnifiedList(
         />
       )}
       {noMatches && (
-        <p className="empty">
-          {sessionsOnly ? "No sessions." : "No matching tickets or sessions."}
-        </p>
+        <p className="empty">No matching tickets or sessions.</p>
       )}
       {projectSections.map((sec) => (
         <section key={sec.project}>

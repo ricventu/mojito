@@ -26,7 +26,6 @@ export function narrowed(filters: ListFilters): boolean {
     filters.project.length > 0 ||
     filters.status !== null ||
     filters.mine ||
-    filters.sessionsOnly ||
     filters.backlog !== NO_FILTERS.backlog
   );
 }

@@ -7,7 +7,7 @@ import {
 } from "@/lib/filterFavorites";
 
 const mojito: ListFilters = { ...NO_FILTERS, project: ["Mojito"] };
-const mine: ListFilters = { ...NO_FILTERS, mine: true, sessionsOnly: true };
+const mine: ListFilters = { ...NO_FILTERS, mine: true };
 
 function fav(name: string, search: string): FilterFavorite {
   return { name, search };
@@ -31,7 +31,7 @@ describe("addFavorite", () => {
     const list = addFavorite(addFavorite([], "Mojito", mojito), "Mine", mine);
     const next = addFavorite(list, "Mojito", mine);
     expect(next.map((f) => f.name)).toEqual(["Mojito", "Mine"]);
-    expect(next[0].search).toBe("mine=1&sessions=1");
+    expect(next[0].search).toBe("mine=1");
   });
 
   it("matches an existing name case-insensitively, keeping the name already stored", () => {
@@ -73,20 +73,20 @@ describe("addFavorite", () => {
 
 describe("favoriteFilters", () => {
   it("reads the stored search back through the url parser", () => {
-    expect(favoriteFilters(fav("Mine", "mine=1&sessions=1"))).toEqual(mine);
+    expect(favoriteFilters(fav("Mine", "mine=1"))).toEqual(mine);
   });
 
   it("round-trips every filter, the Backlog flag included", () => {
     const all: ListFilters = {
       query: "auth bug", project: ["Mojito", "Fornace"], status: "In Review",
-      mine: true, sessionsOnly: true, backlog: true,
+      mine: true, backlog: true,
     };
     expect(favoriteFilters(addFavorite([], "All", all)[0])).toEqual(all);
   });
 });
 
 describe("activeFavorite", () => {
-  const list = [fav("Mojito", "project=Mojito"), fav("Mine", "mine=1&sessions=1")];
+  const list = [fav("Mojito", "project=Mojito"), fav("Mine", "mine=1")];
 
   it("names the favourite whose filters the board is showing", () => {
     expect(activeFavorite(list, mine)).toBe("Mine");
@@ -97,7 +97,7 @@ describe("activeFavorite", () => {
   });
 
   it("ignores the order the parameters happen to be written in", () => {
-    expect(activeFavorite([fav("Mine", "sessions=1&mine=1")], mine)).toBe("Mine");
+    expect(activeFavorite([fav("Mine", "mine=1")], mine)).toBe("Mine");
   });
 
   it("does not match a favourite that is only a subset of the board's filters", () => {
@@ -204,7 +204,7 @@ describe("validateFavorites", () => {
   });
 
   it("rejects two favourites sharing a name", () => {
-    expect(validateFavorites([fav("Mine", "mine=1"), fav("mine", "sessions=1")]).ok).toBe(false);
+    expect(validateFavorites([fav("Mine", "mine=1"), fav("mine", "")]).ok).toBe(false);
   });
 
   it("trims and truncates names it accepts", () => {
@@ -223,8 +223,8 @@ describe("validateFavorites", () => {
   });
 
   it("keeps a hand-written search a parser would reorder canonical", () => {
-    const res = validateFavorites([fav("Mine", "sessions=1&mine=1")]);
-    expect(res.ok && res.value[0].search).toBe("mine=1&sessions=1");
+    const res = validateFavorites([fav("Mine", "mine=1")]);
+    expect(res.ok && res.value[0].search).toBe("mine=1");
     expect(res.ok && parseFilters(res.value[0].search)).toEqual(mine);
   });
 });
