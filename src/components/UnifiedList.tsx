@@ -182,11 +182,6 @@ export default function UnifiedList(
     onChanged();
   };
 
-  // The badge on the toolbar's gear row, counted here now that the nav it used to ride
-  // on is gone. Sessions are not scoped by any filter for this: it answers "is anything
-  // waiting for me", which a narrowed board must not be able to understate.
-  const needsInput = sessions.filter((s) => s.state === "needs-input").length;
-
   // The board's own copy of the sessions sidebar (RIC-313). Owned here and not by the
   // page because both halves of it are this component's — the list and the toggle in
   // the toolbar — and, unlike the New ticket sheet, it is reachable from nowhere else.
@@ -288,11 +283,6 @@ export default function UnifiedList(
                 <Trash2 size={15} aria-hidden="true" />
                 <span className="btn-label">Clean up</span>
               </button>
-              {needsInput > 0 && (
-                <span className="count" title={`${needsInput} session${needsInput === 1 ? "" : "s"} waiting for input`}>
-                  {needsInput}
-                </span>
-              )}
               <button className="btn ghost sm icon settings" aria-label="Settings" title="Settings" onClick={onSettings}>
                 <Settings size={15} aria-hidden="true" />
               </button>
@@ -336,6 +326,18 @@ export default function UnifiedList(
                   onPick={() => setPicked(row.ticket)}
                   onOpenSession={onOpen}
                   onDismissSession={dismiss}
+                  onImprove={async () => {
+                    const res = await apiFetch(token, `/api/tickets/${row.ticket.identifier}/improve`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        projectName: row.ticket.project,
+                        title: row.ticket.title,
+                        labels: row.ticket.labels,
+                      }),
+                    });
+                    if (res.ok) onLaunched();
+                  }}
                 />
               ))}
             </div>
