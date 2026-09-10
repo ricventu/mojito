@@ -12,5 +12,5 @@ export async function GET(req: Request) {
   const cfg = getConfig();
   if (!tokenFromHeaders(req.headers, cfg.token)) return new NextResponse("unauthorized", { status: 401 });
   const projectName = new URL(req.url).searchParams.get("projectName") || null;
-  return NextResponse.json(getProjectWorktrees(cfg.projectsPath, projectName));
+  return NextResponse.json(await getProjectWorktrees(cfg.projectsPath, projectName));
 }

@@ -14,6 +14,7 @@ const status: WorktreeStatus = {
     { path: "/repo/.claude/worktrees/RIC-9-x", branch: "RIC-9-x" },
     { path: "/repo/.claude/worktrees/RIC-8-y", branch: "RIC-8-y" },
   ],
+  repoRootBranch: "main",
 };
 
 describe("canPickWorktree", () => {

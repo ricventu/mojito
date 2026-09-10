@@ -1,6 +1,7 @@
 import { repoForTicket } from "./ticketCwd";
 import { findExistingTicketWorktree, listLocalBranches, listRemoteBranches, listPickableWorktrees } from "./worktree";
 import { detectDefaultBranch } from "./merge";
+import { currentBranch } from "./projectStack";
 
 export interface TicketWorktreeStatus {
   exists: boolean;
@@ -15,6 +16,8 @@ export interface TicketWorktreeStatus {
   // the only place the picker appears — a ticket that already has a worktree opens in it
   // with no question asked, so there is nothing to offer and no git call to spend.
   worktrees: { path: string; branch: string }[];
+  /** The current branch of the repo root (RIC-333). "" when git cannot answer. */
+  repoRootBranch: string;
 }
 
 export interface TicketWorktreeStatusDeps {
@@ -24,13 +27,14 @@ export interface TicketWorktreeStatusDeps {
   listRemoteBranches: typeof listRemoteBranches;
   detectDefaultBranch: typeof detectDefaultBranch;
   listPickableWorktrees: typeof listPickableWorktrees;
+  currentBranch: typeof currentBranch;
 }
 
 // The answer when there is no question to ask: the ticket's worktree is there, or there is
 // no repo to create one in. Every list stays empty — the sheet only reads them when it asks.
 // A function rather than a constant so no caller shares (or mutates) one set of arrays.
 const nothingToAsk = (): TicketWorktreeStatus =>
-  ({ exists: true, branches: [], remoteBranches: [], defaultBranch: null, worktrees: [] });
+  ({ exists: true, branches: [], remoteBranches: [], defaultBranch: null, worktrees: [], repoRootBranch: "" });
 
 /**
  * What the launch sheet needs to decide whether to ask "create a worktree for this
@@ -46,7 +50,7 @@ export async function getTicketWorktreeStatus(
   title: string,
   deps: TicketWorktreeStatusDeps = {
     repoForTicket, findExistingTicketWorktree, listLocalBranches, listRemoteBranches,
-    detectDefaultBranch, listPickableWorktrees,
+    detectDefaultBranch, listPickableWorktrees, currentBranch,
   },
 ): Promise<TicketWorktreeStatus> {
   const repo = deps.repoForTicket(projectsPath, ticket, projectName);
@@ -57,5 +61,7 @@ export async function getTicketWorktreeStatus(
   const worktrees = deps.listPickableWorktrees(repo).map((w) => ({ path: w.path, branch: w.branch }));
   let defaultBranch: string | null = null;
   try { defaultBranch = await deps.detectDefaultBranch(repo); } catch { /* no default found — leave null */ }
-  return { exists: false, branches, remoteBranches, defaultBranch, worktrees };
+  let repoRootBranch = "";
+  try { repoRootBranch = await deps.currentBranch(repo); } catch { /* detached HEAD or git failed */ }
+  return { exists: false, branches, remoteBranches, defaultBranch, worktrees, repoRootBranch };
 }

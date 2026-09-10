@@ -11,6 +11,8 @@ export interface WorktreeStatus {
   remoteBranches: string[];
   defaultBranch: string | null;
   worktrees: WorktreeChoice[];
+  /** The current branch of the repo root (RIC-333). "" when git cannot answer. */
+  repoRootBranch: string;
 }
 
 /** The three answers, in the order the sheet offers them. */

@@ -8,6 +8,7 @@ const FETCHED: TicketWorktreeStatus = {
   remoteBranches: ["origin/main", "origin/new-thing"],
   defaultBranch: "main",
   worktrees: [],
+  repoRootBranch: "main",
 };
 
 function deps(over: Partial<Parameters<typeof fetchTicketRemotes>[4]> = {}) {

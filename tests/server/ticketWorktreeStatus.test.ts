@@ -9,6 +9,7 @@ function deps(over: Partial<Parameters<typeof getTicketWorktreeStatus>[4]> = {})
     listRemoteBranches: vi.fn(() => ["origin/main", "origin/feature"]),
     detectDefaultBranch: vi.fn(async () => "main"),
     listPickableWorktrees: vi.fn(() => [{ path: "/repo/.claude/worktrees/RIC-9-other", branch: "RIC-9-other" }]),
+    currentBranch: vi.fn(async (_cwd: string) => "main"),
     ...over,
   };
 }
@@ -17,12 +18,13 @@ describe("getTicketWorktreeStatus", () => {
   it("reports exists:true and skips branch lookup when a worktree already exists", async () => {
     const d = deps({ findExistingTicketWorktree: vi.fn(() => "/repo/.claude/worktrees/RIC-1-x") });
     const res = await getTicketWorktreeStatus("/cfg.json", "RIC-1", "mojito", "Some title", d);
-    expect(res).toEqual({ exists: true, branches: [], remoteBranches: [], defaultBranch: null, worktrees: [] });
+    expect(res).toEqual({ exists: true, branches: [], remoteBranches: [], defaultBranch: null, worktrees: [], repoRootBranch: "" });
     expect(d.listLocalBranches).not.toHaveBeenCalled();
     expect(d.listRemoteBranches).not.toHaveBeenCalled();
     expect(d.detectDefaultBranch).not.toHaveBeenCalled();
     // The picker only shows where the question does, so nothing is listed on this path.
     expect(d.listPickableWorktrees).not.toHaveBeenCalled();
+    expect(d.currentBranch).not.toHaveBeenCalled();
   });
 
   it("reports exists:false with the repo's branches, remotes apart, and detected default", async () => {
@@ -30,7 +32,8 @@ describe("getTicketWorktreeStatus", () => {
     const res = await getTicketWorktreeStatus("/cfg.json", "RIC-1", "mojito", "Some title", d);
     expect(res).toEqual({ exists: false, branches: ["main", "dev"],
       remoteBranches: ["origin/main", "origin/feature"], defaultBranch: "main",
-      worktrees: [{ path: "/repo/.claude/worktrees/RIC-9-other", branch: "RIC-9-other" }] });
+      worktrees: [{ path: "/repo/.claude/worktrees/RIC-9-other", branch: "RIC-9-other" }],
+      repoRootBranch: "main" });
   });
 
   it("falls back to a null default branch when it cannot be detected", async () => {
@@ -38,13 +41,15 @@ describe("getTicketWorktreeStatus", () => {
     const res = await getTicketWorktreeStatus("/cfg.json", "RIC-1", "mojito", "Some title", d);
     expect(res).toEqual({ exists: false, branches: ["main", "dev"],
       remoteBranches: ["origin/main", "origin/feature"], defaultBranch: null,
-      worktrees: [{ path: "/repo/.claude/worktrees/RIC-9-other", branch: "RIC-9-other" }] });
+      worktrees: [{ path: "/repo/.claude/worktrees/RIC-9-other", branch: "RIC-9-other" }],
+      repoRootBranch: "main" });
   });
 
   it("offers nothing to pick when the repo has no other worktree", async () => {
     const d = deps({ listPickableWorktrees: vi.fn(() => []) });
     const res = await getTicketWorktreeStatus("/cfg.json", "RIC-1", "mojito", "Some title", d);
     expect(res.worktrees).toEqual([]);
+    expect(res.repoRootBranch).toBe("main");
   });
 
   // No resolvable repo: reports exists:true so the UI skips the create-worktree question —
@@ -52,7 +57,15 @@ describe("getTicketWorktreeStatus", () => {
   it("reports exists:true when the ticket maps to no repo", async () => {
     const d = deps({ repoForTicket: vi.fn(() => null) });
     const res = await getTicketWorktreeStatus("/cfg.json", "RIC-1", "mojito", "Some title", d);
-    expect(res).toEqual({ exists: true, branches: [], remoteBranches: [], defaultBranch: null, worktrees: [] });
+    expect(res).toEqual({ exists: true, branches: [], remoteBranches: [], defaultBranch: null, worktrees: [], repoRootBranch: "" });
     expect(d.findExistingTicketWorktree).not.toHaveBeenCalled();
+    expect(d.currentBranch).not.toHaveBeenCalled();
+  });
+
+  it("returns empty repoRootBranch when currentBranch throws", async () => {
+    const d = deps({ currentBranch: vi.fn(async () => { throw new Error("detached HEAD"); }) });
+    const res = await getTicketWorktreeStatus("/cfg.json", "RIC-1", "mojito", "Some title", d);
+    expect(res.repoRootBranch).toBe("");
+    expect(res.exists).toBe(false);
   });
 });

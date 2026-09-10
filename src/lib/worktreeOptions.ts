@@ -30,10 +30,14 @@ function dirName(path: string): string {
  * is in there. A detached one has no branch, so it falls back to its directory name:
  * these go into a searchable select, where an option with no label cannot be found or
  * even seen.
+ *
+ * The repo root carries its own branch when the server supplies one (RIC-333) — the one
+ * thing the human needs to know before picking where to open.
  */
-export function worktreeOptions(worktrees: readonly WorktreeChoice[]): SelectOption[] {
+export function worktreeOptions(worktrees: readonly WorktreeChoice[], repoRootBranch = ""): SelectOption[] {
+  const rootLabel = repoRootBranch ? `${REPO_ROOT_LABEL} · ${repoRootBranch}` : REPO_ROOT_LABEL;
   return [
-    { value: REPO_ROOT, label: REPO_ROOT_LABEL },
+    { value: REPO_ROOT, label: rootLabel },
     ...worktrees.map((w) => ({ value: w.path, label: w.branch || dirName(w.path) })),
   ];
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const h = vi.hoisted(() => ({
-  getProjectWorktrees: vi.fn((): { worktrees: { path: string; branch: string }[] } => ({ worktrees: [] })),
+  getProjectWorktrees: vi.fn(async (): Promise<{ worktrees: { path: string; branch: string }[]; repoRootBranch: string }> => ({ worktrees: [], repoRootBranch: "" })),
 }));
 
 vi.mock("@/server/projectWorktrees", () => ({ getProjectWorktrees: h.getProjectWorktrees }));
@@ -19,15 +19,21 @@ const req = (qs = "?projectName=Mojito") =>
 
 beforeEach(() => {
   h.getProjectWorktrees.mockClear();
-  h.getProjectWorktrees.mockReturnValue({ worktrees: [] });
+  h.getProjectWorktrees.mockResolvedValue({ worktrees: [], repoRootBranch: "" });
 });
 
 describe("GET /api/projects/worktrees", () => {
-  it("answers the project's worktrees", async () => {
-    h.getProjectWorktrees.mockReturnValue({ worktrees: [{ path: "/repo/wt", branch: "RIC-9-x" }] });
+  it("answers the project's worktrees and repo root branch", async () => {
+    h.getProjectWorktrees.mockResolvedValue({
+      worktrees: [{ path: "/repo/wt", branch: "RIC-9-x" }],
+      repoRootBranch: "main",
+    });
     const res = await GET(req());
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ worktrees: [{ path: "/repo/wt", branch: "RIC-9-x" }] });
+    expect(await res.json()).toEqual({
+      worktrees: [{ path: "/repo/wt", branch: "RIC-9-x" }],
+      repoRootBranch: "main",
+    });
     expect(h.getProjectWorktrees).toHaveBeenCalledWith("/cfg/projects.json", "Mojito");
   });
 

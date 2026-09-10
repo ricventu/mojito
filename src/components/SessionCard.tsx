@@ -1,9 +1,18 @@
 "use client";
+import { useEffect, useState } from "react";
 import StateBadge from "./StateBadge";
 import TicketLink from "./TicketLink";
+import RepoRootBadge from "./RepoRootBadge";
 import { isActiveSession } from "@/lib/activeSession";
 import { tapProps } from "@/lib/tapProps";
+import { apiFetch } from "@/lib/client";
 import type { SessionMeta } from "@/server/types";
+
+interface RepoInfo {
+  repoRoot: string;
+  branch: string;
+  isRepoRoot: boolean;
+}
 
 /**
  * A session with no visible ticket to nest under — a bare claude session, a plain
@@ -21,6 +30,22 @@ export default function SessionCard(
     onDismiss: () => void },
 ) {
   const active = isActiveSession(s);
+  const [repoInfo, setRepoInfo] = useState<RepoInfo | null>(null);
+
+  useEffect(() => {
+    // Fetch the repo root and branch for this session (RIC-333). The token is read
+    // from the same source the rest of the app uses — a missing one means the gate
+    // is still up, so skip the call rather than failing it.
+    const token = (document.cookie.match(/mojito-token=([^;]+)/) ?? [])[1];
+    if (!token) return;
+    let live = true;
+    apiFetch(token, `/api/sessions/${s.id}/repo-info`)
+      .then((res) => { if (live && res.ok) return res.json(); return null; })
+      .then((data) => { if (live && data) setRepoInfo(data); })
+      .catch(() => { /* session gone or endpoint unreachable — hide the badge */ });
+    return () => { live = false; };
+  }, [s.id]);
+
   return (
     <div className={`card${s.state === "needs-input" ? " attn" : ""}`}>
       {/* A ticket session leads with its id, which links to Linear — so that row sits
@@ -55,6 +80,13 @@ export default function SessionCard(
         <div className="meta">
           {s.kind !== "shell" && <span className="chip">{s.model} · {s.effort}</span>}
           {s.kind === "shell" && <span className="chip">terminal</span>}
+          {repoInfo?.repoRoot && (
+            <RepoRootBadge
+              repoRoot={repoInfo.repoRoot}
+              branch={repoInfo.branch}
+              isRepoRoot={repoInfo.isRepoRoot}
+            />
+          )}
         </div>
       </div>
       <div className="row" style={{ marginTop: 12 }}>

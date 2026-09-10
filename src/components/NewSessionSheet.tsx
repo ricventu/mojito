@@ -38,17 +38,22 @@ export default function NewSessionSheet(
   // Re-fetched per project, and the selection resets with it: a path from the previous
   // project is not a worktree of this one, and the server would refuse it anyway.
   const [worktrees, setWorktrees] = useState<WorktreeChoice[]>([]);
+  const [repoRootBranch, setRepoRootBranch] = useState("");
   const [worktree, setWorktree] = useState(REPO_ROOT);
   useEffect(() => {
     let live = true;
     setWorktree(REPO_ROOT);
+    setRepoRootBranch("");
     // General has no repo, so there is nothing to ask the server about.
     if (!projectName) { setWorktrees([]); return; }
     (async () => {
       try {
         const res = await apiFetch(token, `/api/projects/worktrees?projectName=${encodeURIComponent(projectName)}`);
         const data = res.ok ? await res.json() : null;
-        if (live) setWorktrees(Array.isArray(data?.worktrees) ? data.worktrees : []);
+        if (live) {
+          setWorktrees(Array.isArray(data?.worktrees) ? data.worktrees : []);
+          setRepoRootBranch(typeof data?.repoRootBranch === "string" ? data.repoRootBranch : "");
+        }
       } catch {
         // Unreachable check hides the field, which is what "no worktrees" already means:
         // the launch lands in the repo root exactly as it did before this existed.
@@ -113,7 +118,7 @@ export default function NewSessionSheet(
             no linked worktree. A field with one option is noise. */}
         {worktrees.length > 0 && (
           <div className="field"><span className="lbl">Worktree</span>
-            <Combobox options={worktreeOptions(worktrees)} value={worktree} onChange={setWorktree}
+            <Combobox options={worktreeOptions(worktrees, repoRootBranch)} value={worktree} onChange={setWorktree}
               label="Worktree" searchLabel="Search worktrees…" emptyLabel="No worktree matches." />
           </div>
         )}

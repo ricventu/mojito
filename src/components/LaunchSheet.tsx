@@ -32,7 +32,7 @@ const LAUNCH_FAILED = "launch request failed — check the connection and retry"
 // which is the behaviour from before the question existed — launch in whatever cwd the
 // server resolves, create nothing.
 const NO_QUESTION: WorktreeStatus =
-  { exists: true, branches: [], remoteBranches: [], defaultBranch: null, worktrees: [] };
+  { exists: true, branches: [], remoteBranches: [], defaultBranch: null, worktrees: [], repoRootBranch: "" };
 
 // Every list is normalized rather than trusted: a server that predates one of these fields
 // answers without it, and an absent list means exactly what an empty one does to the sheet
@@ -46,6 +46,7 @@ function parseWorktreeStatus(data: unknown): WorktreeStatus {
     remoteBranches: Array.isArray(d.remoteBranches) ? d.remoteBranches : [],
     defaultBranch: typeof d.defaultBranch === "string" ? d.defaultBranch : null,
     worktrees: Array.isArray(d.worktrees) ? d.worktrees : [],
+    repoRootBranch: typeof d.repoRootBranch === "string" ? d.repoRootBranch : "",
   };
 }
 
@@ -440,7 +441,7 @@ export default function LaunchSheet(
   const worktreeSelect = wtAnswer?.kind === "pick" && wtStatus !== "loading" ? (
     <div className="field" style={{ marginTop: 12 }}><span className="lbl">Worktree</span>
       <Combobox label="Worktree" searchLabel="Search worktrees…" emptyLabel="No worktree matches."
-        options={worktreeOptions(wtStatus.worktrees)} value={wtAnswer.worktree}
+        options={worktreeOptions(wtStatus.worktrees, wtStatus.repoRootBranch)} value={wtAnswer.worktree}
         onChange={(v) => setWtAnswer({ kind: "pick", baseBranch: "", worktree: v })} />
     </div>
   ) : null;
