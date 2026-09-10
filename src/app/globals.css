@@ -134,6 +134,8 @@ label { color: var(--text); }
   transition: border-color .15s, transform .1s; color: var(--text);
 }
 .card .card-head { display: flex; align-items: center; gap: 8px; }
+.card .card-head .improve-btn { margin-left: auto; font-size: 14px; padding: 2px 6px; line-height: 1; }
+.card .card-head .improve-btn:disabled { opacity: .4; cursor: not-allowed; }
 .card .tap { cursor: pointer; }
 .card .tap:active { transform: scale(.99); }
 .card.attn {
@@ -542,8 +544,8 @@ button.chip:active { transform: scale(.96); }
    another session state (see its doc comment), so a plain chip is unambiguous. */
 .chip.mine {
   margin-left: 6px; vertical-align: middle;
-  color: var(--accent); background: var(--accent-soft);
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--text-dim); background: transparent;
+  border-color: var(--border);
 }
 
 /* ---- Status dot (project toolbars) ---- */
