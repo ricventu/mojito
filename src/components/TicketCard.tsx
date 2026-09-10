@@ -1,4 +1,5 @@
 "use client";
+import { Sparkles } from "lucide-react";
 import SessionRow from "./SessionRow";
 import TicketLink from "./TicketLink";
 import { showsMineMarker } from "@/lib/ticketFilter";
@@ -26,21 +27,32 @@ import type { TicketRow } from "@/lib/unifiedRows";
  * below it, which is most of the card, still open the sheet.
  */
 export default function TicketCard(
-  { row, mine, onPick, onOpenSession, onDismissSession }: {
+  { row, mine, onPick, onOpenSession, onDismissSession, onImprove }: {
     row: TicketRow;
     mine: boolean;
     onPick: () => void;
     onOpenSession: (s: SessionMeta) => void;
     onDismissSession: (s: SessionMeta) => void;
+    onImprove: () => void;
   },
 ) {
   const { ticket, sessions } = row;
   const attn = activeSessionLevel(ticket.identifier, sessions) === "attn";
+  const hasImprove = sessions.some((s) => s.kind === "improve" && (s.state === "starting" || s.state === "running" || s.state === "needs-input"));
   return (
     <div className={`card${attn ? " attn" : ""}`}>
       <div className="card-head">
         <TicketLink id={ticket.identifier} url={ticket.url} />
         {showsMineMarker(ticket, mine) && <span className="chip mine">Mine</span>}
+        <button
+          className="btn sm ghost icon improve-btn"
+          disabled={hasImprove}
+          onClick={(e) => { e.stopPropagation(); onImprove(); }}
+          aria-label="Improve ticket"
+          title="Improve ticket"
+        >
+          <Sparkles size={15} aria-hidden="true" />
+        </button>
       </div>
       <div className="tap" {...tapProps(onPick)}>
         <div className="title">{ticket.title}</div>
