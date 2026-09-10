@@ -165,5 +165,9 @@ export function tmuxEnvArgs(globalEnv: Record<string, string>): string[] {
  * having no NODE_ENV is the entire point.
  */
 export function spawnEnv(env: EnvLike = process.env): NodeJS.ProcessEnv {
-  return sanitizeEnv(env) as NodeJS.ProcessEnv;
+  const sanitized = sanitizeEnv(env) as NodeJS.ProcessEnv;
+  // Suppress the YOLO mode warning in spawned sessions (RIC-315). Mojito sessions are
+  // already isolated in worktrees with controlled prompts, so auto-execution is intended.
+  sanitized.QWEN_CODE_SUPPRESS_YOLO_WARNING = "1";
+  return sanitized;
 }

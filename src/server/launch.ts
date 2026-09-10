@@ -165,6 +165,7 @@ export function buildClaudeCommand(
   if (prompt.startsWith("-")) throw new Error("prompt must not start with '-'");
   const cmd = req.command === "qwen" ? "qwen" : req.command === "cqwen" ? "cqwen" : "claude";
   // Qwen and cqwen don't support --effort or --settings flags; cqwen is an alias that sets env vars
+  // No special approval flags - matches Claude Code behavior: interactive session that waits for user input
   if (cmd === "qwen") {
     return `${cmd} --model ${q(req.model)} ${q(prompt)}`;
   }
@@ -274,6 +275,7 @@ export function buildCustomClaudeCommand(req: CustomLaunchRequest, settingsPath:
   const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
   const cmd = req.command === "qwen" ? "qwen" : req.command === "cqwen" ? "cqwen" : "claude";
   // Qwen and cqwen don't support --effort or --settings flags; cqwen is an alias that sets env vars
+  // No special approval flags - matches Claude Code behavior: interactive session that waits for user input
   if (cmd === "qwen") {
     const base = `${cmd} --model ${q(req.model)}`;
     if (req.prompt && req.prompt.startsWith("-")) {

@@ -64,6 +64,8 @@ describe("buildClaudeCommand", () => {
     expect(cmd).toBe("qwen --model 'qwen3.7-plus' 'work on RIC-46'");
     expect(cmd).not.toContain("--effort");
     expect(cmd).not.toContain("--settings");
+    expect(cmd).not.toContain("--approval-mode");
+    expect(cmd).not.toContain("-y");
   });
 
   it("escapes single quotes in the prompt for qwen command", () => {
@@ -287,6 +289,8 @@ describe("buildCustomClaudeCommand", () => {
       expect(cmd).toBe("qwen --model 'qwen3.7-plus'");
       expect(cmd).not.toContain("--effort");
       expect(cmd).not.toContain("--settings");
+      expect(cmd).not.toContain("--approval-mode");
+      expect(cmd).not.toContain("-y");
     });
 
     it("appends the prompt as a single quoted positional arg for qwen", () => {
