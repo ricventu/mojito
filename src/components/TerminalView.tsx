@@ -463,9 +463,6 @@ export default function TerminalView(
       <div className="term-main">
         {!kbdOpen && (
         <header className="term-head">
-          <button className="back icon" aria-label="Back" onClick={onBack}>
-            <ChevronLeft size={20} aria-hidden="true" />
-          </button>
           {/* Deliberately not bound to Escape as well: Esc belongs to claude's TUI, and a
               terminal that swallows it to close a list is a worse terminal. */}
           <button
@@ -476,6 +473,9 @@ export default function TerminalView(
             onClick={sidebar.toggle}
           >
             <PanelLeft size={15} aria-hidden="true" />
+          </button>
+          <button className="back icon" aria-label="Back" onClick={onBack}>
+            <ChevronLeft size={20} aria-hidden="true" />
           </button>
           <div className="term-ident">
             {/* The id is the ticket's name here, so it is what opens the issue on Linear;
