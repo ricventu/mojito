@@ -13,7 +13,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 // webpack's, and the build runs on Turbopack since Next 16 (RIC-227) — the global
 // import is kept because it is the plainer arrangement, not because it is still
 // forced. Treat the diagnosis as history, not as a Turbopack constraint.
-import { ChevronLeft, FileText, PanelLeft, Plus, X } from "lucide-react";
+import { Bot, ChevronLeft, FileText, PanelLeft, Plus, X } from "lucide-react";
 import AccessoryBar from "./AccessoryBar";
 import SessionSidebar from "./SessionSidebar";
 import DocsView from "./DocsView";
@@ -39,7 +39,7 @@ import { quoteArg } from "@/lib/quoteArg";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 
 export default function TerminalView(
-  { token, session, sessions, tickets, docs, onNewTicket, onOpenDocs, onSelectDoc, onOpenSession, onBack }:
+  { token, session, sessions, tickets, docs, onNewTicket, onNewSession, onOpenDocs, onSelectDoc, onOpenSession, onBack }:
   {
     token: string;
     session: SessionMeta;
@@ -54,6 +54,7 @@ export default function TerminalView(
     // The New ticket sheet is the page's, not this component's: it has to be reachable
     // from here too (RIC-224), and it opens pre-set to this session's project.
     onNewTicket: () => void;
+    onNewSession: () => void;
     onOpenDocs: () => void;
     onSelectDoc: (path: string) => void;
     /** Switch this view to another live session — navigation is the page's, not ours. */
@@ -501,6 +502,9 @@ export default function TerminalView(
                 &lt;/&gt;
               </a>
             )}
+            <button className="btn sm icon" aria-label="New session" title="New session" onClick={onNewSession}>
+              <Bot size={15} aria-hidden="true" />
+            </button>
             <button className="btn sm icon" aria-label="New ticket" title="New ticket" onClick={onNewTicket}>
               <Plus size={15} aria-hidden="true" />
             </button>

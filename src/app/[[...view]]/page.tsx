@@ -12,6 +12,7 @@ import UnifiedList from "@/components/UnifiedList";
 import AlertLayer from "@/components/AlertLayer";
 import SettingsSheet from "@/components/SettingsSheet";
 import NewTicketSheet from "@/components/NewTicketSheet";
+import NewSessionSheet from "@/components/NewSessionSheet";
 import DocsView from "@/components/DocsView";
 import { withSession } from "@/lib/launchedSession";
 import { newTicketProject } from "@/lib/sheetProject";
@@ -46,6 +47,7 @@ export default function Home() {
   // we are" (see newTicketProject). One piece of state rather than two, so the flag and
   // the project cannot disagree.
   const [newTicket, setNewTicket] = useState<{ project: string | null } | null>(null);
+  const [newSession, setNewSession] = useState<{ project: string | null } | null>(null);
   const { tickets, refresh: refreshTickets } = useTickets(token);
   const { sessions, setSessions, loaded: sessionsLoaded, refresh: refreshSessions } = useSessions(token);
   // Owned here — not by the project toolbar or SettingsSheet — so a deploy's health poll
@@ -155,6 +157,7 @@ export default function Home() {
         tickets={tickets}
         docs={view.docs}
         onNewTicket={() => setNewTicket({ project: null })}
+        onNewSession={() => setNewSession({ project: openSession.projectName ?? null })}
         // Replaces the entry rather than pushing one: the sidebar is a switcher, so Back
         // must return to the board as it always did, not walk back through the terminals
         // visited on the way. Replacing carries the depth over untouched, so a terminal
@@ -173,6 +176,15 @@ export default function Home() {
         }}
       />
       {newTicketSheet}
+      {newSession && (
+        <NewSessionSheet
+          token={token}
+          defaultProject={newSession.project}
+          onClose={() => setNewSession(null)}
+          onLaunched={refreshSessions}
+          onOpen={(s) => { setNewSession(null); openLaunched(s); }}
+        />
+      )}
       </>
     );
   }
