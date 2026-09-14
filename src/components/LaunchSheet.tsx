@@ -77,7 +77,7 @@ export default function LaunchSheet(
   // Pre-fill the model + effort optimal for this ticket's stage (overridable via the selectors).
   const [model, setModel] = useState<string>(() => resolveModel(stageKey));
   const [effort, setEffort] = useState<string>(() => resolveEffort(stageKey));
-  const [command, setCommand] = useState<"claude" | "qwen" | "cqwen">("claude");
+  const [command, setCommand] = useState<"claude" | "qwen">("claude");
   const [qwenModel, setQwenModel] = useState("qwen3.7-plus");
   const [touched, setTouched] = useState(false);
   // Re-seed both selectors from the effective (possibly user-edited) defaults once they load,
@@ -297,7 +297,7 @@ export default function LaunchSheet(
       const res = await apiFetch(token, "/api/sessions", {
         method: "POST",
         body: JSON.stringify({ ticket: ticket.identifier, status, model: command === "qwen" ? qwenModel : model, effort: command === "claude" ? effort : undefined,
-          command: command === "qwen" ? "qwen" : command === "cqwen" ? "cqwen" : undefined,
+          command: command === "qwen" ? "qwen" : undefined,
           projectName: ticket.project, title: ticket.title, labels: ticket.labels,
           ...launchWorktreeFields(wtAnswer) }),
       });
@@ -324,7 +324,7 @@ export default function LaunchSheet(
         method: "POST",
         body: JSON.stringify({ kind: "custom", ticket: ticket.identifier, status,
           projectName: ticket.project, title: ticket.title, labels: ticket.labels, model: command === "qwen" ? qwenModel : model, effort: command === "claude" ? effort : undefined,
-          command: command === "qwen" ? "qwen" : command === "cqwen" ? "cqwen" : undefined,
+          command: command === "qwen" ? "qwen" : undefined,
           ...launchWorktreeFields(wtAnswer) }),
       });
       if (!res.ok) { setErr(await apiError(res, "launch failed")); return; }
@@ -365,7 +365,6 @@ export default function LaunchSheet(
         <div className="btns">
           <button className={`btn ${command === "claude" ? "primary" : "ghost"}`} onClick={() => setCommand("claude")}>claude</button>
           <button className={`btn ${command === "qwen" ? "primary" : "ghost"}`} onClick={() => setCommand("qwen")}>qwen</button>
-          <button className={`btn ${command === "cqwen" ? "primary" : "ghost"}`} onClick={() => setCommand("cqwen")}>cqwen</button>
         </div>
       </div>
       <div className="two">

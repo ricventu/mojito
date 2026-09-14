@@ -17,9 +17,10 @@ export interface SessionMeta {
   // "intake" = the New-ticket session that turns a draft into a Linear issue (RIC-251) —
   // a custom session in every mechanical respect (no ticket, no lifecycle, mapCustomHook
   // drives its state), but it says so on the board instead of hiding among the bare
-  // claude sessions the human started themselves; "shell" = plain login-shell terminal
+  // claude sessions the human started themselves; "improve" = the session that rewrites
+  // an existing ticket's title and description; "shell" = plain login-shell terminal
   // ($SHELL, or bash).
-  kind: "ticket" | "custom" | "intake" | "shell";
+  kind: "ticket" | "custom" | "intake" | "improve" | "shell";
   id: string;            // tmux session name, e.g. "mojito-RIC-46-work"
   ticket: string;        // "RIC-46" (empty for custom sessions)
   launchStatus: string;  // Linear status name at launch (empty for custom sessions)
@@ -55,7 +56,4 @@ export interface AppConfig {
   stateDir: string;
   projectsPath: string;
   qwenModel: string;
-  cqwenBaseUrl?: string;
-  cqwenApiKey?: string;
-  cqwenModel?: string;
 }

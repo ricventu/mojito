@@ -73,25 +73,6 @@ describe("buildClaudeCommand", () => {
     expect(cmd).toContain("'it'\\''s fine'");
   });
 
-  it("builds a cqwen command with ANTHROPIC_API_KEY when provided", () => {
-    const cmd = buildClaudeCommand({ ...baseReq, command: "cqwen" }, "/state/settings/x.json", "work on RIC-46",
-      { baseUrl: "https://example.com", apiKey: "sk-test-key", model: "qwen-custom" });
-    expect(cmd).toContain("ANTHROPIC_BASE_URL='https://example.com'");
-    expect(cmd).toContain("ANTHROPIC_API_KEY='sk-test-key'");
-    expect(cmd).toContain("ANTHROPIC_MODEL='qwen-custom'");
-    expect(cmd).not.toContain("--model");
-    expect(cmd).not.toContain("--effort");
-    expect(cmd).not.toContain("--settings");
-  });
-
-  it("builds a cqwen command without ANTHROPIC_API_KEY when not provided", () => {
-    const cmd = buildClaudeCommand({ ...baseReq, command: "cqwen" }, "/state/settings/x.json", "work on RIC-46");
-    expect(cmd).toBe("ANTHROPIC_BASE_URL='https://dashscope-intl.aliyuncs.com/apps/anthropic' ANTHROPIC_MODEL='qwen3.7-plus' claude 'work on RIC-46'");
-    expect(cmd).not.toContain("ANTHROPIC_API_KEY");
-    expect(cmd).not.toContain("--model");
-    expect(cmd).not.toContain("--effort");
-    expect(cmd).not.toContain("--settings");
-  });
 });
 
 describe("launchSession", () => {
@@ -307,35 +288,6 @@ describe("buildCustomClaudeCommand", () => {
       expect(() => buildCustomClaudeCommand({ projectName: "Factorybook", model: "qwen3.7-plus", effort: "high", command: "qwen" as const, prompt: "-h" }, "/s/x.json")).toThrow();
     });
 
-    it("builds a cqwen command with ANTHROPIC_API_KEY when provided", () => {
-      const cmd = buildCustomClaudeCommand({ projectName: null, model: "opus", effort: "high", command: "cqwen" as const }, "/s/x.json",
-        { baseUrl: "https://example.com", apiKey: "sk-test-key", model: "qwen-custom" });
-      expect(cmd).toContain("ANTHROPIC_BASE_URL='https://example.com'");
-      expect(cmd).toContain("ANTHROPIC_API_KEY='sk-test-key'");
-      expect(cmd).toContain("ANTHROPIC_MODEL='qwen-custom'");
-      expect(cmd).not.toContain("--model");
-      expect(cmd).not.toContain("--effort");
-      expect(cmd).not.toContain("--settings");
-    });
-
-    it("builds a bare cqwen command without ANTHROPIC_API_KEY when not provided", () => {
-      const cmd = buildCustomClaudeCommand({ projectName: null, model: "opus", effort: "high", command: "cqwen" as const }, "/s/x.json");
-      expect(cmd).toBe("ANTHROPIC_BASE_URL='https://dashscope-intl.aliyuncs.com/apps/anthropic' ANTHROPIC_MODEL='qwen3.7-plus' claude");
-      expect(cmd).not.toContain("ANTHROPIC_API_KEY");
-      expect(cmd).not.toContain("--model");
-      expect(cmd).not.toContain("--effort");
-      expect(cmd).not.toContain("--settings");
-    });
-
-    it("appends the prompt as a single quoted positional arg for cqwen with env vars", () => {
-      const cmd = buildCustomClaudeCommand({ projectName: "Factorybook", model: "opus", effort: "high", command: "cqwen" as const, prompt: "align the branch" }, "/s/x.json",
-        { baseUrl: "https://example.com", apiKey: "sk-test-key", model: "qwen-custom" });
-      expect(cmd).toBe("ANTHROPIC_BASE_URL='https://example.com' ANTHROPIC_API_KEY='sk-test-key' ANTHROPIC_MODEL='qwen-custom' claude 'align the branch'");
-    });
-
-    it("rejects a prompt starting with '-' for cqwen", () => {
-      expect(() => buildCustomClaudeCommand({ projectName: "Factorybook", model: "opus", effort: "high", command: "cqwen" as const, prompt: "-h" }, "/s/x.json")).toThrow();
-    });
   });
 });
 

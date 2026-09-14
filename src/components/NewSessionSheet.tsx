@@ -29,7 +29,7 @@ export default function NewSessionSheet(
 ) {
   const { projects, project, setProject, projectName } = useProjectPicker(token, defaultProject);
   const [mode, setMode] = useState<"claude" | "terminal">("claude");
-  const [command, setCommand] = useState<"claude" | "qwen" | "cqwen">("claude");
+  const [command, setCommand] = useState<"claude" | "qwen">("claude");
   const [model, setModel] = useState("opus");
   const [qwenModel, setQwenModel] = useState("qwen3.7-plus");
   const [effort, setEffort] = useState("high");
@@ -84,7 +84,7 @@ export default function NewSessionSheet(
     const picked = worktree ? { worktree } : {};
     const body = mode === "terminal"
       ? { kind: "shell", projectName, ...picked }
-      : { kind: "custom", projectName, model: command === "qwen" ? qwenModel : model, effort: command === "claude" ? effort : undefined, command: command === "qwen" ? "qwen" : command === "cqwen" ? "cqwen" : undefined, ...picked };
+      : { kind: "custom", projectName, model: command === "qwen" ? qwenModel : model, effort: command === "claude" ? effort : undefined, command: command === "qwen" ? "qwen" : undefined, ...picked };
     const res = await apiFetch(token, "/api/sessions", {
       method: "POST",
       body: JSON.stringify(body),
@@ -128,7 +128,6 @@ export default function NewSessionSheet(
               <div className="btns">
                 <button className={`btn ${command === "claude" ? "primary" : "ghost"}`} onClick={() => setCommand("claude")}>claude</button>
                 <button className={`btn ${command === "qwen" ? "primary" : "ghost"}`} onClick={() => setCommand("qwen")}>qwen</button>
-                <button className={`btn ${command === "cqwen" ? "primary" : "ghost"}`} onClick={() => setCommand("cqwen")}>cqwen</button>
               </div>
             </div>
             <div className="two">

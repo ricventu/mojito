@@ -39,8 +39,5 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     stateDir: env.MOJITO_STATE_DIR ?? join(homedir(), ".mojito-state"),
     projectsPath: resolveProjectsPath(env),
     qwenModel: env.MOJITO_QWEN_MODEL ?? "qwen3.7-plus",
-    cqwenBaseUrl: env.CQWEN_BASE_URL,
-    cqwenApiKey: env.CQWEN_API_KEY,
-    cqwenModel: env.CQWEN_MODEL ?? "qwen3.7-plus",
   };
 }

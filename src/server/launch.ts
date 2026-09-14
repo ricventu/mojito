@@ -3,7 +3,7 @@ import { join, basename } from "node:path";
 import { homedir } from "node:os";
 import { randomBytes } from "node:crypto";
 import type { Effort, SessionMeta } from "./types";
-import { tmuxName, validateTicket, statusSlug, customSessionName, intakeSessionName, conflictSessionName, shellSessionName } from "./sessionKey";
+import { tmuxName, validateTicket, statusSlug, customSessionName, intakeSessionName, improveSessionName, conflictSessionName, shellSessionName } from "./sessionKey";
 import { buildHookSettings } from "./hookSettings";
 import { loadProjectMap, resolvePathForProject } from "./projects";
 import { repoForTicket } from "./ticketCwd";
@@ -11,13 +11,13 @@ import { findExistingTicketWorktree, createTicketWorktree, resolveWorktreePick }
 import { logfilePath } from "./sidecar";
 import type { Registry } from "./registry";
 import { writeLaunchContext } from "./launchContext";
-import { buildWorkPrompt, buildMergeFixPrompt, buildIntakePrompt } from "./prompts";
+import { buildWorkPrompt, buildMergeFixPrompt, buildIntakePrompt, buildImprovePrompt } from "./prompts";
 import type { MergeMode } from "./merge";
 import { resultPath, clearSessionResult } from "./sessionResult";
 import type { TicketAsset, TicketAttachment } from "./ticketAssets";
 import { watchStartupStall, type StallDeps } from "./startupStall";
 
-export type ClaudeCommand = "claude" | "qwen" | "cqwen";
+export type ClaudeCommand = "claude" | "qwen";
 
 export interface LaunchRequest {
   ticket: string;
@@ -72,8 +72,6 @@ export interface LaunchDeps extends Pick<StallDeps, "bus" | "stallGraceMs" | "sc
   // project's repo root, or a worktree of it the human picked (RIC-243).
   resolveProjectCwd?: (req: { projectName: string; worktree?: string }) => ResolvedCwd | null;
   nowIso?: () => string;
-  // cqwen environment variables for building the command
-  cqwenEnv?: { baseUrl?: string; apiKey?: string; model?: string };
 }
 
 // A picked worktree, or the repo root. The pick is client-supplied and names the directory
@@ -159,25 +157,14 @@ export function buildClaudeCommand(
   req: { model: string; effort: Effort; command?: ClaudeCommand },
   settingsPath: string,
   prompt: string,
-  cqwenEnv?: { baseUrl?: string; apiKey?: string; model?: string },
 ): string {
   const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
   if (prompt.startsWith("-")) throw new Error("prompt must not start with '-'");
-  const cmd = req.command === "qwen" ? "qwen" : req.command === "cqwen" ? "cqwen" : "claude";
-  // Qwen and cqwen don't support --effort or --settings flags; cqwen is an alias that sets env vars
+  const cmd = req.command === "qwen" ? "qwen" : "claude";
+  // Qwen doesn't support --effort or --settings flags
   // No special approval flags - matches Claude Code behavior: interactive session that waits for user input
   if (cmd === "qwen") {
     return `${cmd} --model ${q(req.model)} ${q(prompt)}`;
-  }
-  if (cmd === "cqwen") {
-    // Expand the alias: cqwen sets ANTHROPIC_* env vars and runs claude
-    const baseUrl = cqwenEnv?.baseUrl ?? "https://dashscope-intl.aliyuncs.com/apps/anthropic";
-    const model = cqwenEnv?.model ?? "qwen3.7-plus";
-    const envParts: string[] = [];
-    envParts.push(`ANTHROPIC_BASE_URL='${baseUrl}'`);
-    if (cqwenEnv?.apiKey) envParts.push(`ANTHROPIC_API_KEY='${cqwenEnv.apiKey}'`);
-    envParts.push(`ANTHROPIC_MODEL='${model}'`);
-    return `${envParts.join(" ")} claude ${q(prompt)}`;
   }
   return `${cmd} --model ${q(req.model)} --effort ${q(req.effort)} --settings ${q(settingsPath)} ${q(prompt)}`;
 }
@@ -221,7 +208,7 @@ export async function launchSession(
     contextPath,
     resultPath: resultPath(deps.stateDir, id),
     hasAssets: Boolean(req.assets?.length || req.attachments?.length),
-  }), deps.cqwenEnv);
+  }));
   await deps.newSession(id, cwd, withWarning(command, warning));
   await deps.pipePane(id, logfilePath(deps.stateDir, id));
 
@@ -269,32 +256,22 @@ export interface CustomLaunchRequest {
   // registered `kind`, both of which exist so the board can name it instead of filing it
   // among the bare claude sessions the human started themselves.
   intake?: boolean;
+  // Set only by launchImproveSession. An improve session rewrites an existing ticket's
+  // title and description — same mechanical shape as intake, but it has a ticket and
+  // its own id prefix.
+  improve?: boolean;
 }
 
-export function buildCustomClaudeCommand(req: CustomLaunchRequest, settingsPath: string, cqwenEnv?: { baseUrl?: string; apiKey?: string; model?: string }): string {
+export function buildCustomClaudeCommand(req: CustomLaunchRequest, settingsPath: string): string {
   const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
-  const cmd = req.command === "qwen" ? "qwen" : req.command === "cqwen" ? "cqwen" : "claude";
-  // Qwen and cqwen don't support --effort or --settings flags; cqwen is an alias that sets env vars
+  const cmd = req.command === "qwen" ? "qwen" : "claude";
+  // Qwen doesn't support --effort or --settings flags
   // No special approval flags - matches Claude Code behavior: interactive session that waits for user input
   if (cmd === "qwen") {
     const base = `${cmd} --model ${q(req.model)}`;
     if (req.prompt && req.prompt.startsWith("-")) {
       throw new Error("prompt must not start with '-'");
     }
-    return req.prompt ? `${base} ${q(req.prompt)}` : base;
-  }
-  if (cmd === "cqwen") {
-    // Expand the alias: cqwen sets ANTHROPIC_* env vars and runs claude
-    if (req.prompt && req.prompt.startsWith("-")) {
-      throw new Error("prompt must not start with '-'");
-    }
-    const baseUrl = cqwenEnv?.baseUrl ?? "https://dashscope-intl.aliyuncs.com/apps/anthropic";
-    const model = cqwenEnv?.model ?? "qwen3.7-plus";
-    const envParts: string[] = [];
-    envParts.push(`ANTHROPIC_BASE_URL='${baseUrl}'`);
-    if (cqwenEnv?.apiKey) envParts.push(`ANTHROPIC_API_KEY='${cqwenEnv.apiKey}'`);
-    envParts.push(`ANTHROPIC_MODEL='${model}'`);
-    const base = `${envParts.join(" ")} claude`;
     return req.prompt ? `${base} ${q(req.prompt)}` : base;
   }
   const base = `${cmd} --model ${q(req.model)} --effort ${q(req.effort)} --settings ${q(settingsPath)}`;
@@ -316,7 +293,9 @@ export async function launchCustomSession(
   if (!scoped) return { ok: false, reason: "no-repo" };
   const { cwd, slug, warning } = scoped;
 
-  const id = (req.intake ? intakeSessionName : customSessionName)(slug, genId());
+  const id = req.improve && req.ticket
+    ? improveSessionName(req.ticket, genId())
+    : (req.intake ? intakeSessionName : customSessionName)(slug, genId());
 
   const settingsDir = join(deps.stateDir, "settings");
   mkdirSync(settingsDir, { recursive: true, mode: 0o700 });
@@ -326,13 +305,13 @@ export async function launchCustomSession(
 
   // A custom session — ticket-scoped or project-scoped — is a bare interactive session
   // with a human driving it; it needs no machine-readable context file.
-  const command = buildCustomClaudeCommand(req, settingsPath, deps.cqwenEnv);
+  const command = buildCustomClaudeCommand(req, settingsPath);
   await deps.newSession(id, cwd, withWarning(command, warning));
   await deps.pipePane(id, logfilePath(deps.stateDir, id));
 
   const title = req.ticket ? (req.title ?? basename(cwd)) : cwd === homeDir() ? "home" : basename(cwd);
   const meta: SessionMeta = {
-    kind: req.intake ? "intake" : "custom",
+    kind: req.improve ? "improve" : req.intake ? "intake" : "custom",
     id,
     ticket: req.ticket ?? "",
     launchStatus: "",
@@ -558,6 +537,35 @@ export async function launchIntakeSession(
   });
   return launchCustomSession(
     { projectName: req.projectName, model: "sonnet", effort: "medium", prompt, intake: true },
+    deps,
+  );
+}
+
+export interface ImproveLaunchRequest {
+  ticket: string;
+  projectName: string | null;
+  title: string;
+  labels: string[];
+  teamKey: string;
+}
+
+/**
+ * Launch the session that rewrites an existing ticket's title and description.
+ * Mechanically a custom session with a ticket — the session reads the issue through
+ * the Linear MCP and updates it in place. Sonnet at medium effort, same as intake:
+ * a rewrite of one ticket, not work on a ticket.
+ */
+export async function launchImproveSession(
+  req: ImproveLaunchRequest,
+  deps: LaunchDeps & { genId?: () => string; homeDir?: () => string },
+): Promise<{ ok: true; meta: SessionMeta } | { ok: false; reason: "duplicate" | "no-repo" }> {
+  validateTicket(req.ticket);
+  const prompt = buildImprovePrompt({ ticketId: req.ticket, teamKey: req.teamKey });
+  return launchCustomSession(
+    {
+      projectName: req.projectName, model: "sonnet", effort: "medium", prompt,
+      improve: true, ticket: req.ticket, title: req.title, labels: req.labels,
+    },
     deps,
   );
 }
