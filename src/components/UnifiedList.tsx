@@ -41,12 +41,18 @@ const NO_TICKET = "No ticket";
 
 export default function UnifiedList(
   {
-    token, tickets, sessions, filters, onFilters, selfUpdate,
+    token, tickets, sessions, ticketsError, onRetryTickets, filters, onFilters, selfUpdate,
     onLaunched, onChanged, onNewTicket, onSettings, onOpen, onOpenTicketDocs, onOpenSessionDocs,
   }: {
     token: string;
     tickets: TicketSummary[];
     sessions: SessionMeta[];
+    // Why the last ticket fetch failed, or null. `tickets` still holds whatever the
+    // previous fetch left (useTickets never blanks it), so this is the only thing that
+    // tells a stale board from a current one — and, on a first fetch that never
+    // succeeded, an empty list from a Linear outage.
+    ticketsError: string | null;
+    onRetryTickets: () => void;
     filters: ListFilters;
     onFilters: (f: ListFilters, mode: "push" | "replace") => void;
     // Owned by the page (one instance, shared with the Settings sheet) so the project
@@ -203,6 +209,16 @@ export default function UnifiedList(
     // Docking takes a column out of the list's own padding — the board scrolls the page,
     // so there is no flex sibling to take it off (see `.pad.side-docked`).
     <div className={`pad${sideOpen && sidebar.view.docked ? " side-docked" : ""}`}>
+      {/* Outside both the `empty` and `!empty` branches below, because it has to show in
+          each: with sessions on screen a failed fetch is indistinguishable from a board
+          filtered down to them, and with none the branch below says "Nothing here yet",
+          which in that state is simply untrue. */}
+      {ticketsError && (
+        <div className="notice" role="status">
+          <span className="notice-text">Tickets unavailable — {ticketsError}</span>
+          <button className="btn ghost sm" onClick={onRetryTickets}>Retry</button>
+        </div>
+      )}
       {sideOpen && (
         <SessionSidebar
           sessions={sessions}

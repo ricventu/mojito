@@ -17,7 +17,9 @@ export async function GET(req: Request) {
   try {
     return NextResponse.json(await listOpenIssues(cfg.linearApiKey, projects));
   } catch {
-    return new NextResponse("linear error", { status: 502 });
+    // JSON, like every other route here: the board puts this straight in front of the
+    // user (see useTickets), and "Linear is not answering" says more than a bare 502.
+    return NextResponse.json({ error: "Linear is not answering" }, { status: 502 });
   }
 }
 

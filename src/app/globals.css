@@ -560,6 +560,19 @@ button.chip:active { transform: scale(.96); }
 .s-dot.stopped { background: var(--text-faint); }
 .s-dot.crashed { background: var(--err); }
 
+/* ---- Board notice ---- */
+/* A failed ticket fetch, reported in the flow of the board rather than over it: unlike
+   .alert it is not a tap target and has nowhere to be dismissed to — it goes when the
+   next fetch succeeds. Wraps on a phone, where the message and the Retry button do not
+   share a 320px line. */
+.notice {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px 12px; margin-bottom: 12px; border-radius: var(--r);
+  background: var(--attn-bg); border: 1px solid color-mix(in srgb, var(--attn) 45%, transparent);
+  color: var(--text); font-size: 13px;
+}
+.notice-text { flex: 1 1 auto; min-width: 0; }
+
 /* ---- Alert banner ---- */
 .alert {
   display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--r);

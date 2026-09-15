@@ -48,7 +48,7 @@ export default function Home() {
   // the project cannot disagree.
   const [newTicket, setNewTicket] = useState<{ project: string | null } | null>(null);
   const [newSession, setNewSession] = useState<{ project: string | null } | null>(null);
-  const { tickets, refresh: refreshTickets } = useTickets(token);
+  const { tickets, refresh: refreshTickets, recover: recoverTickets, error: ticketsError } = useTickets(token);
   const { sessions, setSessions, loaded: sessionsLoaded, refresh: refreshSessions } = useSessions(token);
   // Owned here — not by the project toolbar or SettingsSheet — so a deploy's health poll
   // and "Deploying…" state survive opening a terminal or a doc, either of which unmounts
@@ -74,22 +74,32 @@ export default function Home() {
     refreshSessions();
     if (e.type === "session.alert") setAlerts((a) => [{ id: e.id, ticket: e.ticket, message: e.message }, ...a].slice(0, 20));
   }, [refreshSessions]);
-  // Third argument = resync on every (re)connection, which is what keeps the list from
-  // freezing at whatever it last heard; openEventStream explains why. Tickets are left out
-  // of it on purpose — they have their own 45s poll, and a flapping connection must not
-  // turn into a burst of Linear queries.
-  useEvents(token, onEvent, refreshSessions);
+  // Resync on every (re)connection, which is what keeps the list from freezing at
+  // whatever it last heard; openEventStream explains why. The tickets join it through
+  // `recoverTickets` and not `refreshTickets`: that one refetches only after a failed
+  // fetch, so a healthy board still costs no extra Linear query per reconnection — the
+  // reason the tickets were left out of this entirely — while a board whose fetch died
+  // during a deploy stops waiting on a 45s poll that a suspended window may never run.
+  const onReconnect = useCallback(() => {
+    refreshSessions();
+    recoverTickets();
+  }, [refreshSessions, recoverTickets]);
+  useEvents(token, onEvent, onReconnect);
 
   // The other way an event goes missing: a phone that backgrounds this tab can leave the
   // socket half-open — frames are sent into it and no close event ever arrives, so the
   // reconnect resync above never gets its chance. Refetching when the tab comes back
-  // covers that, and costs one local request. Sessions only: tickets have their own 45s
-  // poll, and this fires every time the user switches away and back.
+  // covers that, and costs one local request. This fires every time the user switches
+  // away and back, which is why the tickets ride on `recoverTickets` here too.
   useEffect(() => {
-    const onVisible = () => { if (document.visibilityState === "visible") refreshSessions(); };
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      refreshSessions();
+      recoverTickets();
+    };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [refreshSessions]);
+  }, [refreshSessions, recoverTickets]);
 
   // A terminal url whose session is gone — killed from another tab, swept, or simply
   // stale in a bookmark. Correct the address bar rather than leave a blank page, and
@@ -227,6 +237,10 @@ export default function Home() {
           project dividers it held one destination, which was the page you were already
           on, so Settings and the needs-input count moved into the board's own toolbar. */}
       <UnifiedList token={token} tickets={tickets} sessions={sessions}
+        // A failed ticket fetch leaves a board of sessions that looks exactly like a
+        // board filtered down to them. Saying so is the whole point: without it the
+        // only symptom is tickets quietly missing.
+        ticketsError={ticketsError} onRetryTickets={refreshTickets}
         filters={filters} onFilters={setFilters} selfUpdate={selfUpdate}
         onLaunched={() => { refreshSessions(); refreshTickets(); }}
         onChanged={refreshSessions}
