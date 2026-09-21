@@ -2,9 +2,15 @@ import { describe, it, expect } from "vitest";
 import { sidebarItem, sidebarSessions } from "@/lib/sidebarSessions";
 import type { SessionMeta, SessionState } from "@/server/types";
 
-function s(id: string, ticket: string, createdAt: string, state: SessionState = "running"): SessionMeta {
+function s(
+  id: string,
+  ticket: string,
+  createdAt: string,
+  state: SessionState = "running",
+  projectName = "",
+): SessionMeta {
   return {
-    kind: "ticket", id, ticket, createdAt, state,
+    kind: "ticket", id, ticket, createdAt, state, projectName,
     launchStatus: "", model: "", effort: "low", cwd: "", title: "", labels: [],
   } as SessionMeta;
 }
@@ -27,23 +33,59 @@ describe("sidebarSessions", () => {
     expect(sidebarSessions(list).map((x) => x.id)).toEqual(["b", "a", "c"]);
   });
 
-  // The one thing worth interrupting for. Everything else is newest-first.
-  it("floats the sessions waiting for an answer to the top", () => {
+  // The order rests on nothing that changes while a session is alive. It shipped with
+  // needs-input split off the front, which made a row jump to the top and back down as
+  // its session asked and was answered — the card you were reaching for moved under
+  // your finger. The signal is the row's own badge and styling instead.
+  it("leaves a session waiting for an answer where it is", () => {
     const list = [
       s("a", "RIC-1", T(12)),
       s("b", "RIC-2", T(9), "needs-input"),
       s("c", "RIC-3", T(11)),
     ];
-    expect(sidebarSessions(list).map((x) => x.id)).toEqual(["b", "a", "c"]);
+    expect(sidebarSessions(list).map((x) => x.id)).toEqual(["a", "c", "b"]);
   });
 
-  it("orders each half newest-first, clustering a ticket's own sessions", () => {
+  it("orders newest-first, clustering a ticket's own sessions", () => {
     const list = [
       s("old", "RIC-1", T(8)),
       s("new", "RIC-2", T(12)),
       s("mid", "RIC-1", T(10)),
     ];
     expect(sidebarSessions(list).map((x) => x.id)).toEqual(["new", "mid", "old"]);
+  });
+
+  // The sidebar is unfiltered, so a machine working two repos at once interleaved them
+  // and the sessions of the repo you are in were scattered down a list ordered by clock.
+  it("keeps a project's sessions together", () => {
+    const list = [
+      s("a1", "RIC-1", T(12), "running", "alpha"),
+      s("b1", "RIC-2", T(11), "running", "beta"),
+      s("a2", "RIC-3", T(10), "running", "alpha"),
+      s("b2", "RIC-4", T(9), "running", "beta"),
+    ];
+    expect(sidebarSessions(list).map((x) => x.id)).toEqual(["a1", "a2", "b1", "b2"]);
+  });
+
+  // A freshly launched session brings its project up — at launch, the one moment the
+  // list is allowed to rearrange.
+  it("orders the groups by their newest session", () => {
+    const list = [
+      s("a1", "RIC-1", T(8), "running", "alpha"),
+      s("b1", "RIC-2", T(9), "running", "beta"),
+      s("b2", "RIC-3", T(12), "running", "beta"),
+    ];
+    expect(sidebarSessions(list).map((x) => x.id)).toEqual(["b2", "b1", "a1"]);
+  });
+
+  // A General launch has no project; it is simply the "" group, by the same rule.
+  it("groups the project-less sessions together too", () => {
+    const list = [
+      s("g1", "", T(12), "running", ""),
+      s("a1", "RIC-1", T(11), "running", "alpha"),
+      s("g2", "", T(10), "running", ""),
+    ];
+    expect(sidebarSessions(list).map((x) => x.id)).toEqual(["g1", "g2", "a1"]);
   });
 
   it("does not mutate its input", () => {

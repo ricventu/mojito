@@ -325,9 +325,24 @@ Mojito owns the whole lifecycle — there is no external plugin:
   sampled a different side of the flip. A registration lasts as long as the session does,
   and Kill/Dismiss/Clean up are what remove it, so having one is the honest criterion;
   `unifiedRows` had already settled the same question the same way for the board's
-  Sessions filter, and says so at length. Ordered `needs-input` first and then
-  `orderSessions`' own newest-first: a session that starts waiting for an answer moves
-  to the top under you, which is the point. `sidebarItem` is its row model, in
+  Sessions filter, and says so at length. Ordered **by project**, and on nothing that
+  changes while a session is alive. It shipped with `needs-input` split off
+  the front, on the grounds that a session waiting for an answer is the one row worth
+  interrupting for — but that is a *live* key, so a card jumped to the top and back down
+  again as its session asked and was answered, and the one you were reaching for moved
+  under your finger. A switcher whose rows will not hold still is the one thing it must
+  not be, and the signal is not lost: the row keeps its `.attn` styling and its
+  `StateBadge` either way, and the board's amber pill is what counts them. Every key the
+  order now rests on is immutable for the life of a session — project, ticket,
+  `createdAt`, id — so the list only rearranges when one is launched or removed.
+  Grouping by project follows from the sidebar being unfiltered: on a machine working
+  two or three repos at once it interleaved them, and the sessions of the repo you are
+  actually in were scattered down a list ordered by clock time. Within a group it is
+  still `orderSessions`' own ticket-clustered newest-first, and the groups themselves go
+  by their newest session (ties by name; the project-less sessions of a General launch
+  are simply the `""` group, taking their turn by the same rule), so a fresh launch does
+  bring its project to the top — at launch, the one moment the list is allowed to move.
+  `sidebarItem` is its row model, in
   `terminalHeadModel`'s shape and for its reasons — the four kinds carry very different
   metadata, so every field is normalised to a string and the component branches on
   emptiness alone.

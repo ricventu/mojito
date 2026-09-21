@@ -2,8 +2,8 @@ import { orderSessions } from "./orderSessions";
 import type { SessionMeta } from "@/server/types";
 
 /**
- * What the terminal's session sidebar lists (RIC-313): every session Mojito has a
- * registration for, ordered `needs-input` first and then newest-first.
+ * What the session sidebar lists (RIC-313): every session Mojito has a registration
+ * for, **grouped by project** and otherwise in `orderSessions`' own order.
  *
  * **Every** one of them, and not the ones in an "active" state — the mistake this was
  * first written with. A ticket session goes to `done` on every Stop once its result file
@@ -16,18 +16,50 @@ import type { SessionMeta } from "@/server/types";
  * what remove it, so having one is the honest criterion. `unifiedRows` settled the same
  * question the same way for the board's Sessions filter, and says so at length.
  *
- * Splitting `needs-input` off the front means a session that starts waiting for an
- * answer moves to the top under you; that is the point, since it is the one thing in the
- * list worth interrupting for, and it is the same signal the board's amber pill counts.
- * Everything else keeps `orderSessions`' own order, which also clusters a ticket's
- * several sessions together.
+ * **Nothing here depends on a session's state**, which is the point of the grouping.
+ * It shipped with `needs-input` split off the front, on the grounds that a session
+ * waiting for an answer is the one thing in the list worth interrupting for — but that
+ * is a *live* key, so a row jumped to the top and back down again as its session asked
+ * and was answered, and the card you were reaching for moved under your finger. A
+ * switcher whose rows will not hold still is the one thing it must not be, and the
+ * signal is not lost: the row keeps its `.attn` styling and its StateBadge either way,
+ * and the board's amber pill is what counts them. Every key the order rests on now is
+ * immutable for the life of a session — its project, its ticket, its `createdAt`, its
+ * id — so the list only ever changes when a session is launched or removed.
+ *
+ * Grouping by project is what was asked for: the sidebar is deliberately unfiltered, so
+ * on a machine working two or three repos at once it interleaved them, and the sessions
+ * of the repo you are actually in were scattered down a list ordered by clock time.
+ * Groups themselves are ordered by their newest session (and named-ties by project, with
+ * the project-less sessions of a General launch simply forming the `""` group and taking
+ * their turn by the same rule), so a freshly launched session still brings its project
+ * to the top — at launch, which is the one moment the list is allowed to rearrange.
  *
  * Returns a new array; does not mutate the input.
  */
 export function sidebarSessions(sessions: SessionMeta[]): SessionMeta[] {
-  const waiting = sessions.filter((s) => s.state === "needs-input");
-  const rest = sessions.filter((s) => s.state !== "needs-input");
-  return [...orderSessions(waiting), ...orderSessions(rest)];
+  const groups = new Map<string, SessionMeta[]>();
+  for (const s of sessions) {
+    const key = s.projectName ?? "";
+    const arr = groups.get(key);
+    if (arr) arr.push(s);
+    else groups.set(key, [s]);
+  }
+
+  const ordered = [...groups.entries()].map(([project, arr]) => {
+    const sorted = orderSessions(arr);
+    return { project, sorted, newest: sorted[0].createdAt }; // sorted[0] is the newest
+  });
+
+  // Newest group first; two groups whose newest sessions share a timestamp fall back to
+  // the project name, so the order is total and never depends on insertion order.
+  ordered.sort(
+    (a, b) =>
+      (a.newest < b.newest ? 1 : a.newest > b.newest ? -1 : 0) ||
+      (a.project < b.project ? -1 : a.project > b.project ? 1 : 0),
+  );
+
+  return ordered.flatMap((g) => g.sorted);
 }
 
 /**
@@ -52,6 +84,7 @@ const KIND_LABEL: Record<SessionMeta["kind"], string> = {
   ticket: "session",
   custom: "claude",
   intake: "new ticket",
+  improve: "improve",
   shell: "terminal",
 };
 
