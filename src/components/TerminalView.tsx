@@ -13,7 +13,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 // webpack's, and the build runs on Turbopack since Next 16 (RIC-227) — the global
 // import is kept because it is the plainer arrangement, not because it is still
 // forced. Treat the diagnosis as history, not as a Turbopack constraint.
-import { Bot, ChevronLeft, FileText, PanelLeft, Plus, X } from "lucide-react";
+import { Bot, FileText, LayoutList, PanelLeft, Plus, X } from "lucide-react";
 import AccessoryBar from "./AccessoryBar";
 import SessionSidebar from "./SessionSidebar";
 import DocsView from "./DocsView";
@@ -39,7 +39,7 @@ import { quoteArg } from "@/lib/quoteArg";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 
 export default function TerminalView(
-  { token, session, sessions, tickets, docs, onNewTicket, onNewSession, onOpenDocs, onSelectDoc, onOpenSession, onBack }:
+  { token, session, sessions, tickets, docs, onNewTicket, onNewSession, onOpenDocs, onSelectDoc, onOpenSession, onBack, onHome }:
   {
     token: string;
     session: SessionMeta;
@@ -59,7 +59,10 @@ export default function TerminalView(
     onSelectDoc: (path: string) => void;
     /** Switch this view to another live session — navigation is the page's, not ours. */
     onOpenSession: (id: string) => void;
+    /** Back out of the docs overlay, one step. */
     onBack: () => void;
+    /** Straight to the board — the header's button, and where a kill lands. */
+    onHome: () => void;
   },
 ) {
   const holder = useRef<HTMLDivElement>(null);
@@ -430,7 +433,7 @@ export default function TerminalView(
       alert(err);
       return;
     }
-    onBack();
+    onHome();
   };
 
   return (
@@ -475,8 +478,8 @@ export default function TerminalView(
           >
             <PanelLeft size={15} aria-hidden="true" />
           </button>
-          <button className="back icon" aria-label="Back" onClick={onBack}>
-            <ChevronLeft size={20} aria-hidden="true" />
+          <button className="back icon" aria-label="Board" title="Board" onClick={onHome}>
+            <LayoutList size={18} aria-hidden="true" />
           </button>
           <div className="term-ident">
             {/* The id is the ticket's name here, so it is what opens the issue on Linear;

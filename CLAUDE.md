@@ -581,7 +581,12 @@ Mojito owns the whole lifecycle — there is no external plugin:
   always used the getter; now so do we. In-app Back
   buttons step through real history when the previous entry is ours, tracked as a depth
   counter in `history.state` (`src/lib/navDepth.ts`), and fall back to a url otherwise,
-  so a link opened straight into a terminal never backs out of Mojito.
+  so a link opened straight into a terminal never backs out of Mojito. The terminal
+  header's button is the exception: it is a **Board** button (`LayoutList`), not a Back,
+  and goes straight to the list whatever history holds (`home` in `useAppLocation`) —
+  a history step could land on another terminal (one opened from its own + Session) or
+  a doc. It carries the url's filters, or the remembered set when the url has none, as
+  a cold start would; a kill lands there too. The docs overlay keeps its stepwise Back.
 - **Live updates**: `/ws/events` is the *only* thing that refreshes the session list —
   `useSessions` has no poll of its own (tickets do, every 45s). And the bus is
   fire-and-forget: `EventBus.emit` walks whoever is subscribed right now, nothing is

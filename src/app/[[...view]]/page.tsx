@@ -38,7 +38,7 @@ const TITLE = "Tickets — Mojito";
 // dividers — still lands somewhere real.
 export default function Home() {
   const { token, setToken } = useToken();
-  const { location, navigate, replace, back } = useAppLocation();
+  const { location, navigate, replace, back, home } = useAppLocation();
   const { view, filters } = location;
   const [alerts, setAlerts] = useState<{ id: string; ticket: string; message: string }[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -177,12 +177,16 @@ export default function Home() {
         onOpenSession={(id) => goInPlace({ kind: "session", id, docs: null })}
         onOpenDocs={() => go({ kind: "session", id: view.id, docs: { doc: null } })}
         onSelectDoc={(doc) => go({ kind: "session", id: view.id, docs: { doc } })}
-        onBack={() => {
-          back({ view: fallback, filters });
-          // Refresh on leaving the terminal: dismiss/advance mutate server state, and a
-          // dead session (tmux gone) emits no hook event to trigger a refresh on its own,
-          // so without this its card would linger in the list after being deleted.
-          if (view.docs === null) refreshSessions();
+        // The docs overlay's own Back, which unwinds one step at a time.
+        onBack={() => back({ view: fallback, filters })}
+        // The header's board button, and where a kill lands: always the board, never a
+        // history step — Back could walk into another terminal (one opened from + Session)
+        // or a doc. Refresh on leaving the terminal: dismiss/advance mutate server state,
+        // and a dead session (tmux gone) emits no hook event to trigger a refresh on its
+        // own, so without this its card would linger in the list after being deleted.
+        onHome={() => {
+          home(filters);
+          refreshSessions();
         }}
       />
       {newTicketSheet}

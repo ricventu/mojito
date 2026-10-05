@@ -118,5 +118,17 @@ export function useAppLocation() {
     else navigate(fallback);
   }, [navigate]);
 
-  return { location, navigate, replace, back };
+  /**
+   * Straight to the board, whatever history holds — not a Back. Carries the filters
+   * the current url has, and when it has none (a terminal opened from a deep link, the
+   * CLI, a new tab) takes the set the board last remembered, as a cold start would:
+   * the board is the board, however the terminal was reached.
+   */
+  const home = useCallback((filters: AppLocation["filters"]) => {
+    const list: AppLocation = { view: { kind: "list" }, filters };
+    const seeded = seedFilters(list, readRemembered());
+    navigate(seeded === null ? list : { ...list, filters: seeded });
+  }, [navigate]);
+
+  return { location, navigate, replace, back, home };
 }
