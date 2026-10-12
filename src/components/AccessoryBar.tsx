@@ -7,6 +7,7 @@ import { composerHeight } from "@/lib/composerHeight";
 const KEYS: { label: string; bytes: string }[] = [
   { label: "Esc", bytes: "\x1b" },
   { label: "Tab", bytes: "\t" },
+  { label: "⇧Tab", bytes: "\x1b[Z" },
   { label: "↑", bytes: "\x1b[A" },
   { label: "↓", bytes: "\x1b[B" },
   { label: "←", bytes: "\x1b[D" },

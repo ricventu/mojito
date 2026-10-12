@@ -917,7 +917,7 @@ Mojito owns the whole lifecycle — there is no external plugin:
   and never scale with a stroke, so each one was nudged into place by a
   hand-tuned `font-size`/`line-height`; those are gone. Two deliberate
   exceptions, both of which a future cleanup will want to re-break: the
-  accessory bar's key row (`↑ ↓ ← → ⏎ ⇧⏎ Esc Tab ^C`) is the *names of keys*,
+  accessory bar's key row (`↑ ↓ ← → ⏎ ⇧⏎ Esc Tab ⇧Tab ^C`) is the *names of keys*,
   not icons — no lucide glyph spells "Esc" — and Warp/VS Code's `>_` / `</>`
   (see **Terminal header**). Prose in comments may still name a glyph; markup
   must not.
