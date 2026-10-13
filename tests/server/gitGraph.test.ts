@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  attachRefs, isValidHash, markWorktrees, parseCounts, parseLog, parseNameStatus, parseRefs,
+  attachRefs, isValidHash, markWorktrees, MAX_FILES, parseCounts, parseLog, parseNameStatus, parseRefs,
+  readCommit, readGitGraph,
 } from "@/server/gitGraph";
 
 const A = "a".repeat(40), B = "b".repeat(40), C = "c".repeat(40), T = "d".repeat(40);
@@ -114,4 +115,78 @@ describe("isValidHash", () => {
     "rejects %s",
     (h) => expect(isValidHash(h)).toBe(false),
   );
+});
+
+// A scripted runner: the first matching prefix answers; an Error value throws.
+function fakeRun(script: [string[], string | Error][]) {
+  const calls: string[][] = [];
+  const run = async (args: string[]) => {
+    calls.push(args);
+    const hit = script.find(([prefix]) => prefix.every((p, i) => args[i] === p));
+    if (!hit) throw new Error(`unscripted: git ${args.join(" ")}`);
+    if (hit[1] instanceof Error) throw hit[1];
+    return hit[1];
+  };
+  return { run, calls };
+}
+
+describe("readCommit", () => {
+  it("never calls git for an invalid hash", async () => {
+    const { run, calls } = fakeRun([]);
+    await expect(readCommit("/r", "--output=/tmp/x", run)).rejects.toThrow("invalid hash");
+    expect(calls).toEqual([]);
+  });
+
+  it("answers null for a commit the repo does not have", async () => {
+    const { run } = fakeRun([[["rev-parse"], new Error("exit 1")]]);
+    expect(await readCommit("/r", "abc1234", run)).toBeNull();
+  });
+
+  it(`truncates a file list beyond ${MAX_FILES} entries and reports how many it dropped`, async () => {
+    const many = Array.from({ length: MAX_FILES + 5 }, (_, i) => `M\0f${i}.ts\0`).join("");
+    const { run } = fakeRun([
+      [["rev-parse"], `${A}\n`],
+      [["show", "-s"], `${A}\x00${B}\x00Ann\x00ann@x\x002026-10-01T10:00:00+02:00\x00Subject\n\nBody\n`],
+      [["show", "--format="], `\n${many}`],
+    ]);
+    const d = await readCommit("/r", "aaaaaaa", run);
+    expect(d?.files).toHaveLength(MAX_FILES);
+    expect(d?.moreFiles).toBe(5);
+    expect(d?.message).toBe("Subject\n\nBody");
+    expect(d?.parents).toEqual([B]);
+  });
+});
+
+describe("readGitGraph", () => {
+  it("propagates a failure to read refs, which is what a non-repo looks like", async () => {
+    const { run } = fakeRun([[["for-each-ref"], new Error("not a git repository")]]);
+    await expect(readGitGraph("/r", { skip: 0, highlight: null }, run)).rejects.toThrow("not a git repository");
+  });
+
+  it("answers an empty graph for a repo with no commits, without running log", async () => {
+    const { run, calls } = fakeRun([
+      [["for-each-ref"], ""],
+      [["rev-parse"], new Error("exit 1")],
+      [["worktree"], ""],
+    ]);
+    expect(await readGitGraph("/r", { skip: 0, highlight: null }, run))
+      .toEqual({ head: null, highlight: null, commits: [], hasMore: false });
+    expect(calls.some((c) => c[0] === "log")).toBe(false);
+  });
+
+  it("sets hasMore from a 201st record and drops it", async () => {
+    const log = Array.from({ length: 201 }, (_, i) => rec(i.toString(16).padStart(40, "0"), "", `c${i}`)).join("");
+    const { run, calls } = fakeRun([
+      [["for-each-ref"], ""],
+      [["rev-parse"], `${A}\n`],
+      [["worktree"], ""],
+      [["log"], log],
+    ]);
+    const g = await readGitGraph("/r", { skip: 400, highlight: null }, run);
+    expect(g.commits).toHaveLength(200);
+    expect(g.hasMore).toBe(true);
+    const logCall = calls.find((c) => c[0] === "log")!;
+    expect(logCall).toContain("--skip=400");
+    expect(logCall).toContain("201");
+  });
 });
