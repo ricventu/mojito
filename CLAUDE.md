@@ -522,6 +522,26 @@ Mojito owns the whole lifecycle — there is no external plugin:
   deliberately left as plain text: `AlertLayer`'s, whose whole surface is the tap that
   takes you to the session waiting for input, and the docs header's, where the identifier
   is prose (`RIC-242 · docs`) rather than a label.
+- **Git graph**: a read-only branch/commit graph of a repo, reachable from a project
+  divider (`/git/project/<name>`), a ticket's launch sheet (`/git/ticket/<id>`) and a
+  terminal header (`/session/<id>/git`, an overlay like docs so the pty stays attached).
+  The server reads raw commits (`git log --topo-order`, NUL/RS-separated so no subject can
+  break the parse), refs via `for-each-ref` rather than `%D` (ambiguous for branch names
+  with `,` or `->`) and worktrees, and answers JSON (`src/server/gitGraph.ts`,
+  `gitTarget.ts`); lanes are assigned on the client by the pure `layoutGraph`
+  (`src/lib/gitGraph.ts`). Freshly opened merge lanes are tracked as they open rather than
+  inferred from the row above, because inferring them drew a stray straight segment when a
+  merge parent reopened a lane freed in the same row. It never fetches: the graph is
+  whatever the last fetch left. The highlighted branch's ahead/behind is
+  `rev-list --left-right --count` against `origin/<default>`, exact outside the loaded
+  window. The highlight strip says "even with <base>" when the branch sits on its base's
+  tip, since the server's `merged` flag (nothing ahead) cannot tell a fresh branch from a
+  merged one. A load-more response that lands after the graph was reloaded or retargeted
+  is discarded (a generation counter in `useGitGraph`). The view reuses
+  `.docs-root`/`.docs-head`/`.docs-scroll`, so it inherits the docs overlay's safe-area
+  handling. Commit hashes are validated (`^[0-9a-f]{7,40}$`) before any git call and
+  resolved through `rev-parse` before `show`, so a query value never reaches git as a
+  flag.
 - **Client url state**: the address bar is the single source of truth for which view is
   open and how the list is filtered (RIC-204). `src/lib/appLocation.ts` is the pure codec
   — `parseLocation`/`formatLocation` over `/`, `/session/<id>`, `/session/<id>/docs`,
