@@ -55,7 +55,7 @@ export function resolveGitTarget(url: URL, deps: GitTargetDeps): GitTargetResult
 export function currentBranch(cwd: string): string | null {
   try {
     const name = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
-      cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"],
+      cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 10_000,
     }).trim();
     return name && name !== "HEAD" ? name : null;
   } catch {
