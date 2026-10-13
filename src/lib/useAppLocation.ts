@@ -109,14 +109,18 @@ export function useAppLocation() {
 
   /**
    * An in-app back button. Steps back through history when the previous entry is
-   * one of ours, and navigates to `fallback` when it is not — a link opened
-   * straight into a terminal has nothing behind it, and backing out of that would
-   * leave Mojito rather than return to the list.
+   * one of ours, and moves to `fallback` when it is not — a link opened straight
+   * into a terminal has nothing behind it, and backing out of that would leave
+   * Mojito rather than return to the list. The fallback *replaces* the entry rather
+   * than pushing: a pushed one would leave the deep link right behind it, so the next
+   * Back (a commit sheet over a graph, a doc over a view) would step into the very
+   * url that was just closed. Replacing keeps the entry's depth (0), so the
+   * "nothing of ours behind" answer stays true for the entry that takes its place.
    */
   const back = useCallback((fallback: AppLocation) => {
     if (canGoBack(window.history.state)) window.history.back();
-    else navigate(fallback);
-  }, [navigate]);
+    else replace(fallback);
+  }, [replace]);
 
   /**
    * Straight to the board, whatever history holds — not a Back. Carries the filters
