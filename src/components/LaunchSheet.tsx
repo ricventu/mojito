@@ -59,9 +59,9 @@ function worktreeQuery(ticket: TicketSummary): string {
 }
 
 export default function LaunchSheet(
-  { token, ticket, sessions, onClose, onLaunched, onOpen, onOpenDocs }:
+  { token, ticket, sessions, onClose, onLaunched, onOpen, onOpenDocs, onOpenGit }:
   { token: string; ticket: TicketSummary; sessions: SessionMeta[]; onClose: () => void;
-    onLaunched: () => void; onOpen: (s: SessionMeta) => void; onOpenDocs: () => void },
+    onLaunched: () => void; onOpen: (s: SessionMeta) => void; onOpenDocs: () => void; onOpenGit: () => void },
 ) {
   // Mirrors ticket.statusName, the way `mine` below mirrors ticket.assignedToMe: the
   // ticket prop is a snapshot taken when the sheet opened, and the Backlog <-> Todo move
@@ -560,6 +560,7 @@ export default function LaunchSheet(
           {mine ? "Unassign" : "Assign to me"}
         </button>
         <button className="btn ghost block" style={{ marginTop: 12 }} onClick={onOpenDocs}>Docs</button>
+        <button className="btn ghost block" style={{ marginTop: 12 }} onClick={onOpenGit}>Git</button>
         {!isInReview && err && <p className="err-text">{err}</p>}
       </div>
     </div>

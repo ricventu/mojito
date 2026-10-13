@@ -13,10 +13,11 @@ import { WebglAddon } from "@xterm/addon-webgl";
 // webpack's, and the build runs on Turbopack since Next 16 (RIC-227) — the global
 // import is kept because it is the plainer arrangement, not because it is still
 // forced. Treat the diagnosis as history, not as a Turbopack constraint.
-import { Bot, FileText, LayoutList, PanelLeft, Plus, X } from "lucide-react";
+import { Bot, FileText, GitGraph, LayoutList, PanelLeft, Plus, X } from "lucide-react";
 import AccessoryBar from "./AccessoryBar";
 import SessionSidebar from "./SessionSidebar";
 import DocsView from "./DocsView";
+import GitGraphView from "./GitGraphView";
 import StateBadge from "./StateBadge";
 import TicketLink from "./TicketLink";
 import { apiFetch } from "@/lib/client";
@@ -39,7 +40,7 @@ import { quoteArg } from "@/lib/quoteArg";
 import type { SessionMeta, TicketSummary } from "@/server/types";
 
 export default function TerminalView(
-  { token, session, sessions, tickets, docs, onNewTicket, onNewSession, onOpenDocs, onSelectDoc, onOpenSession, onBack, onHome }:
+  { token, session, sessions, tickets, docs, git, onNewTicket, onNewSession, onOpenDocs, onSelectDoc, onOpenGit, onSelectCommit, onOpenSession, onBack, onHome }:
   {
     token: string;
     session: SessionMeta;
@@ -51,12 +52,17 @@ export default function TerminalView(
     // closes it instead of leaving the terminal — and the terminal stays mounted
     // underneath, because the page keeps rendering this view for that path.
     docs: { doc: string | null } | null;
+    // The git graph overlay (/session/<id>/git) — like docs, a url of its own drawn over a
+    // terminal that stays mounted underneath, so the pty is not torn down and repainted.
+    git: { commit: string | null } | null;
     // The New ticket sheet is the page's, not this component's: it has to be reachable
     // from here too (RIC-224), and it opens pre-set to this session's project.
     onNewTicket: () => void;
     onNewSession: () => void;
     onOpenDocs: () => void;
     onSelectDoc: (path: string) => void;
+    onOpenGit: () => void;
+    onSelectCommit: (hash: string) => void;
     /** Switch this view to another live session — navigation is the page's, not ours. */
     onOpenSession: (id: string) => void;
     /** Back out of the docs overlay, one step. */
@@ -514,6 +520,12 @@ export default function TerminalView(
             <button className="btn sm icon" aria-label="Documents" title="Documents" onClick={onOpenDocs}>
               <FileText size={15} aria-hidden="true" />
             </button>
+            {/* A General session runs in the home directory, which is not a repo. */}
+            {session.projectName && (
+              <button className="btn sm icon" aria-label="Git graph" title="Git graph" onClick={onOpenGit}>
+                <GitGraph size={15} aria-hidden="true" />
+              </button>
+            )}
             <StateBadge state={session.state} />
             {/* Icon at every width. The Kill/Dismiss distinction it used to spell out
                 on desktop now rides on `title`/`aria-label` and on `.danger`'s colour —
@@ -545,6 +557,16 @@ export default function TerminalView(
           label={session.ticket || session.title}
           selected={docs.doc}
           onSelect={onSelectDoc}
+          onBack={onBack}
+        />
+      )}
+      {git && !docs && (
+        <GitGraphView
+          token={token}
+          target={{ session: session.id }}
+          label={session.ticket || session.title}
+          selected={git.commit}
+          onSelect={onSelectCommit}
           onBack={onBack}
         />
       )}

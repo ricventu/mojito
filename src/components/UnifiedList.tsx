@@ -43,6 +43,7 @@ export default function UnifiedList(
   {
     token, tickets, sessions, ticketsError, onRetryTickets, filters, onFilters, selfUpdate,
     onLaunched, onChanged, onNewTicket, onSettings, onOpen, onOpenTicketDocs, onOpenSessionDocs,
+    onOpenTicketGit, onOpenProjectGit,
   }: {
     token: string;
     tickets: TicketSummary[];
@@ -72,6 +73,8 @@ export default function UnifiedList(
     onOpen: (s: SessionMeta) => void;
     onOpenTicketDocs: (t: TicketSummary) => void;
     onOpenSessionDocs: (s: SessionMeta) => void;
+    onOpenTicketGit: (t: TicketSummary) => void;
+    onOpenProjectGit: (project: string) => void;
   },
 ) {
   const [picked, setPicked] = useState<TicketSummary | null>(null);
@@ -329,6 +332,7 @@ export default function UnifiedList(
             onOpenSession={onOpen}
             onNewTicket={() => onNewTicket(sec.project)}
             onNewSession={() => setNewSession({ project: sec.project })}
+            onOpenGit={() => onOpenProjectGit(sec.project)}
             selfUpdate={selfUpdate}
           />
           {groupByStatus(sec.ticketRows, (r) => r.ticket.statusName).map((group) => (
@@ -384,7 +388,8 @@ export default function UnifiedList(
         <LaunchSheet token={token} ticket={picked} sessions={sessions}
           onClose={() => setPicked(null)} onLaunched={onLaunched}
           onOpen={(s) => { setPicked(null); onOpen(s); }}
-          onOpenDocs={() => { setPicked(null); onOpenTicketDocs(picked); }} />
+          onOpenDocs={() => { setPicked(null); onOpenTicketDocs(picked); }}
+          onOpenGit={() => { setPicked(null); onOpenTicketGit(picked); }} />
       )}
       {newSession && (
         <NewSessionSheet token={token} defaultProject={newSession.project ?? soleProject(project)}

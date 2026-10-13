@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import {
-  ArrowDownToLine, ArrowUpToLine, Bot, FileTerminal, Plus, Rocket, X,
+  ArrowDownToLine, ArrowUpToLine, Bot, FileTerminal, GitGraph, Plus, Rocket, X,
 } from "lucide-react";
 import { apiFetch } from "@/lib/client";
 import { projectActions, projectLinks, type ProjectAction } from "@/lib/projectToolbar";
@@ -33,7 +33,7 @@ import type { SessionMeta } from "@/server/types";
  * `stack === null` is the ordinary case for the NO_PROJECT bucket and for a project
  * whose name only a session still carries: the header renders exactly as it always did.
  */
-export default function ProjectToolbar({ project, stack, token, refresh, onOpenSession, onNewTicket, onNewSession, selfUpdate }: {
+export default function ProjectToolbar({ project, stack, token, refresh, onOpenSession, onNewTicket, onNewSession, onOpenGit, selfUpdate }: {
   project: string;
   stack: StackRow | null;
   token: string;
@@ -43,6 +43,8 @@ export default function ProjectToolbar({ project, stack, token, refresh, onOpenS
   onNewTicket: () => void;
   /** The same for the New session sheet, which UnifiedList owns — see its `newSession`. */
   onNewSession: () => void;
+  /** Opens the git graph of this project's repo (a page view, owned by page.tsx). */
+  onOpenGit: () => void;
   selfUpdate: SelfUpdate;
 }) {
   return (
@@ -56,7 +58,7 @@ export default function ProjectToolbar({ project, stack, token, refresh, onOpenS
       {stack && (
         <StackActions
           stack={stack} token={token} refresh={refresh}
-          onOpenSession={onOpenSession} onNewTicket={onNewTicket} onNewSession={onNewSession}
+          onOpenSession={onOpenSession} onNewTicket={onNewTicket} onNewSession={onNewSession} onOpenGit={onOpenGit}
           selfUpdate={selfUpdate}
         />
       )}
@@ -70,6 +72,7 @@ const LABELS: Record<ProjectAction, string> = {
   vscode: "Open in VS Code",
   ticket: "New ticket",
   session: "New session",
+  git: "Git graph",
   pull: "Pull",
   deploy: "Pull & deploy",
   push: "Push",
@@ -85,6 +88,7 @@ const ICONS: Record<Exclude<ProjectAction, "warp" | "vscode">, typeof Plus> = {
   // Not a terminal glyph: Warp's `>_` sits three squares away, and a session here is as
   // often a claude one as a shell.
   session: Bot,
+  git: GitGraph,
   pull: ArrowDownToLine,
   deploy: Rocket,
   push: ArrowUpToLine,
@@ -97,13 +101,15 @@ const ICONS: Record<Exclude<ProjectAction, "warp" | "vscode">, typeof Plus> = {
 /** What a finished action has to say for itself, until the next one or a dismiss. */
 type Note = { kind: "ok" | "err"; text: string; canResolve: boolean };
 
-function StackActions({ stack, token, refresh, onOpenSession, onNewTicket, onNewSession, selfUpdate }: {
+function StackActions({ stack, token, refresh, onOpenSession, onNewTicket, onNewSession, onOpenGit, selfUpdate }: {
   stack: StackRow;
   token: string;
   refresh: () => void;
   onOpenSession: (s: SessionMeta) => void;
   onNewTicket: () => void;
   onNewSession: () => void;
+  /** Opens the git graph of this project's repo (a page view, owned by page.tsx). */
+  onOpenGit: () => void;
   selfUpdate: SelfUpdate;
 }) {
   const [busy, setBusy] = useState(false);
@@ -152,6 +158,7 @@ function StackActions({ stack, token, refresh, onOpenSession, onNewTicket, onNew
   const onAction: Record<Exclude<ProjectAction, "warp" | "vscode">, () => void> = {
     ticket: onNewTicket,
     session: onNewSession,
+    git: onOpenGit,
     pull,
     deploy: selfUpdate.run,
     push,

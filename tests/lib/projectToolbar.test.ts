@@ -18,7 +18,7 @@ function row(over: Partial<StackRow> = {}): StackRow {
 
 // The four that lead every mapped project's row: the terminal header's two links to the
 // repo root, and the board's two creation sheets.
-const HEAD = ["warp", "vscode", "ticket", "session"] as const;
+const HEAD = ["warp", "vscode", "ticket", "session", "git"] as const;
 
 describe("stackFor", () => {
   it("finds the row naming the section's project", () => {
@@ -81,6 +81,11 @@ describe("projectActions", () => {
       .toEqual(expect.arrayContaining(["ticket", "session"]));
   });
 
+  it("offers the git graph on every mapped project, whatever its stack and git state", () => {
+    expect(projectActions(row(), false)).toContain("git");
+    expect(projectActions(row({ hasStack: false, status: null, pullable: false, self: true }), false)).toContain("git");
+  });
+
   // Mojito does not know any repo's deploy procedure, so it has no signal to hide the
   // action on: the session it opens is what finds out. It is the confirm in the
   // component, not this list, that keeps a mistap from reaching production.
@@ -96,7 +101,7 @@ describe("projectActions", () => {
   // relative path would open whatever directory the receiving app considers current.
   it("drops Warp and VS Code when the mapped path is not absolute", () => {
     expect(projectActions(row({ path: "relative/repo" }), false))
-      .toEqual(["ticket", "session", "pull", "push", "claude-deploy"]);
+      .toEqual(["ticket", "session", "git", "pull", "push", "claude-deploy"]);
     expect(projectActions(row({ path: "" }), false)).not.toContain("warp");
   });
 });

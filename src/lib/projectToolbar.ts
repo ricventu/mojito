@@ -17,6 +17,7 @@ import type { StackRow } from "./stacks";
  * `session` joins `ticket` for the same reason the board's toolbar pairs `+ Ticket`
  * with `+ Session` — both create, and both used to have to guess their project from
  * the filters.
+ * `git` opens the read-only git graph of the repo root.
  *
  * `deploy` and `claude-deploy` are **not** two names for one thing. `deploy` is
  * Mojito's own guarded self-update — pull, rebuild, restart *this* server — and exists
@@ -30,6 +31,7 @@ export type ProjectAction =
   | "vscode"
   | "ticket"
   | "session"
+  | "git"
   | "pull"
   | "deploy"
   | "push"
@@ -89,7 +91,7 @@ export function projectActions(stack: StackRow | null, canDeploy: boolean): Proj
   const links = projectLinks(stack);
   if (links.warp) actions.push("warp");
   if (links.vscode) actions.push("vscode");
-  actions.push("ticket", "session");
+  actions.push("ticket", "session", "git");
   if (stack.pullable) actions.push("pull");
   if (stack.self && canDeploy) actions.push("deploy");
   actions.push("push", "claude-deploy");

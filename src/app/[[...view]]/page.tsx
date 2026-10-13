@@ -24,6 +24,8 @@ import type { MojitoEvent } from "@/server/events";
 // load time, which crashes Next.js's server-side prerender of this page. Loading
 // TerminalView with ssr:false keeps it out of the server bundle entirely.
 const TerminalView = dynamic(() => import("@/components/TerminalView"), { ssr: false });
+// Same reasoning as TerminalView: the board never pays for the graph's code.
+const GitGraphView = dynamic(() => import("@/components/GitGraphView"), { ssr: false });
 
 /** Where every in-app Back lands once there is nothing of ours left to go back to. */
 const LIST: AppView = { kind: "list" };
@@ -155,7 +157,9 @@ export default function Home() {
     // terminal to the ticket list.
     const fallback: AppView = view.docs?.doc != null
       ? { kind: "session", id: view.id, docs: { doc: null } }
-      : view.docs != null ? { kind: "session", id: view.id, docs: null } : LIST;
+      : view.git?.commit != null
+        ? { kind: "session", id: view.id, docs: null, git: { commit: null } }
+        : view.docs != null || view.git != null ? { kind: "session", id: view.id, docs: null } : LIST;
     return (
       <>
       <TerminalView
@@ -166,6 +170,7 @@ export default function Home() {
         sessions={sessions}
         tickets={tickets}
         docs={view.docs}
+        git={view.git ?? null}
         onNewTicket={() => setNewTicket({ project: null })}
         onNewSession={() => setNewSession({ project: openSession.projectName ?? null })}
         // Replaces the entry rather than pushing one: the sidebar is a switcher, so Back
@@ -177,6 +182,8 @@ export default function Home() {
         onOpenSession={(id) => goInPlace({ kind: "session", id, docs: null })}
         onOpenDocs={() => go({ kind: "session", id: view.id, docs: { doc: null } })}
         onSelectDoc={(doc) => go({ kind: "session", id: view.id, docs: { doc } })}
+        onOpenGit={() => go({ kind: "session", id: view.id, docs: null, git: { commit: null } })}
+        onSelectCommit={(commit) => go({ kind: "session", id: view.id, docs: null, git: { commit } })}
         // The docs overlay's own Back, which unwinds one step at a time.
         onBack={() => back({ view: fallback, filters })}
         // The header's board button, and where a kill lands: always the board, never a
@@ -228,6 +235,28 @@ export default function Home() {
     );
   }
 
+  // Opened from a project divider or a ticket's sheet: no terminal to keep alive, so it
+  // replaces the page, as the docs view does. Keyed on the target so moving between two
+  // git targets remounts it — its once-per-load scroll flag and reload counter belong to
+  // one target.
+  if (view.kind === "git") {
+    const label = "ticket" in view.target ? view.target.ticket : view.target.project;
+    return (
+      <>
+      <GitGraphView
+        key={JSON.stringify(view.target)}
+        token={token}
+        target={view.target}
+        label={label}
+        selected={view.commit}
+        onSelect={(commit) => go({ ...view, commit })}
+        onBack={() => back({ view: view.commit !== null ? { ...view, commit: null } : LIST, filters })}
+      />
+      {newTicketSheet}
+      </>
+    );
+  }
+
   return (
     // `.page` carries the padding that keeps the board clear of the status bar above
     // and the home indicator below — see globals.css, and RIC-257 for why it matters.
@@ -252,7 +281,9 @@ export default function Home() {
         onSettings={() => setSettingsOpen(true)}
         onOpen={openLaunched}
         onOpenTicketDocs={(t) => go({ kind: "docs", target: { ticket: t.identifier, project: t.project }, doc: null })}
-        onOpenSessionDocs={(s) => go({ kind: "docs", target: { session: s.id }, doc: null })} />
+        onOpenSessionDocs={(s) => go({ kind: "docs", target: { session: s.id }, doc: null })}
+        onOpenTicketGit={(t) => go({ kind: "git", target: { ticket: t.identifier, project: t.project }, commit: null })}
+        onOpenProjectGit={(project) => go({ kind: "git", target: { project }, commit: null })} />
     </div>
   );
 }
