@@ -1,4 +1,5 @@
 import type { DocsTarget } from "./useDocs";
+import type { GitTarget } from "./useGitGraph";
 
 /**
  * The unified list's five filter values — the shape activeFilters reads, and the
@@ -42,14 +43,16 @@ export const NO_FILTERS: ListFilters = {
 };
 
 /**
- * Which page the user is on. `session` keeps its docs overlay nested rather than
- * as a sibling boolean so "a file is selected but the overlay is closed" cannot
- * be expressed at all.
+ * Which page the user is on. `session` keeps its overlays nested rather than as sibling
+ * booleans so "a file is selected but the overlay is closed" cannot be expressed at all.
+ * `git` is optional so the many `docs: null` literals stay valid; the codec never sets
+ * both, since each is its own path segment.
  */
 export type AppView =
   | { kind: "list" }
-  | { kind: "session"; id: string; docs: { doc: string | null } | null }
-  | { kind: "docs"; target: DocsTarget; doc: string | null };
+  | { kind: "session"; id: string; docs: { doc: string | null } | null; git?: { commit: string | null } }
+  | { kind: "docs"; target: DocsTarget; doc: string | null }
+  | { kind: "git"; target: Exclude<GitTarget, { session: string }>; commit: string | null };
 
 /** The whole client state that lives in the address bar: the page, plus the filters. */
 export interface AppLocation {
@@ -62,6 +65,14 @@ export interface AppLocation {
  * project filter, and both hold a project name, so one key could not carry both.
  */
 const DOC_PROJECT = "docProject";
+
+/** The selected commit of a git graph — only ever a hash, so a hand-edited url cannot smuggle a rev expression in. */
+const COMMIT = "commit";
+
+function commitParam(params: URLSearchParams): string | null {
+  const v = params.get(COMMIT);
+  return v !== null && /^[0-9a-f]{7,40}$/.test(v) ? v : null;
+}
 
 function segments(pathname: string): string[] {
   return pathname.split("/").filter((s) => s !== "").map(decodeURIComponent);
@@ -128,6 +139,16 @@ function readView(pathname: string, params: URLSearchParams): AppView {
     }
     if (parts[1] === "session") return { kind: "docs", target: { session: parts[2] }, doc };
   }
+  if (parts[0] === "session" && parts.length === 3 && parts[2] === "git") {
+    return { kind: "session", id: parts[1], docs: null, git: { commit: commitParam(params) } };
+  }
+  if (parts[0] === "git" && parts.length === 3) {
+    const commit = commitParam(params);
+    if (parts[1] === "project") return { kind: "git", target: { project: parts[2] }, commit };
+    // The ticket's project rides in `docProject` for the reason the docs view's does:
+    // `project` is the board's filter.
+    if (parts[1] === "ticket") return { kind: "git", target: { ticket: parts[2], project: named(params, DOC_PROJECT) }, commit };
+  }
   // Anything unrecognised is the list, so a stale bookmark or a hand-typed path —
   // /stacks, from before RIC-253 folded that panel into the board's project dividers —
   // lands somewhere real instead of on a blank page.
@@ -160,11 +181,15 @@ function viewPath(view: AppView): string {
   const enc = encodeURIComponent;
   switch (view.kind) {
     case "list": return "/";
-    case "session": return `/session/${enc(view.id)}${view.docs ? "/docs" : ""}`;
+    case "session": return `/session/${enc(view.id)}${view.docs ? "/docs" : view.git ? "/git" : ""}`;
     case "docs":
       return "ticket" in view.target
         ? `/docs/ticket/${enc(view.target.ticket)}`
         : `/docs/session/${enc(view.target.session)}`;
+    case "git":
+      return "ticket" in view.target
+        ? `/git/ticket/${enc(view.target.ticket)}`
+        : `/git/project/${enc(view.target.project)}`;
   }
 }
 
@@ -181,6 +206,11 @@ export function formatLocation({ view, filters }: AppLocation): string {
   const doc = view.kind === "session" ? view.docs?.doc ?? null : view.kind === "docs" ? view.doc : null;
   if (doc !== null) params.set("doc", doc);
   if (view.kind === "docs" && "ticket" in view.target && view.target.project !== null) {
+    params.set(DOC_PROJECT, view.target.project);
+  }
+  const commit = view.kind === "git" ? view.commit : view.kind === "session" && !view.docs ? view.git?.commit ?? null : null;
+  if (commit !== null) params.set(COMMIT, commit);
+  if (view.kind === "git" && "ticket" in view.target && view.target.project !== null) {
     params.set(DOC_PROJECT, view.target.project);
   }
   const query = params.toString();

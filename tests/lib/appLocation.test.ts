@@ -248,3 +248,35 @@ describe("filterSearch / parseFilters", () => {
     expect(parseFilters(filterSearch(filters))).toEqual(filters);
   });
 });
+
+describe("git graph routes", () => {
+  const H = "0123abc";
+  it.each([
+    ["/git/project/Factory%20Book", "", { kind: "git", target: { project: "Factory Book" }, commit: null }],
+    ["/git/ticket/RIC-7", "?docProject=Mojito", { kind: "git", target: { ticket: "RIC-7", project: "Mojito" }, commit: null }],
+    ["/git/ticket/RIC-7", `?commit=${H}`, { kind: "git", target: { ticket: "RIC-7", project: null }, commit: H }],
+    ["/session/s1/git", "", { kind: "session", id: "s1", docs: null, git: { commit: null } }],
+    ["/session/s1/git", `?commit=${H}`, { kind: "session", id: "s1", docs: null, git: { commit: H } }],
+  ])("reads %s%s", (path, search, view) => {
+    expect(parseLocation(path, search).view).toEqual(view);
+  });
+
+  it.each([
+    "/git/project/Factory%20Book",
+    "/git/ticket/RIC-7?docProject=Mojito",
+    `/git/project/Mojito?commit=${H}`,
+    "/session/s1/git",
+    `/session/s1/git?commit=${H}`,
+  ])("round-trips %s", (url) => {
+    const [path, search = ""] = url.split("?");
+    expect(formatLocation(parseLocation(path, search ? `?${search}` : ""))).toBe(url);
+  });
+
+  it("drops a commit parameter that is not a hash", () => {
+    expect(parseLocation("/git/project/Mojito", "?commit=HEAD~1").view).toMatchObject({ commit: null });
+  });
+
+  it("reads an unknown git target as the list", () => {
+    expect(parseLocation("/git/branch/x", "").view).toEqual({ kind: "list" });
+  });
+});
