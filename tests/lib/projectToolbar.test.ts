@@ -16,8 +16,8 @@ function row(over: Partial<StackRow> = {}): StackRow {
   };
 }
 
-// The four that lead every mapped project's row: the terminal header's two links to the
-// repo root, and the board's two creation sheets.
+// The five that lead every mapped project's row: the terminal header's two links to the
+// repo root, the board's two creation sheets, and the git graph.
 const HEAD = ["warp", "vscode", "ticket", "session", "git"] as const;
 
 describe("stackFor", () => {

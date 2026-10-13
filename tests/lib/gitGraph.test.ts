@@ -1,4 +1,3 @@
-// tests/lib/gitGraph.test.ts
 import { describe, it, expect } from "vitest";
 import { highlightChain, highlightSummary, layoutGraph } from "@/lib/gitGraph";
 
@@ -129,7 +128,7 @@ describe("highlightSummary", () => {
     expect(highlightSummary({ ...h, base: "", baseTip: "" }, false)).toBe("RIC-1-x");
   });
   it("tells a ticket it has no branch yet, and says nothing for a project", () => {
-    expect(highlightSummary(null, true)).toBe("No branch for this ticket yet");
+    expect(highlightSummary(null, true)).toBe("No worktree for this ticket yet");
     expect(highlightSummary(null, false)).toBeNull();
   });
 });

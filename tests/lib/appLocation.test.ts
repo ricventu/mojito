@@ -264,6 +264,7 @@ describe("git graph routes", () => {
   it.each([
     "/git/project/Factory%20Book",
     "/git/ticket/RIC-7?docProject=Mojito",
+    `/git/ticket/RIC-7?commit=${H}&docProject=Mojito`,
     `/git/project/Mojito?commit=${H}`,
     "/session/s1/git",
     `/session/s1/git?commit=${H}`,

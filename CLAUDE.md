@@ -534,7 +534,7 @@ Mojito owns the whole lifecycle — there is no external plugin:
   merge parent reopened a lane freed in the same row. It never fetches: the graph is
   whatever the last fetch left. The highlighted branch's ahead/behind is
   `rev-list --left-right --count` against `origin/<default>`, exact outside the loaded
-  window. The highlight strip says "even with <base>" when the branch sits on its base's
+  window. The highlight strip says `even with <base>` when the branch sits on its base's
   tip, since the server's `merged` flag (nothing ahead) cannot tell a fresh branch from a
   merged one. A load-more response that lands after the graph was reloaded or retargeted
   is discarded (a generation counter in `useGitGraph`). The view reuses

@@ -128,7 +128,7 @@ export function highlightChain(commits: { hash: string; parents: string[] }[], t
  * has nothing ahead, which is exactly what the server's `merged` flag (ahead === 0) also says.
  */
 export function highlightSummary(h: GraphHighlight | null, isTicket: boolean): string | null {
-  if (!h) return isTicket ? "No branch for this ticket yet" : null;
+  if (!h) return isTicket ? "No worktree for this ticket yet" : null;
   if (!h.base) return h.branch;
   if (h.tip === h.baseTip) return `${h.branch} · even with ${h.base}`;
   if (h.merged) return `${h.branch} · merged into ${h.base}`;
