@@ -16,10 +16,19 @@ describe("git graph styles", () => {
     for (let i = 0; i < 8; i++) expect(root).toContain(`--graph-${i}:`);
   });
 
-  // The view is a .docs-root overlay (z-index 120); a plain .sheet-backdrop (100) would
-  // open *under* it and look like the tap did nothing.
+  // The sheet sits inside .docs-root's own stacking context, so this is belt-and-braces:
+  // the rule keeps it above any positioned descendant of the overlay (z-index 120).
   it("lifts the commit sheet above the overlay it opens from", () => {
     const z = Number(/z-index:\s*(\d+)/.exec(block(".sheet-backdrop.git-sheet"))?.[1]);
     expect(z).toBeGreaterThan(120);
+  });
+
+  // Ref chips must give way to the commit subject: a `flex: none` strip of ~190px chips left
+  // the subject zero width on a phone, and a bare text node ignores text-overflow.
+  it("lets ref chips shrink and truncate instead of starving the subject", () => {
+    expect(block(".git-refs")).not.toMatch(/flex:\s*none/);
+    expect(block(".git-refs")).toMatch(/min-width:\s*0/);
+    expect(block(".git-ref-name")).toContain("text-overflow: ellipsis");
+    expect(block(".git-ref-name")).toMatch(/min-width:\s*0/);
   });
 });

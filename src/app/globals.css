@@ -968,9 +968,15 @@ button.chip:active { transform: scale(.96); }
   font: 500 13px/1.3 var(--sans); }
 .git-row.hl .git-subj { color: var(--accent); }
 .git-meta { flex: none; font: 500 11px var(--mono); color: var(--text-faint); white-space: nowrap; }
-.git-refs { display: flex; gap: 4px; flex: none; max-width: 45%; overflow: hidden; }
+/* The chips yield to the subject, never the other way round: shrinkable and capped, each
+   name truncating with an ellipsis (on .git-ref-name — text-overflow does not reach the bare
+   text node of an inline-flex box). */
+.git-refs { display: flex; gap: 4px; flex: 0 1 auto; min-width: 0; max-width: 45%; overflow: hidden; }
 .git-ref { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 999px;
-  font: 600 10.5px/1.5 var(--mono); white-space: nowrap; border: 1px solid var(--border-hi); color: var(--text-dim); }
+  font: 600 10.5px/1.5 var(--mono); white-space: nowrap; border: 1px solid var(--border-hi); color: var(--text-dim);
+  min-width: 0; overflow: hidden; }
+.git-ref svg { flex: none; }
+.git-ref-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .git-ref.local { color: var(--run); border-color: color-mix(in srgb, var(--run) 45%, transparent); }
 .git-ref.tag { color: var(--attn); border-color: color-mix(in srgb, var(--attn) 45%, transparent); }
 .git-ref.hl { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
@@ -978,7 +984,7 @@ button.chip:active { transform: scale(.96); }
 /* Below 480px the hash/date drop under the subject rather than costing it width. */
 @media (max-width: 479px) {
   .git-text { flex-direction: column; align-items: stretch; gap: 2px; }
-  .git-refs { max-width: 100%; }
+  .git-refs { max-width: 50%; }
 }
 .sheet-backdrop.git-sheet { z-index: 130; }
 .git-sheet-head { display: flex; align-items: center; gap: 8px; }

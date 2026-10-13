@@ -49,7 +49,7 @@ function Refs({ commit, branch }: { commit: GraphCommit; branch: string | null }
           title={r.mojito ? "Mojito worktree" : r.worktree ? "Checked out in a worktree" : r.kind === "tag" ? "Tag" : undefined}
         >
           {r.worktree && <FolderGit2 size={10} aria-hidden="true" />}
-          {r.name}
+          <span className="git-ref-name">{r.name}</span>
         </span>
       ))}
     </span>
@@ -124,6 +124,7 @@ export default function GitGraphView(
                   id={`git-${c.hash}`}
                   className={`git-row${hl ? " hl" : chain.size > 0 ? " dim" : ""}`}
                   style={{ height: rowH }}
+                  aria-label={c.subject}
                   aria-current={c.hash === selected ? "true" : undefined}
                   onClick={() => onSelect(c.hash)}
                 >
