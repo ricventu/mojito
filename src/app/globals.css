@@ -37,6 +37,11 @@
   --pink: #e06cc4;   --pink-bg: #2c1826;   /* custom sessions (non-lifecycle) */
   --term: #b5d334;   --term-bg: #26290f;   /* shell/terminal sessions (non-lifecycle) */
 
+  /* Git graph lanes — layoutGraph's colour index N paints var(--graph-N). The lime accent
+     is deliberately not among them: it marks the highlighted branch. */
+  --graph-0: var(--run);  --graph-1: var(--indigo); --graph-2: var(--teal); --graph-3: var(--pink);
+  --graph-4: var(--attn); --graph-5: var(--term);   --graph-6: var(--err);  --graph-7: var(--text-dim);
+
   /* ---- shadcn bridge ----
      The components under src/components/ui are shadcn sources, styled in Tailwind
      utilities whose colour names (popover, accent, input, ring …) tailwind.config.ts
@@ -946,3 +951,44 @@ button.chip:active { transform: scale(.96); }
 .docs-item:active { transform: scale(.99); }
 .docs-item .name { font: 600 13px/1.35 var(--mono); word-break: break-all; }
 .docs-item .meta { margin-top: 6px; font: 500 12px var(--mono); color: var(--text-dim); }
+
+/* ---- git graph (GitGraphView) — lives inside .docs-root/.docs-scroll ---- */
+.git-strip { padding: 8px 14px; border-bottom: 1px solid var(--border); background: var(--surface);
+  font: 500 12px/1.35 var(--mono); color: var(--text-dim); overflow-wrap: anywhere; }
+.git-strip.hl { color: var(--accent); }
+.git-lanes-more { font: 500 11px var(--mono); color: var(--text-faint); flex: none; }
+.git-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 0 14px 0 6px;
+  background: none; border: none; color: var(--text); text-align: left; cursor: pointer; }
+.git-row:active, .git-row[aria-current="true"] { background: var(--surface-hi); }
+.git-row.dim { opacity: .55; }
+.git-row svg { flex: none; display: block; }
+.git-text { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.git-line { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.git-subj { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 500 13px/1.3 var(--sans); }
+.git-row.hl .git-subj { color: var(--accent); }
+.git-meta { flex: none; font: 500 11px var(--mono); color: var(--text-faint); white-space: nowrap; }
+.git-refs { display: flex; gap: 4px; flex: none; max-width: 45%; overflow: hidden; }
+.git-ref { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 999px;
+  font: 600 10.5px/1.5 var(--mono); white-space: nowrap; border: 1px solid var(--border-hi); color: var(--text-dim); }
+.git-ref.local { color: var(--run); border-color: color-mix(in srgb, var(--run) 45%, transparent); }
+.git-ref.tag { color: var(--attn); border-color: color-mix(in srgb, var(--attn) 45%, transparent); }
+.git-ref.hl { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.git-more { display: block; margin: 12px auto; }
+/* Below 480px the hash/date drop under the subject rather than costing it width. */
+@media (max-width: 479px) {
+  .git-text { flex-direction: column; align-items: stretch; gap: 2px; }
+  .git-refs { max-width: 100%; }
+}
+.sheet-backdrop.git-sheet { z-index: 130; }
+.git-sheet-head { display: flex; align-items: center; gap: 8px; }
+.git-sheet-head .sheet-title { margin: 0; flex: 1; }
+.git-sheet .git-meta { white-space: normal; overflow-wrap: anywhere; }
+.git-sheet .git-who { margin-top: 8px; }
+.git-sheet .git-msg { white-space: pre-wrap; overflow-wrap: anywhere; font: 500 13px/1.45 var(--mono);
+  margin: 12px 0; color: var(--text); }
+.git-files { list-style: none; margin: 0; padding: 0; font: 500 12px/1.6 var(--mono); }
+.git-files li { display: flex; gap: 8px; overflow-wrap: anywhere; }
+.git-files .st { flex: none; width: 1.2em; font-weight: 700; }
+.git-files .st.A { color: var(--ok); } .git-files .st.D { color: var(--err); }
+.git-files .st.M { color: var(--attn); } .git-files .st.R, .git-files .st.C { color: var(--indigo); }
