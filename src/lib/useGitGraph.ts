@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "./client";
 import type { CommitDetails, GraphPage } from "./gitGraph";
 
@@ -51,14 +51,19 @@ export function useGitGraph(token: string, target: GitTarget, reload: number) {
   const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState(false);
+  // Bumped by every initial load. A load-more response that lands after a bump belongs
+  // to the graph that was on screen before it, so it is dropped rather than appended.
+  const generation = useRef(0);
   // The serialised query, not the object: a fresh literal each render would re-fetch forever.
   const q = gitTargetQuery(target);
 
   useEffect(() => {
     let alive = true;
+    generation.current += 1;
     setPage(null);
     setError(null);
     setMoreError(false);
+    setLoadingMore(false);
     apiFetch(token, `/api/git/graph?${q}`)
       .then(async (res) => {
         if (!alive) return;
@@ -72,16 +77,19 @@ export function useGitGraph(token: string, target: GitTarget, reload: number) {
 
   const loadMore = useCallback(() => {
     if (!page || !page.hasMore || loadingMore) return;
+    const gen = generation.current;
     setLoadingMore(true);
     setMoreError(false);
     apiFetch(token, `/api/git/graph?${q}&skip=${page.commits.length}`)
       .then(async (res) => {
+        if (gen !== generation.current) return;
         if (!res.ok) { setMoreError(true); return; }
         const next = (await res.json()) as GraphPage;
+        if (gen !== generation.current) return;
         setPage((prev) => (prev ? appendPage(prev, next) : prev));
       })
-      .catch(() => setMoreError(true))
-      .finally(() => setLoadingMore(false));
+      .catch(() => { if (gen === generation.current) setMoreError(true); })
+      .finally(() => { if (gen === generation.current) setLoadingMore(false); });
   }, [token, q, page, loadingMore]);
 
   return { page, error, loadMore, loadingMore, moreError };
