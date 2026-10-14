@@ -837,12 +837,18 @@ button.chip:active { transform: scale(.96); }
 .term-root.kbd .sess-side-list { padding-bottom: 8px; }
 .sess-side-empty { margin: 4px 6px; color: var(--text-dim); font-size: 13px; }
 
-/* A row is the session's button plus its hide toggle beside it — siblings, so nothing
-   interactive is nested inside the row and it needs none of the `tapProps` treatment the
-   board's cards do. */
-.side-row { display: flex; align-items: flex-start; gap: 2px; min-width: 0; }
-.side-hide { flex: none; padding: 7px; border-color: transparent; color: var(--text-faint); }
-.side-hide:hover { color: var(--text); }
+/* A row is the session's button plus its hide toggle — siblings, so nothing interactive is
+   nested inside the row and it needs none of the `tapProps` treatment the board's cards
+   do. The toggle is laid over the card's bottom-right corner rather than beside it, so
+   the card keeps the sidebar's full width; the card's last line leaves room for it, and
+   a card that is only its head line grows a strip of bottom padding to give it a corner
+   of its own (otherwise it would sit on the state badge). */
+.side-row { position: relative; display: flex; min-width: 0; }
+.btn.side-hide { position: absolute; right: 4px; bottom: 4px; padding: 4px;
+  border-color: transparent; color: var(--text-faint); }
+.btn.side-hide:hover { color: var(--text); }
+.side-item > :last-child:not(.side-item-head) { padding-right: 22px; }
+.side-item:has(> .side-item-head:only-child) { padding-bottom: 28px; }
 /* The hidden sessions' toggle, alone in a footer under the scrolling list. When there is
    one, the footer is what sits on the home indicator, so it takes the list's `--sab`. */
 .sess-side-list.has-foot { padding-bottom: 8px; }
