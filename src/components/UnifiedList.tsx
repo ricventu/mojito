@@ -224,6 +224,7 @@ export default function UnifiedList(
       )}
       {sideOpen && (
         <SessionSidebar
+          token={token}
           sessions={sessions}
           // Nothing is current on the board: it is not any one session's view.
           currentId=""

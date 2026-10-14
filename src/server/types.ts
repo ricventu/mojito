@@ -35,6 +35,11 @@ export interface SessionMeta {
   // so readSidecar can yield `undefined` at runtime despite the types — callers must guard.
   title: string;         // Linear ticket title at launch, goes into the session context file
   labels: string[];      // Linear label names at launch, for bug/feature classification
+  // Tucked away from the session sidebar by the human (PATCH /api/sessions/[id]). A
+  // sidebar-only preference: nothing behavioural reads it. Absent on every sidecar
+  // written before it existed, and on every fresh launch — a relaunch is a new
+  // registration, so it comes back visible.
+  hidden?: boolean;
 }
 
 export interface TicketSummary {

@@ -837,10 +837,23 @@ button.chip:active { transform: scale(.96); }
 .term-root.kbd .sess-side-list { padding-bottom: 8px; }
 .sess-side-empty { margin: 4px 6px; color: var(--text-dim); font-size: 13px; }
 
-/* A real <button>: nothing interactive is nested inside a row, so this needs none of
-   the `tapProps` treatment the board's cards do. */
+/* A row is the session's button plus its hide toggle beside it — siblings, so nothing
+   interactive is nested inside the row and it needs none of the `tapProps` treatment the
+   board's cards do. */
+.side-row { display: flex; align-items: flex-start; gap: 2px; min-width: 0; }
+.side-hide { flex: none; padding: 7px; border-color: transparent; color: var(--text-faint); }
+.side-hide:hover { color: var(--text); }
+/* The hidden sessions' toggle, alone in a footer under the scrolling list. When there is
+   one, the footer is what sits on the home indicator, so it takes the list's `--sab`. */
+.sess-side-list.has-foot { padding-bottom: 8px; }
+.sess-side-foot { flex: none; display: flex; padding: 6px 8px calc(6px + var(--sab));
+  border-top: 1px solid var(--border); }
+.term-root.kbd .sess-side-foot { padding-bottom: 6px; }
+.side-hidden-toggle { padding: 7px; border-color: transparent; color: var(--text-faint); }
+.side-hidden-toggle:hover, .side-hidden-toggle.on { color: var(--text); }
+.side-hidden-toggle.attn { color: var(--attn); }
 .side-item {
-  display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left;
+  display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; text-align: left;
   padding: 8px 10px; border-radius: var(--r-sm); cursor: pointer;
   background: var(--surface-hi); border: 1px solid var(--border); color: var(--text);
   font: inherit;

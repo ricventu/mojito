@@ -63,6 +63,29 @@ export function sidebarSessions(sessions: SessionMeta[]): SessionMeta[] {
 }
 
 /**
+ * Part the sidebar's sessions into the ones it lists and the ones the human tucked away
+ * under "Hidden" — each half in the order it was handed, so feed it `sidebarSessions`'
+ * output and both keep the project grouping. Hiding exists for sidebar clutter (a
+ * long-lived shell nobody switches to), and it moves only the row that was hidden: the
+ * rest hold still, which is the one thing this list promises.
+ *
+ * `overrides` is the component's optimistic answer while a PATCH is in flight, keyed by
+ * session id, and wins over the server's flag.
+ */
+export function splitHidden(
+  sessions: SessionMeta[],
+  overrides: Record<string, boolean> = {},
+): { visible: SessionMeta[]; hidden: SessionMeta[] } {
+  const visible: SessionMeta[] = [];
+  const hidden: SessionMeta[] = [];
+  for (const s of sessions) {
+    const isHidden = s.id in overrides ? overrides[s.id] : s.hidden === true;
+    (isHidden ? hidden : visible).push(s);
+  }
+  return { visible, hidden };
+}
+
+/**
  * One row of that sidebar, in the shape of `terminalHeadModel`: every field normalised
  * to a string so the component branches on emptiness alone, since the four session
  * kinds carry very different amounts of metadata and a sidecar written before `title`

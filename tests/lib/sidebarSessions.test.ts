@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sidebarItem, sidebarSessions } from "@/lib/sidebarSessions";
+import { sidebarItem, sidebarSessions, splitHidden } from "@/lib/sidebarSessions";
 import type { SessionMeta, SessionState } from "@/server/types";
 
 function s(
@@ -97,6 +97,34 @@ describe("sidebarSessions", () => {
 
   it("returns an empty list unchanged", () => {
     expect(sidebarSessions([])).toEqual([]);
+  });
+});
+
+describe("splitHidden", () => {
+  it("parts hidden sessions from the rest, keeping each half in the order it was given", () => {
+    const list = [
+      { ...s("a", "RIC-1", T(12)), hidden: true },
+      s("b", "RIC-2", T(11)),
+      { ...s("c", "RIC-3", T(10)), hidden: true },
+      s("d", "RIC-4", T(9)),
+    ];
+    const { visible, hidden } = splitHidden(list);
+    expect(visible.map((x) => x.id)).toEqual(["b", "d"]);
+    expect(hidden.map((x) => x.id)).toEqual(["a", "c"]);
+  });
+
+  // Every sidecar written before the flag existed lacks it.
+  it("treats a session with no flag at all as visible", () => {
+    const { visible, hidden } = splitHidden([s("a", "RIC-1", T(10))]);
+    expect(visible.map((x) => x.id)).toEqual(["a"]);
+    expect(hidden).toEqual([]);
+  });
+
+  it("lets a local override win over the server's flag", () => {
+    const list = [{ ...s("a", "RIC-1", T(10)), hidden: true }, s("b", "RIC-2", T(9))];
+    const { visible, hidden } = splitHidden(list, { a: false, b: true });
+    expect(visible.map((x) => x.id)).toEqual(["a"]);
+    expect(hidden.map((x) => x.id)).toEqual(["b"]);
   });
 });
 

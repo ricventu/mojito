@@ -342,6 +342,24 @@ Mojito owns the whole lifecycle — there is no external plugin:
   by their newest session (ties by name; the project-less sessions of a General launch
   are simply the `""` group, taking their turn by the same rule), so a fresh launch does
   bring its project to the top — at launch, the one moment the list is allowed to move.
+  The one thing that takes a row out is the human: each row carries a hide toggle (`EyeOff`,
+  a *sibling* of the row's button, never nested in it), and a hidden session leaves the
+  list for a single icon-only toggle in a footer under it (the count is in its label and
+  tooltip), which lists them again at the end. The footer, when present, is the sidebar's
+  bottom edge and so takes the `--sab` the list otherwise pays. It exists for sidebar clutter — a
+  long-lived shell nobody switches to — so it is **sidebar-only**: the board, the amber
+  pill and Kill ignore it, and nothing behavioural reads the flag. It is `SessionMeta.hidden`,
+  written by `PATCH /api/sessions/[id]` (`{ hidden: boolean }` and nothing else) through
+  `Registry.patch`, so it rides the sidecar and survives every hook's state patch; it is
+  server-side rather than localStorage so hiding on the Mac hides on the phone, and the
+  route emits `session.updated` because the bus is the only thing that refreshes other
+  clients. The route 404s on anything the in-memory registry lacks rather than letting
+  `patch` fall back to a sidecar on disk. A relaunch is a new registration, so it comes
+  back visible. `splitHidden` is the pure half, applied after `sidebarSessions` so both
+  halves keep the project grouping and hiding moves only the row hidden; the component
+  holds an optimistic override per id until the refetch agrees. The footer icon takes
+  the attention colour while a hidden session waits for input, so tucking one away never
+  means missing it.
   `sidebarItem` is its row model, in
   `terminalHeadModel`'s shape and for its reasons — the four kinds carry very different
   metadata, so every field is normalised to a string and the component branches on

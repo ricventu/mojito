@@ -24,6 +24,17 @@ describe("Registry", () => {
     expect(new Registry(dir).get("a")?.state).toBe("needs-input"); // reloaded from disk
   });
 
+  // Hooks rewrite the state through patch on every turn; a hidden session that came back
+  // into the sidebar the next time claude stopped would make the flag worthless.
+  it("keeps a session hidden across state patches and a reload", () => {
+    const r = new Registry(dir);
+    r.upsert(meta("a"));
+    r.patch("a", { hidden: true });
+    r.patch("a", { state: "done" });
+    expect(r.get("a")?.hidden).toBe(true);
+    expect(new Registry(dir).get("a")?.hidden).toBe(true);
+  });
+
   it("recovers sidecars and fails dead running sessions", () => {
     writeSidecar(dir, meta("alive"));
     writeSidecar(dir, meta("dead"));

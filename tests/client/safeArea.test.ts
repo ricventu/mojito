@@ -113,6 +113,14 @@ describe("surfaces that touch a screen edge", () => {
     expect(block(".term-root.kbd .sess-side-list")).toMatch(/padding-bottom:\s*8px/);
   });
 
+  // With a session hidden, the footer holding its toggle sits under the list and becomes
+  // the bottom edge — so the inset moves to it, on the same keyboard terms.
+  it("hands the home-indicator inset to the sidebar's footer when it has one", () => {
+    expect(block(".sess-side-list.has-foot")).toMatch(/padding-bottom:\s*8px/);
+    expect(block(".sess-side-foot")).toContain("--sab");
+    expect(block(".term-root.kbd .sess-side-foot")).toMatch(/padding-bottom:\s*6px/);
+  });
+
   // The board's copy of that sidebar is fixed against the viewport in *both* of its
   // arrangements — the board scrolls the page, so there is no flex row for a docked one
   // to be a cell of — which means it pays the top and left insets itself either way,

@@ -8,6 +8,8 @@ const h = vi.hoisted(() => ({
   clearTicketAssets: vi.fn(() => {}),
   registryGet: vi.fn((_id: string) => undefined as unknown),
   registryRemove: vi.fn((_id: string) => {}),
+  registryPatch: vi.fn((_id: string, _p: unknown) => undefined as unknown),
+  emit: vi.fn((_e: unknown) => {}),
 }));
 
 vi.mock("@/server/tmux", () => ({ closeSession: h.closeSession }));
@@ -16,10 +18,11 @@ vi.mock("@/server/pasteImageStore", () => ({ cleanupPastedImages: h.cleanupPaste
 vi.mock("@/server/ticketAssets", () => ({ clearTicketAssets: h.clearTicketAssets }));
 vi.mock("@/server/app", () => ({
   getConfig: () => ({ token: "test-token", stateDir: "/state", port: 4711 }),
-  getRegistry: () => ({ get: h.registryGet, remove: h.registryRemove }),
+  getRegistry: () => ({ get: h.registryGet, remove: h.registryRemove, patch: h.registryPatch }),
+  getBus: () => ({ emit: h.emit }),
 }));
 
-import { DELETE } from "@/app/api/sessions/[id]/route";
+import { DELETE, PATCH } from "@/app/api/sessions/[id]/route";
 
 const TOKEN = "test-token";
 function req(auth = true): Request {
@@ -79,5 +82,63 @@ describe("DELETE /api/sessions/[id]", () => {
     h.registryGet.mockImplementation(() => ({ cwd: "/code/mojito/.worktrees/ric-46" }));
     await DELETE(req(), params("mojito-RIC-46-work"));
     expect(h.cleanupPastedImages).toHaveBeenCalledWith("/code/mojito/.worktrees/ric-46", "mojito-RIC-46-work");
+  });
+});
+
+describe("PATCH /api/sessions/[id]", () => {
+  function patchReq(body: unknown, auth = true): Request {
+    return new Request("http://localhost/api/sessions/mojito-RIC-46-work", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...(auth ? { "x-mojito-token": TOKEN } : {}) },
+      body: typeof body === "string" ? body : JSON.stringify(body),
+    });
+  }
+
+  it("401 without a token", async () => {
+    const res = await PATCH(patchReq({ hidden: true }, false), params());
+    expect(res.status).toBe(401);
+    expect(h.registryPatch).not.toHaveBeenCalled();
+  });
+
+  it("hides a session, persists it through the registry and tells every client", async () => {
+    const meta = { id: "mojito-RIC-46-work", hidden: true };
+    h.registryGet.mockImplementation(() => ({ id: "mojito-RIC-46-work" }));
+    h.registryPatch.mockImplementation(() => meta);
+    const res = await PATCH(patchReq({ hidden: true }), params());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(meta);
+    expect(h.registryPatch).toHaveBeenCalledWith("mojito-RIC-46-work", { hidden: true });
+    // Another device's sidebar learns of it only through the bus.
+    expect(h.emit).toHaveBeenCalledWith({ type: "session.updated", id: "mojito-RIC-46-work" });
+  });
+
+  it("unhides one", async () => {
+    h.registryGet.mockImplementation(() => ({ id: "mojito-RIC-46-work", hidden: true }));
+    h.registryPatch.mockImplementation(() => ({ id: "mojito-RIC-46-work", hidden: false }));
+    const res = await PATCH(patchReq({ hidden: false }), params());
+    expect(res.status).toBe(200);
+    expect(h.registryPatch).toHaveBeenCalledWith("mojito-RIC-46-work", { hidden: false });
+  });
+
+  it("404 for a session Mojito has no registration for", async () => {
+    // Registry.patch would fall back to a sidecar on disk; a session the registry does
+    // not hold is not one the sidebar can show, so it must not be resurrected here.
+    const res = await PATCH(patchReq({ hidden: true }), params("mojito-nope"));
+    expect(res.status).toBe(404);
+    expect(h.registryPatch).not.toHaveBeenCalled();
+    expect(h.emit).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a non-boolean", { hidden: "yes" }],
+    ["a missing flag", {}],
+    ["any other field", { hidden: true, state: "done" }],
+    ["a non-object", [true]],
+    ["malformed json", "{"],
+  ])("400 for %s", async (_label, body) => {
+    h.registryGet.mockImplementation(() => ({ id: "mojito-RIC-46-work" }));
+    const res = await PATCH(patchReq(body), params());
+    expect(res.status).toBe(400);
+    expect(h.registryPatch).not.toHaveBeenCalled();
   });
 });

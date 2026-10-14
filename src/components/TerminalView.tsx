@@ -455,6 +455,7 @@ export default function TerminalView(
     >
       {sidebar.view.visible && (
         <SessionSidebar
+          token={token}
           sessions={sessions}
           currentId={session.id}
           view={sidebar.view}
