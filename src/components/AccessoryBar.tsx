@@ -6,8 +6,6 @@ import { composerHeight } from "@/lib/composerHeight";
 
 const KEYS: { label: string; bytes: string }[] = [
   { label: "Esc", bytes: "\x1b" },
-  { label: "Tab", bytes: "\t" },
-  { label: "⇧Tab", bytes: "\x1b[Z" },
   { label: "↑", bytes: "\x1b[A" },
   { label: "↓", bytes: "\x1b[B" },
   { label: "←", bytes: "\x1b[D" },
@@ -18,6 +16,8 @@ const KEYS: { label: string; bytes: string }[] = [
   { label: "1", bytes: "1" },
   { label: "2", bytes: "2" },
   { label: "3", bytes: "3" },
+  { label: "Tab", bytes: "\t" },
+  { label: "⇧Tab", bytes: "\x1b[Z" },
 ];
 
 // Grow the composer to five lines, then let it scroll. See composerHeight.ts for
