@@ -219,12 +219,14 @@ describe("getIssueContent", () => {
     expect(await getIssueContent("key", "RIC-46", impl)).toEqual({
       description: "the body",
       attachments: [{ title: "Design", url: "https://figma.com/x" }],
+      comments: [],
     });
   });
 
   it("degrades a null description and a missing attachment connection to empty", async () => {
     const impl = fakeFetch({ issues: { nodes: [{ description: null }] } });
-    expect(await getIssueContent("key", "RIC-46", impl)).toEqual({ description: "", attachments: [] });
+    expect(await getIssueContent("key", "RIC-46", impl))
+      .toEqual({ description: "", attachments: [], comments: [] });
   });
 
   it("drops attachments with no url and defaults a missing title", async () => {
@@ -247,6 +249,51 @@ describe("getIssueContent", () => {
     const body = (impl as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string;
     expect(body).toContain("description");
     expect(body).toContain("attachments(first: 25)");
+  });
+
+  it("returns the comments oldest first, whatever order Linear answered in", async () => {
+    const impl = fakeFetch({ issues: { nodes: [{
+      description: "",
+      comments: { nodes: [
+        { body: "second", createdAt: "2026-09-02T10:00:00.000Z", user: { displayName: "Ric" } },
+        { body: "first", createdAt: "2026-09-01T10:00:00.000Z", user: { displayName: "Ada" } },
+      ] },
+    }] } });
+    expect((await getIssueContent("key", "RIC-46", impl)).comments).toEqual([
+      { author: "Ada", createdAt: "2026-09-01T10:00:00.000Z", body: "first" },
+      { author: "Ric", createdAt: "2026-09-02T10:00:00.000Z", body: "second" },
+    ]);
+  });
+
+  it("names a bot comment by its actor and an unattributed one by nobody", async () => {
+    const impl = fakeFetch({ issues: { nodes: [{
+      description: "",
+      comments: { nodes: [
+        { body: "opened a PR", createdAt: "2026-09-01T10:00:00.000Z", botActor: { name: "GitHub" } },
+        { body: "orphaned", createdAt: "2026-09-02T10:00:00.000Z" },
+      ] },
+    }] } });
+    expect((await getIssueContent("key", "RIC-46", impl)).comments.map((c) => c.author))
+      .toEqual(["GitHub", ""]);
+  });
+
+  it("drops comments with no body — an image-only or deleted comment is noise to the session", async () => {
+    const impl = fakeFetch({ issues: { nodes: [{
+      description: "",
+      comments: { nodes: [
+        { body: "", createdAt: "2026-09-01T10:00:00.000Z" },
+        { createdAt: "2026-09-02T10:00:00.000Z" },
+        { body: "kept", createdAt: "2026-09-03T10:00:00.000Z" },
+      ] },
+    }] } });
+    expect((await getIssueContent("key", "RIC-46", impl)).comments.map((c) => c.body)).toEqual(["kept"]);
+  });
+
+  it("asks for the comments in the same query as the description", async () => {
+    const impl = fakeFetch({ issues: { nodes: [{ description: "" }] } });
+    await getIssueContent("key", "RIC-46", impl);
+    const body = (impl as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string;
+    expect(body).toContain("comments(first: 50)");
   });
 });
 

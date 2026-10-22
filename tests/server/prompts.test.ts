@@ -22,6 +22,12 @@ describe("prompt builder", () => {
     expect(p).toContain("CONFLICT (content): src/a.ts");
     expect(p).not.toContain("{{");
   });
+  // The comments are where a ticket's real spec often ends up, and the session has no
+  // reason to go looking for a field the prompt does not name.
+  it("names the comments among the context fields the work prompt lists", () => {
+    expect(flat(buildWorkPrompt(vars))).toContain("labels, description, and any comments");
+  });
+
   // RIC-184. Neither prompt tells the session anything about how it may use Linear, in
   // either direction, and both wrong answers have already shipped once: the original
   // blanket ban killed the follow-up tickets that surface mid-session, and the permission

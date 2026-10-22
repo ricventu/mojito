@@ -13,6 +13,8 @@ export interface AdoptOrphansDeps {
 // always uppercase, so this never matches mojito-custom-…, mojito-intake-… or
 // mojito-shell-….
 const TICKET_SESSION_RE = /^mojito-([A-Z][A-Z0-9]*-\d+)-/;
+// mojito-improve-<TICKET>-<unique> — the improve session that rewrites a ticket.
+const IMPROVE_SESSION_RE = /^mojito-improve-([A-Z][A-Z0-9]*-\d+)-/;
 
 /**
  * The other half of boot recovery that Registry.recover() doesn't cover: a tmux session
@@ -63,9 +65,10 @@ export function adoptOrphanSessions(
       : {
           kind: id.startsWith("mojito-shell-") ? "shell"
             : id.startsWith("mojito-intake-") ? "intake"
+            : IMPROVE_SESSION_RE.test(id) ? "improve"
             : ticketMatch ? "ticket" : "custom",
           id,
-          ticket: ticketMatch?.[1] ?? "",
+          ticket: IMPROVE_SESSION_RE.exec(id)?.[1] ?? ticketMatch?.[1] ?? "",
           launchStatus: "",
           model: "",
           effort: "",

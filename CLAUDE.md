@@ -149,11 +149,21 @@ Mojito owns the whole lifecycle — there is no external plugin:
   opens a plain Claude session in the project root to write that script — offered only
   while the repo has none, tested with the same `existsSync` this launch path uses.
 - **Session context**: the launcher writes `<stateDir>/context/<id>.json`
-  (`{identifier, statusName, title, project, labels, description, assets?, attachments?}`);
-  the prompt embeds the path. It exists to save the session the tokens of
+  (`{identifier, statusName, title, project, labels, description, comments?, assets?,
+  attachments?}`); the prompt embeds the path. It exists to save the session the tokens of
   re-reading Linear, not to fence it in. `assets`/`attachments` point at files
   Mojito already downloaded into the sibling `<stateDir>/context/<id>-assets/` directory,
-  since those URLs sit behind Linear's file auth.
+  since those URLs sit behind Linear's file auth. `comments` is the issue's thread — each
+  `{author, createdAt, body}`, oldest first, flattened (reply threading is structure the
+  session does not need, where chronology is), bodyless comments dropped, and the whole
+  field omitted when the issue has none. It is *pre-read* rather than left to the session
+  for the reason the rest of the file is: the session holds no Linear credential of its
+  own (RIC-207), so anything Mojito does not read at launch costs an MCP round trip the
+  prompt never asks for — and a ticket's real requirements routinely get settled in the
+  thread rather than in the description, so a session reading only the description was
+  reading a draft. Deliberately *not* passed: **issue relations** (blocked-by, related,
+  parent/children). The merge-fix session's context is the reduced one it always was —
+  no comments, no labels; it resolves a conflict, and the thread is noise there.
 - **Outcome channel**: at the end of every round — not just once — the session writes
   `<stateDir>/results/<id>.json` (`{outcome: "ready-for-qa" | "merged"}`), a bare status
   signal with no notes. The Stop hook reads it (`src/server/hookHandler.ts`) and Mojito
@@ -1162,6 +1172,22 @@ Mojito owns the whole lifecycle — there is no external plugin:
   coalesces a `start` on an active unit, `triggerRebuild()` coalesces a second SIGUSR2.
   `make start` (dev server + `scripts/dev-supervisor.sh`, HMR, `tsx watch`) is the
   other option and is unchanged.
+- **As a macOS service**: `make service-install` runs that same supervisor as a user
+  LaunchAgent (`com.mojito.server`, `scripts/launchd-service.sh`) — starts at login, no
+  terminal, logs in `~/Library/Logs/Mojito/mojito.log`, "Pull & deploy" unchanged since
+  it still signals through `.prod-supervisor.pid`. A LaunchAgent and never a daemon:
+  claude's credentials are in the login keychain. Stopping the job does **not** take the
+  sessions with it — tmux daemonizes out of the process group launchd tears down
+  (verified with a throwaway agent before this shipped). Three choices in
+  `scripts/launchd-run.sh` are load-bearing: the supervisor is `exec`'d and caffeinate
+  only *watches* it (`-w $$`), because wrapped, caffeinate would take launchd's SIGTERM
+  and the supervisor's shutdown would never run, orphaning the server on the port; only
+  `MOJITO_PORT` is read out of `.env.local`, since exporting the file (as `make prod`'s
+  `LOAD_ENV` does) puts `LINEAR_API_KEY` in the server's environment before
+  `registerEnvFileKeys` can watch it arrive; and PATH/LANG are baked into the plist from
+  the installing shell (minus pnpm's injected entries), because launchd gives a job
+  neither — re-run `service-install` after an nvm upgrade. Install refuses while a
+  `make prod` is live: two supervisors would race `next build` into the same `.next`.
 - **The Makefile has no `set -e` on macOS.** It declares
   `.SHELLFLAGS := -eu -o pipefail -c`, and macOS ships **GNU Make 3.81**, which
   predates `.SHELLFLAGS` (3.82) and ignores it outright — the same version gap the

@@ -1,5 +1,6 @@
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { IssueComment } from "./linear";
 import type { TicketAsset, TicketAttachment } from "./ticketAssets";
 
 export interface LaunchContext {
@@ -9,6 +10,9 @@ export interface LaunchContext {
   project: string | null;
   labels: string[];
   description: string;
+  // The issue's comment thread, oldest first. A ticket's real specification often ends up
+  // here rather than in the description. Omitted when the issue has none.
+  comments?: IssueComment[];
   // Linear uploads Mojito already downloaded for the session — it holds no Linear
   // credential of its own, so a bare URL would be unreadable to it. Omitted when empty.
   assets?: TicketAsset[];

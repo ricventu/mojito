@@ -1,6 +1,7 @@
 import { WORK_PROMPT_TEMPLATE, ASSETS_PARAGRAPH } from "./prompts/work";
 import { MERGE_FIX_PROMPT_TEMPLATE, COMPLETE_STEP_LOCAL, COMPLETE_STEP_MR } from "./prompts/conflict";
 import { INTAKE_PROMPT_TEMPLATE, INTAKE_IMAGES_PARAGRAPH } from "./prompts/intake";
+import { IMPROVE_PROMPT_TEMPLATE } from "./prompts/improve";
 import type { MergeMode } from "./merge";
 
 export interface PromptVars {
@@ -70,4 +71,16 @@ export function buildIntakePrompt(vars: IntakePromptVars): string {
     .replaceAll("{{TEAM_KEY}}", defuse(vars.teamKey))
     .replaceAll("{{PROJECT_CLAUSE}}", clause)
     .replaceAll("{{IMAGES_PARAGRAPH}}", vars.hasImages ? INTAKE_IMAGES_PARAGRAPH : "");
+}
+
+export interface ImprovePromptVars {
+  ticketId: string;
+  teamKey: string;
+}
+
+export function buildImprovePrompt(vars: ImprovePromptVars): string {
+  const defuse = (s: string) => s.replaceAll("{{", "{ {");
+  return IMPROVE_PROMPT_TEMPLATE
+    .replaceAll("{{TICKET_ID}}", defuse(vars.ticketId))
+    .replaceAll("{{TEAM_KEY}}", defuse(vars.teamKey));
 }

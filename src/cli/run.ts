@@ -67,7 +67,7 @@ export async function runMojitoCli(argv: string[], deps: CliDeps): Promise<numbe
   const { projectName, worktree } = resolveProjectForPath(git, deps.projects());
 
   if (!(await isHealthy(base, deps))) {
-    deps.log(`Mojito is not running on port ${port} — start it with \`make prod\``);
+    deps.log(`Mojito is not running on port ${port} — start it with \`make prod\` or \`make service-install\``);
     return 1;
   }
 

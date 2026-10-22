@@ -48,6 +48,8 @@ help:
 	@echo "  make https    put Mojito behind the Tailscale HTTPS hostname (needed to install it in Chrome)"
 	@echo "  make https-off  tear that down again"
 	@echo "  make install-cli  install the \`mojito\` command (open a session in the current folder)"
+	@echo "  make service-install  run \`make prod\` as a macOS LaunchAgent: starts at login, no terminal"
+	@echo "  make service-uninstall | service-restart | service-status | service-logs"
 
 ## install-cli: write ~/.local/bin/mojito (override with BINDIR), a launcher for
 ## `bin/mojito` that opens a Mojito session in whatever directory you run it from.
@@ -89,6 +91,28 @@ prod:
 	echo ""; \
 	export MOJITO_PORT="$$PORT"; \
 	exec caffeinate -is node ./scripts/prod-supervisor.mjs
+
+## service-*: `make prod` as a macOS LaunchAgent (com.mojito.server), so no terminal has
+## to stay open: it starts at login and launchd restarts it if the supervisor dies.
+## Everything lives in scripts/launchd-service.sh — a script rather than recipes, since
+## make 3.81 gives these no `-e` (see the header note) and install has steps that must
+## not be walked past. "Pull & deploy" works unchanged: it signals the supervisor through
+## .prod-supervisor.pid either way. Re-run service-install after an nvm upgrade: the
+## plist bakes the PATH it was installed from.
+service-install:
+	@./scripts/launchd-service.sh install && { $(LOAD_ENV); $(SHOW_URLS); }
+
+service-uninstall:
+	@./scripts/launchd-service.sh uninstall
+
+service-restart:
+	@./scripts/launchd-service.sh restart
+
+service-status:
+	@./scripts/launchd-service.sh status
+
+service-logs:
+	@./scripts/launchd-service.sh logs
 
 ## restart: rebuild the Next app (next build) then restart the systemd user service
 ## and wait for /api/health. Production deploy path on the Linux box (NOT `make start`,
@@ -148,4 +172,4 @@ https-off:
 	tailscale serve reset; \
 	echo "OK — Tailscale Serve is off; the http URLs still work."
 
-.PHONY: help start prod restart https https-off
+.PHONY: help start prod restart https https-off install-cli service-install service-uninstall service-restart service-status service-logs

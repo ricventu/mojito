@@ -104,6 +104,20 @@ describe("POST /api/sessions (ticket)", () => {
     expect(passed.attachments).toEqual([{ title: "The PR", url: "https://github.com/x/y/pull/1" }]);
   });
 
+  it("hands the ticket's comments to launchSession", async () => {
+    h.getIssueContent.mockImplementation(async () => ({
+      description: "", attachments: [],
+      comments: [{ author: "Ada", createdAt: "2026-09-01T10:00:00.000Z", body: "the real spec" }],
+    }));
+    await POST(req(launch));
+    const passed = h.launchSession.mock.calls[0][0] as {
+      comments: { author: string; body: string }[];
+    };
+    expect(passed.comments).toEqual([
+      { author: "Ada", createdAt: "2026-09-01T10:00:00.000Z", body: "the real spec" },
+    ]);
+  });
+
   it("gives prepareTicketAssets a download bound to the Linear API key and the size cap", async () => {
     await POST(req(launch));
     const prep = h.prepareTicketAssets.mock.calls[0][0] as {
@@ -118,9 +132,12 @@ describe("POST /api/sessions (ticket)", () => {
     h.getIssueContent.mockImplementation(async () => { throw new Error("Linear down"); });
     const res = await POST(req(launch));
     expect(res.status).toBe(201);
-    const passed = h.launchSession.mock.calls[0][0] as { description: string; assets: unknown[] };
+    const passed = h.launchSession.mock.calls[0][0] as {
+      description: string; assets: unknown[]; comments: unknown[];
+    };
     expect(passed.description).toBe("");
     expect(passed.assets).toEqual([]);
+    expect(passed.comments).toEqual([]);
   });
 
   it("rejects a malformed ticket id with 422 rather than a 500", async () => {

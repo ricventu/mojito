@@ -13,8 +13,10 @@
 export const WORK_PROMPT_TEMPLATE = `You are working Linear ticket {{TICKET}} end to end in this repository.
 
 First read the JSON session context at {{CONTEXT_PATH}}: identifier, statusName,
-title, project, labels, and description. Mojito already read all of that from Linear,
-so you never have to spend tokens re-reading it.
+title, project, labels, description, and any comments — each \`{author, createdAt,
+body}\`, oldest first, and often where the ticket's real requirements were settled.
+Mojito already read all of that from Linear, so you never have to spend tokens
+re-reading it.
 
 {{ASSETS_PARAGRAPH}}Result file — REQUIRED. As the very last action of a round, write {{RESULT_PATH}}
 with exactly this JSON object:

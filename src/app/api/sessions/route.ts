@@ -65,7 +65,7 @@ export async function POST(req: Request) {
   // previous contents — so the duplicate check has to happen before the download, not
   // only inside launchSession, or a rejected 409 would wipe a live session's assets.
   if (await hasSession(id)) return NextResponse.json({ error: "duplicate", id }, { status: 409 });
-  let content: IssueContent = { description: "", attachments: [] };
+  let content: IssueContent = { description: "", attachments: [], comments: [] };
   try {
     content = await getIssueContent(cfg.linearApiKey, body.ticket);
   } catch (err) {
@@ -83,7 +83,8 @@ export async function POST(req: Request) {
       command: cmd,
       projectName: body.projectName ?? null,
       title: body.title ?? "", labels: Array.isArray(body.labels) ? body.labels : [],
-      description: content.description, assets: prepared.assets, attachments: prepared.attachments,
+      description: content.description, comments: content.comments,
+      assets: prepared.assets, attachments: prepared.attachments,
       createWorktree: Boolean(body.createWorktree), baseBranch: body.baseBranch, ...picked },
     { registry: getRegistry(), stateDir: cfg.stateDir, port: cfg.port, token: cfg.token, projectsPath: cfg.projectsPath,
       hasSession, newSession, pipePane, bus: getBus() },

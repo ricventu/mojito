@@ -20,7 +20,7 @@ export function supervisorPidPath(root: string): string {
 type Kill = (pid: number, signal: NodeJS.Signals | 0) => void;
 
 /**
- * macOS deploy trigger: nudge the `make prod` supervisor, which already owns the same
+ * macOS deploy trigger: nudge the prod supervisor (`make prod` or the LaunchAgent), which already owns the same
  * typecheck -> stop -> build -> start cycle the systemd unit runs on Linux.
  *
  * SIGUSR2, not SIGHUP: Node's default SIGHUP action is to exit, so handling it would turn
@@ -41,7 +41,7 @@ export async function signalProdSupervisor(
     kill(pid, 0); // liveness probe: a file left behind by a killed supervisor is not a listener
   } catch (e) {
     throw new Error(
-      `no prod supervisor is listening on ${path} — this server was started outside \`make prod\` (${String(e)})`,
+      `no prod supervisor is listening on ${path} — this server was started outside \`make prod\` and the LaunchAgent (${String(e)})`,
     );
   }
   kill(pid, "SIGUSR2");

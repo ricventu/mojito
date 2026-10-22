@@ -134,15 +134,32 @@ export interface IssueAttachmentRef {
   url: string;
 }
 
+/** One comment on the issue, flattened: threading is dropped, chronology is kept. */
+export interface IssueComment {
+  /** The commenter's display name, the bot's name for an integration comment, "" for neither. */
+  author: string;
+  createdAt: string;
+  body: string;
+}
+
 export interface IssueContent {
   description: string;
   attachments: IssueAttachmentRef[];
+  comments: IssueComment[];
 }
 
 /**
- * The description plus the issue's attachment list in one round trip. Every caller on
- * the launch path wants both — the description for the prompt context, the attachments
- * so Mojito can download the ones that are Linear uploads.
+ * The description, the issue's attachment list and its comments in one round trip. Every
+ * caller on the launch path wants all three — the description and the comments for the
+ * prompt context, the attachments so Mojito can download the ones that are Linear uploads.
+ *
+ * The comments are here because a ticket's real specification routinely ends up in the
+ * thread rather than in the description, and the spawned session holds no Linear
+ * credential of its own (RIC-207) — so whatever Mojito does not read at launch is
+ * something the session can only get through an MCP round trip it is never told to make.
+ * Flattened deliberately: reply threading is structure the session does not need, where
+ * chronology is. Linear orders a connection by updatedAt descending, so `first: 50` on a
+ * very long thread is the 50 most recently touched comments, sorted back into order here.
  */
 export async function getIssueContent(
   apiKey: string,
@@ -155,6 +172,14 @@ export async function getIssueContent(
       nodes: {
         description?: string | null;
         attachments?: { nodes?: { title?: string | null; url?: string | null }[] };
+        comments?: {
+          nodes?: {
+            body?: string | null;
+            createdAt?: string | null;
+            user?: { displayName?: string | null } | null;
+            botActor?: { name?: string | null } | null;
+          }[];
+        };
       }[];
     };
   }>(
@@ -165,6 +190,9 @@ export async function getIssueContent(
           nodes {
             description
             attachments(first: 25) { nodes { title url } }
+            comments(first: 50) {
+              nodes { body createdAt user { displayName } botActor { name } }
+            }
           }
         }
       }`,
@@ -178,7 +206,19 @@ export async function getIssueContent(
   for (const a of node.attachments?.nodes ?? []) {
     if (typeof a?.url === "string" && a.url) attachments.push({ title: a.title ?? "", url: a.url });
   }
-  return { description: node.description ?? "", attachments };
+  // A comment with no body is a deleted one or an image-only one the session cannot see:
+  // it carries nothing, and every row here is paid for in the session's context window.
+  const comments: IssueComment[] = [];
+  for (const c of node.comments?.nodes ?? []) {
+    if (typeof c?.body !== "string" || !c.body) continue;
+    comments.push({
+      author: c.user?.displayName ?? c.botActor?.name ?? "",
+      createdAt: c.createdAt ?? "",
+      body: c.body,
+    });
+  }
+  comments.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return { description: node.description ?? "", attachments, comments };
 }
 
 const ASSET_TIMEOUT_MS = 15_000;

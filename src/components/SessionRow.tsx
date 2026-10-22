@@ -14,7 +14,7 @@ function rowLabel(s: SessionMeta): string {
   // "new ticket" is unreachable in practice — an intake session has no ticket to nest
   // under, so it only ever renders as a loose SessionCard — but naming it here keeps the
   // fallback from calling it "work", which is the one thing it certainly is not.
-  const what = s.kind === "custom" ? "claude" : s.kind === "intake" ? "new ticket" : "work";
+  const what = s.kind === "custom" ? "claude" : s.kind === "intake" ? "new ticket" : s.kind === "improve" ? "improve" : "work";
   return `${what} · ${s.model}`;
 }
 

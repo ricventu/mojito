@@ -4,7 +4,8 @@
 // One `next build`, then the resulting server (`pnpm start`) is kept alive: the
 // app is served from an optimized build, never from Next's dev server, so page
 // loads and renders are fast. Invoked by `make prod`, which wraps it in
-// `caffeinate` and prints the reachable URLs.
+// `caffeinate` and prints the reachable URLs, or by the macOS LaunchAgent
+// (scripts/launchd-run.sh, installed by `make service-install`) with no terminal.
 //
 // One loop runs over one child process (`pnpm start`):
 //
@@ -166,7 +167,7 @@ function onServerExit(code, signal) {
   log(`server exited on its own (code ${code}, signal ${signal}) — crash ${crashes}/${MAX_CRASHES}`);
   if (crashes >= MAX_CRASHES) {
     state = "down";
-    log("server keeps dying — the build is probably broken. Staying DOWN; fix it and save a file to retry (or Ctrl-C).");
+    log("server keeps dying — the build is probably broken. Staying DOWN; fix it and deploy again (SIGUSR2 / Pull & deploy) to retry.");
     return;
   }
   state = "down";
@@ -315,7 +316,7 @@ function acceptRebuildSignals() {
 
 async function main() {
   if ((await runOnce(["build"], "initial production build")) !== 0) {
-    console.error("[prod-supervisor] initial build failed — nothing to serve. Fix the build and rerun `make prod`.");
+    console.error("[prod-supervisor] initial build failed — nothing to serve. Fix the build and rerun `make prod` (under the LaunchAgent, launchd retries it every minute).");
     process.exit(1);
   }
   acceptRebuildSignals();

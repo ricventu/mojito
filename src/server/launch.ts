@@ -14,6 +14,7 @@ import { writeLaunchContext } from "./launchContext";
 import { buildWorkPrompt, buildMergeFixPrompt, buildIntakePrompt, buildImprovePrompt } from "./prompts";
 import type { MergeMode } from "./merge";
 import { resultPath, clearSessionResult } from "./sessionResult";
+import type { IssueComment } from "./linear";
 import type { TicketAsset, TicketAttachment } from "./ticketAssets";
 import { watchStartupStall, type StallDeps } from "./startupStall";
 
@@ -28,6 +29,7 @@ export interface LaunchRequest {
   title: string;
   labels: string[];
   description: string;
+  comments?: IssueComment[];
   assets?: TicketAsset[];
   attachments?: TicketAttachment[];
   // Which CLI binary to use for launching the session
@@ -199,6 +201,7 @@ export async function launchSession(
     project: req.projectName,
     labels: req.labels,
     description: req.description,
+    ...(req.comments?.length ? { comments: req.comments } : {}),
     ...(req.assets?.length ? { assets: req.assets } : {}),
     ...(req.attachments?.length ? { attachments: req.attachments } : {}),
   });

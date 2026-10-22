@@ -43,6 +43,13 @@ export function intakeSessionName(slug: string, unique: string): string {
   return `mojito-intake-${slug}-${unique}`;
 }
 
+// The improve session that rewrites an existing ticket. Same prefix logic as intake:
+// the id says what the session does, so it stands out on the board.
+export function improveSessionName(ticket: string, unique: string): string {
+  validateTicket(ticket);
+  return `mojito-improve-${ticket}-${unique}`;
+}
+
 export function shellSessionName(slug: string, unique: string): string {
   return `mojito-shell-${slug}-${unique}`;
 }

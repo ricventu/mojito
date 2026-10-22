@@ -31,7 +31,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const resolveDirs = () => resolveTicketDirs(cfg.projectsPath, id, projectName);
 
   const content = async (): Promise<IssueContent> => {
-    try { return await getIssueContent(cfg.linearApiKey, id); } catch { return { description: "", attachments: [] }; }
+    try { return await getIssueContent(cfg.linearApiKey, id); } catch { return { description: "", attachments: [], comments: [] }; }
   };
 
   const result = await resolveTicketVerdict(

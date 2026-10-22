@@ -175,6 +175,25 @@ describe("launchSession", () => {
     expect(written.attachments).toEqual([{ title: "The PR", url: "https://github.com/x/y/pull/1" }]);
   });
 
+  it("forwards the ticket's comments into the context file", async () => {
+    const d = deps();
+    await launchSession({
+      ...baseReq,
+      comments: [{ author: "Ada", createdAt: "2026-09-01T10:00:00.000Z", body: "the real spec" }],
+    }, d);
+    const written = JSON.parse(readFileSync(join(dir, "context", "mojito-RIC-46-planned.json"), "utf8"));
+    expect(written.comments).toEqual([
+      { author: "Ada", createdAt: "2026-09-01T10:00:00.000Z", body: "the real spec" },
+    ]);
+  });
+
+  it("omits the comments field when the ticket has none", async () => {
+    const d = deps();
+    await launchSession({ ...baseReq, comments: [] }, d);
+    const written = JSON.parse(readFileSync(join(dir, "context", "mojito-RIC-46-planned.json"), "utf8"));
+    expect("comments" in written).toBe(false);
+  });
+
   it("omits the asset fields when the request carries none", async () => {
     const d = deps();
     await launchSession({ ...baseReq, assets: [], attachments: [] }, d);
