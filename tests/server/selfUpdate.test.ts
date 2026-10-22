@@ -6,6 +6,7 @@ import {
   isSelfUpdateEnabled,
   runSelfUpdate,
   signalProdSupervisor,
+  startDeployUnit,
   supervisorPidPath,
   _resetSelfUpdate,
 } from "@/server/selfUpdate";
@@ -123,7 +124,7 @@ describe("signalProdSupervisor", () => {
 });
 
 describe("runSelfUpdate deploy trigger", () => {
-  it("triggers the deploy when already up to date (no merge, so no post-merge hook)", async () => {
+  it("triggers the deploy when already up to date (no merge, nothing else would deploy)", async () => {
     let calls = 0;
     const res = await runSelfUpdate(
       async () => ({ status: "up-to-date", from: "a", to: "a" }),
@@ -134,7 +135,7 @@ describe("runSelfUpdate deploy trigger", () => {
   });
 
   // A real update deploys too: on macOS the prod supervisor watches no files (a pulled
-  // commit triggers nothing by itself), and this checkout has no post-merge hook at all.
+  // commit triggers nothing by itself), and neither checkout has a post-merge hook.
   it("triggers the deploy on a real update as well", async () => {
     let calls = 0;
     await runSelfUpdate(
@@ -150,5 +151,48 @@ describe("runSelfUpdate deploy trigger", () => {
       runSelfUpdate(() => Promise.reject(new Error("boom")), async () => { calls += 1; }),
     ).rejects.toThrow("boom");
     expect(calls).toBe(0);
+  });
+});
+
+describe("startDeployUnit (Linux)", () => {
+  // Records every command; `active` decides what `systemctl is-active` answers.
+  function runner(active: boolean) {
+    const calls: [string, string[]][] = [];
+    const run = async (file: string, args: string[]) => {
+      calls.push([file, args]);
+      if (file === "systemctl" && !active) throw Object.assign(new Error("inactive"), { code: 3 });
+    };
+    return { run, calls };
+  }
+
+  it("runs `make deploy` in its own transient unit, from the checkout", async () => {
+    const r = runner(false);
+    await startDeployUnit("/srv/mojito", r.run);
+    expect(r.calls[1]).toEqual([
+      "systemd-run",
+      [
+        "--user",
+        "--unit=mojito-deploy",
+        "--collect",
+        "--working-directory=/srv/mojito",
+        "--description=Mojito deploy (Pull & deploy)",
+        "make",
+        "deploy",
+      ],
+    ]);
+  });
+
+  it("leaves a deploy that is already running alone", async () => {
+    const r = runner(true);
+    await startDeployUnit("/srv/mojito", r.run);
+    expect(r.calls).toEqual([["systemctl", ["--user", "is-active", "--quiet", "mojito-deploy.service"]]]);
+  });
+
+  it("reports a failure to start the unit", async () => {
+    const run = async (file: string) => {
+      if (file === "systemctl") throw new Error("inactive");
+      throw new Error("systemd-run: Failed to start transient service unit");
+    };
+    await expect(startDeployUnit("/srv/mojito", run)).rejects.toThrow(/transient service unit/);
   });
 });

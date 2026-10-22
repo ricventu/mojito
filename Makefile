@@ -133,6 +133,16 @@ restart:
 	echo "WARN: no HTTP 200 after 30s — check: journalctl --user -u $(SERVICE) -e" >&2; \
 	exit 1
 
+## deploy: what "Pull & deploy" runs on the Linux box, in the transient systemd unit
+## mojito-deploy (src/server/selfUpdate.ts#startDeployUnit): pnpm install, then restart.
+## The install is unconditional, as in the Mac supervisor's cycle: a pull can bring a
+## lockfile change. NODE_ENV is dropped for it, since an install under production can
+## strip the devDependencies the build needs (RIC-207). Logs: journalctl --user -u mojito-deploy
+deploy:
+	@echo "==> Installing dependencies (pnpm install)…"; \
+	env -u NODE_ENV pnpm install --frozen-lockfile; \
+	$(MAKE) --no-print-directory restart
+
 ## https: front Mojito with Tailscale Serve, i.e. an https://<host>.<tailnet>.ts.net
 ## URL with a real Let's Encrypt certificate. Needed to *install* Mojito as an app in
 ## Chrome or on Android: Chromium only offers "Install" on a secure origin, and
@@ -172,4 +182,4 @@ https-off:
 	tailscale serve reset; \
 	echo "OK — Tailscale Serve is off; the http URLs still work."
 
-.PHONY: help start prod restart https https-off install-cli service-install service-uninstall service-restart service-status service-logs
+.PHONY: help start prod restart deploy https https-off install-cli service-install service-uninstall service-restart service-status service-logs

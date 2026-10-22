@@ -47,13 +47,46 @@ export async function signalProdSupervisor(
   kill(pid, "SIGUSR2");
 }
 
+type Exec = (file: string, args: string[]) => Promise<unknown>;
+const exec: Exec = (file, args) => pexec(file, args);
+
+// The unit `make deploy` runs in on Linux. A transient unit of its own, not a child of
+// the server: the deploy restarts mojito.service, and systemd would kill a child of that
+// service halfway through. Created per deploy by systemd-run (`--collect` removes it,
+// failed or not), so the server needs no hand-installed unit file that can go missing.
+export const DEPLOY_UNIT = "mojito-deploy";
+
+/**
+ * Linux deploy trigger: `make deploy` (pnpm install -> build -> restart -> health) in
+ * DEPLOY_UNIT. A deploy already running absorbs the request, as the Mac supervisor's
+ * triggerRebuild() does — systemd-run would refuse a second unit of the same name.
+ * `is-active` exits non-zero for a unit that is not running, so a rejection there means
+ * "start one"; a failure of systemd-run itself propagates, and the button reports it.
+ */
+export async function startDeployUnit(root: string = process.cwd(), run: Exec = exec): Promise<void> {
+  try {
+    await run("systemctl", ["--user", "is-active", "--quiet", `${DEPLOY_UNIT}.service`]);
+    return;
+  } catch {
+    // not running
+  }
+  await run("systemd-run", [
+    "--user",
+    `--unit=${DEPLOY_UNIT}`,
+    "--collect",
+    `--working-directory=${root}`,
+    "--description=Mojito deploy (Pull & deploy)",
+    "make",
+    "deploy",
+  ]);
+}
+
 // Start the rebuild+restart without blocking, so this request can return its
-// response before the server it triggers is torn down. On Linux that is the SAME
-// systemd unit (stop -> install -> build -> start) the post-merge git hook starts on a
-// real merge; on the Mac it is the prod supervisor's SIGUSR2 cycle.
+// response before the server it triggers is torn down: on Linux the transient deploy
+// unit above, on the Mac the prod supervisor's SIGUSR2 cycle.
 export async function triggerDeploy(): Promise<void> {
   if (process.platform === "darwin") return signalProdSupervisor();
-  await pexec("systemctl", ["--user", "start", "--no-block", "mojito-deploy.service"]);
+  await startDeployUnit();
 }
 
 // Module-level single-flight: a second POST while a pull is running gets the same
@@ -69,11 +102,11 @@ export function runSelfUpdate(
     try {
       const res = await pull();
       // Unconditionally, whatever the pull did: "Pull & deploy" must always rebuild and
-      // restart. Nothing else will. The Mac's prod supervisor no longer watches files, so
-      // a pull that brings commits produces no rebuild of its own; only on Linux does a
-      // real merge also fire the post-merge hook, and that overlap costs nothing — systemd
-      // coalesces a `start` on an already-active unit, and the supervisor's triggerRebuild()
-      // coalesces a second SIGUSR2 into at most one extra cycle.
+      // restart. Nothing else will: neither checkout has a post-merge hook, and the Mac's
+      // prod supervisor watches no files, so a pull that brings commits produces no
+      // rebuild of its own. A second click while a deploy runs costs nothing —
+      // startDeployUnit() leaves a running unit alone, and the supervisor's
+      // triggerRebuild() coalesces a second SIGUSR2 into at most one extra cycle.
       await deploy();
       return res;
     } finally {

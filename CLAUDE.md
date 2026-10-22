@@ -1168,8 +1168,7 @@ Mojito owns the whole lifecycle — there is no external plugin:
   safety, and a tree that does not compile is the editor's problem, not the deploy's. `runSelfUpdate`
   therefore signals on **every** outcome, up-to-date or updated: with no watcher, a pull
   that brings commits triggers nothing by itself, and this checkout has no post-merge
-  hook (that is the Linux box's trigger). Double-triggering on Linux is free — systemd
-  coalesces a `start` on an active unit, `triggerRebuild()` coalesces a second SIGUSR2.
+  hook. A second click is free — `triggerRebuild()` coalesces a second SIGUSR2.
   `make start` (dev server + `scripts/dev-supervisor.sh`, HMR, `tsx watch`) is the
   other option and is unchanged.
 - **As a macOS service**: `make service-install` runs that same supervisor as a user
@@ -1197,8 +1196,16 @@ Mojito owns the whole lifecycle — there is no external plugin:
   "Open the Tailscale Serve URL" under a banner containing no such URL because
   `tailscale serve` had exited 1 against a stopped tailnet. Check the status yourself
   in anything that has to run on the Mac (`if ! cmd; then … exit 1; fi`, as `https`
-  does). `restart` may keep leaning on `-e` — it is the Linux box's path, and that
-  make is new enough.
+  does). `restart` and `deploy` may keep leaning on `-e` — they are the Linux box's
+  path, and that make is new enough.
+- **Pull & deploy on Linux** (the server runs as the `mojito.service` user unit, linger on):
+  `startDeployUnit` runs `make deploy` (pnpm install → `make restart`: build → restart →
+  health) through `systemd-run --user --unit=mojito-deploy --collect`. A transient unit
+  of its own, because the deploy restarts `mojito.service` and systemd would kill a child
+  of that service mid-build; created per deploy, so there is no unit file to install or
+  lose (the old hand-installed `mojito-deploy.service` and its post-merge hook were gone
+  from the box, and the button had failed silently since). A click while one runs is left
+  to the running one. Logs: `journalctl --user -u mojito-deploy`.
 - **xterm 6**: a clean bump. Nothing Mojito uses was touched by the 6.0 removals
   (`windowsMode`, `fastScrollModifier`, the canvas renderer, `overviewRulerWidth`), and
   the viewport/scrollbar rewrite is invisible here because `globals.css` only ever
