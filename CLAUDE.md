@@ -1205,7 +1205,13 @@ Mojito owns the whole lifecycle — there is no external plugin:
   of that service mid-build; created per deploy, so there is no unit file to install or
   lose (the old hand-installed `mojito-deploy.service` and its post-merge hook were gone
   from the box, and the button had failed silently since). A click while one runs is left
-  to the running one. Logs: `journalctl --user -u mojito-deploy`.
+  to the running one. Logs: `journalctl --user -u mojito-deploy`. **Sessions survive it**
+  only because `tmux.ts#outsideService` starts each `new-session` in a scope of its own
+  (`systemd-run --user --scope`) when `INVOCATION_ID` says Mojito runs under systemd: a tmux
+  server started straight from the service sat in `mojito.service`'s cgroup, and every
+  restart (KillMode=control-group) killed it and every agent with it (2026-10-22). A server
+  started before that fix still dies with the next restart; check with
+  `cat /proc/$(pgrep -x tmux)/cgroup` (a `run-*.scope`, not `mojito.service`).
 - **xterm 6**: a clean bump. Nothing Mojito uses was touched by the 6.0 removals
   (`windowsMode`, `fastScrollModifier`, the canvas renderer, `overviewRulerWidth`), and
   the viewport/scrollbar rewrite is invisible here because `globals.css` only ever

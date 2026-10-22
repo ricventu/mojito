@@ -70,6 +70,18 @@ export async function globalEnvironment(): Promise<Record<string, string>> {
   }
 }
 
+// Where Mojito runs as a systemd service (the Linux box: `mojito.service`, a user unit), a
+// tmux server started from here would land in that service's cgroup, and every restart of
+// the service — each "Pull & deploy" — kills the whole cgroup: the server, so every
+// session's pty, so every agent in it. A transient scope of its own keeps the server out.
+// Only the new-session that happens to start the server needs it, but which one that is
+// is a race, so each gets one; a client that finds a server running exits at once and its
+// scope with it. INVOCATION_ID is what systemd sets in a service's environment.
+export function outsideService(args: string[], env: EnvLike): [string, string[]] {
+  if (!env.INVOCATION_ID) return ["tmux", args];
+  return ["systemd-run", ["--user", "--scope", "--quiet", "--description=Mojito tmux", "tmux", ...args]];
+}
+
 export async function newSession(
   name: string,
   cwd: string,
@@ -77,11 +89,12 @@ export async function newSession(
   deps: Partial<SpawnDeps> = {},
 ): Promise<void> {
   const d = { ...defaultSpawnDeps, ...deps };
-  await d.exec("tmux", [
+  const [file, args] = outsideService([
     "new-session", "-d", "-s", name, ...tmuxEnvArgs(await d.globalEnv()), "-c", cwd, command,
     ";",
     ...statusOffFor(name),
-  ], { env: spawnEnv(d.env()) });
+  ], d.env());
+  await d.exec(file, args, { env: spawnEnv(d.env()) });
 }
 
 export async function startStackSession(
@@ -93,13 +106,14 @@ export async function startStackSession(
   const d = { ...defaultSpawnDeps, ...deps };
   // Create the session and set remain-on-exit window-scoped in the SAME invocation,
   // so a pane that dies immediately is retained (status "crashed") instead of vanishing.
-  await d.exec("tmux", [
+  const [file, args] = outsideService([
     "new-session", "-d", "-s", name, ...tmuxEnvArgs(await d.globalEnv()), "-c", cwd, command,
     ";",
     "set-option", "-w", "-t", name, "remain-on-exit", "on",
     ";",
     ...statusOffFor(name),
-  ], { env: spawnEnv(d.env()) });
+  ], d.env());
+  await d.exec(file, args, { env: spawnEnv(d.env()) });
 }
 
 export async function statusOption(name: string): Promise<string> {

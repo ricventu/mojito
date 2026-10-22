@@ -115,3 +115,34 @@ describe("parseGlobalEnvironment", () => {
     expect(parseGlobalEnvironment("-NODE_ENV\nHOME=/Users/me\n")).toEqual({ HOME: "/Users/me" });
   });
 });
+
+// Under systemd (the Linux box), a tmux server started from mojito.service's cgroup died with
+// every restart of the service, taking every session with it.
+describe("tmux server outside the systemd service", () => {
+  const UNDER_SYSTEMD = { ...POLLUTED_PARENT, INVOCATION_ID: "abc123" };
+
+  it("starts each session in a scope of its own when Mojito runs as a systemd service", async () => {
+    for (const start of [newSession, startStackSession]) {
+      const rec = recorder();
+      await start("mojito-RIC-1-work", "/repo", "claude", {
+        exec: rec.exec,
+        globalEnv: async () => ({}),
+        env: () => UNDER_SYSTEMD,
+      });
+      expect(rec.calls[0].file).toBe("systemd-run");
+      expect(rec.calls[0].args.slice(0, 6)).toEqual([
+        "--user", "--scope", "--quiet", "--description=Mojito tmux", "tmux", "new-session",
+      ]);
+    }
+  });
+
+  it("runs tmux directly anywhere else", async () => {
+    const rec = recorder();
+    await newSession("mojito-RIC-1-work", "/repo", "claude", {
+      exec: rec.exec,
+      globalEnv: async () => ({}),
+      env: () => POLLUTED_PARENT,
+    });
+    expect(rec.calls[0].file).toBe("tmux");
+  });
+});
