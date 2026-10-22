@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "./client";
-import { initialPollState, nextPollState } from "./deployPoll";
+import { initialPollState, nextPollState, probeHealth } from "./deployPoll";
 import { selfUpdateMessage, type SelfUpdateResponse } from "./selfUpdate";
 
 export type SelfUpdatePhase = "idle" | "pulling" | "deploying" | "timeout";
@@ -28,6 +28,9 @@ export function useSelfUpdate(token: string) {
   const [phase, setPhase] = useState<SelfUpdatePhase>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The process that answered /api/health before the POST: the poll reloads once a
+  // different one answers (see deployPoll).
+  const bootBefore = useRef<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -45,15 +48,14 @@ export function useSelfUpdate(token: string) {
     if (phase !== "deploying") return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
-    let state = initialPollState;
+    let state = initialPollState(bootBefore.current);
     const startedAt = Date.now();
     const tick = async () => {
       if (cancelled) return;
       if (Date.now() - startedAt > 5 * 60_000) { setPhase("timeout"); return; }
-      let up = false;
-      try { up = (await apiFetch(token, "/api/health")).ok; } catch { up = false; }
+      const probe = await probeHealth(() => apiFetch(token, "/api/health"));
       if (cancelled) return;
-      state = nextPollState(state, up);
+      state = nextPollState(state, probe);
       if (state.recovered) { location.reload(); return; }
       timer = setTimeout(tick, 3000);
     };
@@ -68,6 +70,7 @@ export function useSelfUpdate(token: string) {
     setError(null);
     setMessage(null);
     setPhase("pulling");
+    bootBefore.current = (await probeHealth(() => apiFetch(token, "/api/health"))).boot;
     let res: Response;
     try {
       res = await apiFetch(token, "/api/self-update", { method: "POST" });
