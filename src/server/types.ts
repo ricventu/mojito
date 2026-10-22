@@ -56,6 +56,7 @@ export interface TicketSummary {
 
 export interface AppConfig {
   port: number;
+  host: string;
   token: string;
   linearApiKey: string;
   stateDir: string;

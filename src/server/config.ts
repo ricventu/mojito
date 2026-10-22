@@ -34,6 +34,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   if (!linearApiKey) throw new Error("LINEAR_API_KEY is required");
   return {
     port: Number(env.MOJITO_PORT ?? 4711),
+    host: env.MOJITO_HOST || "0.0.0.0",
     token,
     linearApiKey,
     stateDir: env.MOJITO_STATE_DIR ?? join(homedir(), ".mojito-state"),

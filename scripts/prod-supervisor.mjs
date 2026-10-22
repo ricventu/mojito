@@ -42,8 +42,8 @@ import { unlinkSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const PORT = process.env.MOJITO_PORT || "4711";
-// 127.0.0.1, not localhost: the server binds 0.0.0.0, and `localhost` can
-// resolve to ::1 first, which nothing is listening on.
+// 127.0.0.1, not localhost: the server binds 0.0.0.0 or 127.0.0.1 (MOJITO_HOST),
+// and `localhost` can resolve to ::1 first, which nothing is listening on.
 const HEALTH_URL = `http://127.0.0.1:${PORT}/api/health`;
 
 const POLL_INTERVAL_MS = 5_000;

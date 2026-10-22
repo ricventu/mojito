@@ -9,7 +9,13 @@ describe("loadConfig", () => {
     expect(cfg.token).toBe("t");
     expect(cfg.linearApiKey).toBe("k");
     expect(cfg.port).toBe(4711);
+    expect(cfg.host).toBe("0.0.0.0");
     expect(cfg.stateDir).toMatch(/mojito-state$/);
+  });
+
+  it("binds to MOJITO_HOST when set", () => {
+    const cfg = loadConfig({ MOJITO_TOKEN: "t", LINEAR_API_KEY: "k", MOJITO_HOST: "127.0.0.1" } as unknown as NodeJS.ProcessEnv);
+    expect(cfg.host).toBe("127.0.0.1");
   });
 
   it("throws when the token is missing", () => {

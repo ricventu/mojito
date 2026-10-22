@@ -32,6 +32,8 @@ clean. `public/` is not watched: Next serves it from disk, no rebuild needed.
 Config lives in `.env.local`:
 
 - `MOJITO_PORT` — port to bind (default `4711`).
+- `MOJITO_HOST` — address to bind (default `0.0.0.0`). Set `127.0.0.1` on a host reached
+  only through `tailscale serve`, so the plain-http port is never exposed on a public interface.
 - `MOJITO_TOKEN` — auth token; when set, the printed URLs include `?token=…`.
 
 Tests: `npx tsc --noEmit && npx vitest run`.

@@ -119,8 +119,8 @@ async function main() {
   };
   server.on("upgrade", onUpgrade);
 
-  server.listen(cfg.port, "0.0.0.0", () => {
-    console.log(`Mojito on http://0.0.0.0:${cfg.port}`);
+  server.listen(cfg.port, cfg.host, () => {
+    console.log(`Mojito on http://${cfg.host}:${cfg.port}`);
   });
 }
 
