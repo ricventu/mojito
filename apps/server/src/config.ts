@@ -18,8 +18,10 @@ export interface ServerConfig {
 
 // The repository root, two levels above apps/server. Resolved from this module's own
 // location rather than the cwd, so it is the same whether the server runs from src/ (tsx)
-// or from the bundled dist/ — both sit one level below apps/server.
-const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+// or from the bundled dist/ — both sit one level below apps/server. Exported on its own
+// because it is needed before `loadConfig` can run: `.env.local`, which usually carries
+// the token `loadConfig` requires, is found there.
+export const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url)).replace(/\/$/, "");
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const token = env.MOJITO_TOKEN;
@@ -33,7 +35,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     token,
     linearApiKey,
     stateDir: env.MOJITO_STATE_DIR ?? join(home, ".local", "state", "mojito2"),
-    repoRoot: REPO_ROOT.replace(/\/$/, ""),
+    repoRoot: REPO_ROOT,
     projectsJsonPath: env.MOJITO_PROJECTS ?? join(home, ".config", "mojito", "projects.json"),
     home,
   };
