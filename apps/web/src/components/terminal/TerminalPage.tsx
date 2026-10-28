@@ -1,10 +1,14 @@
 import { useState } from "react";
+import type { Terminal } from "@xterm/xterm";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, X } from "lucide-react";
 import { Link, Navigate, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import type { SessionKind, SessionMeta, TicketSummary } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
+import { AccessoryBar } from "@/components/terminal/AccessoryBar";
+import { Composer } from "@/components/terminal/Composer";
+import { CopyBuffer } from "@/components/terminal/CopyBuffer";
 import { TerminalView } from "@/components/terminal/TerminalView";
 import { Button } from "@/components/ui/button";
 import { useKeyboardOpen } from "@/hooks/useKeyboardOpen";
@@ -65,6 +69,13 @@ export function TerminalPage() {
   // Keyed by id: the route reuses this component when one terminal links to another.
   const [goneId, setGoneId] = useState<string | null>(null);
   const gone = goneId === id;
+  // The live xterm, handed up by TerminalView, for the accessory bar and its two panels.
+  const [term, setTerm] = useState<Terminal | null>(null);
+  // At most one panel: both take their room from the terminal's box. Keyed by id like
+  // `goneId`, so a panel open on one terminal does not follow a link to the next.
+  const [panelState, setPanel] = useState<{ id: string; kind: "compose" | "copy" } | null>(null);
+  const panel = panelState?.id === id ? panelState.kind : null;
+  const togglePanel = (kind: "compose" | "copy") => setPanel(panel === kind ? null : { id, kind });
 
   const session = sessions.data?.find((s) => s.id === id);
   const ticket = session?.ticket ? tickets.data?.tickets.find((t) => t.identifier === session.ticket) : undefined;
@@ -91,12 +102,13 @@ export function TerminalPage() {
   if (sessions.isSuccess && !sessions.isFetching && !session) return <Navigate to="/" replace />;
 
   return (
-    // The bottom inset is the terminal's to pay until the accessory bar sits under it —
-    // and never with the keyboard up, whose top edge is then the band's bottom.
+    // The bottom inset is the root's to pay only where the accessory bar is not (a fine
+    // pointer hides it); on a touch screen the bar pays it. Never with the keyboard up,
+    // whose top edge is then the band's bottom.
     <div
       className={cn(
         "fixed inset-x-0 top-0 flex h-dvh flex-col overscroll-none bg-background pt-[var(--sat)] pr-[var(--sar)] pl-[var(--sal)]",
-        !band.open && "pb-[var(--sab)]",
+        !band.open && "pb-[var(--sab)] pointer-coarse:pb-0",
       )}
       style={band.rootStyle}
     >
@@ -137,7 +149,17 @@ export function TerminalPage() {
           </Button>
         </div>
       ) : (
-        <TerminalView sessionId={id} keyboardOpen={band.open} onExit={() => setGoneId(id)} />
+        <>
+          <TerminalView sessionId={id} keyboardOpen={band.open} onExit={() => setGoneId(id)} onReady={setTerm} />
+          {term && panel === "compose" && <Composer term={term} onClose={() => setPanel(null)} />}
+          {term && panel === "copy" && <CopyBuffer term={term} onClose={() => setPanel(null)} />}
+          <AccessoryBar
+            term={term}
+            keyboardOpen={band.open}
+            onCompose={() => togglePanel("compose")}
+            onCopy={() => togglePanel("copy")}
+          />
+        </>
       )}
     </div>
   );

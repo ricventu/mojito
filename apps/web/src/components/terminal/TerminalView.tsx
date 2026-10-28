@@ -23,6 +23,8 @@ interface Props {
   keyboardOpen: boolean;
   /** The tmux session is gone for good (close code `SESSION_GONE_CODE`); nothing is retried after it. */
   onExit(): void;
+  /** The live `Terminal` once it exists, `null` when it is torn down (the keys, composer and copy overlay drive it). */
+  onReady?(term: Terminal | null): void;
 }
 
 /**
@@ -33,7 +35,7 @@ interface Props {
  * anchored to the bottom of its box, so rows the keyboard costs come off the top and
  * claude's input line stays on screen.
  */
-export function TerminalView({ sessionId, keyboardOpen, onExit }: Props) {
+export function TerminalView({ sessionId, keyboardOpen, onExit, onReady }: Props) {
   const holder = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -42,9 +44,11 @@ export function TerminalView({ sessionId, keyboardOpen, onExit }: Props) {
   const kbdRef = useRef(keyboardOpen);
   const syncRef = useRef<() => void>(() => {});
   const onExitRef = useRef(onExit);
+  const onReadyRef = useRef(onReady);
   useLayoutEffect(() => {
     kbdRef.current = keyboardOpen;
     onExitRef.current = onExit;
+    onReadyRef.current = onReady;
   });
 
   useEffect(() => {
@@ -69,6 +73,7 @@ export function TerminalView({ sessionId, keyboardOpen, onExit }: Props) {
       term.open(el);
       fit.fit();
       termRef.current = term;
+      onReadyRef.current?.(term);
 
       // send() on a CONNECTING socket throws; every write goes through this guard.
       const sendBytes = (data: string) => {
@@ -142,6 +147,7 @@ export function TerminalView({ sessionId, keyboardOpen, onExit }: Props) {
         wsRef.current?.close();
         wsRef.current = null;
         syncRef.current = () => {};
+        onReadyRef.current?.(null);
         term.dispose();
         termRef.current = null;
       };
