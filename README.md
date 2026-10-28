@@ -104,3 +104,42 @@ tailscale debug prefs | grep -i shields
 
 `--shields-up` is a persistent Tailscale preference (survives reboots), so if remote
 access silently stops working, check this first.
+
+## Mojito v2
+
+Riscrittura del nucleo di Mojito come workspace pnpm, accanto all'app Next.js attuale
+(che non viene toccata): `apps/server` (Hono + SQLite + tmux), `apps/web` (Vite + React,
+Tailwind e shadcn) e `packages/shared` (tipi e schemi condivisi). Convive con la vecchia
+app: porta `3100` invece di `4711`, servizio `mojito2` invece di `mojito`, stato in
+`~/.local/state/mojito2` (`MOJITO_STATE_DIR` lo sovrascrive; il database è
+`mojito.db`), prefisso tmux `mj-`. `LINEAR_API_KEY` e `MOJITO_TOKEN` si leggono da
+variabili d'ambiente o da `.env.local` nella radice del repo, e non arrivano mai
+nell'ambiente delle sessioni.
+
+Sviluppo, con server (`tsx watch`, porta 3100) e Vite (porta 5173) in parallelo:
+
+```bash
+pnpm v2:dev
+```
+
+Build di produzione e avvio da un solo processo, che serve API, websocket e client da
+`:3100`:
+
+```bash
+pnpm v2:build   # apps/web/dist e apps/server/dist/main.js
+pnpm v2:start
+```
+
+Come servizio systemd utente (Linux), accanto a `mojito.service`:
+
+```bash
+pnpm v2:build
+make v2-install-service   # copia deploy/mojito2.service in ~/.config/systemd/user, enable --now
+make v2-deploy            # git pull --ff-only, pnpm install, pnpm v2:build, restart mojito2
+```
+
+L'unità parte da `~/code/mojito` e non ha un `EnvironmentFile`: il server legge da solo
+`.env.local`. Le sessioni tmux nascono in uno scope systemd a parte, quindi sopravvivono
+al riavvio del servizio. Log: `journalctl --user -u mojito2`.
+
+Test: `pnpm v2:test && pnpm v2:typecheck`.

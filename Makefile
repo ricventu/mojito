@@ -50,6 +50,8 @@ help:
 	@echo "  make install-cli  install the \`mojito\` command (open a session in the current folder)"
 	@echo "  make service-install  run \`make prod\` as a macOS LaunchAgent: starts at login, no terminal"
 	@echo "  make service-uninstall | service-restart | service-status | service-logs"
+	@echo "  make v2-install-service  install and start $(V2_SERVICE) (Mojito v2, port 3100, systemd --user)"
+	@echo "  make v2-deploy  v2: git pull --ff-only, pnpm install, pnpm v2:build, restart $(V2_SERVICE)"
 
 ## install-cli: write ~/.local/bin/mojito (override with BINDIR), a launcher for
 ## `bin/mojito` that opens a Mojito session in whatever directory you run it from.
@@ -182,4 +184,26 @@ https-off:
 	tailscale serve reset; \
 	echo "OK — Tailscale Serve is off; the http URLs still work."
 
-.PHONY: help start prod restart deploy https https-off install-cli service-install service-uninstall service-restart service-status service-logs
+## v2-install-service: Mojito v2 (apps/server + apps/web) as a systemd user unit beside
+## mojito.service, on port 3100. The unit's WorkingDirectory is ~/code/mojito, so build
+## there first (`pnpm v2:build`). Every command's exit status is checked by hand: make 3.81
+## ignores .SHELLFLAGS, so there is no `-e` to lean on (see the header note).
+V2_SERVICE ?= mojito2.service
+V2_UNIT_DIR ?= $(HOME)/.config/systemd/user
+v2-install-service:
+	@if ! mkdir -p "$(V2_UNIT_DIR)"; then exit 1; fi; \
+	if ! cp deploy/mojito2.service "$(V2_UNIT_DIR)/$(V2_SERVICE)"; then exit 1; fi; \
+	if ! systemctl --user daemon-reload; then exit 1; fi; \
+	if ! systemctl --user enable --now "$(V2_SERVICE)"; then exit 1; fi; \
+	echo "OK — $(V2_SERVICE) installed and started (status: systemctl --user status $(V2_SERVICE))"
+
+## v2-deploy: update Mojito v2 in place and restart it. Each step aborts the deploy, so a
+## failed pull, install or build never replaces the running server.
+v2-deploy:
+	@if ! git pull --ff-only; then exit 1; fi; \
+	if ! pnpm install; then exit 1; fi; \
+	if ! pnpm v2:build; then exit 1; fi; \
+	if ! systemctl --user restart "$(V2_SERVICE)"; then exit 1; fi; \
+	echo "OK — $(V2_SERVICE) restarted"
+
+.PHONY: help start prod restart deploy https https-off install-cli service-install service-uninstall service-restart service-status service-logs v2-install-service v2-deploy
