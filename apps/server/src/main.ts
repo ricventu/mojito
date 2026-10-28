@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import type { Server } from "node:http";
 import { join } from "node:path";
+import { query } from "@anthropic-ai/claude-agent-sdk";
 import { serve } from "@hono/node-server";
 import { WebSocketServer } from "ws";
 import { REPO_ROOT, loadConfig, loadEnvFile } from "./config";
@@ -15,6 +16,8 @@ import { createApp } from "./http/app";
 import { LinearClient } from "./linear/client";
 import { defaultLaunchIo, type LaunchDeps } from "./sessions/launch";
 import { reconcileSessions } from "./sessions/reconcile";
+import { linearImageFetcher } from "./tasks/images";
+import { TaskQueue } from "./tasks/runner";
 import { TicketCache } from "./tickets/cache";
 import { PREFIX, closeSession, listSessions } from "./tmux/tmux";
 import { startHeartbeat } from "./ws/heartbeat";
@@ -50,6 +53,18 @@ async function main(): Promise<void> {
   const linear = new LinearClient(cfg.linearApiKey);
   const tickets = new TicketCache({ linear, projects: () => projects.list().map((p) => p.name), bus });
   const launch: LaunchDeps = { cfg, sessions, projects, bus, linear, tickets, ...defaultLaunchIo() };
+  // Nothing is re-enqueued at boot: `failInterrupted` above already failed whatever was in
+  // flight, and those are retried from the UI.
+  const taskQueue = new TaskQueue({
+    tasks,
+    projects,
+    linear,
+    bus,
+    tickets,
+    query,
+    fetchImage: linearImageFetcher(cfg.linearApiKey),
+    now: Date.now,
+  });
 
   const { ended, adopted } = await reconcileSessions({
     sessions,
@@ -76,6 +91,7 @@ async function main(): Promise<void> {
     tickets,
     launch,
     closeSession,
+    taskQueue,
     staticDir,
   });
 

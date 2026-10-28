@@ -55,6 +55,7 @@ export function setup(over: Partial<AppDeps> = {}) {
     listTeamStates: vi.fn(async (_team: string) => ["Backlog", "Todo", "In Progress"]),
     setStatus: vi.fn(async (_id: string, _status: string) => {}),
     assignToMe: vi.fn(async (_id: string) => {}),
+    uploadImage: vi.fn(async (_file: { filename: string; contentType: string; size: number; bytes: Uint8Array }) => "https://uploads.linear.app/x"),
   };
   const tickets = new TicketCache({ linear, projects: () => projects.list().map((p) => p.name), bus });
   const refresh = vi.spyOn(tickets, "refresh");
@@ -75,6 +76,7 @@ export function setup(over: Partial<AppDeps> = {}) {
   const closeSession = vi.fn(async (_name: string) => ({ closed: true }));
   const exists = vi.fn((_path: string) => true);
   const removeFile = vi.fn((_path: string) => {});
+  const taskQueue = { enqueue: vi.fn((_id: string) => {}), retry: vi.fn((_id: string) => false) };
   const deps: AppDeps = {
     cfg,
     db,
@@ -87,6 +89,7 @@ export function setup(over: Partial<AppDeps> = {}) {
     tickets,
     launch,
     closeSession,
+    taskQueue,
     exists,
     removeFile,
     now: () => 2000,
@@ -106,5 +109,5 @@ export function setup(over: Partial<AppDeps> = {}) {
       ...(init.json !== undefined ? { body: JSON.stringify(init.json) } : {}),
     });
 
-  return { app, req, deps, db, projects, settings, sessions, tasks, bus, events, linear, tickets, refresh, launch, closeSession, exists, removeFile };
+  return { app, req, deps, db, projects, settings, sessions, tasks, bus, events, linear, tickets, refresh, launch, closeSession, taskQueue, exists, removeFile };
 }
