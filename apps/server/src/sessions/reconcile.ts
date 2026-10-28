@@ -12,16 +12,27 @@ export interface ReconcileDeps {
 
 /**
  * Bring the table in line with tmux after a restart: a row whose tmux is gone has ended, and a
- * `mj-*` tmux session with no row is adopted. A row with a live tmux is kept as it is.
+ * `mj-*` tmux session with no row is adopted. A live row with a live tmux is kept as it is; an
+ * `ended` row whose tmux is alive was ended wrongly (a missed or misread hook) and comes back
+ * as `idle` — tmux is the ground truth, so every such mistake heals at the next boot.
  */
-export async function reconcileSessions(deps: ReconcileDeps): Promise<{ ended: string[]; adopted: string[] }> {
+export async function reconcileSessions(
+  deps: ReconcileDeps,
+): Promise<{ ended: string[]; adopted: string[]; revived: string[] }> {
   const live = new Set((await deps.listTmux()).filter((n) => n.startsWith(PREFIX)));
   const rows = deps.sessions.list();
   const known = new Set(rows.map((r) => r.id));
   const ended: string[] = [];
   const adopted: string[] = [];
+  const revived: string[] = [];
 
   for (const row of rows) {
+    if (row.state === "ended" && live.has(row.id)) {
+      const session = deps.sessions.patch(row.id, { state: "idle", alert: null, lastEventAt: deps.now() });
+      if (session) deps.bus.emit({ type: "session.updated", session });
+      revived.push(row.id);
+      continue;
+    }
     if (row.state === "ended" || live.has(row.id)) continue;
     const session = deps.sessions.patch(row.id, { state: "ended", alert: null, lastEventAt: deps.now() });
     if (session) deps.bus.emit({ type: "session.updated", session });
@@ -50,5 +61,5 @@ export async function reconcileSessions(deps: ReconcileDeps): Promise<{ ended: s
     adopted.push(id);
   }
 
-  return { ended, adopted };
+  return { ended, adopted, revived };
 }

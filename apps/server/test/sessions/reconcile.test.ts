@@ -33,7 +33,7 @@ function setup(rows: SessionMeta[], tmux: string[]) {
 describe("reconcileSessions", () => {
   it("ends rows without tmux and adopts tmux sessions without a row", async () => {
     const { sessions, events, run } = setup([meta("mj-RIC-1", "running"), meta("mj-RIC-2", "idle")], ["mj-RIC-1", "mj-web-aa11bb"]);
-    expect(await run()).toEqual({ ended: ["mj-RIC-2"], adopted: ["mj-web-aa11bb"] });
+    expect(await run()).toEqual({ ended: ["mj-RIC-2"], adopted: ["mj-web-aa11bb"], revived: [] });
     expect(sessions.get("mj-RIC-1")?.state).toBe("running");
     expect(sessions.get("mj-RIC-2")).toMatchObject({ state: "ended", alert: null, lastEventAt: 900 });
     expect(sessions.get("mj-web-aa11bb")).toEqual({
@@ -70,20 +70,28 @@ describe("reconcileSessions", () => {
 
   it("ignores tmux sessions outside the mj- prefix", async () => {
     const { sessions, run } = setup([], ["work", "other-RIC-1"]);
-    expect(await run()).toEqual({ ended: [], adopted: [] });
+    expect(await run()).toEqual({ ended: [], adopted: [], revived: [] });
     expect(sessions.list()).toEqual([]);
   });
 
-  it("leaves rows already ended alone, with no event", async () => {
+  it("leaves ended rows whose tmux is gone alone, with no event", async () => {
     const { sessions, events, run } = setup([meta("mj-RIC-4", "ended")], []);
-    expect(await run()).toEqual({ ended: [], adopted: [] });
+    expect(await run()).toEqual({ ended: [], adopted: [], revived: [] });
     expect(sessions.get("mj-RIC-4")?.lastEventAt).toBe(1);
     expect(events).toEqual([]);
+  });
+
+  // tmux is the ground truth: a row a missed or misread hook ended wrongly heals at boot.
+  it("revives an ended row whose tmux is alive as idle, and says so", async () => {
+    const { sessions, events, run } = setup([meta("mj-RIC-6", "ended")], ["mj-RIC-6"]);
+    expect(await run()).toEqual({ ended: [], adopted: [], revived: ["mj-RIC-6"] });
+    expect(sessions.get("mj-RIC-6")).toMatchObject({ state: "idle", alert: null, lastEventAt: 900 });
+    expect(events).toEqual([{ type: "session.updated", session: sessions.get("mj-RIC-6") }]);
   });
 
   it("is idempotent", async () => {
     const { run } = setup([meta("mj-RIC-5", "idle")], ["mj-web-aa11bb"]);
     await run();
-    expect(await run()).toEqual({ ended: [], adopted: [] });
+    expect(await run()).toEqual({ ended: [], adopted: [], revived: [] });
   });
 });

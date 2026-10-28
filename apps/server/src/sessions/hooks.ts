@@ -3,7 +3,7 @@ import type { SessionsRepo } from "../db/sessions";
 import type { EventBus } from "../events/bus";
 import type { TicketCache } from "../tickets/cache";
 import { PREFIX } from "../tmux/tmux";
-import { isHookEvent, mapHook } from "./hookMap";
+import { hookPayload, isHookEvent, isNoiseHook, mapHook } from "./hookMap";
 
 const TICKET_ID = /^[A-Z][A-Z0-9]*-\d+$/;
 
@@ -32,15 +32,18 @@ export interface HookDeps {
 /**
  * Apply one Claude Code hook to its session. Never throws: it runs behind an endpoint whose
  * `curl` ends in `|| true`, and a bad hook must not be able to fail claude or the server.
- * Unknown ids and unknown events are ignored, and so is any event for an `ended` session.
+ * Unknown ids and unknown events are ignored, and so is any event for an `ended` session and
+ * any hook `isNoiseHook` rules out (a `/clear`'s SessionEnd). `body` is the hook's own JSON;
+ * missing or unparseable, it reads as an empty payload.
  *
  * A hook that maps to the state and alert the row already has (PostToolUse fires on every
  * tool call) refreshes `lastEventAt` but emits nothing: no client-visible field but the
  * timestamp changed, and a broadcast per tool call is noise for every open board.
  */
-export function handleHook(id: string, event: string, deps: HookDeps): void {
+export function handleHook(id: string, event: string, deps: HookDeps, body?: unknown): void {
   try {
     if (!isHookEvent(event)) return;
+    if (isNoiseHook(event, hookPayload(body))) return;
     const before = deps.sessions.get(id);
     if (!before || before.state === "ended") return;
     const next = mapHook(event, before.state);

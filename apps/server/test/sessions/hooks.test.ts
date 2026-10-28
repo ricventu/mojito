@@ -83,11 +83,33 @@ describe("handleHook", () => {
     expect(events).toEqual([]);
   });
 
+  // Hooks never revive an ended row; only the boot-time reconcile does, on a live tmux.
   it("never revives an ended session", () => {
     const { sessions, events, deps } = setup(meta({ state: "ended", lastEventAt: 7 }));
-    handleHook("mj-RIC-1", "SessionStart", deps);
+    handleHook("mj-RIC-1", "SessionStart", deps, { source: "startup" });
     expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "ended", lastEventAt: 7 });
     expect(events).toEqual([]);
+  });
+
+  // `/clear` is SessionEnd (reason "clear") then SessionStart, in the same live claude.
+  it("ignores the SessionEnd a /clear fires, so the SessionStart after it still lands", () => {
+    const { sessions, events, deps } = setup(meta({ state: "idle", lastEventAt: 7 }));
+    handleHook("mj-RIC-1", "SessionEnd", deps, { hook_event_name: "SessionEnd", reason: "clear" });
+    expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "idle", lastEventAt: 7 });
+    expect(events).toEqual([]);
+    handleHook("mj-RIC-1", "SessionStart", deps, { hook_event_name: "SessionStart", source: "clear" });
+    expect(sessions.get("mj-RIC-1")?.state).toBe("running");
+  });
+
+  it.each([
+    ["any other reason", { reason: "prompt_input_exit" }],
+    ["no body", undefined],
+    ["a body that is not an object", "garbage"],
+    ["a mistyped reason", { reason: 42 }],
+  ])("still ends the session on a SessionEnd with %s", (_label, body) => {
+    const { sessions, deps } = setup(meta());
+    handleHook("mj-RIC-1", "SessionEnd", deps, body);
+    expect(sessions.get("mj-RIC-1")?.state).toBe("ended");
   });
 
   it("refreshes the board when a ticket session stops", () => {

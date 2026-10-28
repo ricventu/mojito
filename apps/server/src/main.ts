@@ -66,14 +66,14 @@ async function main(): Promise<void> {
     now: Date.now,
   });
 
-  const { ended, adopted } = await reconcileSessions({
+  const { ended, adopted, revived } = await reconcileSessions({
     sessions,
     listTmux: () => listSessions(PREFIX),
     bus,
     now: Date.now,
   });
-  if (ended.length + adopted.length > 0) {
-    console.log(`reconciled sessions: ${ended.length} ended, ${adopted.length} adopted`);
+  if (ended.length + adopted.length + revived.length > 0) {
+    console.log(`reconciled sessions: ${ended.length} ended, ${adopted.length} adopted, ${revived.length} revived`);
   }
   tickets.start();
 

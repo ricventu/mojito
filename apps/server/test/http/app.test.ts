@@ -60,6 +60,30 @@ describe("POST /api/hook", () => {
     expect(sessions.get("mj-web-a1b2c3")?.state).toBe("running");
     expect(events.map((e) => e.type)).toEqual(["session.updated"]);
   });
+
+  it("hands the hook's JSON body to the handler: a /clear's SessionEnd ends nothing", async () => {
+    const { req, sessions, events } = setup();
+    sessions.insert(meta({ id: "mj-web-a1b2c3", kind: "claude", ticket: null, state: "idle" }));
+    const res = await req("/api/hook?session=mj-web-a1b2c3&event=SessionEnd", {
+      method: "POST",
+      json: { hook_event_name: "SessionEnd", reason: "clear" },
+    });
+    expect(res.status).toBe(200);
+    expect(sessions.get("mj-web-a1b2c3")?.state).toBe("idle");
+    expect(events).toEqual([]);
+  });
+
+  it("treats a malformed body as no body", async () => {
+    const { app, sessions } = setup();
+    sessions.insert(meta({ id: "mj-web-a1b2c3", kind: "claude", ticket: null, state: "running" }));
+    const res = await app.request("/api/hook?session=mj-web-a1b2c3&event=SessionEnd", {
+      method: "POST",
+      headers: { "x-mojito-token": TOKEN, "content-type": "application/json" },
+      body: "{not json",
+    });
+    expect(res.status).toBe(200);
+    expect(sessions.get("mj-web-a1b2c3")?.state).toBe("ended");
+  });
 });
 
 describe("unknown routes", () => {
