@@ -147,12 +147,15 @@ pnpm v2:build   # apps/web/dist e apps/server/dist/main.js
 pnpm v2:start
 ```
 
-Come servizio systemd utente (Linux), accanto a `mojito.service`:
+Come servizio systemd utente (Linux), accanto a `mojito.service`. Tutti e due i comandi
+vanno lanciati dal checkout principale (`~/code/mojito`), quello che l'unità serve — mai da
+un worktree:
 
 ```bash
 pnpm v2:build
-make v2-install-service   # copia deploy/mojito2.service in ~/.config/systemd/user, enable --now
-make v2-deploy            # git pull --ff-only, pnpm install, pnpm v2:build, restart mojito2
+make v2-install-service   # rifiuta se manca apps/server/dist/main.js; copia l'unità, enable --now
+make v2-deploy            # pull --ff-only, pnpm install --frozen-lockfile, build, restart,
+                          # poi attende /api/health fino a 30s e fallisce se non risponde
 ```
 
 L'unità parte da `~/code/mojito` e non ha un `EnvironmentFile`: il server legge da solo

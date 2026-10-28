@@ -185,25 +185,43 @@ https-off:
 	echo "OK — Tailscale Serve is off; the http URLs still work."
 
 ## v2-install-service: Mojito v2 (apps/server + apps/web) as a systemd user unit beside
-## mojito.service, on port 3100. The unit's WorkingDirectory is ~/code/mojito, so build
-## there first (`pnpm v2:build`). Every command's exit status is checked by hand: make 3.81
-## ignores .SHELLFLAGS, so there is no `-e` to lean on (see the header note).
+## mojito.service, on port 3100. The unit's WorkingDirectory is ~/code/mojito, so run this
+## from there, after `pnpm v2:build`: an unbuilt checkout is refused rather than installed
+## as a unit that crash-loops on a missing dist/main.js. Every command's exit status is
+## checked by hand: make 3.81 ignores .SHELLFLAGS, so there is no `-e` to lean on (see the
+## header note).
 V2_SERVICE ?= mojito2.service
 V2_UNIT_DIR ?= $(HOME)/.config/systemd/user
 v2-install-service:
-	@if ! mkdir -p "$(V2_UNIT_DIR)"; then exit 1; fi; \
+	@if [ ! -f apps/server/dist/main.js ]; then \
+		echo "apps/server/dist/main.js is missing: run 'pnpm v2:build' first (in the main checkout, ~/code/mojito)" >&2; \
+		exit 1; \
+	fi; \
+	if ! mkdir -p "$(V2_UNIT_DIR)"; then exit 1; fi; \
 	if ! cp deploy/mojito2.service "$(V2_UNIT_DIR)/$(V2_SERVICE)"; then exit 1; fi; \
 	if ! systemctl --user daemon-reload; then exit 1; fi; \
 	if ! systemctl --user enable --now "$(V2_SERVICE)"; then exit 1; fi; \
 	echo "OK — $(V2_SERVICE) installed and started (status: systemctl --user status $(V2_SERVICE))"
 
-## v2-deploy: update Mojito v2 in place and restart it. Each step aborts the deploy, so a
-## failed pull, install or build never replaces the running server.
+## v2-deploy: update Mojito v2 in place and restart it. Run it from the main checkout
+## (~/code/mojito), the one the unit serves. Each step aborts the deploy, so a failed pull,
+## install or build never replaces the running server. The install is --frozen-lockfile: a
+## lockfile out of step with the manifests is a broken commit, not something to re-resolve on
+## the server. A restart is not a success until /api/health answers, which it must within
+## 30s (the unit's own MOJITO2_PORT, 3100 unless overridden in the caller's environment).
 v2-deploy:
 	@if ! git pull --ff-only; then exit 1; fi; \
-	if ! pnpm install; then exit 1; fi; \
+	if ! pnpm install --frozen-lockfile; then exit 1; fi; \
 	if ! pnpm v2:build; then exit 1; fi; \
 	if ! systemctl --user restart "$(V2_SERVICE)"; then exit 1; fi; \
-	echo "OK — $(V2_SERVICE) restarted"
+	url="http://127.0.0.1:$${MOJITO2_PORT:-3100}/api/health"; \
+	for i in $$(seq 1 30); do \
+		if curl -fsS -m 2 "$$url" >/dev/null 2>&1; then \
+			echo "OK — $(V2_SERVICE) restarted and healthy"; exit 0; \
+		fi; \
+		sleep 1; \
+	done; \
+	echo "$(V2_SERVICE) restarted but $$url did not answer within 30s (journalctl --user -u $(V2_SERVICE))" >&2; \
+	exit 1
 
 .PHONY: help start prod restart deploy https https-off install-cli service-install service-uninstall service-restart service-status service-logs v2-install-service v2-deploy
