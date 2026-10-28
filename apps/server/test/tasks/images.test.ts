@@ -35,7 +35,10 @@ describe("linearImageFetcher", () => {
     const fetchImpl = vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/png; charset=binary" } }));
     const fetchImage = linearImageFetcher("lin_key", fetchImpl as unknown as typeof fetch);
     expect(await fetchImage("https://uploads.linear.app/x")).toEqual({ mediaType: "image/png", base64: "AQID" });
-    expect(fetchImpl).toHaveBeenCalledWith("https://uploads.linear.app/x", { headers: { Authorization: "lin_key" } });
+    expect(fetchImpl).toHaveBeenCalledWith("https://uploads.linear.app/x", {
+      headers: { Authorization: "lin_key" },
+      signal: expect.any(AbortSignal),
+    });
   });
 
   it("throws on a failed download", async () => {

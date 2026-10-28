@@ -1,3 +1,5 @@
+import { LINEAR_TIMEOUT_MS } from "../linear/client";
+
 export const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"] as const;
 export type ImageType = (typeof IMAGE_TYPES)[number];
 export const MAX_IMAGES = 10;
@@ -24,7 +26,9 @@ export function validateImages(files: { name: string; type: string; size: number
  */
 export function linearImageFetcher(apiKey: string, fetchImpl: typeof fetch = fetch) {
   return async (url: string): Promise<{ mediaType: string; base64: string }> => {
-    const res = await fetchImpl(url, { headers: { Authorization: apiKey } });
+    // Bounded like every other request to Linear (LINEAR_TIMEOUT_MS): a hung download would
+    // otherwise hold one of the task queue's two slots for good.
+    const res = await fetchImpl(url, { headers: { Authorization: apiKey }, signal: AbortSignal.timeout(LINEAR_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`download immagine fallito: ${res.status}`);
     const mediaType = (res.headers.get("content-type") ?? "").split(";")[0].trim();
     return { mediaType, base64: Buffer.from(await res.arrayBuffer()).toString("base64") };

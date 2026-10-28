@@ -1,6 +1,13 @@
 import type { TicketSummary } from "@mojito/shared";
 
 const ENDPOINT = "https://api.linear.app/graphql";
+
+/**
+ * Every request to Linear is bounded. Without a deadline a hung connection stalls whatever
+ * awaits it for good: the board poll (whose next tick never comes), a launch's status write,
+ * a ticket task holding one of the queue's two slots.
+ */
+export const LINEAR_TIMEOUT_MS = 15_000;
 const TICKET_RE = /^([A-Z][A-Z0-9]*)-(\d+)$/;
 
 interface IssueNode {
@@ -38,18 +45,35 @@ export class LinearClient {
   constructor(
     private readonly apiKey: string,
     private readonly fetchImpl: typeof fetch = fetch,
+    private readonly timeoutMs = LINEAR_TIMEOUT_MS,
   ) {}
 
+  /**
+   * One fetch plus whatever reads its body, under one deadline: the signal also aborts a body
+   * still streaming in. A timeout becomes a plain Error, so callers see it like any other failure.
+   */
+  private async request<T>(url: string, init: RequestInit, read: (res: Response) => Promise<T>): Promise<T> {
+    const signal = AbortSignal.timeout(this.timeoutMs);
+    try {
+      return await read(await this.fetchImpl(url, { ...init, signal }));
+    } catch (err) {
+      if (signal.aborted) throw new Error(`Linear API timeout after ${this.timeoutMs} ms`);
+      throw err;
+    }
+  }
+
   private async query<T>(body: object): Promise<T> {
-    const res = await this.fetchImpl(ENDPOINT, {
+    const init = {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: this.apiKey },
       body: JSON.stringify(body),
+    };
+    return this.request(ENDPOINT, init, async (res) => {
+      if (!res.ok) throw new Error(`Linear API error: ${res.status}`);
+      const json = (await res.json()) as { data: T; errors?: unknown };
+      if (json.errors) throw new Error("Linear GraphQL error");
+      return json.data;
     });
-    if (!res.ok) throw new Error(`Linear API error: ${res.status}`);
-    const json = (await res.json()) as { data: T; errors?: unknown };
-    if (json.errors) throw new Error("Linear GraphQL error");
-    return json.data;
   }
 
   /**
@@ -141,8 +165,9 @@ export class LinearClient {
     if (!data.fileUpload.success || !uf) throw new Error("Linear fileUpload failed");
     const headers: Record<string, string> = { "Content-Type": file.contentType };
     for (const h of uf.headers) headers[h.key] = h.value;
-    const put = await this.fetchImpl(uf.uploadUrl, { method: "PUT", headers, body: file.bytes as unknown as Buffer });
-    if (!put.ok) throw new Error(`Linear asset upload failed: ${put.status}`);
+    await this.request(uf.uploadUrl, { method: "PUT", headers, body: file.bytes as unknown as Buffer }, async (put) => {
+      if (!put.ok) throw new Error(`Linear asset upload failed: ${put.status}`);
+    });
     return uf.assetUrl;
   }
 

@@ -98,6 +98,49 @@ describe("LinearClient errors", () => {
   });
 });
 
+// A hung connection must not stall the board poll, a launch or a task slot for good.
+describe("LinearClient timeouts", () => {
+  /** A fetch that never answers, and rejects with the signal's reason once it aborts. */
+  const hanging = () =>
+    vi.fn(
+      (_url: string | URL | Request, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        }),
+    ) as unknown as typeof fetch;
+
+  it("gives every request a deadline", async () => {
+    const { fetchImpl, calls } = seq([{ issues: { nodes: [] } }]);
+    await new LinearClient("k", fetchImpl).listOpenIssues([]);
+    expect(calls[0].init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("turns a request that never answers into an error like the others", async () => {
+    await expect(new LinearClient("k", hanging(), 20).listOpenIssues([])).rejects.toThrow(
+      "Linear API timeout after 20 ms",
+    );
+  });
+
+  it("bounds the upload PUT too", async () => {
+    let n = 0;
+    const put = hanging();
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (++n === 1)
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: { fileUpload: { success: true, uploadFile: { uploadUrl: "u", assetUrl: "a", headers: [] } } },
+          }),
+        } as Response;
+      return put(url, init);
+    }) as unknown as typeof fetch;
+    await expect(
+      new LinearClient("k", fetchImpl, 20).uploadImage({ filename: "a.png", contentType: "image/png", size: 1, bytes: new Uint8Array([1]) }),
+    ).rejects.toThrow("Linear API timeout after 20 ms");
+  });
+});
+
 describe("LinearClient.setStatus", () => {
   const ref = { issues: { nodes: [{ id: "I1", team: { id: "T1" } }] } };
 
