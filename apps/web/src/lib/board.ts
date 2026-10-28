@@ -75,7 +75,8 @@ export function needsInput(sessions: SessionMeta[]): SessionMeta[] {
   return sessions.filter((s) => s.state === "needs-input").sort((a, b) => a.lastEventAt - b.lastEventAt);
 }
 
-function clock(ms: number): string {
+/** Local HH:MM. */
+export function clock(ms: number): string {
   const d = new Date(ms);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }

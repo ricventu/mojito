@@ -10,6 +10,18 @@ import { ProjectSection } from "./ProjectSection";
 import { TaskStrip } from "./TaskStrip";
 import { Toolbar } from "./Toolbar";
 
+function Banner({ text }: { text: string }) {
+  return (
+    <div
+      role="status"
+      className="flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200"
+    >
+      <TriangleAlert size={16} className="shrink-0" />
+      <span className="min-w-0 break-words">{text}</span>
+    </div>
+  );
+}
+
 /** The home page: toolbar, background tasks, then every project's tickets and free sessions. */
 export function Board() {
   const tickets = useTickets();
@@ -26,24 +38,22 @@ export function Board() {
   );
   const banner = tickets.data ? linearBanner(tickets.data) : null;
   const loading = tickets.isPending || sessions.isPending || projects.isPending;
-  const failure = tickets.error ?? sessions.error ?? projects.error;
+  // A failed refetch keeps the last data on screen; only a query that never had any is fatal.
+  const queries = [tickets, sessions, projects];
+  const failure = queries.find((q) => q.data === undefined && q.error)?.error;
+  const refreshError = queries.find((q) => q.data !== undefined && q.error)?.error;
 
   // Wired to the new-ticket and new-session sheets when those exist.
   const onNewTicket = (_project?: string) => {};
   const onNewSession = (_project?: string) => {};
 
   return (
-    <div className="min-h-dvh overflow-x-hidden pb-[var(--sab)]">
+    <div className="min-h-dvh overflow-x-clip pb-[var(--sab)]">
       <Toolbar sessions={sessionList} onNewTicket={() => onNewTicket()} onNewSession={() => onNewSession()} />
       <main className="mx-auto flex max-w-3xl flex-col gap-4 px-4 pt-3 pr-[max(1rem,var(--sar))] pb-6 pl-[max(1rem,var(--sal))]">
-        {banner && (
-          <div
-            role="status"
-            className="flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200"
-          >
-            <TriangleAlert size={16} className="shrink-0" />
-            <span className="min-w-0 break-words">{banner}</span>
-          </div>
+        {banner && <Banner text={banner} />}
+        {refreshError && (
+          <Banner text={`Aggiornamento non riuscito: ${refreshError instanceof Error ? refreshError.message : "errore"}`} />
         )}
         <TaskStrip tasks={tasks.data ?? []} />
         {failure ? (

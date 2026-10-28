@@ -6,6 +6,7 @@ import type { SessionMeta } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
+import { clock } from "@/lib/board";
 import { qk } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
 
@@ -35,7 +36,10 @@ export function FreeSessionRow({ session }: { session: SessionMeta }) {
       >
         <SquareTerminal size={16} className="shrink-0 text-muted-foreground" />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-sm font-medium">{KIND_LABEL[session.kind]}</span>
+          <span className="truncate text-sm font-medium">
+            {KIND_LABEL[session.kind]}
+            <span className="font-normal text-muted-foreground"> · {clock(session.createdAt)}</span>
+          </span>
           {waiting && session.alert && (
             <span className="text-xs text-amber-700 dark:text-amber-300">{session.alert}</span>
           )}
