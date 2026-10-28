@@ -1,22 +1,7 @@
 import { createBrowserRouter, Link, Navigate } from "react-router";
-import { useSessions } from "@/hooks/useSessions";
-import { useTickets } from "@/hooks/useTickets";
+import { Board } from "@/components/board/Board";
 
-// Placeholder pages: the board, the terminal and the settings arrive in later tasks.
-function Board() {
-  const tickets = useTickets();
-  const sessions = useSessions();
-  return (
-    <main className="p-4 pt-[calc(var(--sat)+1rem)]">
-      <h1 className="text-lg font-semibold">Board</h1>
-      <p className="text-sm text-muted-foreground">
-        {tickets.data?.tickets.length ?? 0} ticket · {sessions.data?.length ?? 0} sessioni
-      </p>
-      <Link className="text-sm underline" to="/settings">Impostazioni</Link>
-    </main>
-  );
-}
-
+// Placeholder pages: the terminal and the settings arrive in later tasks.
 function Session() {
   return <main className="p-4 pt-[calc(var(--sat)+1rem)]">Sessione</main>;
 }
