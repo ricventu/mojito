@@ -59,7 +59,9 @@ Un solo processo:
 
 ### Coesistenza con la vecchia app
 
-- Porta `MOJITO_PORT`, default `3100`.
+- Porta `MOJITO2_PORT` (default `3100`) e indirizzo `MOJITO2_HOST` (default `0.0.0.0`);
+  `MOJITO_PORT`/`MOJITO_HOST` sono della vecchia app, nello stesso `.env.local`, e v2 li
+  ignora (R29).
 - Prefisso tmux `mj-` (la vecchia app usa `mojito-`): nessuna delle due adotta le
   sessioni dell'altra.
 - State dir `~/.local/state/mojito2/` (DB, settings degli hook, upload temporanei).

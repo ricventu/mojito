@@ -98,6 +98,13 @@ async function main(): Promise<void> {
   const server = serve({ fetch: app.fetch, port: cfg.port, hostname: cfg.host }, () => {
     console.log(`Mojito on http://${cfg.host}:${cfg.port}${staticDir ? "" : " (API only: no apps/web/dist)"}`);
   }) as Server;
+  // A listen failure (EADDRINUSE: the port is taken, e.g. by the old app) would otherwise leave
+  // a process that serves nothing yet keeps polling Linear and holding the database. Exit, so
+  // systemd's Restart= (or the human) sees the failure.
+  server.on("error", (err) => {
+    console.error(`cannot listen on ${cfg.host}:${cfg.port}:`, err);
+    process.exit(1);
+  });
   const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
   // A socket severed by a NAT/Tailscale idle timeout or a phone in a pocket emits no close, so
   // its pty (a `tmux attach`) would never be released: ping every client, reap the silent ones.

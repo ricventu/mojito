@@ -23,6 +23,12 @@ export interface ServerConfig {
 // the token `loadConfig` requires, is found there.
 export const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url)).replace(/\/$/, "");
 
+/**
+ * Port and host are v2's own (`MOJITO2_PORT`, default 3100; `MOJITO2_HOST`, default 0.0.0.0).
+ * `MOJITO_PORT`/`MOJITO_HOST` are deliberately ignored: they belong to the old app, live in the
+ * same shared `.env.local` (8700 on 127.0.0.1 on the Linux box), and read here they made v2
+ * collide with it. The token and the Linear key stay shared — one Linear workspace, one login.
+ */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const token = env.MOJITO_TOKEN;
   if (!token) throw new Error("MOJITO_TOKEN is required");
@@ -30,8 +36,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   if (!linearApiKey) throw new Error("LINEAR_API_KEY is required");
   const home = env.HOME ?? homedir();
   return {
-    port: Number(env.MOJITO_PORT ?? 3100),
-    host: env.MOJITO_HOST || "0.0.0.0",
+    port: Number(env.MOJITO2_PORT || 3100),
+    host: env.MOJITO2_HOST || "0.0.0.0",
     token,
     linearApiKey,
     stateDir: env.MOJITO_STATE_DIR ?? join(home, ".local", "state", "mojito2"),

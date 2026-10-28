@@ -113,8 +113,25 @@ Tailwind e shadcn) e `packages/shared` (tipi e schemi condivisi). Convive con la
 app: porta `3100` invece di `4711`, servizio `mojito2` invece di `mojito`, stato in
 `~/.local/state/mojito2` (`MOJITO_STATE_DIR` lo sovrascrive; il database è
 `mojito.db`), prefisso tmux `mj-`. `LINEAR_API_KEY` e `MOJITO_TOKEN` si leggono da
-variabili d'ambiente o da `.env.local` nella radice del repo, e non arrivano mai
-nell'ambiente delle sessioni.
+variabili d'ambiente o da `.env.local` nella radice del repo, condivisi con la vecchia app,
+e non arrivano mai nell'ambiente delle sessioni.
+
+Porta e indirizzo sono invece solo di v2:
+
+- `MOJITO2_PORT` — porta (default `3100`).
+- `MOJITO2_HOST` — indirizzo (default `0.0.0.0`).
+
+`MOJITO_PORT` e `MOJITO_HOST` vengono ignorati di proposito: stanno nello stesso
+`.env.local` e appartengono alla vecchia app. Una porta già occupata fa uscire il server
+con errore invece di lasciarlo vivo senza ascoltare.
+
+Siccome v2 ascolta su `0.0.0.0`, il telefono lo raggiunge direttamente sulla tailnet o
+sulla LAN: `http://<host>:3100`. Per l'https (serve a Chromium per installare la PWA),
+Tailscale Serve su una porta a parte, senza toccare la configurazione della vecchia app:
+
+```bash
+tailscale serve --bg --https=8443 3100   # poi https://<host>.<tailnet>.ts.net:8443
+```
 
 Sviluppo, con server (`tsx watch`, porta 3100) e Vite (porta 5173) in parallelo:
 

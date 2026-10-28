@@ -43,6 +43,7 @@ const POLLUTED = {
   __NEXT_PROCESSED_ENV: "true",
   MOJITO_TOKEN: "s3cret",
   MOJITO_PORT: "4711",
+  MOJITO2_PORT: "3100",
   LINEAR_API_KEY: "lin_api_deadbeef",
   TURBOPACK: "auto",
 };
@@ -70,6 +71,7 @@ describe("sanitizeEnv", () => {
     const clean = sanitizeEnv(POLLUTED);
     expect(clean).not.toHaveProperty("MOJITO_TOKEN");
     expect(clean).not.toHaveProperty("MOJITO_PORT");
+    expect(clean).not.toHaveProperty("MOJITO2_PORT");
     expect(clean).not.toHaveProperty("LINEAR_API_KEY");
     expect(clean).not.toHaveProperty("__NEXT_PROCESSED_ENV");
   });

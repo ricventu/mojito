@@ -8,7 +8,9 @@ WorkingDirectory=%h/code/mojito
 # No EnvironmentFile: the server reads <repoRoot>/.env.local itself and scrubs what it adds
 # from every child's environment, so the token and the Linear key never reach a session.
 # systemd --user starts with a minimal PATH; node and pnpm live in /usr/bin and /usr/local/bin.
-Environment=MOJITO_PORT=3100
+# v2 reads MOJITO2_PORT/MOJITO2_HOST only: the shared .env.local carries the old app's
+# MOJITO_PORT/MOJITO_HOST, which v2 ignores. Binds 0.0.0.0 by default (MOJITO2_HOST).
+Environment=MOJITO2_PORT=3100
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/usr/bin/env pnpm v2:start
 Restart=on-failure
