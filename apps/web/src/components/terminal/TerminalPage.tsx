@@ -102,13 +102,14 @@ export function TerminalPage() {
   if (sessions.isSuccess && !sessions.isFetching && !session) return <Navigate to="/" replace />;
 
   return (
-    // The bottom inset is the root's to pay only where the accessory bar is not (a fine
-    // pointer hides it); on a touch screen the bar pays it. Never with the keyboard up,
-    // whose top edge is then the band's bottom.
+    // The bottom inset is the root's to pay only where the accessory bar is not: a fine
+    // pointer hides it, and the "terminated" panel never mounts it, touch or not. Where
+    // the bar is mounted on a touch screen it pays the inset itself. Never with the
+    // keyboard up, whose top edge is then the band's bottom.
     <div
       className={cn(
         "fixed inset-x-0 top-0 flex h-dvh flex-col overscroll-none bg-background pt-[var(--sat)] pr-[var(--sar)] pl-[var(--sal)]",
-        !band.open && "pb-[var(--sab)] pointer-coarse:pb-0",
+        !band.open && (gone ? "pb-[var(--sab)]" : "pb-[var(--sab)] pointer-coarse:pb-0"),
       )}
       style={band.rootStyle}
     >
