@@ -23,7 +23,7 @@ import { SESSION_GONE_CODE } from "@mojito/shared";
 import { spawn as ptySpawn } from "node-pty";
 import type { WebSocket } from "ws";
 import { sanitizeEnv } from "../env/childEnv";
-import { capturePane, hasSession } from "../tmux/tmux";
+import { capturePane, hasSession, sessionTarget } from "../tmux/tmux";
 
 export interface AttachDeps {
   hasSession: (name: string) => Promise<boolean>;
@@ -118,7 +118,9 @@ export function attachPty(ws: WebSocket, id: string, deps: Partial<AttachDeps> =
       }
 
       try {
-        pty = d.spawn("tmux", ["attach-session", "-t", id], {
+        // Exact target: a bare `-t` prefix-matches, and would attach to `mj-RIC-49x` once
+        // `mj-RIC-49` is gone (sessionTarget).
+        pty = d.spawn("tmux", ["attach-session", "-t", sessionTarget(id)], {
           // tmux only emits sequences the client's terminfo names, and it hides the cursor
           // while it repaints. `xterm-color` has no civis/cnorm, so every cursor-hide was
           // dropped and the browser drew a cursor at random positions (RIC-241); it also

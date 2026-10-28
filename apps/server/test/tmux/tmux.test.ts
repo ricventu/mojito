@@ -91,7 +91,7 @@ describe("newSession environment", () => {
     });
     expect(rec.calls[0].args).toEqual([
       "new-session", "-d", "-s", "mj-RIC-207", "-c", "/repo", "claude --model opus",
-      ";", "set-option", "-t", "mj-RIC-207", "status", "off",
+      ";", "set-option", "-t", "=mj-RIC-207:", "status", "off",
     ]);
   });
 });

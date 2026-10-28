@@ -78,7 +78,7 @@ describe("attachPty", () => {
 
     expect(deps.spawn).toHaveBeenCalledWith(
       "tmux",
-      ["attach-session", "-t", "mj-RIC-46"],
+      ["attach-session", "-t", "=mj-RIC-46"],
       expect.any(Object),
     );
     expect(ws.close).not.toHaveBeenCalledWith(SESSION_GONE_CODE, expect.any(String));

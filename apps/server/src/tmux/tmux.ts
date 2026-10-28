@@ -21,6 +21,16 @@ export class DuplicateSessionError extends Error {
   }
 }
 
+// tmux resolves a bare `-t name` by exact match first, then as a *prefix*, then as a glob —
+// so once `mj-RIC-49` is gone, `-t mj-RIC-49` quietly lands on a live `mj-RIC-49x`: Kill
+// would send Ctrl-D to the wrong claude, a reconnecting terminal would attach to the wrong
+// session, and a stale row would look alive. `=` asks for the exact name only. A session
+// target (has-session, attach-session) is `=name`; a pane target (send-keys, capture-pane,
+// set-option) needs the trailing colon to say "that session's active pane" — given a bare
+// `=name`, tmux answers "no such session".
+export const sessionTarget = (name: string) => `=${name}`;
+export const paneTarget = (name: string) => `=${name}:`;
+
 export function tmuxAvailable(): boolean {
   try {
     execFileSync("tmux", ["-V"], { stdio: "ignore" });
@@ -32,7 +42,7 @@ export function tmuxAvailable(): boolean {
 
 export async function hasSession(name: string): Promise<boolean> {
   try {
-    await pexec("tmux", ["has-session", "-t", name]);
+    await pexec("tmux", ["has-session", "-t", sessionTarget(name)]);
     return true;
   } catch {
     return false;
@@ -43,9 +53,9 @@ export async function hasSession(name: string): Promise<boolean> {
 // session state are already in the app's own header. On a phone with the
 // keyboard open the visible band is only ~13 rows, and that one row is the
 // difference between claude's TUI having room for its input line or dropping it.
-// Session-scoped, so it never touches the user's own tmux sessions.
-const STATUS_OFF = ["set-option", "-t", "@NAME@", "status", "off"];
-const statusOffFor = (name: string) => STATUS_OFF.map((a) => (a === "@NAME@" ? name : a));
+// Session-scoped, so it never touches the user's own tmux sessions. set-option's `-t` is a
+// pane target, so it takes the colon form (`=name` alone is "no such session" there).
+const statusOffFor = (name: string) => ["set-option", "-t", paneTarget(name), "status", "off"];
 
 // Mojito's own environment must not reach the shell of anything it spawns (see childEnv.ts
 // for what leaks and why it is destructive). Both layers matter: `env` cleans what a tmux
@@ -122,7 +132,7 @@ export async function newSession(
 }
 
 export async function sendKeys(name: string, keys: string): Promise<void> {
-  await pexec("tmux", ["send-keys", "-t", name, keys]);
+  await pexec("tmux", ["send-keys", "-t", paneTarget(name), keys]);
 }
 
 export interface CloseDeps {
@@ -190,6 +200,6 @@ export async function listSessions(prefix: string): Promise<string[]> {
 // `-e` keeps the SGR escape sequences, so the scrollback the browser terminal
 // replays on attach (ptyGateway) comes back in colour instead of flat text.
 export async function capturePane(name: string, lines: number): Promise<string> {
-  const { stdout } = await pexec("tmux", ["capture-pane", "-t", name, "-p", "-e", "-S", `-${lines}`]);
+  const { stdout } = await pexec("tmux", ["capture-pane", "-t", paneTarget(name), "-p", "-e", "-S", `-${lines}`]);
   return stdout;
 }
