@@ -9,6 +9,9 @@ import { groupBoard, linearBanner } from "@/lib/board";
 import { ProjectSection } from "./ProjectSection";
 import { TaskStrip } from "./TaskStrip";
 import { Toolbar } from "./Toolbar";
+import { NewSessionSheet } from "@/components/sheets/NewSessionSheet";
+import { NewTicketSheet } from "@/components/sheets/NewTicketSheet";
+import { TicketSheet } from "@/components/sheets/TicketSheet";
 
 function Banner({ text }: { text: string }) {
   return (
@@ -43,9 +46,11 @@ export function Board() {
   const failure = queries.find((q) => q.data === undefined && q.error)?.error;
   const refreshError = queries.find((q) => q.data !== undefined && q.error)?.error;
 
-  // Wired to the new-ticket and new-session sheets when those exist.
-  const onNewTicket = (_project?: string) => {};
-  const onNewSession = (_project?: string) => {};
+  // `{ project }` is the section the sheet was opened from; `{}` is the toolbar's, with none preselected.
+  const [newTicket, setNewTicket] = useState<{ project?: string } | null>(null);
+  const [newSession, setNewSession] = useState<{ project?: string } | null>(null);
+  const onNewTicket = (project?: string) => setNewTicket({ project });
+  const onNewSession = (project?: string) => setNewSession({ project });
 
   return (
     <div className="min-h-dvh overflow-x-clip pb-[var(--sab)]">
@@ -76,6 +81,9 @@ export function Board() {
           ))
         )}
       </main>
+      {selectedTicket && <TicketSheet ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />}
+      {newTicket && <NewTicketSheet project={newTicket.project} onClose={() => setNewTicket(null)} />}
+      {newSession && <NewSessionSheet project={newSession.project} onClose={() => setNewSession(null)} />}
     </div>
   );
 }
