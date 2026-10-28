@@ -148,18 +148,20 @@ pnpm v2:build   # apps/web/dist e apps/server/dist/main.js
 pnpm v2:start
 ```
 
-Come servizio systemd utente (Linux), accanto a `mojito.service`. Tutti e due i comandi
-vanno lanciati dal checkout principale (`~/code/mojito`), quello che l'unità serve — mai da
-un worktree:
+Come servizio systemd utente (Linux), accanto a `mojito.service`. v2 vive sul branch `v2`,
+in un checkout suo, `~/code/mojito-v2` (`git worktree add ~/code/mojito-v2 v2` dal
+checkout principale), con `.env.local` come link a quello di `~/code/mojito`: v1 resta su
+`main` in `~/code/mojito` e i due deploy non si toccano. I comandi vanno lanciati da
+`~/code/mojito-v2`:
 
 ```bash
 pnpm v2:build
 make v2-install-service   # rifiuta se manca apps/server/dist/main.js; copia l'unità, enable --now
-make v2-deploy            # pull --ff-only, pnpm install --frozen-lockfile, build, restart,
+make v2-deploy            # pull --ff-only (se il branch ha un upstream), pnpm install --frozen-lockfile, build, restart,
                           # poi attende /api/health fino a 30s e fallisce se non risponde
 ```
 
-L'unità parte da `~/code/mojito` e non ha un `EnvironmentFile`: il server legge da solo
+L'unità parte da `~/code/mojito-v2` e non ha un `EnvironmentFile`: il server legge da solo
 `.env.local`. Le sessioni tmux nascono in uno scope systemd a parte, quindi sopravvivono
 al riavvio del servizio. Log: `journalctl --user -u mojito2`.
 

@@ -51,7 +51,7 @@ help:
 	@echo "  make service-install  run \`make prod\` as a macOS LaunchAgent: starts at login, no terminal"
 	@echo "  make service-uninstall | service-restart | service-status | service-logs"
 	@echo "  make v2-install-service  install and start $(V2_SERVICE) (Mojito v2, port 3100, systemd --user)"
-	@echo "  make v2-deploy  v2: git pull --ff-only, pnpm install, pnpm v2:build, restart $(V2_SERVICE)"
+	@echo "  make v2-deploy  v2: git pull --ff-only (if tracked), pnpm install, pnpm v2:build, restart $(V2_SERVICE)"
 
 ## install-cli: write ~/.local/bin/mojito (override with BINDIR), a launcher for
 ## `bin/mojito` that opens a Mojito session in whatever directory you run it from.
@@ -185,8 +185,9 @@ https-off:
 	echo "OK — Tailscale Serve is off; the http URLs still work."
 
 ## v2-install-service: Mojito v2 (apps/server + apps/web) as a systemd user unit beside
-## mojito.service, on port 3100. The unit's WorkingDirectory is ~/code/mojito, so run this
-## from there, after `pnpm v2:build`: an unbuilt checkout is refused rather than installed
+## mojito.service, on port 3100. The unit's WorkingDirectory is ~/code/mojito-v2 (the
+## checkout of branch v2, beside the v1 one on main), so run this from there, after
+## `pnpm v2:build`: an unbuilt checkout is refused rather than installed
 ## as a unit that crash-loops on a missing dist/main.js. Every command's exit status is
 ## checked by hand: make 3.81 ignores .SHELLFLAGS, so there is no `-e` to lean on (see the
 ## header note).
@@ -194,7 +195,7 @@ V2_SERVICE ?= mojito2.service
 V2_UNIT_DIR ?= $(HOME)/.config/systemd/user
 v2-install-service:
 	@if [ ! -f apps/server/dist/main.js ]; then \
-		echo "apps/server/dist/main.js is missing: run 'pnpm v2:build' first (in the main checkout, ~/code/mojito)" >&2; \
+		echo "apps/server/dist/main.js is missing: run 'pnpm v2:build' first (in ~/code/mojito-v2)" >&2; \
 		exit 1; \
 	fi; \
 	if ! mkdir -p "$(V2_UNIT_DIR)"; then exit 1; fi; \
@@ -203,14 +204,17 @@ v2-install-service:
 	if ! systemctl --user enable --now "$(V2_SERVICE)"; then exit 1; fi; \
 	echo "OK — $(V2_SERVICE) installed and started (status: systemctl --user status $(V2_SERVICE))"
 
-## v2-deploy: update Mojito v2 in place and restart it. Run it from the main checkout
-## (~/code/mojito), the one the unit serves. Each step aborts the deploy, so a failed pull,
+## v2-deploy: update Mojito v2 in place and restart it. Run it from ~/code/mojito-v2, the
+## checkout the unit serves. The pull runs only when the branch tracks a remote: v2 may live
+## as a local branch, worked on in that checkout directly. Each step aborts the deploy, so a failed pull,
 ## install or build never replaces the running server. The install is --frozen-lockfile: a
 ## lockfile out of step with the manifests is a broken commit, not something to re-resolve on
 ## the server. A restart is not a success until /api/health answers, which it must within
 ## 30s (the unit's own MOJITO2_PORT, 3100 unless overridden in the caller's environment).
 v2-deploy:
-	@if ! git pull --ff-only; then exit 1; fi; \
+	@if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then \
+		if ! git pull --ff-only; then exit 1; fi; \
+	fi; \
 	if ! pnpm install --frozen-lockfile; then exit 1; fi; \
 	if ! pnpm v2:build; then exit 1; fi; \
 	if ! systemctl --user restart "$(V2_SERVICE)"; then exit 1; fi; \

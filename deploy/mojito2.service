@@ -4,7 +4,7 @@ After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/code/mojito
+WorkingDirectory=%h/code/mojito-v2
 # No EnvironmentFile: the server reads <repoRoot>/.env.local itself and scrubs what it adds
 # from every child's environment, so the token and the Linear key never reach a session.
 # systemd --user starts with a minimal PATH; node and pnpm live in /usr/bin and /usr/local/bin.
