@@ -232,9 +232,26 @@ describe("LinearClient.listTeamStates / listLabels", () => {
     await expect(new LinearClient("k", fetchImpl).listTeamStates("XX")).rejects.toThrow("team not found: XX");
   });
 
-  it("lists the team's labels", async () => {
-    const { fetchImpl, calls } = seq([{ teams: { nodes: [{ labels: { nodes: [{ id: "L1", name: "Bug" }] } }] } }]);
-    expect(await new LinearClient("k", fetchImpl).listLabels("RIC")).toEqual([{ id: "L1", name: "Bug" }]);
+  it("lists team and workspace labels through issueLabels, dropping retired ones", async () => {
+    const { fetchImpl, calls } = seq([
+      {
+        issueLabels: {
+          nodes: [
+            { id: "L1", name: "Bug", retiredAt: null },
+            { id: "L2", name: "Old", retiredAt: "2026-01-01T00:00:00Z" },
+            { id: "L3", name: "Feature" },
+          ],
+        },
+      },
+    ]);
+    expect(await new LinearClient("k", fetchImpl).listLabels("RIC")).toEqual([
+      { id: "L1", name: "Bug" },
+      { id: "L3", name: "Feature" },
+    ]);
+    const q = calls[0].body.query.replace(/\s+/g, " ");
+    expect(q).toContain("issueLabels(");
+    expect(q).toContain("or: [{ team: { key: { eq: $key } } }, { team: { null: true } }]");
+    expect(q).toContain("retiredAt: { null: true }");
     expect(calls[0].body.variables).toEqual({ key: "RIC" });
   });
 });

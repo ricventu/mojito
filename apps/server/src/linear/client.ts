@@ -146,16 +146,28 @@ export class LinearClient {
     return uf.assetUrl;
   }
 
+  /**
+   * Issue labels usable on the team: its own and the workspace-level ones (team null). Read from
+   * the root `issueLabels` connection because `team.labels` may leave the workspace ones out.
+   * Retired labels are filtered in the query and again here, since a retired label must never
+   * reach the ticket-creating agent.
+   */
   async listLabels(teamKey: string): Promise<{ id: string; name: string }[]> {
-    const data = await this.query<{ teams: { nodes: { labels: { nodes: { id: string; name: string }[] } }[] } }>({
+    const data = await this.query<{
+      issueLabels: { nodes: { id: string; name: string; retiredAt?: string | null }[] };
+    }>({
       query: `query ($key: String!) {
-        teams(filter: { key: { eq: $key } }) { nodes { labels(first: 250) { nodes { id name } } } }
+        issueLabels(
+          filter: {
+            or: [{ team: { key: { eq: $key } } }, { team: { null: true } }]
+            retiredAt: { null: true }
+          }
+          first: 250
+        ) { nodes { id name retiredAt } }
       }`,
       variables: { key: teamKey },
     });
-    const team = data.teams.nodes[0];
-    if (!team) throw new Error(`team not found: ${teamKey}`);
-    return team.labels.nodes.map((l) => ({ id: l.id, name: l.name }));
+    return data.issueLabels.nodes.filter((l) => !l.retiredAt).map((l) => ({ id: l.id, name: l.name }));
   }
 
   async createIssue(input: {
