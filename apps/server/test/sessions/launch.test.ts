@@ -197,8 +197,21 @@ describe("launchTicket", () => {
   it("answers 400 for a ticket whose project is not mapped", async () => {
     const { deps } = setup();
     expect(await launchTicket(body({ ticket: "RIC-2" }), deps)).toEqual({ ok: false, status: 400, error: "project not mapped: Unmapped" });
-    expect(await launchTicket(body({ ticket: "RIC-3" }), deps)).toEqual({ ok: false, status: 400, error: "project not mapped: null" });
     expect(deps.newSession).not.toHaveBeenCalled();
+  });
+
+  it("answers 400 for a ticket with no project", async () => {
+    const { deps } = setup();
+    expect(await launchTicket(body({ ticket: "RIC-3" }), deps)).toEqual({ ok: false, status: 400, error: "ticket has no project: RIC-3" });
+    expect(deps.newSession).not.toHaveBeenCalled();
+  });
+
+  it("answers 400 for a relative project path even when it resolves locally", async () => {
+    const { deps, projects } = setup();
+    projects.upsert({ name: "Web", path: "repo/web", teamKey: "RIC" });
+    expect(await launchTicket(body(), deps)).toEqual({ ok: false, status: 400, error: "project path not found: repo/web" });
+    expect(deps.newSession).not.toHaveBeenCalled();
+    expect(deps.writeFile).not.toHaveBeenCalled();
   });
 
   it("answers 400 for a project path that does not exist, and opens no tmux", async () => {
@@ -361,6 +374,15 @@ describe("launchFree", () => {
   it("answers 400 for a directory that does not exist", async () => {
     const { deps } = setup({ exists: vi.fn(() => false) });
     expect(await launchFree(free({ project: null }), deps)).toEqual({ ok: false, status: 400, error: "project path not found: /home/me" });
+    expect(deps.newSession).not.toHaveBeenCalled();
+  });
+
+  it("answers 400 for a relative project path even when it resolves locally", async () => {
+    const { deps, projects } = setup();
+    projects.upsert({ name: "Rel", path: "./rel", teamKey: "RIC" });
+    for (const kind of ["claude", "shell"] as const) {
+      expect(await launchFree(free({ kind, project: "Rel" }), deps)).toEqual({ ok: false, status: 400, error: "project path not found: ./rel" });
+    }
     expect(deps.newSession).not.toHaveBeenCalled();
   });
 

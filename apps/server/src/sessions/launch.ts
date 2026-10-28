@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { LaunchTicketBody, type Effort, type LaunchFreeBody, type Model, type SessionMeta } from "@mojito/shared";
 import type { ServerConfig } from "../config";
 import type { ProjectsRepo } from "../db/projects";
@@ -61,6 +61,10 @@ const conflict = (id: string): LaunchResult => ({
   sessionId: id,
 });
 
+// `exists` resolves a relative path against Mojito's cwd, tmux's `-c` against the tmux
+// server's: the two can disagree, so only an absolute path can be trusted to mean one place.
+const usableDir = (deps: LaunchDeps, path: string) => isAbsolute(path) && deps.exists(path);
+
 const hookSettingsPath = (cfg: ServerConfig, id: string) => join(cfg.stateDir, "hooks", `${id}.json`);
 
 function claudeCommand(model: Model, effort: Effort, settingsPath: string, prompt?: string): string {
@@ -99,9 +103,10 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
   }
   const ticket = deps.tickets.get(body.ticket);
   if (!ticket) return { ok: false, status: 404, error: `ticket not found: ${body.ticket}` };
-  const project = ticket.project === null ? null : deps.projects.get(ticket.project);
+  if (ticket.project === null) return { ok: false, status: 400, error: `ticket has no project: ${body.ticket}` };
+  const project = deps.projects.get(ticket.project);
   if (!project) return { ok: false, status: 400, error: `project not mapped: ${ticket.project}` };
-  if (!deps.exists(project.path)) return { ok: false, status: 400, error: `project path not found: ${project.path}` };
+  if (!usableDir(deps, project.path)) return { ok: false, status: 400, error: `project path not found: ${project.path}` };
 
   const id = `${PREFIX}${body.ticket}`;
   if (launching.has(id)) return conflict(id);
@@ -168,7 +173,7 @@ export async function launchFree(body: LaunchFreeBody, deps: LaunchDeps): Promis
     if (!project) return { ok: false, status: 400, error: `project not mapped: ${body.project}` };
     cwd = project.path;
   }
-  if (!deps.exists(cwd)) return { ok: false, status: 400, error: `project path not found: ${cwd}` };
+  if (!usableDir(deps, cwd)) return { ok: false, status: 400, error: `project path not found: ${cwd}` };
 
   const id = `${PREFIX}${slug(body.project)}-${deps.randomHex()}`;
   const now = deps.now();
