@@ -7,6 +7,13 @@ pnpm workspace under `apps/` and `packages/`. The old Next.js app (`src/`, `serv
 `~/code/mojito` checkout — do not change it from here. Work for v2 happens in `apps/` and
 `packages/` only. Design: `docs/superpowers/specs/2026-10-28-mojito-rewrite-core-design.md`.
 
+**v2 is a rethink, not a port.** v1 is a reference for *what* a feature does and which
+problems it already ran into (its `CLAUDE.md`, `git show main:CLAUDE.md`, records many) —
+never for *how*. Every feature is redesigned for v2's stack and made better: simpler, fewer
+controls, a better interaction where one exists, phone-first. Do not copy v1's structure,
+components or file layout; when a ticket references v1 code, read it to learn the
+requirements and the pitfalls, then design the v2 solution and propose it before coding.
+
 v1 and v2 run side by side on the Linux box and never share state:
 
 | | v1 | v2 |
