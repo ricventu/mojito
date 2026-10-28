@@ -1,6 +1,8 @@
-# pnpm settings for this repo. Not a monorepo — this file exists because pnpm 11
-# reads its settings from here (they moved out of .npmrc), and one setting is not
-# optional for Mojito.
+# pnpm settings for this repo, and its workspace definition. The root stays a package
+# of its own (the Next.js app); the rewrite lives beside it in `apps/*` (server, web)
+# and `packages/*` (shared) and is driven by the `v2:*` root scripts. This file also
+# exists because pnpm 11 reads its settings from here (they moved out of .npmrc), and
+# some of them are not optional for Mojito.
 #
 # pnpm 10+ refuses to run a dependency's install scripts unless it is named here
 # (`onlyBuiltDependencies` in 10, `allowBuilds` in 11 — an object, not a list).
@@ -10,10 +12,18 @@
 #             is no pty binding at all and `server.ts` dies on import.
 #   esbuild   tsx's bundler, so it is what runs `server.ts` and every test. Its
 #             postinstall is what puts the platform binary in place.
+#   better-sqlite3
+#             the rewrite server's database (apps/server). Without its build step
+#             there is no native binding and the server dies on first import.
 #
 # Two esbuild majors are installed (tsx's and vitest's); the key is the package
 # name, so one entry covers both.
+packages:
+  - "apps/*"
+  - "packages/*"
+
 allowBuilds:
+  better-sqlite3: true
   esbuild: true
   node-pty: true
 

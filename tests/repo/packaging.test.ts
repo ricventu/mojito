@@ -46,6 +46,17 @@ describe("package manager", () => {
     expect(allowsBuild("esbuild")).toBe(true);
   });
 
+  // The rewrite's server stores everything in SQLite; no build step, no binding.
+  it("allows the install script better-sqlite3 needs", () => {
+    expect(allowsBuild("better-sqlite3")).toBe(true);
+  });
+
+  it("declares the rewrite's apps and packages as workspace members", () => {
+    expect(workspace).toMatch(/^packages:$/m);
+    expect(workspace).toMatch(/^\s+-\s+["']?apps\/\*["']?\s*$/m);
+    expect(workspace).toMatch(/^\s+-\s+["']?packages\/\*["']?\s*$/m);
+  });
+
   it("pins pre/post scripts on rather than inheriting pnpm's default", () => {
     expect(setting("enablePrePostScripts")).toBe("true");
   });

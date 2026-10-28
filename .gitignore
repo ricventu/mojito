@@ -18,3 +18,6 @@ tsconfig.tsbuildinfo
 # this file — this keeps it from ever being committed alongside pnpm's.
 package-lock.json
 yarn.lock
+
+# Build output of the rewrite (apps/server, apps/web).
+dist/
