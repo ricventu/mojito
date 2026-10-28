@@ -1,11 +1,7 @@
 import { createBrowserRouter, Link, Navigate } from "react-router";
 import { Board } from "@/components/board/Board";
 
-// Placeholder pages: the terminal and the settings arrive in later tasks.
-function Session() {
-  return <main className="p-4 pt-[calc(var(--sat)+1rem)]">Sessione</main>;
-}
-
+// Placeholder page: the settings arrive in a later task.
 function Settings() {
   return (
     <main className="p-4 pt-[calc(var(--sat)+1rem)]">
@@ -17,7 +13,11 @@ function Settings() {
 
 export const router = createBrowserRouter([
   { path: "/", element: <Board /> },
-  { path: "/session/:id", element: <Session /> },
+  // Lazy: xterm is most of the bundle, and the board never needs it.
+  {
+    path: "/session/:id",
+    lazy: () => import("@/components/terminal/TerminalPage").then((m) => ({ Component: m.TerminalPage })),
+  },
   { path: "/settings", element: <Settings /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ]);
