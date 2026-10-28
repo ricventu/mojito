@@ -11,6 +11,8 @@
  *   live output that arrives meanwhile is held back so the replay never lands on top of it.
  * - close code `SESSION_GONE_CODE` (4404, from `@mojito/shared`): the tmux session does not
  *   exist. The client must NOT reconnect on it. Any other close is a candidate for retry.
+ *   The gateway also reports it through `onGone`, so a row still showing `running` for a tmux
+ *   that died with no SessionEnd (a crash, a kill from outside) is marked ended.
  *
  * The resize frame is load-bearing. The pty is spawned at 80x24 unless a resize has
  * already arrived, and the client's resize is the only thing that ever corrects it — so
@@ -29,10 +31,12 @@ export interface AttachDeps {
   hasSession: (name: string) => Promise<boolean>;
   spawn: typeof ptySpawn;
   capturePane: (name: string, lines: number) => Promise<string>;
+  /** The session's tmux was found gone (not merely unreachable). Must not throw; it is guarded anyway. */
+  onGone: (name: string) => void;
 }
 
 export function attachPty(ws: WebSocket, id: string, deps: Partial<AttachDeps> = {}): void {
-  const d: AttachDeps = { hasSession, spawn: ptySpawn, capturePane, ...deps };
+  const d: AttachDeps = { hasSession, spawn: ptySpawn, capturePane, onGone: () => {}, ...deps };
 
   ws.on("error", (err) => {
     console.error("pty ws error:", err);
@@ -102,6 +106,15 @@ export function attachPty(ws: WebSocket, id: string, deps: Partial<AttachDeps> =
   // would repeat that forever. Report it once with the close code that stops the client.
   d.hasSession(id)
     .then((alive) => {
+      // Known gone, whether or not anyone is still listening: the row is wrong either way.
+      if (!alive) {
+        try {
+          d.onGone(id);
+        } catch (err) {
+          console.error("marking a gone session ended failed:", err);
+        }
+      }
+
       // The client is already gone: attaching now would spawn a `tmux attach-session` nobody
       // owns. Each such orphan holds one of the machine's ptys, and a client reconnecting
       // every 1.5s into this window exhausts them all within minutes.
@@ -192,7 +205,8 @@ export function attachPty(ws: WebSocket, id: string, deps: Partial<AttachDeps> =
         });
     })
     .catch((err) => {
-      // A failed existence check is treated as gone rather than spawning a doomed attach.
+      // A failed existence check is treated as gone rather than spawning a doomed attach — but
+      // not reported through onGone: a tmux that could not be asked is not known to be dead.
       console.error("session existence check failed:", err);
       ws.close(SESSION_GONE_CODE, "session gone");
     });

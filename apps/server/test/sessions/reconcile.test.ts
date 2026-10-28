@@ -3,7 +3,7 @@ import type { MojitoEvent, SessionMeta } from "@mojito/shared";
 import { openDb } from "../../src/db/db";
 import { SessionsRepo } from "../../src/db/sessions";
 import { EventBus } from "../../src/events/bus";
-import { reconcileSessions } from "../../src/sessions/reconcile";
+import { markEnded, reconcileSessions } from "../../src/sessions/reconcile";
 
 const meta = (id: string, state: SessionMeta["state"]): SessionMeta => ({
   id,
@@ -29,6 +29,27 @@ function setup(rows: SessionMeta[], tmux: string[]) {
   const run = () => reconcileSessions({ sessions, bus, listTmux: async () => tmux, now: () => 900 });
   return { sessions, events, run };
 }
+
+describe("markEnded", () => {
+  it("ends a live row, clearing its alert, and emits it", () => {
+    const { sessions, events } = setup([meta("mj-RIC-7", "needs-input")], []);
+    const bus = new EventBus();
+    bus.subscribe((e) => events.push(e));
+    expect(markEnded("mj-RIC-7", { sessions, bus, now: () => 42 })).toBe(true);
+    expect(sessions.get("mj-RIC-7")).toMatchObject({ state: "ended", alert: null, lastEventAt: 42 });
+    expect(events).toEqual([{ type: "session.updated", session: sessions.get("mj-RIC-7") }]);
+  });
+
+  it("leaves an unknown or already ended row alone", () => {
+    const { sessions, events } = setup([meta("mj-RIC-8", "ended")], []);
+    const bus = new EventBus();
+    bus.subscribe((e) => events.push(e));
+    expect(markEnded("mj-RIC-8", { sessions, bus, now: () => 42 })).toBe(false);
+    expect(markEnded("mj-NOPE-1", { sessions, bus, now: () => 42 })).toBe(false);
+    expect(sessions.get("mj-RIC-8")?.lastEventAt).toBe(1);
+    expect(events).toEqual([]);
+  });
+});
 
 describe("reconcileSessions", () => {
   it("ends rows without tmux and adopts tmux sessions without a row", async () => {

@@ -44,6 +44,68 @@ describe("attachPty", () => {
     expect(ws.close).toHaveBeenCalledWith(SESSION_GONE_CODE, expect.any(String));
   });
 
+  // A tmux that died without a SessionEnd left its row `running` until the next boot.
+  it("reports a gone session through onGone before closing", async () => {
+    const ws = fakeWs();
+    const order: string[] = [];
+    const onGone = vi.fn(() => void order.push("gone"));
+    ws.close.mockImplementation(() => void order.push("close"));
+    attachPty(ws as never, "mj-RIC-122", {
+      hasSession: vi.fn(async () => false),
+      spawn: spawnStub(),
+      capturePane: vi.fn(async () => ""),
+      onGone,
+    });
+    await vi.waitFor(() => expect(ws.close).toHaveBeenCalled());
+    expect(onGone).toHaveBeenCalledWith("mj-RIC-122");
+    expect(order).toEqual(["gone", "close"]);
+  });
+
+  it("still closes with SESSION_GONE_CODE when onGone throws", async () => {
+    const ws = fakeWs();
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    attachPty(ws as never, "mj-RIC-122", {
+      hasSession: vi.fn(async () => false),
+      spawn: spawnStub(),
+      capturePane: vi.fn(async () => ""),
+      onGone: () => {
+        throw new Error("db closed");
+      },
+    });
+    await vi.waitFor(() => expect(ws.close).toHaveBeenCalledWith(SESSION_GONE_CODE, expect.any(String)));
+    spy.mockRestore();
+  });
+
+  it("does not report a session whose existence check failed: unreachable is not dead", async () => {
+    const ws = fakeWs();
+    const onGone = vi.fn();
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    attachPty(ws as never, "mj-RIC-122", {
+      hasSession: vi.fn(async () => {
+        throw new Error("tmux hung");
+      }),
+      spawn: spawnStub(),
+      capturePane: vi.fn(async () => ""),
+      onGone,
+    });
+    await vi.waitFor(() => expect(ws.close).toHaveBeenCalledWith(SESSION_GONE_CODE, expect.any(String)));
+    expect(onGone).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("does not report a live session", async () => {
+    const ws = fakeWs();
+    const onGone = vi.fn();
+    attachPty(ws as never, "mj-RIC-46", {
+      hasSession: vi.fn(async () => true),
+      spawn: spawnStub(),
+      capturePane: vi.fn(async () => ""),
+      onGone,
+    });
+    await vi.waitFor(() => expect(ws.send).toHaveBeenCalled());
+    expect(onGone).not.toHaveBeenCalled();
+  });
+
   // RIC-207: the pty is the parent of everything the human then types into the terminal,
   // so it must not carry Mojito's own NODE_ENV / credentials either.
   it("spawns the pty with Mojito's own environment scrubbed", async () => {

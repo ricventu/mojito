@@ -9,6 +9,7 @@ import type { WebSocketServer } from "ws";
 import { openDb } from "../../src/db/db";
 import { SessionsRepo } from "../../src/db/sessions";
 import { EventBus } from "../../src/events/bus";
+import type { MojitoEvent } from "@mojito/shared";
 import { attachPty } from "../../src/ws/pty";
 import { handleUpgrade } from "../../src/ws/upgrade";
 
@@ -36,10 +37,13 @@ function setup() {
   // the handshake is written.
   const ws = { on: vi.fn(), send: vi.fn(), close: vi.fn() };
   const wss = { handleUpgrade: vi.fn((_req, _socket, _head, cb: (w: typeof ws) => void) => cb(ws)) };
-  const deps = { token: TOKEN, wss: wss as unknown as WebSocketServer, sessions, bus: new EventBus() };
+  const bus = new EventBus();
+  const events: MojitoEvent[] = [];
+  bus.subscribe((e) => events.push(e));
+  const deps = { token: TOKEN, wss: wss as unknown as WebSocketServer, sessions, bus, now: () => 77 };
   const upgrade = (url: string) =>
     handleUpgrade({ url, headers: {} } as IncomingMessage, socket as unknown as Duplex, Buffer.alloc(0), deps);
-  return { socket, wss, ws, upgrade };
+  return { socket, wss, ws, upgrade, sessions, events };
 }
 
 describe("handleUpgrade", () => {
@@ -57,8 +61,20 @@ describe("handleUpgrade", () => {
     upgrade(`/ws/pty/mj-RIC-1?token=${TOKEN}`);
     expect(wss.handleUpgrade).toHaveBeenCalled();
     expect(socket.destroy).not.toHaveBeenCalled();
-    expect(attachPty).toHaveBeenCalledWith(ws, "mj-RIC-1");
+    expect(attachPty).toHaveBeenCalledWith(ws, "mj-RIC-1", { onGone: expect.any(Function) });
     expect(ws.on).toHaveBeenCalledWith("pong", expect.any(Function));
+  });
+
+  it("wires the gateway's onGone to mark the row ended and tell every board", () => {
+    const { upgrade, sessions, events } = setup();
+    upgrade(`/ws/pty/mj-RIC-1?token=${TOKEN}`);
+    const { onGone } = vi.mocked(attachPty).mock.calls[0][2]!;
+    onGone!("mj-RIC-1");
+    expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "ended", alert: null, lastEventAt: 77 });
+    expect(events).toEqual([{ type: "session.updated", session: sessions.get("mj-RIC-1") }]);
+    // Already ended: nothing more to say.
+    onGone!("mj-RIC-1");
+    expect(events).toHaveLength(1);
   });
 
   // A destroyed handshake is a bare 1006 to the browser, which it retries every 1.5s forever;

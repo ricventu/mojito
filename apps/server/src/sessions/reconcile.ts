@@ -3,6 +3,18 @@ import type { EventBus } from "../events/bus";
 import { PREFIX } from "../tmux/tmux";
 import { kindFromId, ticketFromId } from "./hooks";
 
+/**
+ * Mark a session whose tmux is gone as `ended` (alert cleared) and tell every board. A row that
+ * is missing or already ended is left alone; answers whether anything changed.
+ */
+export function markEnded(id: string, deps: { sessions: SessionsRepo; bus: EventBus; now(): number }): boolean {
+  const row = deps.sessions.get(id);
+  if (!row || row.state === "ended") return false;
+  const session = deps.sessions.patch(id, { state: "ended", alert: null, lastEventAt: deps.now() });
+  if (session) deps.bus.emit({ type: "session.updated", session });
+  return true;
+}
+
 export interface ReconcileDeps {
   sessions: SessionsRepo;
   listTmux(): Promise<string[]>;
@@ -34,9 +46,7 @@ export async function reconcileSessions(
       continue;
     }
     if (row.state === "ended" || live.has(row.id)) continue;
-    const session = deps.sessions.patch(row.id, { state: "ended", alert: null, lastEventAt: deps.now() });
-    if (session) deps.bus.emit({ type: "session.updated", session });
-    ended.push(row.id);
+    if (markEnded(row.id, deps)) ended.push(row.id);
   }
 
   for (const id of live) {

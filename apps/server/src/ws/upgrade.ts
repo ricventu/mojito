@@ -4,6 +4,7 @@ import { SESSION_GONE_CODE } from "@mojito/shared";
 import type { WebSocketServer } from "ws";
 import type { SessionsRepo } from "../db/sessions";
 import type { EventBus } from "../events/bus";
+import { markEnded } from "../sessions/reconcile";
 import { PREFIX } from "../tmux/tmux";
 import { attachEvents } from "./events";
 import { markAlive } from "./heartbeat";
@@ -14,6 +15,7 @@ export interface UpgradeDeps {
   wss: WebSocketServer;
   sessions: SessionsRepo;
   bus: EventBus;
+  now?(): number;
 }
 
 const PTY_PATH = "/ws/pty/";
@@ -66,7 +68,9 @@ export function handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer
         }
         deps.wss.handleUpgrade(req, socket, head, (ws) => {
           markAlive(ws);
-          attachPty(ws, id);
+          // A row the gateway finds without a tmux (a crash, a kill from outside: no SessionEnd)
+          // is ended here rather than left showing `running` until the next boot.
+          attachPty(ws, id, { onGone: (gone) => markEnded(gone, { ...deps, now: deps.now ?? Date.now }) });
         });
         return;
       }
