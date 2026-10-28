@@ -101,6 +101,24 @@ describe("handleHook", () => {
     expect(sessions.get("mj-RIC-1")?.state).toBe("running");
   });
 
+  it("ignores an idle_prompt Notification: a finished session stays idle, not amber", () => {
+    const { sessions, events, deps } = setup(meta({ state: "idle", lastEventAt: 7 }));
+    handleHook("mj-RIC-1", "Notification", deps, { notification_type: "idle_prompt", message: "waiting" });
+    handleHook("mj-RIC-1", "Notification", deps, { notification_type: "auth_success", message: "ok" });
+    expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "idle", alert: null, lastEventAt: 7 });
+    expect(events).toEqual([]);
+  });
+
+  it.each([
+    ["a permission prompt", { notification_type: "permission_prompt" }],
+    ["an elicitation dialog", { notification_type: "elicitation_dialog" }],
+    ["no body", undefined],
+  ])("turns a Notification for %s into needs-input", (_label, body) => {
+    const { sessions, deps } = setup(meta({ state: "idle" }));
+    handleHook("mj-RIC-1", "Notification", deps, body);
+    expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "needs-input", alert: "claude ti sta aspettando" });
+  });
+
   it.each([
     ["any other reason", { reason: "prompt_input_exit" }],
     ["no body", undefined],

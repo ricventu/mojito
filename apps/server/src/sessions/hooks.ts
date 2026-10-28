@@ -33,8 +33,8 @@ export interface HookDeps {
  * Apply one Claude Code hook to its session. Never throws: it runs behind an endpoint whose
  * `curl` ends in `|| true`, and a bad hook must not be able to fail claude or the server.
  * Unknown ids and unknown events are ignored, and so is any event for an `ended` session and
- * any hook `isNoiseHook` rules out (a `/clear`'s SessionEnd). `body` is the hook's own JSON;
- * missing or unparseable, it reads as an empty payload.
+ * any hook `isNoiseHook` rules out (a `/clear`'s SessionEnd, an idle Notification). `body` is
+ * the hook's own JSON; missing or unparseable, it reads as an empty payload.
  *
  * A hook that maps to the state and alert the row already has (PostToolUse fires on every
  * tool call) refreshes `lastEventAt` but emits nothing: no client-visible field but the

@@ -39,6 +39,9 @@ describe("isHookEvent", () => {
 describe("hookPayload", () => {
   it("reads the fields Mojito uses off claude's hook input", () => {
     expect(hookPayload({ hook_event_name: "SessionEnd", session_id: "x", reason: "clear" })).toEqual({ reason: "clear" });
+    expect(hookPayload({ hook_event_name: "Notification", message: "m", notification_type: "idle_prompt" })).toEqual({
+      notification_type: "idle_prompt",
+    });
   });
 
   it("is empty for a missing, non-object or mistyped body", () => {
@@ -56,5 +59,20 @@ describe("isNoiseHook", () => {
     expect(isNoiseHook("SessionEnd", { reason: "logout" })).toBe(false);
     expect(isNoiseHook("SessionEnd", {})).toBe(false);
     expect(isNoiseHook("Stop", { reason: "clear" })).toBe(false);
+  });
+
+  // idle_prompt fires ~60s after every Stop: taken as needs-input, every finished session went amber.
+  it.each([
+    ["permission_prompt", false],
+    ["elicitation_dialog", false],
+    ["elicitation_url_dialog", false],
+    ["idle_prompt", true],
+    ["auth_success", true],
+  ])("a %s Notification is noise: %s", (type, noise) => {
+    expect(isNoiseHook("Notification", { notification_type: type })).toBe(noise);
+  });
+
+  it("keeps a Notification with no type, to be safe", () => {
+    expect(isNoiseHook("Notification", {})).toBe(false);
   });
 });

@@ -38,6 +38,8 @@ export interface HookOutcome {
 export interface HookPayload {
   /** SessionEnd: why the session ended (`clear`, `resume`, `logout`, `prompt_input_exit`, `other`). */
   reason?: string;
+  /** Notification: what it is about (`permission_prompt`, `idle_prompt`, `auth_success`, …). */
+  notification_type?: string;
 }
 
 export function hookPayload(body: unknown): HookPayload {
@@ -45,16 +47,29 @@ export function hookPayload(body: unknown): HookPayload {
   const b = body as Record<string, unknown>;
   const out: HookPayload = {};
   if (typeof b.reason === "string") out.reason = b.reason;
+  if (typeof b.notification_type === "string") out.notification_type = b.notification_type;
   return out;
 }
+
+// The Notification types that mean claude is blocked on the human. `idle_prompt` is not one:
+// it fires ~60s after every Stop, and taken as needs-input it turned every finished session
+// amber; nor is `auth_success`. `elicitation_url_dialog` is the browser-URL twin of
+// `elicitation_dialog` and blocks the same way.
+const WAITING_NOTIFICATIONS = new Set(["permission_prompt", "elicitation_dialog", "elicitation_url_dialog"]);
 
 /**
  * A hook that says nothing about the session's state and must change nothing. `/clear` fires
  * SessionEnd (reason `clear`) and then SessionStart in the same, still-live claude: taken at
  * its word, the first would mark the session `ended` for good and the second could not revive it.
+ * A Notification counts only when its type says claude is waiting on the human; one with no
+ * type at all still counts, since missing a real prompt costs more than a false amber.
  */
 export function isNoiseHook(event: HookEventName, payload: HookPayload): boolean {
-  return event === "SessionEnd" && payload.reason === "clear";
+  if (event === "SessionEnd") return payload.reason === "clear";
+  if (event === "Notification") {
+    return payload.notification_type !== undefined && !WAITING_NOTIFICATIONS.has(payload.notification_type);
+  }
+  return false;
 }
 
 /**
