@@ -80,11 +80,59 @@ describe("groupBoard", () => {
       [
         session("mj-alpha-aaaaaa", { createdAt: 1 }),
         session("mj-alpha-bbbbbb", { createdAt: 5, kind: "shell" }),
-        session("mj-RIC-1", { kind: "ticket", ticket: "RIC-1", createdAt: 9 }),
       ],
     );
     expect(section.active).toEqual([]);
-    expect(section.free.map((s) => s.id)).toEqual(["mj-alpha-bbbbbb", "mj-alpha-aaaaaa"]);
+    expect(section.loose.map((s) => s.id)).toEqual(["mj-alpha-bbbbbb", "mj-alpha-aaaaaa"]);
+  });
+
+  it("hangs a ticket session off its card, not off the loose rows, while the ticket is on the board", () => {
+    const [section] = groupBoard(
+      [project("Alpha")],
+      [ticket("RIC-1", "Todo")],
+      [session("mj-RIC-1", { kind: "ticket", ticket: "RIC-1", createdAt: 9 })],
+    );
+    expect(section.loose).toEqual([]);
+  });
+
+  // A ticket that left the open list (Done, Canceled, moved, past the first 100) must not take
+  // its session off the board with it: a live tmux stays reachable, an ended row removable.
+  it("lists a ticket session whose ticket is not on the board as a loose row of its project, any state", () => {
+    const [section] = groupBoard(
+      [project("Alpha")],
+      [ticket("RIC-2", "Todo")],
+      [
+        session("mj-RIC-1", { kind: "ticket", ticket: "RIC-1", state: "running", createdAt: 9 }),
+        session("mj-RIC-3", { kind: "ticket", ticket: "RIC-3", state: "ended", createdAt: 7 }),
+        session("mj-alpha-aaaaaa", { createdAt: 8 }),
+      ],
+    );
+    expect(section.project).toBe("Alpha");
+    expect(section.loose.map((s) => s.id)).toEqual(["mj-RIC-1", "mj-alpha-aaaaaa", "mj-RIC-3"]);
+  });
+
+  it("puts an orphaned ticket session with no known project in General", () => {
+    const sections = groupBoard(
+      [project("Alpha")],
+      [],
+      [
+        session("mj-RIC-5", { kind: "ticket", ticket: "RIC-5", project: null }),
+        session("mj-RIC-6", { kind: "ticket", ticket: "RIC-6", project: "Gone" }),
+      ],
+    );
+    expect(sections.map((s) => s.project)).toEqual([null]);
+    expect(sections[0].loose.map((s) => s.id).sort()).toEqual(["mj-RIC-5", "mj-RIC-6"]);
+  });
+
+  // The ticket is listed but its project has no section, so it has no card either.
+  it("treats a ticket listed under an unmapped project as not on the board", () => {
+    const sections = groupBoard(
+      [project("Alpha")],
+      [ticket("RIC-7", "Todo", "Gone")],
+      [session("mj-RIC-7", { kind: "ticket", ticket: "RIC-7", project: "Gone" })],
+    );
+    expect(sections.map((s) => s.project)).toEqual([null]);
+    expect(sections[0].loose.map((s) => s.id)).toEqual(["mj-RIC-7"]);
   });
 
   it("puts project-less free sessions in a trailing General section", () => {
@@ -94,7 +142,7 @@ describe("groupBoard", () => {
       [session("mj-general-aaaaaa", { project: null })],
     );
     expect(sections.map((s) => s.project)).toEqual(["Alpha", null]);
-    expect(sections[1].free).toHaveLength(1);
+    expect(sections[1].loose).toHaveLength(1);
   });
 
   it("gives a free session whose project left the map a place in General", () => {
@@ -102,7 +150,7 @@ describe("groupBoard", () => {
     expect(sections.map((s) => s.project)).toEqual([null]);
   });
 
-  it("omits General without free sessions and projects with nothing in them", () => {
+  it("omits General without loose sessions and projects with nothing in them", () => {
     const sections = groupBoard(
       [project("Alpha"), project("Beta")],
       [ticket("RIC-1", "Todo", "Beta")],

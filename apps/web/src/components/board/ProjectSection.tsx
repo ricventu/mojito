@@ -3,7 +3,7 @@ import type { SessionMeta, TicketSummary } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { sessionForTicket, type BoardSection } from "@/lib/board";
-import { FreeSessionRow } from "./FreeSessionRow";
+import { LooseSessionRow } from "./LooseSessionRow";
 import { TicketCard } from "./TicketCard";
 
 interface Props {
@@ -15,7 +15,7 @@ interface Props {
   onNewSession: (project?: string) => void;
 }
 
-/** One project: its active tickets, a closed Backlog group, then its free sessions. */
+/** One project: its active tickets, a closed Backlog group, then its loose sessions. */
 export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket, onNewTicket, onNewSession }: Props) {
   const { project } = section;
   const name = project ?? "General";
@@ -62,10 +62,10 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
         </Collapsible>
       )}
 
-      {section.free.length > 0 && (
+      {section.loose.length > 0 && (
         <ul className="flex flex-col gap-2">
-          {section.free.map((s) => (
-            <FreeSessionRow key={s.id} session={s} />
+          {section.loose.map((s) => (
+            <LooseSessionRow key={s.id} session={s} />
           ))}
         </ul>
       )}

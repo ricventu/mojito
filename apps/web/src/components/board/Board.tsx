@@ -25,7 +25,7 @@ function Banner({ text }: { text: string }) {
   );
 }
 
-/** The home page: toolbar, background tasks, then every project's tickets and free sessions. */
+/** The home page: toolbar, background tasks, then every project's tickets and loose sessions. */
 export function Board() {
   const tickets = useTickets();
   const sessions = useSessions();

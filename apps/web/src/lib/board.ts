@@ -4,11 +4,17 @@ import type { BoardTickets, ProjectRow, SessionMeta, TicketSummary } from "@moji
 export const STATUS_ORDER = ["In Review", "In Progress", "Todo"];
 
 export interface BoardSection {
-  /** `null` is the General section: free sessions with no (or no longer a mapped) project. */
+  /** `null` is the General section: loose sessions with no (or no longer a mapped) project. */
   project: string | null;
   active: TicketSummary[];
   backlog: TicketSummary[];
-  free: SessionMeta[];
+  /**
+   * Sessions with no ticket card to hang off, newest first: free sessions, and ticket sessions
+   * whose ticket is not on the board (Done, Canceled, moved to another project, past the
+   * query's first 100). A live tmux must never vanish from the board just because Linear
+   * stopped listing its ticket.
+   */
+  loose: SessionMeta[];
 }
 
 function statusRank(statusName: string): number {
@@ -33,8 +39,10 @@ function byStatusThenIdentifier(a: TicketSummary, b: TicketSummary): number {
 
 /**
  * One section per configured project (alphabetical), then General last. A section with
- * no ticket and no free session is dropped. Tickets are placed by their own project name;
- * a free session whose project is no longer mapped lands in General rather than vanishing.
+ * no ticket and no loose session is dropped. Tickets are placed by their own project name;
+ * a loose session whose project is no longer mapped lands in General rather than vanishing.
+ * "On the board" means shown: a ticket whose project is not mapped gets no card, so its
+ * session is loose too.
  */
 export function groupBoard(
   projects: ProjectRow[],
@@ -43,8 +51,9 @@ export function groupBoard(
 ): BoardSection[] {
   const names = projects.map((p) => p.name).sort((a, b) => a.localeCompare(b));
   const known = new Set(names);
-  const freeSessions = sessions
-    .filter((s) => s.kind !== "ticket")
+  const carded = new Set(tickets.filter((t) => t.project !== null && known.has(t.project)).map((t) => t.identifier));
+  const looseSessions = sessions
+    .filter((s) => s.kind !== "ticket" || s.ticket === null || !carded.has(s.ticket))
     .sort((a, b) => b.createdAt - a.createdAt);
 
   const section = (project: string | null): BoardSection => {
@@ -53,13 +62,13 @@ export function groupBoard(
       project,
       active: own.filter((t) => t.statusName !== "Backlog").sort(byStatusThenIdentifier),
       backlog: own.filter((t) => t.statusName === "Backlog").sort(byIdentifier),
-      free: freeSessions.filter((s) => (s.project !== null && known.has(s.project) ? s.project : null) === project),
+      loose: looseSessions.filter((s) => (s.project !== null && known.has(s.project) ? s.project : null) === project),
     };
   };
 
   return [...names, null]
     .map(section)
-    .filter((s) => s.active.length + s.backlog.length + s.free.length > 0);
+    .filter((s) => s.active.length + s.backlog.length + s.loose.length > 0);
 }
 
 /** The ticket's live session if it has one, else the most recent one; `null` when it never had any. */
