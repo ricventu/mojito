@@ -20,7 +20,7 @@ describe("loadConfig", () => {
     const cfg = loadConfig(KEYS);
     expect(cfg).toEqual({
       port: 3100,
-      host: "0.0.0.0",
+      host: "127.0.0.1",
       token: "tok",
       linearApiKey: "lin_api_x",
       home: "/home/me",
@@ -34,12 +34,12 @@ describe("loadConfig", () => {
     const cfg = loadConfig({
       ...KEYS,
       MOJITO2_PORT: "4000",
-      MOJITO2_HOST: "127.0.0.1",
+      MOJITO2_HOST: "0.0.0.0",
       MOJITO_STATE_DIR: "/var/mojito",
       MOJITO_PROJECTS: "/etc/projects.json",
     });
     expect(cfg.port).toBe(4000);
-    expect(cfg.host).toBe("127.0.0.1");
+    expect(cfg.host).toBe("0.0.0.0");
     expect(cfg.stateDir).toBe("/var/mojito");
     expect(cfg.projectsJsonPath).toBe("/etc/projects.json");
   });
@@ -47,15 +47,15 @@ describe("loadConfig", () => {
   // The old app's port and host sit in the same shared .env.local (8700 on 127.0.0.1 on the
   // Linux box); read by v2 they made the two apps collide.
   it("ignores the old app's MOJITO_PORT and MOJITO_HOST", () => {
-    const cfg = loadConfig({ ...KEYS, MOJITO_PORT: "8700", MOJITO_HOST: "127.0.0.1" });
+    const cfg = loadConfig({ ...KEYS, MOJITO_PORT: "8700", MOJITO_HOST: "10.0.0.9" });
     expect(cfg.port).toBe(3100);
-    expect(cfg.host).toBe("0.0.0.0");
+    expect(cfg.host).toBe("127.0.0.1");
   });
 
   it("falls back to the defaults on empty values", () => {
     const cfg = loadConfig({ ...KEYS, MOJITO2_PORT: "", MOJITO2_HOST: "" });
     expect(cfg.port).toBe(3100);
-    expect(cfg.host).toBe("0.0.0.0");
+    expect(cfg.host).toBe("127.0.0.1");
   });
 });
 

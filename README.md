@@ -119,15 +119,16 @@ e non arrivano mai nell'ambiente delle sessioni.
 Porta e indirizzo sono invece solo di v2:
 
 - `MOJITO2_PORT` — porta (default `3100`).
-- `MOJITO2_HOST` — indirizzo (default `0.0.0.0`).
+- `MOJITO2_HOST` — indirizzo (default `127.0.0.1`).
 
 `MOJITO_PORT` e `MOJITO_HOST` vengono ignorati di proposito: stanno nello stesso
 `.env.local` e appartengono alla vecchia app. Una porta già occupata fa uscire il server
 con errore invece di lasciarlo vivo senza ascoltare.
 
-Siccome v2 ascolta su `0.0.0.0`, il telefono lo raggiunge direttamente sulla tailnet o
-sulla LAN: `http://<host>:3100`. Per l'https (serve a Chromium per installare la PWA),
-Tailscale Serve su una porta a parte, senza toccare la configurazione della vecchia app:
+v2 ascolta solo su `127.0.0.1`, come la vecchia app: la macchina ha un indirizzo pubblico
+e non va esposta. Dal Mac e dal telefono si passa da Tailscale Serve su una porta a parte,
+senza toccare la configurazione della vecchia app (serve root, oppure una volta
+`sudo tailscale set --operator=$USER`):
 
 ```bash
 tailscale serve --bg --https=8443 3100   # poi https://<host>.<tailnet>.ts.net:8443
