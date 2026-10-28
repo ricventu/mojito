@@ -1,10 +1,12 @@
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
+import { SESSION_GONE_CODE } from "@mojito/shared";
 import type { WebSocketServer } from "ws";
 import type { SessionsRepo } from "../db/sessions";
 import type { EventBus } from "../events/bus";
 import { PREFIX } from "../tmux/tmux";
 import { attachEvents } from "./events";
+import { markAlive } from "./heartbeat";
 import { attachPty } from "./pty";
 
 export interface UpgradeDeps {
@@ -30,8 +32,13 @@ function ptySessionId(pathname: string): string {
 /**
  * The http server's `upgrade` listener. A WebSocket cannot carry a custom header from the
  * browser, so the token rides in the query (`?token=`). Two paths only: `/ws/events`, and
- * `/ws/pty/<id>` for a session Mojito knows (an `mj-` id with a row) — anything else, and any
- * failure at all, destroys the socket rather than answering it.
+ * `/ws/pty/<id>` for an `mj-` id — anything else, and any failure at all, destroys the socket
+ * rather than answering it.
+ *
+ * An `mj-` id with no session row is the one refusal answered rather than destroyed: the
+ * handshake completes and the socket closes at once with `SESSION_GONE_CODE`. A destroyed
+ * handshake reaches the browser as a bare 1006, which its reconnect loop retries every 1.5s
+ * forever; 4404 is how it learns the session is gone and stops.
  */
 export function handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, deps: UpgradeDeps): void {
   try {
@@ -41,7 +48,10 @@ export function handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer
       return;
     }
     if (url.pathname === "/ws/events") {
-      deps.wss.handleUpgrade(req, socket, head, (ws) => attachEvents(ws, deps.bus));
+      deps.wss.handleUpgrade(req, socket, head, (ws) => {
+        markAlive(ws);
+        attachEvents(ws, deps.bus);
+      });
       return;
     }
     if (url.pathname.startsWith(PTY_PATH)) {
@@ -49,8 +59,15 @@ export function handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer
       // `tmux attach-session -t`, and a target like `other:1` or a human's own session is
       // not ours to attach to.
       const id = ptySessionId(url.pathname);
-      if (id.startsWith(PREFIX) && deps.sessions.get(id)) {
-        deps.wss.handleUpgrade(req, socket, head, (ws) => attachPty(ws, id));
+      if (id.startsWith(PREFIX)) {
+        if (!deps.sessions.get(id)) {
+          deps.wss.handleUpgrade(req, socket, head, (ws) => ws.close(SESSION_GONE_CODE, "session gone"));
+          return;
+        }
+        deps.wss.handleUpgrade(req, socket, head, (ws) => {
+          markAlive(ws);
+          attachPty(ws, id);
+        });
         return;
       }
     }

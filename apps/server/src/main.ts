@@ -17,6 +17,7 @@ import { defaultLaunchIo, type LaunchDeps } from "./sessions/launch";
 import { reconcileSessions } from "./sessions/reconcile";
 import { TicketCache } from "./tickets/cache";
 import { PREFIX, closeSession, listSessions } from "./tmux/tmux";
+import { startHeartbeat } from "./ws/heartbeat";
 import { handleUpgrade } from "./ws/upgrade";
 
 // Last-resort backstops: a stray async error (a ws frame, a hook) is logged, not fatal.
@@ -82,6 +83,10 @@ async function main(): Promise<void> {
     console.log(`Mojito on http://${cfg.host}:${cfg.port}${staticDir ? "" : " (API only: no apps/web/dist)"}`);
   }) as Server;
   const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
+  // A socket severed by a NAT/Tailscale idle timeout or a phone in a pocket emits no close, so
+  // its pty (a `tmux attach`) would never be released: ping every client, reap the silent ones.
+  const stopHeartbeat = startHeartbeat(wss);
+  server.on("close", stopHeartbeat);
   server.on("upgrade", (req, socket, head) => handleUpgrade(req, socket, head, { token: cfg.token, wss, sessions, bus }));
 
   // Stop serving and let go of the database; the tmux sessions are deliberately left alone —
