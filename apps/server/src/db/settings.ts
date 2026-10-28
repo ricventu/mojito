@@ -31,6 +31,21 @@ export class SettingsRepo {
     return out;
   }
 
+  /**
+   * Whether boot has already tried importing projects.json into this database. Kept beside the
+   * settings (same key/value table) but not part of `Settings`: it is the server's own
+   * bookkeeping, never shown or sent.
+   */
+  projectsImported(): boolean {
+    return this.read("projectsImported") === true;
+  }
+
+  markProjectsImported(): void {
+    this.db
+      .prepare("INSERT INTO settings (key, value) VALUES ('projectsImported', 'true') ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .run();
+  }
+
   set(s: Settings): void {
     const put = this.db.prepare(
       "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",

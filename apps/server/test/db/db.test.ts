@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openDb, migrate } from "../../src/db/db";
-import { ProjectsRepo, importProjectsJson } from "../../src/db/projects";
+import { ProjectsRepo, importProjectsJson, importProjectsOnce } from "../../src/db/projects";
 import { SettingsRepo } from "../../src/db/settings";
 import { SessionsRepo } from "../../src/db/sessions";
 import { TasksRepo } from "../../src/db/tasks";
@@ -69,6 +69,59 @@ describe("importProjectsJson", () => {
     expect(importProjectsJson(repo, write("{not json"))).toBe(0);
     expect(importProjectsJson(repo, write("null"))).toBe(0);
     expect(repo.isEmpty()).toBe(true);
+  });
+});
+
+describe("importProjectsOnce", () => {
+  const file = () => {
+    const f = join(mkdtempSync(join(tmpdir(), "mj-proj-")), "projects.json");
+    writeFileSync(f, JSON.stringify({ RIC: "/repos/ric" }));
+    return f;
+  };
+
+  it("imports into an empty database and records that it did", () => {
+    const db = openDb(":memory:");
+    const repo = new ProjectsRepo(db);
+    const settings = new SettingsRepo(db);
+    expect(importProjectsOnce(repo, settings, file())).toBe(1);
+    expect(settings.projectsImported()).toBe(true);
+  });
+
+  // Deleting every project in Settings must stick across a restart.
+  it("never imports again, even once every project was deleted", () => {
+    const db = openDb(":memory:");
+    const repo = new ProjectsRepo(db);
+    const settings = new SettingsRepo(db);
+    const f = file();
+    importProjectsOnce(repo, settings, f);
+    repo.remove("RIC");
+    expect(importProjectsOnce(repo, settings, f)).toBeNull();
+    expect(repo.isEmpty()).toBe(true);
+  });
+
+  it("counts a missing file as the one attempt", () => {
+    const db = openDb(":memory:");
+    const settings = new SettingsRepo(db);
+    expect(importProjectsOnce(new ProjectsRepo(db), settings, "/nonexistent/projects.json")).toBe(0);
+    expect(settings.projectsImported()).toBe(true);
+  });
+
+  // A database populated before the flag existed: flag it, leave its projects as they are.
+  it("flags a database that already has projects without reading the file", () => {
+    const db = openDb(":memory:");
+    const repo = new ProjectsRepo(db);
+    const settings = new SettingsRepo(db);
+    repo.upsert({ name: "Web", path: "/repos/web", teamKey: "RIC" });
+    expect(importProjectsOnce(repo, settings, file())).toBeNull();
+    expect(repo.list().map((p) => p.name)).toEqual(["Web"]);
+    expect(settings.projectsImported()).toBe(true);
+  });
+
+  it("keeps the flag out of the settings the API serves", () => {
+    const db = openDb(":memory:");
+    const settings = new SettingsRepo(db);
+    settings.markProjectsImported();
+    expect(Object.keys(settings.get())).toEqual(["statusDefaults", "brainstormingDefault"]);
   });
 });
 

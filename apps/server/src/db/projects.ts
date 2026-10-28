@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { ProjectRow } from "@mojito/shared";
 import type { Db } from "./db";
+import type { SettingsRepo } from "./settings";
 
 interface Row {
   name: string;
@@ -44,6 +45,21 @@ export class ProjectsRepo {
   isEmpty(): boolean {
     return this.db.prepare("SELECT 1 FROM projects LIMIT 1").get() === undefined;
   }
+}
+
+/**
+ * The boot-time import of projects.json, at most once per database. Keyed on a flag rather than
+ * on an empty table: a human who deletes every project in Settings means it, and the old file
+ * must not come back on the next restart. The flag is set after the first attempt whatever it
+ * found — a database that already holds projects (imported before the flag existed) gets it
+ * too, without re-reading the file. Answers the rows written, or null when the import was
+ * skipped.
+ */
+export function importProjectsOnce(repo: ProjectsRepo, settings: SettingsRepo, path: string): number | null {
+  if (settings.projectsImported()) return null;
+  const imported = repo.isEmpty() ? importProjectsJson(repo, path) : null;
+  settings.markProjectsImported();
+  return imported;
 }
 
 type Entry = string | { path?: string; projects?: Record<string, string> };
