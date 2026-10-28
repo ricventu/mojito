@@ -24,7 +24,19 @@ export interface TaskQueueDeps {
   now(): number;
 }
 
+type Created = { identifier: string; url: string };
+
 const TOOL_PREFIX = `mcp__${LINEAR_MCP_NAME}__`;
+
+/**
+ * The claude process's whole environment (the SDK's `env` replaces it, not merges): Mojito's
+ * own credentials scrubbed as for every child, and no Anthropic API credential either, so the
+ * agent always runs on the logged-in subscription and never bills an API key.
+ */
+function agentEnv(): Record<string, string> {
+  const { ANTHROPIC_API_KEY: _key, ANTHROPIC_AUTH_TOKEN: _token, ...env } = spawnEnv() as Record<string, string>;
+  return env;
+}
 export const RETRY_LOG_LINE = "— riprova —";
 
 /**
@@ -80,30 +92,36 @@ export class TaskQueue {
     const task = this.deps.tasks.get(id);
     if (!task || task.status !== "queued") return;
     this.write(id, { status: "running" });
+    // Held here, not in execute: a ticket created before something threw still exists on
+    // Linear, and reporting that as a failure would invite a retry that files it twice.
+    const outcome: { created: Created | null } = { created: null };
+    const onCreated = (r: Created) => {
+      outcome.created = r;
+    };
+    let failure: string;
     try {
-      const outcome = await this.execute(task);
-      if (outcome.created) {
-        this.write(id, { status: "done", result: outcome.created, error: null });
-        void this.deps.tickets.refresh();
-      } else {
-        this.write(id, { status: "failed", error: outcome.resultText || "nessun ticket creato" });
-      }
+      failure = (await this.execute(task, onCreated)) || "nessun ticket creato";
     } catch (err) {
-      this.write(id, { status: "failed", error: errorMessage(err) });
+      failure = errorMessage(err);
+      if (outcome.created) this.appendLog(id, [`errore dopo la creazione: ${failure}`]);
+    }
+    if (outcome.created) {
+      this.write(id, { status: "done", result: outcome.created, error: null });
+      void this.deps.tickets.refresh();
+    } else {
+      this.write(id, { status: "failed", error: failure });
     }
   }
 
-  private async execute(task: TaskRecord): Promise<{ created: { identifier: string; url: string } | null; resultText: string }> {
+  /** Runs the agent; answers the `result` text, which matters only when nothing was created. */
+  private async execute(task: TaskRecord, onCreated: (r: Created) => void): Promise<string> {
     const { project: name, note, imageUrls } = task.input;
     const project = this.deps.projects.get(name);
     if (!project) throw new Error(`progetto sconosciuto: ${name}`);
     const images = await Promise.all(imageUrls.map((u) => this.deps.fetchImage(u)));
     const message = buildCreateTicketMessage({ teamKey: project.teamKey, project: name, note, imageUrls }, images);
+    const mcp = createLinearMcp(this.deps.linear, { teamKey: project.teamKey, project: name }, onCreated);
 
-    let created: { identifier: string; url: string } | null = null;
-    const mcp = createLinearMcp(this.deps.linear, (r) => {
-      created = r;
-    });
     let resultText = "";
     const stream = this.deps.query({
       prompt: (async function* () {
@@ -117,8 +135,7 @@ export class TaskQueue {
         mcpServers: { [LINEAR_MCP_NAME]: mcp },
         allowedTools: [`${TOOL_PREFIX}*`],
         maxTurns: 10,
-        // Replaces the claude process's environment outright: Mojito's own credentials stay here.
-        env: spawnEnv(),
+        env: agentEnv(),
       },
     });
     for await (const m of stream) {
@@ -133,6 +150,6 @@ export class TaskQueue {
         resultText = m.subtype === "success" ? m.result : m.errors.join("; ") || m.subtype;
       }
     }
-    return { created, resultText };
+    return resultText;
   }
 }

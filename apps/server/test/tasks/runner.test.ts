@@ -73,6 +73,8 @@ const settled = async (tasks: TasksRepo, id: string) =>
 
 afterEach(() => {
   delete process.env.LINEAR_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
+  delete process.env.ANTHROPIC_AUTH_TOKEN;
 });
 
 describe("TaskQueue", () => {
@@ -95,6 +97,8 @@ describe("TaskQueue", () => {
 
   it("passes the isolated options and a scrubbed environment to query", async () => {
     process.env.LINEAR_API_KEY = "lin_secret";
+    process.env.ANTHROPIC_API_KEY = "sk-ant-secret";
+    process.env.ANTHROPIC_AUTH_TOKEN = "tok-secret";
     const { tasks, queue, add, query } = setup();
     add("t1");
     queue.enqueue("t1");
@@ -111,6 +115,9 @@ describe("TaskQueue", () => {
     expect(Object.keys(options.mcpServers!)).toEqual(["mojito-linear"]);
     expect(options.env).toBeDefined();
     expect(options.env).not.toHaveProperty("LINEAR_API_KEY");
+    expect(options.env).not.toHaveProperty("ANTHROPIC_API_KEY");
+    expect(options.env).not.toHaveProperty("ANTHROPIC_AUTH_TOKEN");
+    expect(options.env).toHaveProperty("PATH");
   });
 
   it("downloads the images and hands them to the model", async () => {
@@ -148,6 +155,24 @@ describe("TaskQueue", () => {
     queue.enqueue("t1");
     await settled(tasks, "t1");
     expect(tasks.get("t1")).toMatchObject({ status: "failed", error: "nessun ticket creato" });
+  });
+
+  it("is done, not failed, when the ticket was created before something threw", async () => {
+    const { tasks, queue, add, tickets, linear } = setup({
+      query: async function* (p) {
+        yield* creatingModel(p);
+        throw new Error("process exited with code 1");
+      },
+    });
+    add("t1");
+    queue.enqueue("t1");
+    await settled(tasks, "t1");
+    const t = tasks.get("t1")!;
+    expect(t).toMatchObject({ status: "done", error: null, result: { identifier: "RIC-9", url: "https://linear.app/x/issue/RIC-9" } });
+    expect(t.log).toContain("errore dopo la creazione: process exited with code 1");
+    expect(tickets.refresh).toHaveBeenCalled();
+    expect(queue.retry("t1")).toBe(false);
+    expect(linear.createIssue).toHaveBeenCalledTimes(1);
   });
 
   it("fails with the thrown message", async () => {
