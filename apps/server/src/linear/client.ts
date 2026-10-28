@@ -149,8 +149,8 @@ export class LinearClient {
   /**
    * Issue labels usable on the team: its own and the workspace-level ones (team null). Read from
    * the root `issueLabels` connection because `team.labels` may leave the workspace ones out.
-   * Retired labels are filtered in the query and again here, since a retired label must never
-   * reach the ticket-creating agent.
+   * Retired labels are dropped client-side on the selected `retiredAt` node field: it is not a
+   * field of IssueLabelFilter, so the query cannot do it.
    */
   async listLabels(teamKey: string): Promise<{ id: string; name: string }[]> {
     const data = await this.query<{
@@ -160,7 +160,6 @@ export class LinearClient {
         issueLabels(
           filter: {
             or: [{ team: { key: { eq: $key } } }, { team: { null: true } }]
-            retiredAt: { null: true }
           }
           first: 250
         ) { nodes { id name retiredAt } }

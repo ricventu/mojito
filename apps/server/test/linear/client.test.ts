@@ -251,7 +251,8 @@ describe("LinearClient.listTeamStates / listLabels", () => {
     const q = calls[0].body.query.replace(/\s+/g, " ");
     expect(q).toContain("issueLabels(");
     expect(q).toContain("or: [{ team: { key: { eq: $key } } }, { team: { null: true } }]");
-    expect(q).toContain("retiredAt: { null: true }");
+    expect(q).not.toContain("retiredAt: {");
+    expect(q).toContain("nodes { id name retiredAt }");
     expect(calls[0].body.variables).toEqual({ key: "RIC" });
   });
 });
