@@ -24,9 +24,9 @@ export function Toolbar({ sessions, onNewTicket, onNewSession }: Props) {
             size="sm"
             className="bg-amber-500 text-amber-950 hover:bg-amber-500/90"
           >
-            <Link to={`/session/${encodeURIComponent(waiting[0].id)}`} aria-label={`${waiting.length} sessioni attendono una risposta`}>
+            <Link to={`/session/${encodeURIComponent(waiting[0].id)}`} aria-label={`${waiting.length} sessions waiting for a reply`}>
               {waiting.length}
-              <span className="max-[420px]:sr-only">in attesa</span>
+              <span className="max-[420px]:sr-only">waiting</span>
             </Link>
           </Button>
         )}
@@ -34,10 +34,10 @@ export function Toolbar({ sessions, onNewTicket, onNewSession }: Props) {
           <Plus size={14} /> Ticket
         </Button>
         <Button variant="outline" size="sm" onClick={onNewSession}>
-          <SquareTerminal size={14} /> Sessione
+          <SquareTerminal size={14} /> Session
         </Button>
         <Button asChild variant="ghost" size="icon-sm">
-          <Link to="/settings" aria-label="Impostazioni">
+          <Link to="/settings" aria-label="Settings">
             <Settings size={16} />
           </Link>
         </Button>

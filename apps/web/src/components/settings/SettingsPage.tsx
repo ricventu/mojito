@@ -16,7 +16,7 @@ export function SettingsPage() {
               <ArrowLeft size={16} /> Board
             </Link>
           </Button>
-          <h1 className="min-w-0 flex-1 truncate text-base font-semibold">Impostazioni</h1>
+          <h1 className="min-w-0 flex-1 truncate text-base font-semibold">Settings</h1>
         </header>
         <ProjectsCard />
         <DefaultsCard />

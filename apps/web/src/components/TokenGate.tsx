@@ -26,7 +26,7 @@ export function TokenGate({ children }: { children: ReactNode }) {
           <CardTitle className="flex items-center gap-2">
             <KeyRound size={18} /> Mojito
           </CardTitle>
-          <CardDescription>Inserisci il token di accesso per continuare.</CardDescription>
+          <CardDescription>Enter the access token to continue.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="flex flex-col gap-4">
@@ -42,7 +42,7 @@ export function TokenGate({ children }: { children: ReactNode }) {
                 onChange={(e) => setDraft(e.target.value)}
               />
             </div>
-            <Button type="submit" disabled={!draft.trim()}>Entra</Button>
+            <Button type="submit" disabled={!draft.trim()}>Sign in</Button>
           </form>
         </CardContent>
       </Card>

@@ -168,7 +168,7 @@ describe("launchTicket", () => {
       linear: { setStatus: vi.fn(async () => { throw new Error("boom"); }), assignToMe: vi.fn(async () => {}) },
     });
     const res = await launchTicket(body(), deps);
-    expect(res).toMatchObject({ ok: true, warning: "Stato su Linear non aggiornato: boom" });
+    expect(res).toMatchObject({ ok: true, warning: "Linear status not updated: boom" });
     expect(deps.linear.assignToMe).toHaveBeenCalledWith("RIC-1");
     expect(sessions.get("mj-RIC-1")?.state).toBe("starting");
   });
@@ -309,7 +309,7 @@ describe("launchTicket", () => {
     const { deps, sessions } = setup();
     await launchTicket(body(), deps);
     await vi.advanceTimersByTimeAsync(STALL_GRACE_MS);
-    expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "needs-input", alert: "apri il terminale e rispondi" });
+    expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "needs-input", alert: "open the terminal and answer" });
   });
 });
 

@@ -34,14 +34,14 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
       <header className="flex items-center gap-2">
         <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{name}</h2>
         {project !== null && (
-          <Button variant="ghost" size="icon-sm" aria-label={`Nuovo ticket in ${name}`} onClick={() => onNewTicket(project)}>
+          <Button variant="ghost" size="icon-sm" aria-label={`New ticket in ${name}`} onClick={() => onNewTicket(project)}>
             <Plus size={16} />
           </Button>
         )}
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label={`Nuova sessione in ${name}`}
+          aria-label={`New session in ${name}`}
           onClick={() => onNewSession(project ?? undefined)}
         >
           <SquareTerminal size={16} />

@@ -19,14 +19,14 @@ describe("validateImages", () => {
     expect(validateImages(Array.from({ length: 10 }, () => img()))).toEqual({ ok: true });
     expect(validateImages(Array.from({ length: 11 }, () => img()))).toEqual({
       ok: false,
-      error: "troppe immagini (max 10)",
+      error: "too many images (max 10)",
     });
   });
 
   it("refuses a type outside the four", () => {
     expect(validateImages([img({ type: "application/pdf" })])).toEqual({
       ok: false,
-      error: "tipo non supportato: application/pdf",
+      error: "unsupported type: application/pdf",
     });
   });
 
@@ -34,7 +34,7 @@ describe("validateImages", () => {
     expect(validateImages([img({ size: MAX_IMAGE_BYTES })])).toEqual({ ok: true });
     expect(validateImages([img({ name: "big.png", size: MAX_IMAGE_BYTES + 1 })])).toEqual({
       ok: false,
-      error: "immagine troppo grande: big.png",
+      error: "image too large: big.png",
     });
   });
 });

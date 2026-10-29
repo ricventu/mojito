@@ -66,12 +66,12 @@ describe("handleHook", () => {
     const { sessions, events, deps } = setup(meta());
     handleHook("mj-RIC-1", "PermissionRequest", deps);
     const row = sessions.get("mj-RIC-1");
-    expect(row).toMatchObject({ state: "needs-input", alert: "claude chiede un permesso", lastEventAt: 500 });
+    expect(row).toMatchObject({ state: "needs-input", alert: "claude is asking for a permission", lastEventAt: 500 });
     expect(events).toEqual([{ type: "session.updated", session: row }]);
   });
 
   it("clears the alert when the session resumes", () => {
-    const { sessions, deps } = setup(meta({ state: "needs-input", alert: "claude ti sta aspettando" }));
+    const { sessions, deps } = setup(meta({ state: "needs-input", alert: "claude is waiting for you" }));
     handleHook("mj-RIC-1", "PostToolUse", deps);
     expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "running", alert: null });
   });
@@ -116,7 +116,7 @@ describe("handleHook", () => {
   ])("turns a Notification for %s into needs-input", (_label, body) => {
     const { sessions, deps } = setup(meta({ state: "idle" }));
     handleHook("mj-RIC-1", "Notification", deps, body);
-    expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "needs-input", alert: "claude ti sta aspettando" });
+    expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "needs-input", alert: "claude is waiting for you" });
   });
 
   it.each([

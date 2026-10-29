@@ -15,11 +15,11 @@ import { Label } from "@/components/ui/label";
 import { apiJson } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 
-/** Italian text for the field a client-side check rejected; the server's own messages are shown as they come. */
+/** User-facing text for the field a client-side check rejected; the server's own messages are shown as they come. */
 const FIELD_ERRORS: Record<string, string> = {
-  name: "Il nome è obbligatorio.",
-  path: "Il percorso deve essere assoluto (inizia con / o ~/).",
-  teamKey: "La chiave del team va scritta in maiuscolo, ad esempio RIC.",
+  name: "The name is required.",
+  path: "The path must be absolute (start it with / or ~/).",
+  teamKey: "The team key must be uppercase, for example RIC.",
 };
 
 interface Props {
@@ -54,7 +54,7 @@ function Form({ project, onClose }: Props) {
     const parsed = ProjectBody.safeParse({ name: name.trim(), path: path.trim(), teamKey: teamKey.trim() });
     if (!parsed.success) {
       const field = String(parsed.error.issues[0]?.path[0] ?? "");
-      setError(FIELD_ERRORS[field] ?? "Dati non validi.");
+      setError(FIELD_ERRORS[field] ?? "Invalid data.");
       return;
     }
     setError(null);
@@ -64,20 +64,20 @@ function Form({ project, onClose }: Props) {
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
       <DialogHeader>
-        <DialogTitle>{project ? "Modifica progetto" : "Nuovo progetto"}</DialogTitle>
-        <DialogDescription>Il nome è quello del progetto su Linear; il percorso è la cartella del repo.</DialogDescription>
+        <DialogTitle>{project ? "Edit project" : "New project"}</DialogTitle>
+        <DialogDescription>The name is the Linear project's; the path is the repo folder.</DialogDescription>
       </DialogHeader>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="project-name">Nome</Label>
+        <Label htmlFor="project-name">Name</Label>
         <Input id="project-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
       </div>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="project-path">Percorso</Label>
+        <Label htmlFor="project-path">Path</Label>
         <Input
           id="project-path"
           value={path}
           onChange={(e) => setPath(e.target.value)}
-          placeholder="~/code/progetto"
+          placeholder="~/code/project"
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
@@ -104,10 +104,10 @@ function Form({ project, onClose }: Props) {
       )}
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onClose}>
-          Annulla
+          Cancel
         </Button>
         <Button type="submit" disabled={save.isPending}>
-          {save.isPending ? "Salvataggio…" : "Salva"}
+          {save.isPending ? "Saving…" : "Save"}
         </Button>
       </DialogFooter>
     </form>

@@ -33,12 +33,12 @@ export function RouteError() {
   if (action === "reload") return null;
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-3 px-4 pt-[var(--sat)] pb-[var(--sab)]">
-      <h1 className="text-base font-semibold">Qualcosa è andato storto</h1>
+      <h1 className="text-base font-semibold">Something went wrong</h1>
       <p className="text-sm break-words text-muted-foreground">
-        {error instanceof Error ? error.message : "Errore imprevisto nel caricare la pagina."}
+        {error instanceof Error ? error.message : "Unexpected error while loading the page."}
       </p>
       <a href="/" className="text-sm font-medium underline underline-offset-2">
-        Torna alla board
+        Back to the board
       </a>
     </div>
   );

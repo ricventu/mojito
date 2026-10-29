@@ -208,11 +208,11 @@ describe("linearBanner", () => {
   it("names the time of the last good data when the list is stale", () => {
     const at = new Date(2026, 9, 28, 9, 5).getTime();
     expect(linearBanner({ ...base, fetchedAt: at, stale: true, error: "boom" })).toBe(
-      "Linear non raggiungibile — dati delle 09:05",
+      "Linear unreachable — data from 09:05",
     );
   });
 
   it("gives the error when there never was any data", () => {
-    expect(linearBanner({ ...base, error: "401 unauthorized" })).toBe("Linear non raggiungibile: 401 unauthorized");
+    expect(linearBanner({ ...base, error: "401 unauthorized" })).toBe("Linear unreachable: 401 unauthorized");
   });
 });

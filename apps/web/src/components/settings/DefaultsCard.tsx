@@ -25,7 +25,7 @@ function Form({ settings }: { settings: Settings }) {
     mutationFn: (body: SettingsBody) => apiJson<Settings>("/api/settings", "PUT", body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.settings });
-      toast.success("Impostazioni salvate");
+      toast.success("Settings saved");
     },
     onError: (e) => setError(e.message),
   });
@@ -38,7 +38,7 @@ function Form({ settings }: { settings: Settings }) {
     e.preventDefault();
     const parsed = SettingsBody.safeParse({ statusDefaults: defaults, brainstormingDefault: brainstorming });
     if (!parsed.success) {
-      setError("Valori non validi.");
+      setError("Invalid values.");
       return;
     }
     setError(null);
@@ -62,8 +62,8 @@ function Form({ settings }: { settings: Settings }) {
         ))}
         <div className="flex items-center justify-between gap-3 border-t pt-4">
           <div className="min-w-0">
-            <Label htmlFor="default-brainstorming">Brainstorming di default</Label>
-            <p className="text-xs text-muted-foreground">Nuovi lanci di ticket partono con il brainstorming attivo.</p>
+            <Label htmlFor="default-brainstorming">Brainstorming by default</Label>
+            <p className="text-xs text-muted-foreground">New ticket launches start with brainstorming on.</p>
           </div>
           <Switch id="default-brainstorming" checked={brainstorming} onCheckedChange={setBrainstorming} />
         </div>
@@ -75,7 +75,7 @@ function Form({ settings }: { settings: Settings }) {
       </CardContent>
       <CardFooter className="mt-4">
         <Button type="submit" disabled={save.isPending}>
-          {save.isPending ? "Salvataggio…" : "Salva"}
+          {save.isPending ? "Saving…" : "Save"}
         </Button>
       </CardFooter>
     </form>
@@ -88,8 +88,8 @@ export function DefaultsCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Default per stato</CardTitle>
-        <CardDescription>Modello ed effort con cui parte il lancio di un ticket in quello stato.</CardDescription>
+        <CardTitle>Defaults per status</CardTitle>
+        <CardDescription>The model and effort a ticket in that status launches with.</CardDescription>
       </CardHeader>
       {settings.isError ? (
         <CardContent>
@@ -97,7 +97,7 @@ export function DefaultsCard() {
         </CardContent>
       ) : !settings.data ? (
         <CardContent>
-          <p className="text-sm text-muted-foreground">Caricamento…</p>
+          <p className="text-sm text-muted-foreground">Loading…</p>
         </CardContent>
       ) : (
         <Form settings={settings.data} />

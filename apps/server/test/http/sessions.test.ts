@@ -99,7 +99,7 @@ describe("DELETE /api/sessions/:id", () => {
     closeSession.mockResolvedValue({ closed: false });
     const res = await req("/api/sessions/mj-RIC-1", { method: "DELETE" });
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "claude non si è chiuso: apri il terminale" });
+    expect(await res.json()).toEqual({ error: "claude did not exit: open the terminal" });
     expect(sessions.get("mj-RIC-1")?.state).toBe("running");
   });
 

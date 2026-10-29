@@ -6,9 +6,9 @@ describe("mapHook", () => {
     ["SessionStart", "running", null],
     ["UserPromptSubmit", "running", null],
     ["PostToolUse", "running", null],
-    ["PermissionRequest", "needs-input", "claude chiede un permesso"],
-    ["Notification", "needs-input", "claude ti sta aspettando"],
-    ["PreToolUse", "needs-input", "claude ti fa una domanda"],
+    ["PermissionRequest", "needs-input", "claude is asking for a permission"],
+    ["Notification", "needs-input", "claude is waiting for you"],
+    ["PreToolUse", "needs-input", "claude is asking you a question"],
     ["Stop", "idle", null],
     ["SessionEnd", "ended", null],
   ] as const)("%s from running -> %s", (event, state, alert) => {

@@ -56,10 +56,10 @@ export function NewTicketSheet({ project: preselected, onClose }: Props) {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.tasks });
-      toast.success("Ticket in creazione");
+      toast.success("Creating the ticket");
       onClose();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Creazione non riuscita"),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Create failed"),
   });
 
   const onPaste = (e: ClipboardEvent) => {
@@ -81,15 +81,15 @@ export function NewTicketSheet({ project: preselected, onClose }: Props) {
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="bottom" className={SHEET_CONTENT_CLASS}>
         <SheetHeader className="pr-12">
-          <SheetTitle>Nuovo ticket</SheetTitle>
-          <SheetDescription>Scrivi una nota: titolo e descrizione li prepara Claude.</SheetDescription>
+          <SheetTitle>New ticket</SheetTitle>
+          <SheetDescription>Write a note: Claude drafts the title and description.</SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-4 px-4">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="new-ticket-project">Progetto</Label>
+            <Label htmlFor="new-ticket-project">Project</Label>
             <Select value={project} onValueChange={setProject}>
               <SelectTrigger id="new-ticket-project" className="w-full">
-                <SelectValue placeholder="Scegli un progetto" />
+                <SelectValue placeholder="Choose a project" />
               </SelectTrigger>
               <SelectContent>
                 {(projects.data ?? []).map((p) => (
@@ -110,14 +110,14 @@ export function NewTicketSheet({ project: preselected, onClose }: Props) {
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
           >
-            <Label htmlFor="new-ticket-note">Nota</Label>
+            <Label htmlFor="new-ticket-note">Note</Label>
             <Textarea
               id="new-ticket-note"
               rows={6}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               onPaste={onPaste}
-              placeholder="Cosa va fatto? Puoi incollare o trascinare immagini."
+              placeholder="What needs doing? You can paste or drop images."
             />
           </div>
 
@@ -134,7 +134,7 @@ export function NewTicketSheet({ project: preselected, onClose }: Props) {
               }}
             />
             <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => input.current?.click()}>
-              <ImagePlus size={14} /> Aggiungi immagini
+              <ImagePlus size={14} /> Add images
             </Button>
             {files.length > 0 && (
               <ul className="flex flex-wrap gap-2">
@@ -143,7 +143,7 @@ export function NewTicketSheet({ project: preselected, onClose }: Props) {
                     <img src={previews[i]} alt={f.name} className="size-full object-cover" />
                     <button
                       type="button"
-                      aria-label={`Rimuovi ${f.name}`}
+                      aria-label={`Remove ${f.name}`}
                       onClick={() => setFiles(files.filter((_, j) => j !== i))}
                       className="absolute top-0.5 right-0.5 rounded-full bg-background/90 p-0.5 shadow outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                     >
@@ -156,7 +156,7 @@ export function NewTicketSheet({ project: preselected, onClose }: Props) {
           </div>
 
           <Button disabled={!canCreate} onClick={() => create.mutate()}>
-            {create.isPending ? "Creazione…" : "Crea"}
+            {create.isPending ? "Creating…" : "Create"}
           </Button>
         </div>
       </SheetContent>

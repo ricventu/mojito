@@ -37,7 +37,7 @@ function agentEnv(): Record<string, string> {
   const { ANTHROPIC_API_KEY: _key, ANTHROPIC_AUTH_TOKEN: _token, ...env } = spawnEnv() as Record<string, string>;
   return env;
 }
-export const RETRY_LOG_LINE = "— riprova —";
+export const RETRY_LOG_LINE = "— retry —";
 
 /**
  * Runs create-ticket tasks on the Agent SDK, at most `concurrency` at once, in enqueue order.
@@ -100,10 +100,10 @@ export class TaskQueue {
     };
     let failure: string;
     try {
-      failure = (await this.execute(task, onCreated)) || "nessun ticket creato";
+      failure = (await this.execute(task, onCreated)) || "no ticket created";
     } catch (err) {
       failure = errorMessage(err);
-      if (outcome.created) this.appendLog(id, [`errore dopo la creazione: ${failure}`]);
+      if (outcome.created) this.appendLog(id, [`error after creation: ${failure}`]);
     }
     if (outcome.created) {
       this.write(id, { status: "done", result: outcome.created, error: null });
@@ -117,7 +117,7 @@ export class TaskQueue {
   private async execute(task: TaskRecord, onCreated: (r: Created) => void): Promise<string> {
     const { project: name, note, imageUrls } = task.input;
     const project = this.deps.projects.get(name);
-    if (!project) throw new Error(`progetto sconosciuto: ${name}`);
+    if (!project) throw new Error(`unknown project: ${name}`);
     const images = await Promise.all(imageUrls.map((u) => this.deps.fetchImage(u)));
     const message = buildCreateTicketMessage({ teamKey: project.teamKey, project: name, note, imageUrls }, images);
     const mcp = createLinearMcp(this.deps.linear, { teamKey: project.teamKey, project: name }, onCreated);

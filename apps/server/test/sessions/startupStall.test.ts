@@ -47,7 +47,7 @@ describe("watchStartupStall", () => {
     expect(hasSession).toHaveBeenCalledWith("mj-RIC-1");
     const row = sessions.get("mj-RIC-1");
     expect(row?.state).toBe("needs-input");
-    expect(row?.alert).toBe("apri il terminale e rispondi");
+    expect(row?.alert).toBe("open the terminal and answer");
     expect(events).toEqual([{ type: "session.updated", session: row }]);
   });
 

@@ -31,16 +31,16 @@ Create the issue with \`create_issue\`, once, on the team and the project the me
 names. Then print the identifier and the url of what you created and stop — there is
 nothing to implement here.
 
-Non fare domande: se la nota è vaga, crea un ticket fedele a ciò che dice.`;
+Do not ask questions: if the note is vague, create a ticket faithful to what it says.`;
 
 /**
  * Only with images (cf. `INTAKE_IMAGES_PARAGRAPH`): told to embed an empty list, a model either
  * goes looking for images that do not exist or leaves an empty attachments heading behind.
  */
 const imagesParagraph = (urls: string[]) =>
-  `Le immagini allegate a questo messaggio sono quelle allegate alla nota. Mojito le ha già
-caricate su Linear, quindi non c'è nulla da caricare: incorporale in fondo alla
-descrizione come markdown, esattamente così:
+  `The images attached to this message are the ones attached to the note. Mojito has already
+uploaded them to Linear, so there is nothing to upload: embed them at the end of the
+description as markdown, exactly like this:
 
 ${urls.map((u) => `![](${u})`).join("\n")}`;
 
@@ -48,7 +48,7 @@ export function buildCreateTicketMessage(
   input: { teamKey: string; project: string; note: string; imageUrls: string[] },
   images: { mediaType: string; base64: string }[],
 ): SDKUserMessage {
-  const parts = [`Team: ${input.teamKey}\nProgetto: ${input.project}\n\nNota:\n${input.note}`];
+  const parts = [`Team: ${input.teamKey}\nProject: ${input.project}\n\nNote:\n${input.note}`];
   if (input.imageUrls.length > 0) parts.push(imagesParagraph(input.imageUrls));
   // An image whose download came back with a type the API does not take is left out of the
   // model's view; its url is still embedded in the description.

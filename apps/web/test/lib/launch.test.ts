@@ -41,7 +41,7 @@ describe("initialLaunchOptions", () => {
 
 describe("launchErrorAction", () => {
   it("opens the live session on a 409 that names it", () => {
-    const err = new ApiError(409, "già attiva", { error: "già attiva", sessionId: "mj-RIC-1" });
+    const err = new ApiError(409, "already live", { error: "already live", sessionId: "mj-RIC-1" });
     expect(launchErrorAction(err)).toEqual({ kind: "open", sessionId: "mj-RIC-1" });
   });
 

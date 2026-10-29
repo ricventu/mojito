@@ -38,7 +38,7 @@ function StatusField({ ticket, teamKey }: { ticket: TicketSummary; teamKey: stri
       apiJson<unknown>(`/api/tickets/${encodeURIComponent(ticket.identifier)}/status`, "POST", { status: next }),
     onError: (e, _next, previous) => {
       setStatus(previous as string);
-      toast.error(errorMessage(e, "Cambio di stato non riuscito"));
+      toast.error(errorMessage(e, "Status change failed"));
     },
     onSettled: () => qc.invalidateQueries({ queryKey: qk.tickets }),
     onMutate: () => status,
@@ -49,7 +49,7 @@ function StatusField({ ticket, teamKey }: { ticket: TicketSummary; teamKey: stri
 
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor="ticket-status">Stato</Label>
+      <Label htmlFor="ticket-status">Status</Label>
       <Select
         value={status}
         onValueChange={(next) => {
@@ -72,7 +72,7 @@ function StatusField({ ticket, teamKey }: { ticket: TicketSummary; teamKey: stri
   );
 }
 
-/** Model, effort and brainstorming, then Avvia. Disabled while the request is in flight: a double tap is one POST. */
+/** Model, effort and brainstorming, then Launch. Disabled while the request is in flight: a double tap is one POST. */
 function LaunchForm({ ticket, settings, onClose }: { ticket: TicketSummary; settings: Settings; onClose: () => void }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -98,7 +98,7 @@ function LaunchForm({ ticket, settings, onClose }: { ticket: TicketSummary; sett
       navigate(sessionPath(session.id));
     },
     onError: (e) => {
-      const action = e instanceof ApiError ? launchErrorAction(e) : { kind: "toast" as const, message: errorMessage(e, "Avvio non riuscito") };
+      const action = e instanceof ApiError ? launchErrorAction(e) : { kind: "toast" as const, message: errorMessage(e, "Launch failed") };
       if (action.kind === "open") {
         onClose();
         navigate(sessionPath(action.sessionId));
@@ -116,7 +116,7 @@ function LaunchForm({ ticket, settings, onClose }: { ticket: TicketSummary; sett
         <Switch id="ticket-brainstorming" checked={brainstorming} onCheckedChange={setBrainstorming} />
       </div>
       <Button disabled={launch.isPending} onClick={() => launch.mutate()}>
-        <Play size={16} /> {launch.isPending ? "Avvio…" : "Avvia"}
+        <Play size={16} /> {launch.isPending ? "Launching…" : "Launch"}
       </Button>
     </div>
   );
@@ -129,17 +129,17 @@ function LiveSession({ ticket, session, onClose }: { ticket: TicketSummary; sess
   const kill = useMutation({
     mutationFn: () => apiFetch<unknown>(`/api/sessions/${encodeURIComponent(session.id)}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Sessione terminata");
+      toast.success("Session ended");
       void qc.invalidateQueries({ queryKey: qk.sessions });
     },
     // A 409 means claude would not leave: the session is untouched, its terminal is the way in.
-    onError: (e) => toast.error(errorMessage(e, "Kill non riuscito")),
+    onError: (e) => toast.error(errorMessage(e, "Kill failed")),
   });
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2 text-sm">
-        <span className="text-muted-foreground">Sessione</span>
+        <span className="text-muted-foreground">Session</span>
         <StateBadge state={session.state} />
       </div>
       <div className="flex gap-2">
@@ -150,13 +150,13 @@ function LiveSession({ ticket, session, onClose }: { ticket: TicketSummary; sess
             navigate(sessionPath(session.id));
           }}
         >
-          <SquareTerminal size={16} /> Apri terminale
+          <SquareTerminal size={16} /> Open terminal
         </Button>
         <Button
           variant="outline"
           disabled={kill.isPending}
           onClick={() => {
-            if (window.confirm(`Terminare la sessione di ${ticket.identifier}?`)) kill.mutate();
+            if (window.confirm(`Kill the ${ticket.identifier} session?`)) kill.mutate();
           }}
         >
           <Trash2 size={16} /> Kill
@@ -193,7 +193,7 @@ export function TicketSheet({ ticket, onClose }: Props) {
             {ticket.identifier}
           </a>
           <SheetTitle className="leading-snug break-words">{ticket.title}</SheetTitle>
-          <SheetDescription className="sr-only">Stato e avvio della sessione per {ticket.identifier}</SheetDescription>
+          <SheetDescription className="sr-only">Status and session launch for {ticket.identifier}</SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-5 px-4">
           <StatusField ticket={ticket} teamKey={teamKey} />
@@ -203,7 +203,7 @@ export function TicketSheet({ ticket, onClose }: Props) {
             <LaunchForm ticket={ticket} settings={settings.data} onClose={onClose} />
           ) : (
             <p className="text-sm text-muted-foreground">
-              {settings.error ? errorMessage(settings.error, "Impostazioni non disponibili") : "Caricamento…"}
+              {settings.error ? errorMessage(settings.error, "Settings unavailable") : "Loading…"}
             </p>
           )}
         </div>

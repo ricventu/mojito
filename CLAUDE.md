@@ -59,7 +59,7 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   write hook settings (`<stateDir>/hooks/<id>.json`, mode 0600) → `newSession` → insert row
   `starting` → stall watch → Linear writes (In Progress + assign; failures become a
   `warning`, never fail the launch). Ticket id `mj-<TICKET>`, free sessions `mj-<slug>-<hex6>`.
-- **The prompt** (`sessions/prompt.ts`) is the whole instruction, in Italian, pinned
+- **The prompt** (`sessions/prompt.ts`) is the whole instruction, in English, pinned
   byte-for-byte by its test: read ticket X from Linear and execute it; when ready for
   review, move it to "In Review" on Linear; with brainstorming, one extra line asking for
   `superpowers:brainstorming`. Nothing else — the session decides branches/worktrees itself.
@@ -114,7 +114,9 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   `restoreTerminalPlatform` is not ported; a dev-only warning fires if that ever changes.
 - Safe areas: `--sat/--sar/--sab/--sal` in `index.css`; every edge surface pays its inset;
   `test/safeArea.test.ts` guards it.
-- Copy is Italian. Only Tailwind utilities + shadcn components; icons are lucide with `size`.
+- Copy is English, like everything else in v2 (code, comments, server messages, agent
+  prompts); the only Italian left is the create-ticket agent's output (tickets on Linear).
+  Only Tailwind utilities + shadcn components; icons are lucide with `size`.
 
 ## Commands
 

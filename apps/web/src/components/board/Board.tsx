@@ -58,15 +58,15 @@ export function Board() {
       <main className="mx-auto flex max-w-3xl flex-col gap-4 px-4 pt-3 pr-[max(1rem,var(--sar))] pb-6 pl-[max(1rem,var(--sal))]">
         {banner && <Banner text={banner} />}
         {refreshError && (
-          <Banner text={`Aggiornamento non riuscito: ${refreshError instanceof Error ? refreshError.message : "errore"}`} />
+          <Banner text={`Refresh failed: ${refreshError instanceof Error ? refreshError.message : "error"}`} />
         )}
         <TaskStrip tasks={tasks.data ?? []} />
         {failure ? (
-          <p className="text-sm text-destructive">{failure instanceof Error ? failure.message : "Errore di caricamento"}</p>
+          <p className="text-sm text-destructive">{failure instanceof Error ? failure.message : "Loading failed"}</p>
         ) : loading ? (
-          <p className="text-sm text-muted-foreground">Caricamento…</p>
+          <p className="text-sm text-muted-foreground">Loading…</p>
         ) : sections.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nessun ticket e nessuna sessione.</p>
+          <p className="text-sm text-muted-foreground">No tickets and no sessions.</p>
         ) : (
           sections.map((section) => (
             <ProjectSection

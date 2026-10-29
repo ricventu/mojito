@@ -5,8 +5,8 @@
  * A test fixes both variants byte for byte.
  */
 export function buildTicketPrompt(ticket: string, brainstorming: boolean): string {
-  const lines = [`Leggi il ticket ${ticket} da Linear ed eseguilo.`];
-  if (brainstorming) lines.push("Prima di implementare, usa la skill superpowers:brainstorming.");
-  lines.push('Quando il lavoro è pronto per la revisione, sposta il ticket in "In Review" su Linear.');
+  const lines = [`Read ticket ${ticket} from Linear and carry it out.`];
+  if (brainstorming) lines.push("Before implementing, use the superpowers:brainstorming skill.");
+  lines.push('When the work is ready for review, move the ticket to "In Review" on Linear.');
   return lines.join("\n");
 }

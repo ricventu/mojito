@@ -7,7 +7,7 @@ import { parseBody } from "../body";
 import { killSession } from "../../sessions/close";
 import { launchFree, launchTicket } from "../../sessions/launch";
 
-const NOT_CLOSED = "claude non si è chiuso: apri il terminale";
+const NOT_CLOSED = "claude did not exit: open the terminal";
 
 export function sessionRoutes(deps: AppDeps): Hono {
   const removeFile = deps.removeFile ?? ((path: string) => rmSync(path, { force: true }));

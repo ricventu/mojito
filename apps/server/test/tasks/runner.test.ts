@@ -15,9 +15,9 @@ const result = (text: string) => ({ type: "result", subtype: "success", is_error
 /** A model that says something, calls create_issue through the real handler, then ends. */
 const creatingModel = async function* (p: Params) {
   for await (const _ of p.prompt as AsyncIterable<unknown>) break;
-  yield assistant([{ type: "text", text: "Creo il ticket." }, { type: "tool_use", name: "mcp__mojito-linear__create_issue", id: "t1", input: {} }]);
+  yield assistant([{ type: "text", text: "Creating the ticket." }, { type: "tool_use", name: "mcp__mojito-linear__create_issue", id: "t1", input: {} }]);
   await callTool(p.options!.mcpServers!["mojito-linear"], "create_issue", { team: "RIC", project: "Web", title: "T", description: "D" });
-  yield result("Creato RIC-9");
+  yield result("Created RIC-9");
 };
 
 function setup(over: { query?: (p: Params) => AsyncGenerator<unknown>; concurrency?: number } = {}) {
@@ -50,7 +50,7 @@ function setup(over: { query?: (p: Params) => AsyncGenerator<unknown>; concurren
     tasks.insert({
       id,
       type: "create-ticket",
-      input: { project: "Web", note: "nota", imageUrls: [], ...input },
+      input: { project: "Web", note: "note", imageUrls: [], ...input },
       status: "queued",
       log: [],
       error: null,
@@ -87,7 +87,7 @@ describe("TaskQueue", () => {
     expect(t.status).toBe("done");
     expect(t.result).toEqual({ identifier: "RIC-9", url: "https://linear.app/x/issue/RIC-9" });
     expect(t.error).toBeNull();
-    expect(t.log).toContain("Creo il ticket.");
+    expect(t.log).toContain("Creating the ticket.");
     expect(t.log).toContain("→ create_issue");
     expect(t.updatedAt).toBe(5000);
     expect(statuses("t1")).toEqual(["running", "done"]);
@@ -139,13 +139,13 @@ describe("TaskQueue", () => {
   it("fails with the result text when no ticket was created", async () => {
     const { tasks, queue, add, tickets } = setup({
       query: async function* () {
-        yield result("La nota è vuota.");
+        yield result("The note is empty.");
       },
     });
     add("t1");
     queue.enqueue("t1");
     await settled(tasks, "t1");
-    expect(tasks.get("t1")).toMatchObject({ status: "failed", error: "La nota è vuota.", result: null });
+    expect(tasks.get("t1")).toMatchObject({ status: "failed", error: "The note is empty.", result: null });
     expect(tickets.refresh).not.toHaveBeenCalled();
   });
 
@@ -154,7 +154,7 @@ describe("TaskQueue", () => {
     add("t1");
     queue.enqueue("t1");
     await settled(tasks, "t1");
-    expect(tasks.get("t1")).toMatchObject({ status: "failed", error: "nessun ticket creato" });
+    expect(tasks.get("t1")).toMatchObject({ status: "failed", error: "no ticket created" });
   });
 
   it("is done, not failed, when the ticket was created before something threw", async () => {
@@ -169,7 +169,7 @@ describe("TaskQueue", () => {
     await settled(tasks, "t1");
     const t = tasks.get("t1")!;
     expect(t).toMatchObject({ status: "done", error: null, result: { identifier: "RIC-9", url: "https://linear.app/x/issue/RIC-9" } });
-    expect(t.log).toContain("errore dopo la creazione: process exited with code 1");
+    expect(t.log).toContain("error after creation: process exited with code 1");
     expect(tickets.refresh).toHaveBeenCalled();
     expect(queue.retry("t1")).toBe(false);
     expect(linear.createIssue).toHaveBeenCalledTimes(1);
@@ -239,7 +239,7 @@ describe("TaskQueue", () => {
     const t = tasks.get("t1")!;
     expect(t.error).toBeNull();
     expect(t.input.imageUrls).toEqual(["https://uploads.linear.app/a.png"]);
-    expect(t.log).toContain("— riprova —");
+    expect(t.log).toContain("— retry —");
     expect(statuses("t1")).toEqual(["running", "failed", "queued", "running", "done"]);
   });
 });

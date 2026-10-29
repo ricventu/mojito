@@ -29,11 +29,11 @@ export function ProjectsCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Progetti</CardTitle>
-        <CardDescription>I repo su cui Mojito lancia le sessioni.</CardDescription>
+        <CardTitle>Projects</CardTitle>
+        <CardDescription>The repos Mojito launches sessions in.</CardDescription>
         <CardAction>
           <Button size="sm" onClick={() => setEditing(null)}>
-            <Plus size={14} /> Aggiungi
+            <Plus size={14} /> Add
           </Button>
         </CardAction>
       </CardHeader>
@@ -41,9 +41,9 @@ export function ProjectsCard() {
         {projects.isError ? (
           <p className="text-sm text-destructive">{projects.error.message}</p>
         ) : !projects.data ? (
-          <p className="text-sm text-muted-foreground">Caricamento…</p>
+          <p className="text-sm text-muted-foreground">Loading…</p>
         ) : projects.data.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nessun progetto configurato.</p>
+          <p className="text-sm text-muted-foreground">No projects configured.</p>
         ) : (
           <ul className="flex flex-col divide-y">
             {projects.data.map((p) => (
@@ -57,16 +57,16 @@ export function ProjectsCard() {
                     {p.path}
                   </div>
                 </div>
-                <Button variant="ghost" size="icon-sm" aria-label={`Modifica ${p.name}`} onClick={() => setEditing(p)}>
+                <Button variant="ghost" size="icon-sm" aria-label={`Edit ${p.name}`} onClick={() => setEditing(p)}>
                   <Pencil size={14} />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={`Elimina ${p.name}`}
+                  aria-label={`Delete ${p.name}`}
                   disabled={remove.isPending}
                   onClick={() => {
-                    if (window.confirm(`Eliminare il progetto ${p.name}?`)) remove.mutate(p.name);
+                    if (window.confirm(`Delete the project ${p.name}?`)) remove.mutate(p.name);
                   }}
                 >
                   <Trash2 size={14} />

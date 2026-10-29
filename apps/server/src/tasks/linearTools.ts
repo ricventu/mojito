@@ -23,12 +23,12 @@ export function createLinearMcp(
   onCreated: (r: { identifier: string; url: string }) => void,
 ): McpSdkServerConfigWithInstance {
   let created: { identifier: string; url: string } | null = null;
-  const wrongTarget = text(`il ticket va creato su ${bound.teamKey}/${bound.project}`, true);
+  const wrongTarget = text(`the ticket must be created on ${bound.teamKey}/${bound.project}`, true);
   return createSdkMcpServer({
     name: LINEAR_MCP_NAME,
     version: "1.0.0",
     tools: [
-      tool("list_labels", "Le label utilizzabili sul team Linear indicato, con il loro id.", { team: z.string().describe("Chiave del team, es. RIC") }, async ({ team }) => {
+      tool("list_labels", "The labels usable on the given Linear team, with their ids.", { team: z.string().describe("Team key, e.g. RIC") }, async ({ team }) => {
         if (team !== bound.teamKey) return wrongTarget;
         try {
           return text(JSON.stringify(await linear.listLabels(team)));
@@ -38,22 +38,22 @@ export function createLinearMcp(
       }),
       tool(
         "create_issue",
-        "Crea il ticket Linear. Da chiamare una sola volta.",
+        "Creates the Linear ticket. Call it once only.",
         {
-          team: z.string().describe("Chiave del team, es. RIC"),
-          project: z.string().describe("Nome del progetto Linear"),
+          team: z.string().describe("Team key, e.g. RIC"),
+          project: z.string().describe("Linear project name"),
           title: z.string(),
           description: z.string().describe("Markdown"),
-          labelId: z.string().optional().describe("Id di una label restituita da list_labels"),
+          labelId: z.string().optional().describe("Id of a label returned by list_labels"),
         },
         async ({ team, project, title, description, labelId }) => {
-          if (created) return text(`ticket già creato: ${created.identifier} ${created.url}`, true);
+          if (created) return text(`ticket already created: ${created.identifier} ${created.url}`, true);
           if (team !== bound.teamKey || project !== bound.project) return wrongTarget;
           try {
             const r = await linear.createIssue({ teamKey: team, project, title, description, ...(labelId ? { labelId } : {}) });
             created = r;
             onCreated(r);
-            return text(`Creato ${r.identifier}: ${r.url}`);
+            return text(`Created ${r.identifier}: ${r.url}`);
           } catch (err) {
             return text(errorMessage(err), true);
           }

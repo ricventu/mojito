@@ -53,8 +53,8 @@ export function AccessoryBar({ term, onCompose, onCopy, keyboardOpen }: Props) {
         variant="outline"
         size="icon"
         className="shrink-0"
-        aria-label="Componi"
-        title="Componi (dettatura, incolla, sposta il cursore)"
+        aria-label="Compose"
+        title="Compose (dictation, paste, moving the caret)"
         onClick={onCompose}
       >
         <SquarePen size={16} aria-hidden="true" />
@@ -76,8 +76,8 @@ export function AccessoryBar({ term, onCompose, onCopy, keyboardOpen }: Props) {
         variant="outline"
         size="icon"
         className="shrink-0"
-        aria-label="Copia testo"
-        title="Copia testo (tieni premuto per copiare)"
+        aria-label="Copy text"
+        title="Copy text (long-press to copy)"
         onClick={onCopy}
       >
         <Copy size={16} aria-hidden="true" />

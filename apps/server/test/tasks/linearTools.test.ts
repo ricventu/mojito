@@ -80,11 +80,11 @@ describe("createLinearMcp", () => {
     const mcp = createLinearMcp(linear, BOUND, onCreated);
     for (const target of [
       { team: "OPS", project: "Web" },
-      { team: "RIC", project: "Altro" },
+      { team: "RIC", project: "Other" },
     ]) {
       const res = await callTool(mcp, "create_issue", { ...target, title: "T", description: "D" });
       expect(res.isError).toBe(true);
-      expect(res.content[0].text).toBe("il ticket va creato su RIC/Web");
+      expect(res.content[0].text).toBe("the ticket must be created on RIC/Web");
     }
     expect(linear.createIssue).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
@@ -98,7 +98,7 @@ describe("createLinearMcp", () => {
     const linear = fakeLinear();
     const res = await callTool(createLinearMcp(linear, BOUND, () => {}), "list_labels", { team: "OPS" });
     expect(res.isError).toBe(true);
-    expect(res.content[0].text).toBe("il ticket va creato su RIC/Web");
+    expect(res.content[0].text).toBe("the ticket must be created on RIC/Web");
     expect(linear.listLabels).not.toHaveBeenCalled();
   });
 });

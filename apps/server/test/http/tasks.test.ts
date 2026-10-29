@@ -37,13 +37,13 @@ describe("POST /api/tasks", () => {
   it("uploads the images, stores the task queued and enqueues it", async () => {
     const { post, linear, tasks, taskQueue } = withProject();
     linear.uploadImage.mockResolvedValueOnce("https://uploads.linear.app/1").mockResolvedValueOnce("https://uploads.linear.app/2");
-    const res = await post(form({ project: "Web", note: "  il salva non va  ", images: [png("a.png"), png("b.png")] }));
+    const res = await post(form({ project: "Web", note: "  the save button is broken  ", images: [png("a.png"), png("b.png")] }));
     expect(res.status).toBe(201);
     const body = (await res.json()) as TaskRecord;
     expect(body).toMatchObject({
       type: "create-ticket",
       status: "queued",
-      input: { project: "Web", note: "il salva non va", imageUrls: ["https://uploads.linear.app/1", "https://uploads.linear.app/2"] },
+      input: { project: "Web", note: "the save button is broken", imageUrls: ["https://uploads.linear.app/1", "https://uploads.linear.app/2"] },
       log: [],
       error: null,
       result: null,
@@ -57,7 +57,7 @@ describe("POST /api/tasks", () => {
 
   it("takes a note without images", async () => {
     const { post, linear } = withProject();
-    const res = await post(form({ project: "Web", note: "solo testo" }));
+    const res = await post(form({ project: "Web", note: "text only" }));
     expect(res.status).toBe(201);
     expect(((await res.json()) as TaskRecord).input.imageUrls).toEqual([]);
     expect(linear.uploadImage).not.toHaveBeenCalled();
@@ -78,7 +78,7 @@ describe("POST /api/tasks", () => {
     const pdf = new File([new Uint8Array(4)], "doc.pdf", { type: "application/pdf" });
     const res = await post(form({ project: "Web", note: "n", images: [png(), pdf] }));
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "tipo non supportato: application/pdf" });
+    expect(await res.json()).toEqual({ error: "unsupported type: application/pdf" });
     expect(linear.uploadImage).not.toHaveBeenCalled();
     expect(tasks.list()).toEqual([]);
   });
@@ -87,7 +87,7 @@ describe("POST /api/tasks", () => {
     const { post, linear } = withProject();
     const res = await post(form({ project: "Web", note: "n", images: Array.from({ length: 11 }, (_, i) => png(`${i}.png`)) }));
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "troppe immagini (max 10)" });
+    expect(await res.json()).toEqual({ error: "too many images (max 10)" });
     expect(linear.uploadImage).not.toHaveBeenCalled();
   });
 
@@ -95,7 +95,7 @@ describe("POST /api/tasks", () => {
     const { post, linear } = withProject();
     const res = await post(form({ project: "Web", note: "n", images: [png(), png("big.png", 11 * 1024 * 1024)] }));
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "immagine troppo grande: big.png" });
+    expect(await res.json()).toEqual({ error: "image too large: big.png" });
     expect(linear.uploadImage).not.toHaveBeenCalled();
   });
 
@@ -103,10 +103,10 @@ describe("POST /api/tasks", () => {
     const { post, linear } = withProject();
     const unknown = await post(form({ project: "Nope", note: "n" }));
     expect(unknown.status).toBe(400);
-    expect(await unknown.json()).toEqual({ error: "progetto sconosciuto: Nope" });
+    expect(await unknown.json()).toEqual({ error: "unknown project: Nope" });
     const empty = await post(form({ project: "Web", note: "   " }));
     expect(empty.status).toBe(400);
-    expect(await empty.json()).toEqual({ error: "la nota è vuota" });
+    expect(await empty.json()).toEqual({ error: "the note is empty" });
     expect(linear.uploadImage).not.toHaveBeenCalled();
   });
 

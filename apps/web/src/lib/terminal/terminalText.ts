@@ -19,7 +19,7 @@
  *
  * Changing the renderer fixes none of the first three. So the fix is
  * the one the composer already established in the other direction: **give iOS
- * a real text surface** and let its own long-press → "Copia" do the work. That
+ * a real text surface** and let its own long-press → "Copy" do the work. That
  * matters twice over here, because Mojito is served over plain http
  * on the LAN, and outside a secure context `navigator.clipboard` does not
  * exist — a "copy to clipboard" button could not work from a phone at all.

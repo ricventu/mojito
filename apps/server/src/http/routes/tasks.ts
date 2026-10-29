@@ -21,9 +21,9 @@ export function taskRoutes(deps: AppDeps): Hono {
       const name = asString(body.project);
       const note = asString(body.note).trim();
       const entries = [...asList(body["images[]"]), ...asList(body.images)];
-      if (!deps.projects.get(name)) return c.json({ error: `progetto sconosciuto: ${name}` }, 400);
-      if (!note) return c.json({ error: "la nota è vuota" }, 400);
-      if (entries.some((e) => !(e instanceof File))) return c.json({ error: "immagine non valida" }, 400);
+      if (!deps.projects.get(name)) return c.json({ error: `unknown project: ${name}` }, 400);
+      if (!note) return c.json({ error: "the note is empty" }, 400);
+      if (entries.some((e) => !(e instanceof File))) return c.json({ error: "invalid image" }, 400);
       const files = entries as File[];
       const valid = validateImages(files);
       if (!valid.ok) return c.json({ error: valid.error }, 400);

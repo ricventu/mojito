@@ -86,12 +86,12 @@ export function mapHook(event: HookEventName, current: SessionState): HookOutcom
     case "PostToolUse":
       return { state: "running", alert: null };
     case "PermissionRequest":
-      return { state: "needs-input", alert: "claude chiede un permesso" };
+      return { state: "needs-input", alert: "claude is asking for a permission" };
     case "Notification":
-      return { state: "needs-input", alert: "claude ti sta aspettando" };
+      return { state: "needs-input", alert: "claude is waiting for you" };
     case "PreToolUse":
       // Only AskUserQuestion is hooked for PreToolUse (hookSettings matcher).
-      return { state: "needs-input", alert: "claude ti fa una domanda" };
+      return { state: "needs-input", alert: "claude is asking you a question" };
     case "Stop":
       return { state: "idle", alert: null };
     case "SessionEnd":

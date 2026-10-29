@@ -8,7 +8,7 @@ import type { EventBus } from "../events/bus";
  */
 export const STALL_GRACE_MS = 20_000;
 
-const STALL_ALERT = "apri il terminale e rispondi";
+const STALL_ALERT = "open the terminal and answer";
 
 export interface StallDeps {
   sessions: SessionsRepo;

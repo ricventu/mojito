@@ -12,10 +12,10 @@ export const isImageType = (t: string): t is ImageType => (IMAGE_TYPES as readon
  * refusal must never leave half the set uploaded.
  */
 export function validateImages(files: { name: string; type: string; size: number }[]): { ok: true } | { ok: false; error: string } {
-  if (files.length > MAX_IMAGES) return { ok: false, error: `troppe immagini (max ${MAX_IMAGES})` };
+  if (files.length > MAX_IMAGES) return { ok: false, error: `too many images (max ${MAX_IMAGES})` };
   for (const f of files) {
-    if (!isImageType(f.type)) return { ok: false, error: `tipo non supportato: ${f.type}` };
-    if (f.size > MAX_IMAGE_BYTES) return { ok: false, error: `immagine troppo grande: ${f.name}` };
+    if (!isImageType(f.type)) return { ok: false, error: `unsupported type: ${f.type}` };
+    if (f.size > MAX_IMAGE_BYTES) return { ok: false, error: `image too large: ${f.name}` };
   }
   return { ok: true };
 }
@@ -29,7 +29,7 @@ export function linearImageFetcher(apiKey: string, fetchImpl: typeof fetch = fet
     // Bounded like every other request to Linear (LINEAR_TIMEOUT_MS): a hung download would
     // otherwise hold one of the task queue's two slots for good.
     const res = await fetchImpl(url, { headers: { Authorization: apiKey }, signal: AbortSignal.timeout(LINEAR_TIMEOUT_MS) });
-    if (!res.ok) throw new Error(`download immagine fallito: ${res.status}`);
+    if (!res.ok) throw new Error(`image download failed: ${res.status}`);
     const mediaType = (res.headers.get("content-type") ?? "").split(";")[0].trim();
     return { mediaType, base64: Buffer.from(await res.arrayBuffer()).toString("base64") };
   };

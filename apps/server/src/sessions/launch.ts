@@ -52,7 +52,7 @@ export function defaultLaunchIo(): LaunchIo {
 }
 
 // Ids a launch is between its checks and its row insert. A second launch for the same
-// ticket in that window (a double tap on Avvia) is answered 409 instead of racing to tmux.
+// ticket in that window (a double tap on Launch) is answered 409 instead of racing to tmux.
 const launching = new Set<string>();
 
 const conflict = (id: string): LaunchResult => ({
@@ -160,7 +160,7 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
 
     return failures.length === 0
       ? { ok: true, session }
-      : { ok: true, session, warning: `Stato su Linear non aggiornato: ${failures.join("; ")}` };
+      : { ok: true, session, warning: `Linear status not updated: ${failures.join("; ")}` };
   } finally {
     launching.delete(id);
   }

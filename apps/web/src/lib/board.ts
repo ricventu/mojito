@@ -93,6 +93,6 @@ export function clock(ms: number): string {
 /** The banner text for a failed Linear poll, or `null` when the list is fresh. */
 export function linearBanner(t: BoardTickets): string | null {
   if (!t.stale && !t.error) return null;
-  if (t.fetchedAt !== null) return `Linear non raggiungibile — dati delle ${clock(t.fetchedAt)}`;
-  return t.error ? `Linear non raggiungibile: ${t.error}` : "Linear non raggiungibile";
+  if (t.fetchedAt !== null) return `Linear unreachable — data from ${clock(t.fetchedAt)}`;
+  return t.error ? `Linear unreachable: ${t.error}` : "Linear unreachable";
 }

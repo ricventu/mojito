@@ -10,10 +10,10 @@ import { qk } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
 
 const STATUS: Record<TaskStatus, { label: string; className: string }> = {
-  queued: { label: "In coda", className: "text-muted-foreground" },
-  running: { label: "In corso", className: "text-sky-600 dark:text-sky-400" },
-  done: { label: "Creato", className: "text-emerald-600 dark:text-emerald-400" },
-  failed: { label: "Fallito", className: "text-destructive" },
+  queued: { label: "Queued", className: "text-muted-foreground" },
+  running: { label: "Running", className: "text-sky-600 dark:text-sky-400" },
+  done: { label: "Created", className: "text-emerald-600 dark:text-emerald-400" },
+  failed: { label: "Failed", className: "text-destructive" },
 };
 
 function TaskCard({ task }: { task: TaskRecord }) {
@@ -21,7 +21,7 @@ function TaskCard({ task }: { task: TaskRecord }) {
   const action = useMutation({
     mutationFn: (verb: "retry" | "archive") => apiJson<unknown>(`/api/tasks/${encodeURIComponent(task.id)}/${verb}`, "POST"),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.tasks }),
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Operazione non riuscita"),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Action failed"),
   });
   const finished = task.status === "done" || task.status === "failed";
   const look = STATUS[task.status];
@@ -52,14 +52,14 @@ function TaskCard({ task }: { task: TaskRecord }) {
           </div>
           {task.status === "failed" && (
             <Button variant="outline" size="xs" disabled={action.isPending} onClick={() => action.mutate("retry")}>
-              <RotateCcw size={12} /> Riprova
+              <RotateCcw size={12} /> Retry
             </Button>
           )}
           {finished && (
             <Button
               variant="ghost"
               size="icon-xs"
-              aria-label="Archivia"
+              aria-label="Archive"
               disabled={action.isPending}
               onClick={() => action.mutate("archive")}
             >
@@ -90,7 +90,7 @@ export function TaskStrip({ tasks }: { tasks: TaskRecord[] }) {
   const visible = tasks.filter((t) => !t.archived);
   if (visible.length === 0) return null;
   return (
-    <ul aria-label="Task in background" className="flex flex-col gap-2">
+    <ul aria-label="Background tasks" className="flex flex-col gap-2">
       {visible.map((t) => (
         <TaskCard key={t.id} task={t} />
       ))}

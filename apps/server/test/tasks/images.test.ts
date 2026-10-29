@@ -15,18 +15,18 @@ describe("validateImages", () => {
 
   it("refuses eleven images", () => {
     const files = Array.from({ length: 11 }, (_, i) => png(`${i}.png`));
-    expect(validateImages(files)).toEqual({ ok: false, error: "troppe immagini (max 10)" });
+    expect(validateImages(files)).toEqual({ ok: false, error: "too many images (max 10)" });
   });
 
   it("refuses a PDF", () => {
     expect(validateImages([png(), { name: "doc.pdf", type: "application/pdf", size: 10 }])).toEqual({
       ok: false,
-      error: "tipo non supportato: application/pdf",
+      error: "unsupported type: application/pdf",
     });
   });
 
   it("refuses an image one byte over 10 MB", () => {
-    expect(validateImages([png("big.png", 10 * 1024 * 1024 + 1)])).toEqual({ ok: false, error: "immagine troppo grande: big.png" });
+    expect(validateImages([png("big.png", 10 * 1024 * 1024 + 1)])).toEqual({ ok: false, error: "image too large: big.png" });
   });
 });
 

@@ -18,7 +18,7 @@ const KIND_LABEL: Record<SessionMeta["kind"], string> = {
 
 /**
  * A session with no ticket card to live under — a free session, or a ticket session whose
- * ticket has left the board — tapping it opens its terminal. An ended one offers Rimuovi.
+ * ticket has left the board — tapping it opens its terminal. An ended one offers Remove.
  * A live ticket session offers Kill as well: with its card gone, this row is the only place
  * on the board that still reaches it.
  */
@@ -29,22 +29,22 @@ export function LooseSessionRow({ session }: { session: SessionMeta }) {
   const remove = useMutation({
     mutationFn: () => apiFetch<unknown>(`${path}?remove=1`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.sessions }),
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Rimozione non riuscita"),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Remove failed"),
   });
   const kill = useMutation({
     mutationFn: () => apiFetch<unknown>(path, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Sessione terminata");
+      toast.success("Session ended");
       void qc.invalidateQueries({ queryKey: qk.sessions });
     },
     // A 409 means claude would not leave: the session is untouched, its terminal is the way in.
     onError: (e) =>
       toast.error(
         e instanceof ApiError && e.status === 409
-          ? "claude non si è chiuso: apri il terminale"
+          ? "claude did not exit: open the terminal"
           : e instanceof Error
             ? e.message
-            : "Kill non riuscito",
+            : "Kill failed",
       ),
   });
   const waiting = session.state === "needs-input";
@@ -78,7 +78,7 @@ export function LooseSessionRow({ session }: { session: SessionMeta }) {
           disabled={remove.isPending}
           onClick={() => remove.mutate()}
         >
-          <Trash2 size={14} /> Rimuovi
+          <Trash2 size={14} /> Remove
         </Button>
       ) : (
         session.kind === "ticket" && (
@@ -88,7 +88,7 @@ export function LooseSessionRow({ session }: { session: SessionMeta }) {
             className="h-auto self-center text-muted-foreground"
             disabled={kill.isPending}
             onClick={() => {
-              if (window.confirm(`Terminare la sessione di ${label}?`)) kill.mutate();
+              if (window.confirm(`Kill the ${label} session?`)) kill.mutate();
             }}
           >
             <Trash2 size={14} /> Kill

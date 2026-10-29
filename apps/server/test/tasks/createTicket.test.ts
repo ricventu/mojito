@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CREATE_TICKET_SYSTEM, buildCreateTicketMessage } from "../../src/tasks/createTicket";
 
-const input = { teamKey: "RIC", project: "Web", note: "il bottone salva non va", imageUrls: [] as string[] };
+const input = { teamKey: "RIC", project: "Web", note: "the save button is broken", imageUrls: [] as string[] };
 
 type Block = { type: string; text?: string; source?: { type: string; media_type: string; data: string } };
 const blocks = (m: ReturnType<typeof buildCreateTicketMessage>) => m.message.content as Block[];
@@ -17,7 +17,7 @@ describe("buildCreateTicketMessage", () => {
     expect(m.type).toBe("user");
     expect(m.parent_tool_use_id).toBeNull();
     expect(m.message.role).toBe("user");
-    expect(text(m)).toContain("il bottone salva non va");
+    expect(text(m)).toContain("the save button is broken");
     expect(text(m)).toContain("RIC");
     expect(text(m)).toContain("Web");
   });
@@ -25,7 +25,7 @@ describe("buildCreateTicketMessage", () => {
   it("says nothing about images when there are none", () => {
     const m = buildCreateTicketMessage(input, []);
     expect(text(m)).not.toContain("![](");
-    expect(text(m).toLowerCase()).not.toContain("immagini");
+    expect(text(m).toLowerCase()).not.toContain("images");
     expect(blocks(m).some((b) => b.type === "image")).toBe(false);
   });
 
@@ -47,7 +47,7 @@ describe("buildCreateTicketMessage", () => {
 
 describe("CREATE_TICKET_SYSTEM", () => {
   it("never asks questions, and names its own tools rather than a Linear MCP", () => {
-    expect(CREATE_TICKET_SYSTEM).toContain("Non fare domande: se la nota è vaga, crea un ticket fedele a ciò che dice.");
+    expect(CREATE_TICKET_SYSTEM).toContain("Do not ask questions: if the note is vague, create a ticket faithful to what it says.");
     expect(CREATE_TICKET_SYSTEM).not.toContain("ask in this terminal");
     expect(CREATE_TICKET_SYSTEM).toContain("create_issue");
     expect(CREATE_TICKET_SYSTEM).toContain("list_labels");

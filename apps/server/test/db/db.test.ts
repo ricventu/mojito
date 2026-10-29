@@ -208,7 +208,7 @@ describe("SessionsRepo", () => {
 const task = (over: Partial<TaskRecord> = {}): TaskRecord => ({
   id: "t1",
   type: "create-ticket",
-  input: { project: "Web", note: "nota", imageUrls: ["u1"] },
+  input: { project: "Web", note: "note", imageUrls: ["u1"] },
   status: "queued",
   log: [],
   error: null,

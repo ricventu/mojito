@@ -17,7 +17,7 @@ interface Props {
  * A real `<textarea>` to write in, injected into the terminal through xterm's own paste
  * path. The terminal is not a text field — xterm's hidden helper textarea is one cell
  * wide, cleared on Enter/Ctrl-C/blur, and never reconciled with what the pty holds — so
- * iOS's "Incolla" is missing, the space-hold caret trackpad slides a caret around a
+ * iOS's "Paste" is missing, the space-hold caret trackpad slides a caret around a
  * scratch buffer and sends nothing, and dictation arrives twice. In a plain textarea all
  * three work natively, and a dictated prompt can be read back before it reaches claude.
  * Not a paste box: do not simplify it into one.
@@ -60,7 +60,7 @@ export function Composer({ term, onClose }: Props) {
 
   return (
     <div className="flex items-end gap-1.5 border-t bg-background p-2">
-      {/* autoFocus: ready for the dictation key, a long-press → Incolla, or a caret drag.
+      {/* autoFocus: ready for the dictation key, a long-press → Paste, or a caret drag.
           `field-sizing-fixed` and the explicit `leading-5` after the font: the height is
           pinned from JS, which reads the line-height back (a "normal" one is not a number). */}
       <Textarea
@@ -68,13 +68,13 @@ export function Composer({ term, onClose }: Props) {
         ref={input}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        placeholder="Dettatura, incolla o scrivi, poi Inserisci"
+        placeholder="Dictate, paste or type, then Insert"
         className="field-sizing-fixed min-h-10 min-w-0 flex-1 resize-none overflow-y-auto leading-5"
       />
       <Button type="button" onClick={insert}>
-        Inserisci
+        Insert
       </Button>
-      <Button type="button" variant="outline" size="icon" aria-label="Chiudi" onClick={onClose}>
+      <Button type="button" variant="outline" size="icon" aria-label="Close" onClick={onClose}>
         <X size={16} aria-hidden="true" />
       </Button>
     </div>

@@ -11,12 +11,12 @@ interface Props {
   onEffort: (effort: Effort) => void;
 }
 
-/** The Modello / Effort pair shared by the ticket launch and the new-session sheets. */
+/** The Model / Effort pair shared by the ticket launch and the new-session sheets. */
 export function LaunchOptions({ idPrefix, model, effort, onModel, onEffort }: Props) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <div className="flex min-w-0 flex-col gap-1.5">
-        <Label htmlFor={`${idPrefix}-model`}>Modello</Label>
+        <Label htmlFor={`${idPrefix}-model`}>Model</Label>
         <Select value={model} onValueChange={(v) => onModel(v as Model)}>
           <SelectTrigger id={`${idPrefix}-model`} className="w-full">
             <SelectValue />

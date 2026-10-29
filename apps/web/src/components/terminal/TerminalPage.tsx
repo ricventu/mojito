@@ -90,10 +90,10 @@ export function TerminalPage() {
     onError: (e) =>
       toast.error(
         e instanceof ApiError && e.status === 409
-          ? "claude non si è chiuso: apri il terminale"
+          ? "claude did not exit: open the terminal"
           : e instanceof Error
             ? e.message
-            : "Kill non riuscito",
+            : "Kill failed",
       ),
   });
 
@@ -133,7 +133,7 @@ export function TerminalPage() {
             className="shrink-0"
             disabled={!session || kill.isPending}
             onClick={() => {
-              if (window.confirm("Terminare questa sessione?")) kill.mutate();
+              if (window.confirm("Kill this session?")) kill.mutate();
             }}
           >
             <X size={16} /> Kill
@@ -142,10 +142,10 @@ export function TerminalPage() {
       )}
       {gone ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-[#08090a] p-6 text-center text-neutral-300">
-          <p className="text-sm">Sessione terminata</p>
+          <p className="text-sm">Session ended</p>
           <Button asChild variant="secondary" size="sm">
             <Link to="/">
-              <ArrowLeft size={16} /> Torna alla board
+              <ArrowLeft size={16} /> Back to the board
             </Link>
           </Button>
         </div>

@@ -11,7 +11,7 @@ interface Props {
 }
 
 /**
- * The terminal's own text on a surface iOS will let you long-press, select and "Copia"
+ * The terminal's own text on a surface iOS will let you long-press, select and "Copy"
  * from (see `terminalText.ts` for why the terminal cannot be selected, and why a copy
  * button cannot work over plain http). A `<pre>`, deliberately not a `<textarea>`:
  * focusing one raises the keyboard — the wrong thing when you meant to copy, and enough
@@ -39,9 +39,9 @@ export function CopyBuffer({ term, onClose }: Props) {
           !text && "text-muted-foreground",
         )}
       >
-        {text || "— nessun testo sullo schermo —"}
+        {text || "— no text on screen —"}
       </pre>
-      <Button type="button" variant="outline" size="icon" aria-label="Chiudi" onClick={onClose}>
+      <Button type="button" variant="outline" size="icon" aria-label="Close" onClick={onClose}>
         <X size={16} aria-hidden="true" />
       </Button>
     </div>
