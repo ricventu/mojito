@@ -1,20 +1,25 @@
 /**
- * Copy-on-select for the desktop terminal: the moment a mouse selection is released,
- * its text goes to the clipboard.
+ * Getting a desktop mouse selection out of the terminal and onto the clipboard. There
+ * are two selections, because claude's TUI asks for any-motion mouse tracking
+ * (DECSET 1003): a plain drag goes to claude, a Shift/Option+drag to xterm.
  *
- * **Why not Cmd+C like anywhere else.** The selection does not survive long enough.
- * claude's TUI asks for any-motion mouse tracking (DECSET 1003, passed through by tmux
- * with `mouse off`), so xterm reports every pointer move to the app — and it counts each
- * report as user input, which clears the selection (`SelectionService` listens to
- * `onUserInput`). Shift/Option+drag selects, the next nudge of the mouse wipes it, and
- * Cmd+C finds nothing. A right-click is worse: its own mousedown is reported first. Off
- * a Mac there is not even a key for it — Ctrl+C is the app's interrupt and
- * Ctrl+Shift+C opens the browser's inspector. Release is the one moment the selection
- * is guaranteed to exist, so that is when it is copied.
+ * **A plain drag is claude's own selection.** claude highlights it and copies it on
+ * release (its `copyOnSelect`, on by default) by writing an OSC 52 to its terminal —
+ * under tmux both bare and wrapped in tmux's DCS passthrough. tmux drops both unless the
+ * window has `allow-passthrough on` (set by the pty gateway at every attach), and xterm.js
+ * ignores OSC 52 without a handler: `osc52Text` is the decoding half of that handler.
+ * Write-only — a `?` query, an app asking to *read* the clipboard, is never answered.
  *
- * Two paths, because the async clipboard only exists in a secure context (https, or
- * localhost): `document.execCommand("copy")` with a one-shot `copy` listener supplying
- * the text works over plain http too, inside the mouseup's user activation.
+ * **A Shift/Option+drag is xterm's selection**, and Cmd+C cannot reach it. xterm reports
+ * every pointer move to the app and counts each report as user input, which clears the
+ * selection (`SelectionService` listens to `onUserInput`): the next nudge of the mouse
+ * wipes it. A right-click is worse — its own mousedown is reported first — and off a Mac
+ * there is no key at all (Ctrl+C is the app's interrupt, Ctrl+Shift+C the browser's
+ * inspector). Release is the one moment it is guaranteed to exist, so it is copied then.
+ *
+ * Two clipboard paths, because the async clipboard only exists in a secure context
+ * (https, or localhost): `document.execCommand("copy")` with a one-shot `copy` listener
+ * supplying the text works over plain http too, within the user activation.
  */
 
 export interface ClipboardEnv {
@@ -58,4 +63,21 @@ export function browserClipboard(): ClipboardEnv {
       }
     },
   };
+}
+
+/**
+ * The text an OSC 52 asks to put on the clipboard, from the part after `52;`
+ * (`<selection>;<base64>`); null for a read query or anything malformed.
+ */
+export function osc52Text(data: string): string | null {
+  const sep = data.indexOf(";");
+  if (sep < 0) return null;
+  const payload = data.slice(sep + 1);
+  if (!payload || payload === "?") return null;
+  try {
+    const bytes = Uint8Array.from(atob(payload), (c) => c.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return null;
+  }
 }

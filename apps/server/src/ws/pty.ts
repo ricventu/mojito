@@ -25,7 +25,7 @@ import { SESSION_GONE_CODE } from "@mojito/shared";
 import { spawn as ptySpawn } from "node-pty";
 import type { WebSocket } from "ws";
 import { sanitizeEnv } from "../env/childEnv";
-import { capturePane, hasSession, sessionTarget } from "../tmux/tmux";
+import { capturePane, hasSession, paneTarget, sessionTarget } from "../tmux/tmux";
 
 export interface AttachDeps {
   hasSession: (name: string) => Promise<boolean>;
@@ -132,8 +132,13 @@ export function attachPty(ws: WebSocket, id: string, deps: Partial<AttachDeps> =
 
       try {
         // Exact target: a bare `-t` prefix-matches, and would attach to `mj-RIC-49x` once
-        // `mj-RIC-49` is gone (sessionTarget).
-        pty = d.spawn("tmux", ["attach-session", "-t", sessionTarget(id)], {
+        // `mj-RIC-49` is gone (sessionTarget). Passthrough first: claude copies its own mouse
+        // selection with an OSC 52 wrapped in tmux's DCS passthrough, which tmux drops by
+        // default (and `set-clipboard external` drops the bare one), so a copy never reached
+        // the browser. Set at every attach so sessions created before it, or adopted, get it
+        // too; it is a window option, so only this session's window is touched.
+        const passthroughOn = ["set-option", "-w", "-t", paneTarget(id), "allow-passthrough", "on"];
+        pty = d.spawn("tmux", [...passthroughOn, ";", "attach-session", "-t", sessionTarget(id)], {
           // tmux only emits sequences the client's terminfo names, and it hides the cursor
           // while it repaints. `xterm-color` has no civis/cnorm, so every cursor-hide was
           // dropped and the browser drew a cursor at random positions (RIC-241); it also

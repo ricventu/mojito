@@ -118,9 +118,11 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
 - Terminal (`components/terminal`, `lib/terminal`): `syncGeometry` always publishes the size,
   re-fit refused while the iOS keyboard is up; accessory bar (coarse pointers only), composer
   (`term.paste`, no CR — do not turn it into a paste box), buffer copy in a `<pre>`.
-  Desktop mouse selection (Shift/Option+drag) is **copied on release** (`copySelection.ts`):
-  claude's any-motion mouse tracking makes xterm clear the selection on the next mouse move,
-  so Cmd+C/right-click never find it.
+  Desktop mouse copy (`copySelection.ts`): a plain drag is **claude's own** selection, which
+  it copies with an OSC 52 — reaching the browser only because the pty gateway sets
+  `allow-passthrough on` at every attach, and handled by a write-only OSC 52 handler. A
+  Shift/Option+drag is xterm's, **copied on release**: claude's any-motion mouse tracking
+  makes xterm clear it on the next mouse move, so Cmd+C/right-click never find it.
   xterm's platform detection was verified correct under Vite, so v1's
   `restoreTerminalPlatform` is not ported; a dev-only warning fires if that ever changes.
 - Safe areas: `--sat/--sar/--sab/--sal` in `index.css`; every edge surface pays its inset;

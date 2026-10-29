@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { copyText } from "@/lib/terminal/copySelection";
+import { copyText, osc52Text } from "@/lib/terminal/copySelection";
 
 describe("copyText", () => {
   it("writes through the async clipboard when there is one", async () => {
@@ -31,5 +31,32 @@ describe("copyText", () => {
     const execCopy = vi.fn();
     expect(await copyText("", { execCopy })).toBe(false);
     expect(execCopy).not.toHaveBeenCalled();
+  });
+});
+
+describe("osc52Text", () => {
+  const b64 = (s: string) => Buffer.from(s, "utf8").toString("base64");
+
+  it("decodes the clipboard payload claude sends", () => {
+    expect(osc52Text(`c;${b64("hello")}`)).toBe("hello");
+  });
+
+  it("decodes UTF-8, not Latin-1", () => {
+    expect(osc52Text(`c;${b64("perché → ✓")}`)).toBe("perché → ✓");
+  });
+
+  it("accepts an empty or multi-letter selection field", () => {
+    expect(osc52Text(`;${b64("a")}`)).toBe("a");
+    expect(osc52Text(`pc;${b64("b")}`)).toBe("b");
+  });
+
+  it("never answers a clipboard read query", () => {
+    expect(osc52Text("c;?")).toBeNull();
+  });
+
+  it("ignores a payload that is not base64 or has no separator", () => {
+    expect(osc52Text("c;not base64!")).toBeNull();
+    expect(osc52Text("garbage")).toBeNull();
+    expect(osc52Text("c;")).toBeNull();
   });
 });

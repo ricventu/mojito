@@ -128,7 +128,7 @@ describe("attachPty", () => {
     expect(env.HOME).toBe(process.env.HOME);
   });
 
-  it("spawns tmux attach for a live session", async () => {
+  it("spawns tmux attach for a live session, with passthrough on for its window", async () => {
     const ws = fakeWs();
     const deps: Partial<AttachDeps> = {
       hasSession: vi.fn(async () => true),
@@ -140,7 +140,7 @@ describe("attachPty", () => {
 
     expect(deps.spawn).toHaveBeenCalledWith(
       "tmux",
-      ["attach-session", "-t", "=mj-RIC-46"],
+      ["set-option", "-w", "-t", "=mj-RIC-46:", "allow-passthrough", "on", ";", "attach-session", "-t", "=mj-RIC-46"],
       expect.any(Object),
     );
     expect(ws.close).not.toHaveBeenCalledWith(SESSION_GONE_CODE, expect.any(String));
