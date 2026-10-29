@@ -38,10 +38,24 @@ export const ProjectBody = z.object({
 });
 export type ProjectBody = z.infer<typeof ProjectBody>;
 
+/** Names are unique ignoring case, so a favourite is told apart by what the chip shows. */
+export const FavoritesBody = z
+  .array(z.object({ name: z.string().trim().min(1).max(60), search: z.string().max(2000) }))
+  .max(50)
+  .superRefine((list, ctx) => {
+    const seen = new Set<string>();
+    for (const { name } of list) {
+      const key = name.toLowerCase();
+      if (seen.has(key)) ctx.addIssue({ code: "custom", message: `duplicate favourite name: ${name}` });
+      seen.add(key);
+    }
+  });
+
 /** A partial update: each key sent replaces that part of the settings, a key left out keeps it. */
 export const SettingsBody = z.object({
   statusDefaults: z.record(z.string(), z.object({ model: z.enum(MODELS), effort: z.enum(EFFORTS) })).optional(),
   prompts: PromptsBody.optional(),
+  favorites: FavoritesBody.optional(),
 });
 export type SettingsBody = z.infer<typeof SettingsBody>;
 

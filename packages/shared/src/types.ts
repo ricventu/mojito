@@ -9,10 +9,17 @@ export interface StatusDefault {
   effort: Effort;
 }
 
+/** A named board filter: `search` is the filter bar's text, stored verbatim. */
+export interface Favorite {
+  name: string;
+  search: string;
+}
+
 export interface Settings {
   statusDefaults: Record<string, StatusDefault>;
   /** Always complete: a prompt never edited answers its default. */
   prompts: Prompts;
+  favorites: Favorite[];
 }
 
 export interface ProjectRow {

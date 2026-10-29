@@ -1,4 +1,4 @@
-import { DEFAULT_PROMPTS, type PromptKey, type Settings, type SettingsBody, type StatusDefault } from "@mojito/shared";
+import { DEFAULT_PROMPTS, FavoritesBody, type PromptKey, type Settings, type SettingsBody, type StatusDefault } from "@mojito/shared";
 import type { Db } from "./db";
 
 const STATUSES = ["Backlog", "Todo", "In Progress", "In Review"] as const;
@@ -6,7 +6,7 @@ const STATUSES = ["Backlog", "Todo", "In Progress", "In Review"] as const;
 export function defaultSettings(): Settings {
   const statusDefaults: Record<string, StatusDefault> = {};
   for (const s of STATUSES) statusDefaults[s] = { model: "opus", effort: "high" };
-  return { statusDefaults, prompts: { ...DEFAULT_PROMPTS } };
+  return { statusDefaults, prompts: { ...DEFAULT_PROMPTS }, favorites: [] };
 }
 
 const PROMPT_KEYS = Object.keys(DEFAULT_PROMPTS) as PromptKey[];
@@ -33,6 +33,8 @@ export class SettingsRepo {
       const p = prompts?.[k];
       if (typeof p === "string") out.prompts[k] = p;
     }
+    const favorites = FavoritesBody.safeParse(this.read("favorites"));
+    if (favorites.success) out.favorites = favorites.data;
     return out;
   }
 
@@ -63,5 +65,6 @@ export class SettingsRepo {
       const edited = Object.fromEntries(PROMPT_KEYS.flatMap((k) => (s.prompts![k] === DEFAULT_PROMPTS[k] ? [] : [[k, s.prompts![k]]])));
       put.run("prompts", JSON.stringify(edited));
     }
+    if (s.favorites) put.run("favorites", JSON.stringify(s.favorites));
   }
 }

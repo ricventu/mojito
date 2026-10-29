@@ -4,4 +4,5 @@ export type MojitoEvent =
   | { type: "session.updated"; session: SessionMeta }
   | { type: "session.removed"; id: string }
   | { type: "task.updated"; task: TaskRecord }
-  | { type: "tickets.changed" };
+  | { type: "tickets.changed" }
+  | { type: "settings.updated" };

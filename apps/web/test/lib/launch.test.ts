@@ -6,6 +6,7 @@ import { launchErrorAction, launchOptions } from "@/lib/launch";
 const settings: Settings = {
   statusDefaults: { Todo: { model: "sonnet", effort: "medium" } },
   prompts: DEFAULT_PROMPTS,
+  favorites: [],
 };
 
 describe("launchOptions", () => {

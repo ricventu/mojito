@@ -74,4 +74,67 @@ describe("/api/settings", () => {
     const res = await req("/api/settings", { method: "PUT", json: { prompts: { ...DEFAULT_PROMPTS, createTicket: "  \n" } } });
     expect(res.status).toBe(400);
   });
+
+  it("answers no favourites on a fresh database", async () => {
+    const { req } = setup();
+    const body = (await (await req("/api/settings")).json()) as Record<string, any>;
+    expect(body.favorites).toEqual([]);
+  });
+
+  it("stores favourites and leaves the other keys alone", async () => {
+    const { req, settings } = setup();
+    await req("/api/settings", { method: "PUT", json: { statusDefaults: { Todo: { model: "sonnet", effort: "low" } } } });
+    const before = settings.get();
+    const favorites = [{ name: "Mojito", search: "project=mojito" }];
+    const res = await req("/api/settings", { method: "PUT", json: { favorites } });
+    expect(res.status).toBe(200);
+    expect(settings.get().favorites).toEqual(favorites);
+    expect(settings.get().statusDefaults.Todo).toEqual({ model: "sonnet", effort: "low" });
+    expect(settings.get().prompts).toEqual(before.prompts);
+  });
+
+  it("trims favourite names", async () => {
+    const { req, settings } = setup();
+    await req("/api/settings", { method: "PUT", json: { favorites: [{ name: "  Mine ", search: "" }] } });
+    expect(settings.get().favorites).toEqual([{ name: "Mine", search: "" }]);
+  });
+
+  it("refuses duplicate names, ignoring case", async () => {
+    const { req, settings } = setup();
+    const res = await req("/api/settings", {
+      method: "PUT",
+      json: { favorites: [{ name: "A", search: "" }, { name: "a", search: "q=x" }] },
+    });
+    expect(res.status).toBe(400);
+    expect(settings.get().favorites).toEqual([]);
+  });
+
+  it.each([
+    ["an empty name", [{ name: "", search: "" }]],
+    ["a 61-character name", [{ name: "x".repeat(61), search: "" }]],
+    ["a 2001-character search", [{ name: "A", search: "x".repeat(2001) }]],
+    ["51 favourites", Array.from({ length: 51 }, (_, i) => ({ name: `f${i}`, search: "" }))],
+  ])("refuses %s", async (_label, favorites) => {
+    const { req, settings } = setup();
+    const res = await req("/api/settings", { method: "PUT", json: { favorites } });
+    expect(res.status).toBe(400);
+    expect(settings.get().favorites).toEqual([]);
+  });
+
+  it("reads a corrupt favourites row as none", () => {
+    const { settings, db } = setup();
+    db.prepare("INSERT INTO settings (key, value) VALUES ('favorites', ?)").run(JSON.stringify([{ name: 1 }]));
+    expect(settings.get().favorites).toEqual([]);
+  });
+
+  it("emits settings.updated on a successful PUT only", async () => {
+    const { req, events } = setup();
+    const res = await req("/api/settings", { method: "PUT", json: { favorites: [{ name: "A", search: "" }] } });
+    expect(res.status).toBe(200);
+    expect(events).toContainEqual({ type: "settings.updated" });
+    const count = events.length;
+    const bad = await req("/api/settings", { method: "PUT", json: { favorites: [{ name: "", search: "" }] } });
+    expect(bad.status).toBe(400);
+    expect(events).toHaveLength(count);
+  });
 });

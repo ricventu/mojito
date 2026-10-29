@@ -10,6 +10,7 @@ export function settingsRoutes(deps: AppDeps): Hono {
       const body = await parseBody(c, SettingsBody);
       if (!body.ok) return c.json({ error: body.error }, 400);
       deps.settings.set(body.data);
+      deps.bus.emit({ type: "settings.updated" });
       return c.json(deps.settings.get());
     });
 }
