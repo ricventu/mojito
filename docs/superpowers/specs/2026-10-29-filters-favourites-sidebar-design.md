@@ -36,17 +36,21 @@ export const FILTER_STATUSES = ["In Review", "In Progress", "Todo", "Backlog"] a
 export interface BoardFilters { projects: string[]; statuses: string[]; q: string }
 export const NO_FILTERS: BoardFilters;
 export function parseFilters(params: URLSearchParams): BoardFilters;
-export function filterSearch(f: BoardFilters): string; // canonical, no leading "?"
+export function filterSearch(f: BoardFilters): string;    // the live url, no leading "?"
+export function canonicalSearch(f: BoardFilters): string; // filterSearch with q trimmed
 export function isFiltered(f: BoardFilters): boolean;
 ```
 
 - `project` and `status` repeat, one parameter per value (a project name is free text: no
   separator is safe to join on).
 - Canonical form: projects deduplicated and sorted (`localeCompare`), statuses deduplicated
-  in `FILTER_STATUSES` order, `q` trimmed, empty values and defaults omitted, parameter
-  order `project`, `status`, `q`. The unfiltered board is a bare `/`.
+  in `FILTER_STATUSES` order, empty values and defaults omitted (a whitespace-only `q`
+  included), parameter order `project`, `status`, `q`. The unfiltered board is a bare `/`.
+  `q` keeps its spaces in the live url — trimming it there would eat the space being typed
+  between two words — and is trimmed by `canonicalSearch(f)`, the form favourites are saved
+  in and compared by; matching trims it too.
 - `parseFilters` drops unknown parameters and status values outside `FILTER_STATUSES`.
-- Two filter sets are equal iff their `filterSearch` strings are equal.
+- Two filter sets are equal iff their `canonicalSearch` strings are equal.
 
 `hooks/useBoardFilters.ts` is the glue: `useSearchParams` → `parseFilters`, and a setter that
 writes `filterSearch` with `{ replace: true }`. Every filter change **replaces** the history
@@ -116,7 +120,7 @@ after a kill. Both are best effort: a store that throws (Safari private mode) me
 export interface Favorite { name: string; search: string }
 ```
 
-`search` is a canonical `filterSearch` string. Applying one navigates to `/?<search>`, which
+`search` is a `canonicalSearch` string. Applying one navigates to `/?<search>`, which
 goes through `parseFilters` like any url, so unknown parameters are dropped there: the
 server validates shape only, never interprets it.
 
@@ -137,7 +141,7 @@ an open board on another.
 `lib/favorites.ts` (pure):
 
 ```ts
-export function addFavorite(list: Favorite[], name: string, search: string): Favorite[];
+export function addFavorite(list: Favorite[], name: string, search: string): { list: Favorite[]; replaced: boolean };
 // a case-insensitive name match replaces that entry in place (position and stored name kept)
 export function renameRefusal(list: Favorite[], index: number, name: string): string | null;
 // "Name required" | "A favourite with this name already exists" | null;
@@ -155,7 +159,7 @@ toast and an invalidation of `qk.settings` (re-read, not a remembered rollback).
 ### UI
 
 - **Board**: the chip row under the search row, horizontally scrolling, absent when the list
-  is empty. The chip whose `search` equals the current `filterSearch` is highlighted
+  is empty. The chip whose `search` equals the current `canonicalSearch` is highlighted
   (`aria-pressed`); tapping it again clears the filters, tapping another applies it.
 - **Save**: "Save as favourite" in the filter sheet's footer, enabled only when
   `isFiltered`. It reveals an inline name field + Save. A same-name save replaces that
