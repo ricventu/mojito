@@ -203,8 +203,8 @@ highlighted (`aria-current`) when it is the terminal on screen. The hide button 
 - `PATCH /api/sessions/:id`, body `SessionPatchBody = z.strictObject({ hidden: z.boolean() })`:
   404 for an unknown id, 400 for any other body, otherwise updates the column, emits
   `session.updated` and answers the session.
-- Client: an optimistic override per id until the refetch agrees; on error the override is
-  dropped and a toast says why.
+- Client: optimistic — the sessions query cache is patched (`setQueryData`, after cancelling an
+  in-flight refetch); on error a toast says why and the list is re-read.
 - Hidden rows leave the list for a footer toggle (`EyeOff` + "Hidden (n)") that lists them
   again at the end, each with an unhide button. The footer takes the amber colour while a
   hidden session needs input.
@@ -218,7 +218,8 @@ highlighted (`aria-current`) when it is the terminal on screen. The hide button 
   a peek. Closes on picking a row, the backdrop, its ✕ or Escape (focus is in the sheet
   while it is open, so Escape is not claude's).
 - **Pinned**: a docked `w-72` column, offered only at ≥ 1024px (`matchMedia`); below that the
-  pin control is not rendered and a remembered pin is ignored. The pin button lives in the
+  pin control is not rendered and a remembered pin is ignored: a docked sidebar closes when the
+  viewport drops below the breakpoint (keeping its pin) and re-docks when it comes back. The pin button lives in the
   sidebar's header; unpinning a docked sidebar closes it. `hooks/useSidebar.ts` holds the
   open flag, the pin (`localStorage` `mojito2-sidebar-pinned`, read in a `useState`
   initialiser so a pinned sidebar docks on the first render, every access in try/catch)
