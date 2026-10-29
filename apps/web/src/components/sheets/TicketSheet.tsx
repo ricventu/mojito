@@ -5,8 +5,8 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import type { Effort, Model, SessionMeta, Settings, TicketSummary } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
@@ -23,8 +23,11 @@ import { SHEET_CONTENT_CLASS } from "./styles";
 const sessionPath = (id: string) => `/session/${encodeURIComponent(id)}`;
 const errorMessage = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
 
-/** The ticket's status, changeable among the states its team has (Linear's own list). */
-function StatusField({ ticket, teamKey }: { ticket: TicketSummary; teamKey: string | undefined }) {
+/**
+ * The ticket's status as a pill in the header; tapping it moves the ticket among its team's states
+ * (Linear's own list). A plain badge until those states load, or when the project has no team.
+ */
+function StatusPill({ ticket, teamKey }: { ticket: TicketSummary; teamKey: string | undefined }) {
   const qc = useQueryClient();
   const [status, setStatus] = useState(ticket.statusName);
   const states = useQuery({
@@ -36,6 +39,7 @@ function StatusField({ ticket, teamKey }: { ticket: TicketSummary; teamKey: stri
   const move = useMutation({
     mutationFn: (next: string) =>
       apiJson<unknown>(`/api/tickets/${encodeURIComponent(ticket.identifier)}/status`, "POST", { status: next }),
+    onSuccess: (_data, next) => toast.success(`${ticket.identifier} → ${next}`),
     onError: (e, _next, previous) => {
       setStatus(previous as string);
       toast.error(errorMessage(e, "Status change failed"));
@@ -44,31 +48,32 @@ function StatusField({ ticket, teamKey }: { ticket: TicketSummary; teamKey: stri
     onMutate: () => status,
   });
 
-  if (!teamKey || !states.data) return null;
+  if (!teamKey || !states.data) return <Badge variant="secondary">{status}</Badge>;
   const options = states.data.includes(status) ? states.data : [status, ...states.data];
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor="ticket-status">Status</Label>
-      <Select
-        value={status}
-        onValueChange={(next) => {
-          setStatus(next);
-          move.mutate(next);
-        }}
+    <Select
+      value={status}
+      disabled={move.isPending}
+      onValueChange={(next) => {
+        setStatus(next);
+        move.mutate(next);
+      }}
+    >
+      <SelectTrigger
+        aria-label="Status"
+        className="h-auto gap-1 rounded-full border-transparent bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground shadow-none hover:bg-secondary/80 dark:bg-secondary dark:hover:bg-secondary/80 [&_svg]:size-3"
       >
-        <SelectTrigger id="ticket-status" className="w-full">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((s) => (
-            <SelectItem key={s} value={s}>
-              {s}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent position="popper" align="start">
+        {options.map((s) => (
+          <SelectItem key={s} value={s}>
+            {s}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -165,7 +170,7 @@ interface Props {
   onClose: () => void;
 }
 
-/** The ticket's detail sheet: status, and either its live session or the form that starts one. */
+/** The ticket's detail sheet: its status in the header, then either its live session or the form that starts one. */
 export function TicketSheet({ ticket, onClose }: Props) {
   const sessions = useSessions();
   const projects = useProjects();
@@ -178,19 +183,21 @@ export function TicketSheet({ ticket, onClose }: Props) {
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="bottom" className={SHEET_CONTENT_CLASS}>
         <SheetHeader className="pr-12">
-          <a
-            href={ticket.url}
-            target="_blank"
-            rel="noreferrer"
-            className="w-fit font-mono text-xs text-muted-foreground underline-offset-2 hover:underline"
-          >
-            {ticket.identifier}
-          </a>
+          <div className="flex items-center gap-2">
+            <a
+              href={ticket.url}
+              target="_blank"
+              rel="noreferrer"
+              className="w-fit font-mono text-xs text-muted-foreground underline-offset-2 hover:underline"
+            >
+              {ticket.identifier}
+            </a>
+            <StatusPill ticket={ticket} teamKey={teamKey} />
+          </div>
           <SheetTitle className="leading-snug break-words">{ticket.title}</SheetTitle>
           <SheetDescription className="sr-only">Status and session launch for {ticket.identifier}</SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-5 px-4">
-          <StatusField ticket={ticket} teamKey={teamKey} />
           {live ? (
             <LiveSession ticket={ticket} session={session} onClose={onClose} />
           ) : settings.data ? (
