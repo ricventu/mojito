@@ -3,6 +3,7 @@ import type { Favorite } from "@mojito/shared";
 import {
   activeFavorite,
   addFavorite,
+  currentFavorites,
   moveFavorite,
   removeFavorite,
   renameFavorite,
@@ -118,5 +119,22 @@ describe("activeFavorite", () => {
   it("is -1 for no match and for the bare board", () => {
     expect(activeFavorite([A, M], "q=nope")).toBe(-1);
     expect(activeFavorite([{ name: "Empty", search: "" }], "")).toBe(-1);
+  });
+});
+
+describe("currentFavorites", () => {
+  it("is the cached list when no write is queued", () => {
+    const cached = [A, M];
+    expect(currentFavorites(cached, [])).toBe(cached);
+  });
+
+  it("is the newest queued write, whatever a refetch put in the cache meanwhile", () => {
+    const first = [M, A];
+    const second = [M, A, C];
+    expect(currentFavorites([A, M], [first, second])).toBe(second);
+  });
+
+  it("is undefined while settings have never loaded", () => {
+    expect(currentFavorites(undefined, [])).toBeUndefined();
   });
 });

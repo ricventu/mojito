@@ -43,7 +43,9 @@ export function isFiltered(f: BoardFilters): boolean;
 
 - `project` and `status` repeat, one parameter per value (a project name is free text: no
   separator is safe to join on).
-- Canonical form: projects deduplicated and sorted (`localeCompare`), statuses deduplicated
+- Canonical form: projects deduplicated and sorted by plain `sort()` (UTF-16 code units —
+  never the device's locale, since favourites compare as strings across devices; display
+  order elsewhere uses `localeCompare(b, "en")`), statuses deduplicated
   in `FILTER_STATUSES` order, empty values and defaults omitted (a whitespace-only `q`
   included), parameter order `project`, `status`, `q`. The unfiltered board is a bare `/`.
   `q` keeps its spaces in the live url — trimming it there would eat the space being typed
@@ -150,11 +152,26 @@ export function renameFavorite(list: Favorite[], index: number, name: string): F
 export function moveFavorite(list: Favorite[], index: number, delta: -1 | 1): Favorite[];
 export function removeFavorite(list: Favorite[], index: number): Favorite[];
 export function activeFavorite(list: Favorite[], search: string): number; // -1 when none
+// the stored search is re-canonicalised before comparing, so any stored order matches
+export function currentFavorites(cached: Favorite[] | undefined, queued: Favorite[][]): Favorite[] | undefined;
 ```
 
-`hooks/useFavorites.ts`: reads `useSettings().data.favorites`; `save(next)` writes
-optimistically (`setQueryData` on `qk.settings`) then `PUT { favorites: next }`; on error a
-toast and an invalidation of `qk.settings` (re-read, not a remembered rollback).
+`hooks/useFavorites.ts` returns `{ favorites, ready, save }`:
+
+- `ready` is true once settings have loaded. Until then nothing may write: the PUT replaces
+  the whole list, so a write from an empty fallback would erase every saved favourite.
+  "Save as favourite" is disabled and the Settings card shows no rows; `save` refuses too.
+- `save(update: (current) => Favorite[])` computes the next list **at call time** from the
+  current one, then queues `PUT { favorites }` in one mutation (`mutationKey` and
+  `scope: { id: "favorites" }`), so the PUTs run one at a time and in order. It resolves
+  `true` once the server has the list, `false` when nothing was sent or the PUT failed.
+- The current list is `currentFavorites(cached, queued)`: the newest queued write, else the
+  cached settings. The writes' variables are the optimistic state (`useMutationState`), so a
+  settings refetch landing mid-queue — another write's `settings.updated`, a reconnect, a
+  mount — can neither flash an older list nor become the base of the next write. A success
+  writes the PUT's answer into `qk.settings`.
+- On error a toast. Once the queue drains, `qk.settings` is invalidated (re-read, not a
+  remembered rollback); while writes are queued, `settings.updated` does not invalidate it.
 
 ### UI
 
@@ -162,11 +179,15 @@ toast and an invalidation of `qk.settings` (re-read, not a remembered rollback).
   is empty. The chip whose `search` equals the current `canonicalSearch` is highlighted
   (`aria-pressed`); tapping it again clears the filters, tapping another applies it.
 - **Save**: "Save as favourite" in the filter sheet's footer, enabled only when
-  `isFiltered`. It reveals an inline name field + Save. A same-name save replaces that
-  favourite in place and toasts "Updated <name>"; a new one toasts "Saved <name>".
+  `isFiltered` and settings have loaded. It reveals an inline name field + Save. A same-name
+  save replaces that favourite in place and toasts "Updated <name>"; a new one toasts "Saved
+  <name>" — once the PUT has succeeded, never before. A refused save keeps the typed name.
 - **Manage**: a **Favourites** card in Settings (next to Projects): one row per favourite with
-  its name (inline rename, refusal shown under the field), ↑ / ↓ (disabled at the ends) and
-  delete. An empty list says how to save one.
+  its name (inline rename, at most 60 characters, refusal shown under the field), ↑ / ↓
+  (disabled at the ends) and delete. An empty list says how to save one. Rows are keyed by
+  position and a row's draft follows the name stored there, so a rename committed on blur
+  and the ↑ tap that blurred it both land (each is an update of the list current when it is
+  queued).
 
 ## 3. Session sidebar
 
@@ -254,7 +275,8 @@ Node-only vitest, as everywhere in `lib`:
   sessions hidden by a status filter; other statuses hidden by a status filter; Backlog
   group shown/opened (Backlog selected, a search match inside); empty sections dropped.
 - `favorites.test.ts`: case-insensitive replace in place; rename collision refused,
-  re-capitalisation allowed; move at both ends; remove; `activeFavorite`.
+  re-capitalisation allowed; move at both ends; remove; `activeFavorite` (also a stored
+  search in another order); `currentFavorites`.
 - `sidebar.test.ts`: `ended` excluded; group order (alphabetical, General last, unmapped
   into General); order within a group; unchanged by a state change; `splitHidden` keeps
   grouping and drops empty groups.

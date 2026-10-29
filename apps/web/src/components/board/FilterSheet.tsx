@@ -29,35 +29,48 @@ interface Props {
 const toggle = (list: string[], value: string) =>
   list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 
-/** Footer action: name the current filters and save them as a favourite (a same name updates that one). */
+/**
+ * Footer action: name the current filters and save them as a favourite (a same name updates
+ * that one). Offered only once settings have loaded: the list it adds to must be the
+ * server's. The toast waits for the server; a refused save keeps the name to fix.
+ */
 function SaveFavorite({ filters }: { filters: BoardFilters }) {
-  const { favorites, save } = useFavorites();
+  const { ready, save } = useFavorites();
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!isFiltered(filters)) return;
-    const { list, replaced } = addFavorite(favorites, name, canonicalSearch(filters));
-    if (list === favorites) return;
-    save(list);
-    // A same-name save keeps the stored name's capitalisation: name that one.
+    if (!isFiltered(filters) || saving) return;
     const typed = name.trim();
-    const stored = list.find((f) => f.name.toLowerCase() === typed.toLowerCase())?.name ?? typed;
-    toast.success(replaced ? `Updated ${stored}` : `Saved ${stored}`);
+    const search = canonicalSearch(filters);
+    // Filled by the update, which runs on the list current when the write is queued.
+    const outcome = { replaced: false, stored: typed };
+    setSaving(true);
+    const saved = await save((current) => {
+      const { list, replaced } = addFavorite(current, typed, search);
+      // A same-name save keeps the stored name's capitalisation: name that one.
+      outcome.replaced = replaced;
+      outcome.stored = list.find((f) => f.name.toLowerCase() === typed.toLowerCase())?.name ?? typed;
+      return list;
+    });
+    setSaving(false);
+    if (!saved) return;
+    toast.success(outcome.replaced ? `Updated ${outcome.stored}` : `Saved ${outcome.stored}`);
     setNaming(false);
     setName("");
   }
 
   if (!naming) {
     return (
-      <Button variant="outline" disabled={!isFiltered(filters)} onClick={() => setNaming(true)}>
+      <Button variant="outline" disabled={!ready || !isFiltered(filters)} onClick={() => setNaming(true)}>
         Save as favourite
       </Button>
     );
   }
   return (
-    <form onSubmit={submit} className="flex gap-2">
+    <form onSubmit={(e) => void submit(e)} className="flex gap-2">
       <Input
         autoFocus
         aria-label="Favourite name"
@@ -66,7 +79,7 @@ function SaveFavorite({ filters }: { filters: BoardFilters }) {
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
-      <Button type="submit" disabled={name.trim() === "" || !isFiltered(filters)}>
+      <Button type="submit" disabled={!ready || saving || name.trim() === "" || !isFiltered(filters)}>
         Save
       </Button>
     </form>

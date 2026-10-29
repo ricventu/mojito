@@ -57,3 +57,13 @@ export function activeFavorite(list: Favorite[], search: string): number {
   if (search === "") return -1;
   return list.findIndex((f) => canonicalSearch(parseFilters(new URLSearchParams(f.search))) === search);
 }
+
+/**
+ * The list to show and to compute the next write from: the newest queued write (its PUT may
+ * not have landed yet), else the cached settings. A refetch landing mid-queue therefore
+ * never shows an older list or becomes the base of the next write. `undefined` while
+ * settings have never loaded: a write then would replace the server's list with a guess.
+ */
+export function currentFavorites(cached: Favorite[] | undefined, queued: Favorite[][]): Favorite[] | undefined {
+  return queued.length > 0 ? queued[queued.length - 1] : cached;
+}

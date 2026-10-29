@@ -3,7 +3,7 @@ import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import type { MojitoEvent, SessionMeta, TaskRecord } from "@mojito/shared";
 import { openEventStream, type EventSocket } from "@/lib/eventStream";
 import { removeById, upsertById } from "@/lib/eventCache";
-import { qk } from "@/lib/queryKeys";
+import { favoritesMutationKey, qk } from "@/lib/queryKeys";
 import { getToken, subscribeToken } from "@/lib/token";
 
 function applyEvent(qc: QueryClient, e: MojitoEvent) {
@@ -20,7 +20,11 @@ function applyEvent(qc: QueryClient, e: MojitoEvent) {
       );
       break;
     case "settings.updated":
-      void qc.invalidateQueries({ queryKey: qk.settings });
+      // While favourites writes are queued, each one's own echo would refetch a list the
+      // next write already supersedes; the queue re-reads the settings once it drains.
+      if (qc.isMutating({ mutationKey: favoritesMutationKey }) === 0) {
+        void qc.invalidateQueries({ queryKey: qk.settings });
+      }
       break;
     case "tickets.changed":
       void qc.invalidateQueries({ queryKey: qk.tickets });
