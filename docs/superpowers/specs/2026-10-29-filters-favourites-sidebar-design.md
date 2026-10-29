@@ -240,11 +240,13 @@ highlighted (`aria-current`) when it is the terminal on screen. The hide button 
   while it is open, so Escape is not claude's).
 - **Pinned**: a docked `w-72` column, offered only at ≥ 1024px (`matchMedia`); below that the
   pin control is not rendered and a remembered pin is ignored: a docked sidebar closes when the
-  viewport drops below the breakpoint (keeping its pin) and re-docks when it comes back. The pin button lives in the
-  sidebar's header; unpinning a docked sidebar closes it. `hooks/useSidebar.ts` holds the
-  open flag, the pin (`localStorage` `mojito2-sidebar-pinned`, read in a `useState`
-  initialiser so a pinned sidebar docks on the first render, every access in try/catch)
-  and the media query.
+  viewport drops below the breakpoint (keeping its pin) and re-docks when it comes back. The
+  pin button lives in the sidebar's header. Leaving a docked sidebar — unpin, its ✕ or the
+  toolbar toggle — closes it **and drops the pin** (as in v1): a kept pin would re-dock it on
+  the next open and on a reload. `hooks/useSidebar.ts` holds the open flag, the pin
+  (`localStorage` `mojito2-sidebar-pinned`, read in the `useReducer` initialiser so a pinned
+  sidebar docks on the first render, every access in try/catch) and the media query; the
+  open/pin transitions are the pure `lib/sidebarState.ts`.
   - Board: the column is `fixed` on the left, the content gets the matching left padding.
   - Terminal: the root becomes a row (sidebar column + the current column); TerminalView's
     ResizeObserver re-fits once on dock/undock. No width transition: an animation would
@@ -255,7 +257,9 @@ highlighted (`aria-current`) when it is the terminal on screen. The hide button 
 
 ### Navigation
 
-Picking a row from the board **pushes** `/session/<id>` (Back returns to the board).
+A row is a link (`<Link>`, so Cmd/middle-click opens a new tab and iOS offers its long-press
+menu); a plain click also closes the overlay. Picking a row from the board **pushes**
+`/session/<id>` (Back returns to the board).
 Picking one from a terminal **replaces** the entry, so Back keeps meaning "the board" however
 many sessions were flipped through.
 

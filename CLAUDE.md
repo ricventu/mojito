@@ -149,17 +149,23 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   terminal's Board link and Kill's navigation, best effort.
 - **Favourites** (`lib/favorites.ts`, `hooks/useFavorites.ts`): chips under the search row
   (tap the active one = clear), saved from the filter sheet (a same-name save replaces in
-  place), managed in the Settings `FavoritesCard`. `save` is optimistic, then `PUT`; on error a
-  toast and a re-read, no remembered rollback.
+  place), managed in the Settings `FavoritesCard`. The PUT replaces the whole list, so nothing
+  writes before settings have loaded (`ready`). `save(update)` computes from the newest queued
+  write (else the cache) at call time, and the PUTs run serially in one mutation scope; the
+  queued variables are the optimistic state, so a refetch mid-queue can neither flash an older
+  list nor be the next write's base. `settings.updated` does not invalidate while writes are
+  queued; the queue re-reads once it drains. Error → toast, no remembered rollback.
 - **Session sidebar** (`components/sidebar`, `lib/sidebar.ts`, `hooks/useSidebar.ts`): every
   non-`ended` session, unfiltered by the board, grouped by project (General last), newest
   `createdAt` first — only immutable keys, so rows never jump when a state changes. Hide is
   per row (optimistic `setQueryData`, a failed `PATCH` re-reads), with a "Hidden (n)" footer.
   Unpinned it is a left `Sheet` overlay (never resizes the pty); pinned it is a docked `w-72`
   column, only at ≥ 1024px (`useMediaQuery`), pin in `localStorage` (`mojito2-sidebar-pinned`,
-  read in the `useState` initialiser so it docks on the first render, no pty resize twice).
-  The open/pin state machine is `lib/sidebarState.ts`: unpinning a docked sidebar closes it;
-  below 1024px a docked sidebar closes and keeps its pin, re-docking above it. Picking a row
+  read in the `useReducer` initialiser so it docks on the first render, no pty resize twice).
+  The open/pin state machine is `lib/sidebarState.ts`: closing a docked sidebar — unpin, ✕ or
+  the toggle — also **drops the pin** (as v1 did: a kept pin would re-dock it on the next
+  open); below 1024px a docked sidebar closes and keeps its pin, re-docking above it. Rows are
+  `<Link>`s (Cmd/middle-click, iOS long-press; a plain click closes the overlay). Picking a row
   pushes from the board, **replaces** from a terminal (Back stays "the board"). A docked
   sidebar is not rendered while the iOS keyboard is up.
 - Overlay sheets (filter, sidebar) draw their own ✕ (`showCloseButton={false}`): shadcn's
