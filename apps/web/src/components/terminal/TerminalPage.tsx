@@ -120,7 +120,7 @@ export function TerminalPage() {
 
   // Unknown only once the list has really answered: a launch navigates here while its
   // refetch is still in flight.
-  if (sessions.isSuccess && !sessions.isFetching && !session) return <Navigate to="/" replace />;
+  if (sessions.isSuccess && !sessions.isFetching && !session) return <Navigate to={boardHref()} replace />;
 
   return (
     // The bottom inset is the root's to pay only where the accessory bar is not: a fine
