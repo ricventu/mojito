@@ -12,6 +12,9 @@ export function defaultSettings(): Settings {
 const PROMPT_KEYS = Object.keys(DEFAULT_PROMPTS) as PromptKey[];
 
 export class SettingsRepo {
+  /** A corrupt favourites row is reported once, not on every read. */
+  private warnedFavorites = false;
+
   constructor(private db: Db) {}
 
   private read(key: string): unknown {
@@ -33,8 +36,16 @@ export class SettingsRepo {
       const p = prompts?.[k];
       if (typeof p === "string") out.prompts[k] = p;
     }
-    const favorites = FavoritesBody.safeParse(this.read("favorites"));
-    if (favorites.success) out.favorites = favorites.data;
+    const storedFavorites = this.read("favorites");
+    if (storedFavorites !== undefined) {
+      const favorites = FavoritesBody.safeParse(storedFavorites);
+      if (favorites.success) out.favorites = favorites.data;
+      else if (!this.warnedFavorites) {
+        this.warnedFavorites = true;
+        const why = favorites.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ");
+        console.warn(`settings: stored favorites are invalid, serving none (${why})`);
+      }
+    }
     return out;
   }
 

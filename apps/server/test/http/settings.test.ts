@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_PROMPTS } from "@mojito/shared";
 import { defaultSettings } from "../../src/db/settings";
 import { setup } from "./setup";
@@ -121,10 +121,19 @@ describe("/api/settings", () => {
     expect(settings.get().favorites).toEqual([]);
   });
 
-  it("reads a corrupt favourites row as none", () => {
-    const { settings, db } = setup();
-    db.prepare("INSERT INTO settings (key, value) VALUES ('favorites', ?)").run(JSON.stringify([{ name: 1 }]));
-    expect(settings.get().favorites).toEqual([]);
+  it("reads a corrupt favourites row as none, warning once with the reason", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { settings, db } = setup();
+      db.prepare("INSERT INTO settings (key, value) VALUES ('favorites', ?)").run(JSON.stringify([{ name: 1 }]));
+      expect(settings.get().favorites).toEqual([]);
+      expect(settings.get().favorites).toEqual([]);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toMatch(/favorites/);
+      expect(String(warn.mock.calls[0][0])).toMatch(/name/);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("emits settings.updated on a successful PUT only", async () => {

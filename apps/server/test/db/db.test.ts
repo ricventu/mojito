@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
+import Database from "better-sqlite3";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openDb, migrate } from "../../src/db/db";
+import { migrations } from "../../src/db/migrations";
 import { ProjectsRepo, importProjectsJson, importProjectsOnce } from "../../src/db/projects";
 import { SettingsRepo } from "../../src/db/settings";
 import { SessionsRepo } from "../../src/db/sessions";
@@ -31,6 +33,26 @@ describe("migrate", () => {
     const db = openDb(":memory:");
     const columns = db.prepare("PRAGMA table_info(sessions)").all() as { name: string; notnull: number; dflt_value: string | null }[];
     expect(columns.find((c) => c.name === "hidden")).toMatchObject({ notnull: 1, dflt_value: "0" });
+  });
+  it("migrates an existing version-2 database, its sessions reading back visible", () => {
+    // A database as the build before 003 left it: migrations 1 and 2 applied, one session.
+    const db = new Database(":memory:");
+    db.exec("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY)");
+    for (const m of migrations.filter((m) => m.version <= 2)) {
+      db.exec(m.sql);
+      db.prepare("INSERT INTO schema_migrations (version) VALUES (?)").run(m.version);
+    }
+    db.prepare(
+      `INSERT INTO sessions (id, kind, project, ticket, cwd, model, effort, state, alert, created_at, last_event_at)
+       VALUES ('mj-RIC-1', 'ticket', 'Web', 'RIC-1', '/w', 'opus', 'high', 'idle', NULL, 1, 2)`,
+    ).run();
+    migrate(db);
+    expect(db.prepare("SELECT version FROM schema_migrations").all()).toEqual([
+      { version: 1 },
+      { version: 2 },
+      { version: 3 },
+    ]);
+    expect(new SessionsRepo(db).get("mj-RIC-1")).toEqual(session({ state: "idle", lastEventAt: 2, hidden: false }));
   });
   it("enforces foreign keys pragma", () => {
     const db = openDb(":memory:");
