@@ -306,7 +306,7 @@
     open: boolean; docked: boolean; canPin: boolean; pinned: boolean;
     toggle(): void;            // docked → closes and unpins; else flips open
     close(): void;
-    setPinned(p: boolean): void; // unpinning leaves it open as an overlay
+    setPinned(p: boolean): void; // unpinning a docked sidebar closes it (spec §3)
   }
   export function useSidebar(): SidebarState; // open initialised to pinned && canPin; docked = open && pinned && canPin
   // SessionSidebar props
@@ -325,7 +325,7 @@
 
 - [ ] **Step 3: Run** safe-area test + `pnpm v2:test && pnpm v2:typecheck` — PASS.
 
-- [ ] **Step 4: Drive it**: overlay on a narrow window (pick closes it; Back from a terminal reached by switching returns to the board); ≥1024px pin docks on board and terminal, terminal re-fits once, unpin leaves an overlay, toggle on a docked one closes and unpins, reload keeps the pin; hide a row → Hidden (1) footer, unhide; hide on one tab shows hidden on another.
+- [ ] **Step 4: Drive it**: overlay on a narrow window (pick closes it; Back from a terminal reached by switching returns to the board); ≥1024px pin docks on board and terminal, terminal re-fits once, unpin closes it, toggle on a docked one closes and unpins, reload keeps the pin; hide a row → Hidden (1) footer, unhide; hide on one tab shows hidden on another.
 
 - [ ] **Step 5: Commit** `feat(v2/web): live sessions sidebar on the board and the terminal (RIC-502)`
 
