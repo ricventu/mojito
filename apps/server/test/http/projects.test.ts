@@ -41,6 +41,22 @@ describe("POST /api/projects", () => {
     expect(projects.isEmpty()).toBe(true);
   });
 
+  it("keeps a path under the home directory as typed, checking it expanded", async () => {
+    const { req, projects, exists } = setup();
+    const res = await req("/api/projects", { method: "POST", json: { ...web, path: "~/repo/web" } });
+    expect(res.status).toBe(201);
+    expect(exists).toHaveBeenCalledWith("/home/me/repo/web");
+    expect(projects.get("Web")?.path).toBe("~/repo/web");
+  });
+
+  it("names the expanded path when a home path does not exist", async () => {
+    const { req, exists } = setup();
+    exists.mockReturnValue(false);
+    const res = await req("/api/projects", { method: "POST", json: { ...web, path: "~/gone" } });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "project path not found: /home/me/gone" });
+  });
+
   it("refuses a name that already exists", async () => {
     const { req, projects } = setup();
     projects.upsert(web);

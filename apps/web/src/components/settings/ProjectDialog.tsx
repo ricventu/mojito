@@ -18,7 +18,7 @@ import { qk } from "@/lib/queryKeys";
 /** Italian text for the field a client-side check rejected; the server's own messages are shown as they come. */
 const FIELD_ERRORS: Record<string, string> = {
   name: "Il nome è obbligatorio.",
-  path: "Il percorso deve essere assoluto (inizia con /).",
+  path: "Il percorso deve essere assoluto (inizia con / o ~/).",
   teamKey: "La chiave del team va scritta in maiuscolo, ad esempio RIC.",
 };
 
@@ -77,7 +77,7 @@ function Form({ project, onClose }: Props) {
           id="project-path"
           value={path}
           onChange={(e) => setPath(e.target.value)}
-          placeholder="/home/utente/code/progetto"
+          placeholder="~/code/progetto"
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}

@@ -53,11 +53,12 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   `projects.json` (`~/.config/mojito/projects.json`) is imported once per database, then
   projects are edited in Settings.
 - **Launch** (`sessions/launch.ts`): validate (ticket in cache, project mapped, path absolute
-  and existing) → in-memory lock per id (double tap = one 201 + one 409) → live row check
-  (dead tmux → row ended, proceed; live → 409 with `sessionId`) → write hook settings
-  (`<stateDir>/hooks/<id>.json`, mode 0600) → `newSession` → insert row `starting` → stall
-  watch → Linear writes (In Progress + assign; failures become a `warning`, never fail the
-  launch). Ticket id `mj-<TICKET>`, free sessions `mj-<slug>-<hex6>`.
+  and existing — a project path may be `~`/`~/…`, stored as typed and expanded to HOME by
+  `homePath.ts` wherever it meets the disk) → in-memory lock per id (double tap = one 201 +
+  one 409) → live row check (dead tmux → row ended, proceed; live → 409 with `sessionId`) →
+  write hook settings (`<stateDir>/hooks/<id>.json`, mode 0600) → `newSession` → insert row
+  `starting` → stall watch → Linear writes (In Progress + assign; failures become a
+  `warning`, never fail the launch). Ticket id `mj-<TICKET>`, free sessions `mj-<slug>-<hex6>`.
 - **The prompt** (`sessions/prompt.ts`) is the whole instruction, in Italian, pinned
   byte-for-byte by its test: read ticket X from Linear and execute it; when ready for
   review, move it to "In Review" on Linear; with brainstorming, one extra line asking for

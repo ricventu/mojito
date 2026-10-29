@@ -2,17 +2,20 @@ import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { ProjectBody } from "@mojito/shared";
 import { Hono } from "hono";
+import { expandHome } from "../../homePath";
 import type { AppDeps } from "../app";
 import { parseBody } from "../body";
 
 /**
- * The projects map. A path must be absolute and exist on disk: a session is spawned there, and
- * a relative path resolves against whatever cwd tmux happens to have. Every change refreshes
- * the board, whose Linear query is scoped to the project names.
+ * The projects map. A path must be absolute (`~` counts, expanded to the server's home) and
+ * exist on disk: a session is spawned there, and a relative path resolves against whatever cwd
+ * tmux happens to have. The path is stored as typed. Every change refreshes the board, whose
+ * Linear query is scoped to the project names.
  */
 export function projectRoutes(deps: AppDeps): Hono {
   const exists = deps.exists ?? existsSync;
-  const pathError = (path: string): string | null => {
+  const pathError = (typed: string): string | null => {
+    const path = expandHome(typed, deps.cfg.home);
     if (!isAbsolute(path)) return `project path must be absolute: ${path}`;
     if (!exists(path)) return `project path not found: ${path}`;
     return null;

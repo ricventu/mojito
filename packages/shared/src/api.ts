@@ -32,7 +32,8 @@ export type LaunchBody = z.infer<typeof LaunchBody>;
 
 export const ProjectBody = z.object({
   name: z.string().min(1),
-  path: z.string().startsWith("/"),
+  /** Absolute, or under the server's home: `~` or `~/…` (expanded by the server, stored as typed). */
+  path: z.string().regex(/^(\/|~(\/|$))/),
   teamKey: z.string().regex(/^[A-Z][A-Z0-9]*$/),
 });
 export type ProjectBody = z.infer<typeof ProjectBody>;

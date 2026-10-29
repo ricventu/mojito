@@ -214,6 +214,15 @@ describe("launchTicket", () => {
     expect(deps.writeFile).not.toHaveBeenCalled();
   });
 
+  it("launches in a project path under the home directory, recording it expanded", async () => {
+    const { deps, projects } = setup();
+    projects.upsert({ name: "Web", path: "~/repo/web", teamKey: "RIC" });
+    const res = await launchTicket(body(), deps);
+    expect(res).toMatchObject({ ok: true, session: { cwd: "/home/me/repo/web" } });
+    expect(deps.exists).toHaveBeenCalledWith("/home/me/repo/web");
+    expect(vi.mocked(deps.newSession).mock.calls[0][1]).toBe("/home/me/repo/web");
+  });
+
   it("answers 400 for a project path that does not exist, and opens no tmux", async () => {
     const { deps, sessions, linear } = setup({ exists: vi.fn(() => false) });
     expect(await launchTicket(body(), deps)).toEqual({ ok: false, status: 400, error: "project path not found: /repo/web" });
@@ -346,6 +355,14 @@ describe("launchFree", () => {
     projects.upsert({ name: "My App.v2", path: "/repo/app", teamKey: "RIC" });
     const res = await launchFree(free({ project: "My App.v2" }), deps);
     expect(res).toMatchObject({ ok: true, session: { id: "mj-my-app-v2-a1b2c3", cwd: "/repo/app" } });
+  });
+
+  it("opens in a project path under the home directory", async () => {
+    const { deps, projects } = setup();
+    projects.upsert({ name: "Home", path: "~/repo/home", teamKey: "RIC" });
+    const res = await launchFree(free({ kind: "shell", project: "Home" }), deps);
+    expect(res).toMatchObject({ ok: true, session: { cwd: "/home/me/repo/home" } });
+    expect(vi.mocked(deps.newSession).mock.calls[0][1]).toBe("/home/me/repo/home");
   });
 
   it("opens a General session in the home directory", async () => {

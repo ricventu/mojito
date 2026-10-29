@@ -6,6 +6,7 @@ import type { ServerConfig } from "../config";
 import type { ProjectsRepo } from "../db/projects";
 import type { SessionsRepo } from "../db/sessions";
 import type { EventBus } from "../events/bus";
+import { expandHome } from "../homePath";
 import type { LinearClient } from "../linear/client";
 import type { TicketCache } from "../tickets/cache";
 import { DuplicateSessionError, PREFIX, hasSession, newSession, q } from "../tmux/tmux";
@@ -106,7 +107,8 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
   if (ticket.project === null) return { ok: false, status: 400, error: `ticket has no project: ${body.ticket}` };
   const project = deps.projects.get(ticket.project);
   if (!project) return { ok: false, status: 400, error: `project not mapped: ${ticket.project}` };
-  if (!usableDir(deps, project.path)) return { ok: false, status: 400, error: `project path not found: ${project.path}` };
+  const cwd = expandHome(project.path, deps.cfg.home);
+  if (!usableDir(deps, cwd)) return { ok: false, status: 400, error: `project path not found: ${cwd}` };
 
   const id = `${PREFIX}${body.ticket}`;
   if (launching.has(id)) return conflict(id);
@@ -123,7 +125,7 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
     const settingsPath = hookSettingsPath(deps.cfg, id);
     deps.writeFile(settingsPath, JSON.stringify(buildHookSettings(id, deps.cfg.port, deps.cfg.token)));
     const command = claudeCommand(body.model, body.effort, settingsPath, buildTicketPrompt(body.ticket, body.brainstorming));
-    const refused = await spawn(deps, id, project.path, command);
+    const refused = await spawn(deps, id, cwd, command);
     if (refused) return refused;
 
     const now = deps.now();
@@ -132,7 +134,7 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
       kind: "ticket",
       project: ticket.project,
       ticket: body.ticket,
-      cwd: project.path,
+      cwd,
       model: body.model,
       effort: body.effort,
       brainstorming: body.brainstorming,
@@ -171,7 +173,7 @@ export async function launchFree(body: LaunchFreeBody, deps: LaunchDeps): Promis
   if (body.project !== null) {
     const project = deps.projects.get(body.project);
     if (!project) return { ok: false, status: 400, error: `project not mapped: ${body.project}` };
-    cwd = project.path;
+    cwd = expandHome(project.path, deps.cfg.home);
   }
   if (!usableDir(deps, cwd)) return { ok: false, status: 400, error: `project path not found: ${cwd}` };
 

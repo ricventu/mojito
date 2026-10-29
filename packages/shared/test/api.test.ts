@@ -48,6 +48,18 @@ describe("ProjectBody", () => {
   it("accepts an absolute path", () => {
     expect(ProjectBody.safeParse({ name: "x", path: "/code/x", teamKey: "RIC" }).success).toBe(true);
   });
+
+  it("accepts a path under the home directory", () => {
+    for (const path of ["~", "~/", "~/code/x"]) {
+      expect(ProjectBody.safeParse({ name: "x", path, teamKey: "RIC" }).success).toBe(true);
+    }
+  });
+
+  it("rejects another user's home and a bare tilde name", () => {
+    for (const path of ["~bob/code", "~code"]) {
+      expect(ProjectBody.safeParse({ name: "x", path, teamKey: "RIC" }).success).toBe(false);
+    }
+  });
 });
 
 describe("SettingsBody and StatusBody", () => {
