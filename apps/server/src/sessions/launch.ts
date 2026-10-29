@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
-import { LaunchTicketBody, type Effort, type LaunchFreeBody, type Model, type SessionMeta } from "@mojito/shared";
+import { LaunchTicketBody, type Effort, type LaunchFreeBody, type Model, type Prompts, type SessionMeta } from "@mojito/shared";
 import type { ServerConfig } from "../config";
 import type { ProjectsRepo } from "../db/projects";
 import type { SessionsRepo } from "../db/sessions";
@@ -27,6 +27,8 @@ export interface LaunchDeps {
   writeFile(path: string, data: string): void;
   now(): number;
   randomHex(): string;
+  /** The prompts as Settings has them now: read on every launch, so an edit needs no restart. */
+  prompts(): Prompts;
 }
 
 export type LaunchResult =
@@ -124,7 +126,7 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
 
     const settingsPath = hookSettingsPath(deps.cfg, id);
     deps.writeFile(settingsPath, JSON.stringify(buildHookSettings(id, deps.cfg.port, deps.cfg.token)));
-    const command = claudeCommand(body.model, body.effort, settingsPath, buildTicketPrompt(body.ticket));
+    const command = claudeCommand(body.model, body.effort, settingsPath, buildTicketPrompt(body.ticket, deps.prompts().ticket));
     const refused = await spawn(deps, id, cwd, command);
     if (refused) return refused;
 

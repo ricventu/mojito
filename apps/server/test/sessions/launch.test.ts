@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LaunchFreeBody, LaunchTicketBody, MojitoEvent, SessionMeta, TicketSummary } from "@mojito/shared";
+import { DEFAULT_PROMPTS, type LaunchFreeBody, type LaunchTicketBody, type MojitoEvent, type SessionMeta, type TicketSummary } from "@mojito/shared";
 import type { ServerConfig } from "../../src/config";
 import { openDb } from "../../src/db/db";
 import { ProjectsRepo } from "../../src/db/projects";
@@ -61,6 +61,7 @@ function setup(over: Partial<LaunchDeps> = {}, opts: { stateDir?: string } = {})
     writeFile: vi.fn((path: string, data: string) => void files.set(path, data)),
     now: () => 1000,
     randomHex: () => "a1b2c3",
+    prompts: () => DEFAULT_PROMPTS,
     ...over,
   };
   return { deps, sessions, projects, events, tickets, linear, files };
@@ -150,6 +151,13 @@ describe("launchTicket", () => {
     expect(cmd).toBe(
       `claude --model 'sonnet' --effort 'max' --settings '/state/hooks/mj-RIC-1.json' ${q(buildTicketPrompt("RIC-1"))}`,
     );
+  });
+
+  it("uses the ticket prompt from the settings as they are at launch", async () => {
+    const { deps } = setup({ prompts: () => ({ ...DEFAULT_PROMPTS, ticket: "Work on {ticket}, it's urgent." }) });
+    await launchTicket(body(), deps);
+    const cmd = vi.mocked(deps.newSession).mock.calls[0][2];
+    expect(cmd).toBe(`claude --model 'opus' --effort 'high' --settings '/state/hooks/mj-RIC-1.json' ${q("Work on RIC-1, it's urgent.")}`);
   });
 
   it("quotes an apostrophe in the settings path", async () => {

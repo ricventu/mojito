@@ -1,5 +1,5 @@
 import type { query } from "@anthropic-ai/claude-agent-sdk";
-import type { TaskRecord } from "@mojito/shared";
+import type { Prompts, TaskRecord } from "@mojito/shared";
 import type { ProjectsRepo } from "../db/projects";
 import type { TasksRepo } from "../db/tasks";
 import { spawnEnv } from "../env/childEnv";
@@ -7,7 +7,7 @@ import type { EventBus } from "../events/bus";
 import { errorMessage } from "../http/body";
 import type { LinearClient } from "../linear/client";
 import type { TicketCache } from "../tickets/cache";
-import { CREATE_TICKET_SYSTEM, buildCreateTicketMessage } from "./createTicket";
+import { buildCreateTicketMessage } from "./createTicket";
 import { LINEAR_MCP_NAME, createLinearMcp } from "./linearTools";
 
 export type QueryFn = typeof query;
@@ -22,6 +22,8 @@ export interface TaskQueueDeps {
   fetchImage(url: string): Promise<{ mediaType: string; base64: string }>;
   concurrency?: number;
   now(): number;
+  /** The prompts as Settings has them now: read when each task starts. */
+  prompts(): Prompts;
 }
 
 type Created = { identifier: string; url: string };
@@ -129,7 +131,7 @@ export class TaskQueue {
       })(),
       options: {
         model: "sonnet",
-        systemPrompt: CREATE_TICKET_SYSTEM,
+        systemPrompt: this.deps.prompts().createTicket,
         settingSources: [],
         tools: [],
         mcpServers: { [LINEAR_MCP_NAME]: mcp },

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_PROMPTS } from "@mojito/shared";
 import { defaultSettings } from "../../src/db/settings";
 import { setup } from "./setup";
 
@@ -28,5 +29,49 @@ describe("/api/settings", () => {
     });
     expect(res.status).toBe(400);
     expect(settings.get()).toEqual(defaultSettings());
+  });
+
+  it("answers the default prompts until they are edited", async () => {
+    const { req } = setup();
+    const body = (await (await req("/api/settings")).json()) as Record<string, any>;
+    expect(body.prompts).toEqual(DEFAULT_PROMPTS);
+  });
+
+  it("stores edited prompts and leaves the status defaults alone", async () => {
+    const { req, settings } = setup();
+    await req("/api/settings", { method: "PUT", json: { statusDefaults: { Todo: { model: "sonnet", effort: "low" } } } });
+    const prompts = { ticket: "Do {ticket}.", createTicket: "Be brief." };
+    const res = await req("/api/settings", { method: "PUT", json: { prompts } });
+    expect(res.status).toBe(200);
+    expect(settings.get().prompts).toEqual(prompts);
+    expect(settings.get().statusDefaults.Todo).toEqual({ model: "sonnet", effort: "low" });
+  });
+
+  it("leaves the prompts alone when only the status defaults are sent", async () => {
+    const { req, settings } = setup();
+    const prompts = { ticket: "Do {ticket}.", createTicket: "Be brief." };
+    await req("/api/settings", { method: "PUT", json: { prompts } });
+    await req("/api/settings", { method: "PUT", json: { statusDefaults: { Todo: { model: "sonnet", effort: "low" } } } });
+    expect(settings.get().prompts).toEqual(prompts);
+  });
+
+  it("stores no copy of a default, so a prompt never edited follows the shipped one", async () => {
+    const { req, db } = setup();
+    await req("/api/settings", { method: "PUT", json: { prompts: { ...DEFAULT_PROMPTS, createTicket: "Be brief." } } });
+    const row = db.prepare("SELECT value FROM settings WHERE key = 'prompts'").get() as { value: string };
+    expect(JSON.parse(row.value)).toEqual({ createTicket: "Be brief." });
+  });
+
+  it("refuses a ticket prompt without {ticket}", async () => {
+    const { req, settings } = setup();
+    const res = await req("/api/settings", { method: "PUT", json: { prompts: { ...DEFAULT_PROMPTS, ticket: "Do the ticket." } } });
+    expect(res.status).toBe(400);
+    expect(settings.get().prompts).toEqual(DEFAULT_PROMPTS);
+  });
+
+  it("refuses a blank create-ticket prompt", async () => {
+    const { req } = setup();
+    const res = await req("/api/settings", { method: "PUT", json: { prompts: { ...DEFAULT_PROMPTS, createTicket: "  \n" } } });
+    expect(res.status).toBe(400);
   });
 });

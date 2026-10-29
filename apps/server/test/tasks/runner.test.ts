@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { MojitoEvent, TaskRecord } from "@mojito/shared";
+import { DEFAULT_PROMPTS, type MojitoEvent, type Prompts, type TaskRecord } from "@mojito/shared";
 import { openDb } from "../../src/db/db";
 import { ProjectsRepo } from "../../src/db/projects";
 import { TasksRepo } from "../../src/db/tasks";
@@ -20,7 +20,7 @@ const creatingModel = async function* (p: Params) {
   yield result("Created RIC-9");
 };
 
-function setup(over: { query?: (p: Params) => AsyncGenerator<unknown>; concurrency?: number } = {}) {
+function setup(over: { query?: (p: Params) => AsyncGenerator<unknown>; concurrency?: number; prompts?: () => Prompts } = {}) {
   const db = openDb(":memory:");
   const tasks = new TasksRepo(db);
   const projects = new ProjectsRepo(db);
@@ -44,6 +44,7 @@ function setup(over: { query?: (p: Params) => AsyncGenerator<unknown>; concurren
     query: query as unknown as QueryFn,
     fetchImage,
     now: () => 5000,
+    prompts: over.prompts ?? (() => DEFAULT_PROMPTS),
     ...(over.concurrency !== undefined ? { concurrency: over.concurrency } : {}),
   });
   const add = (id: string, input: Partial<TaskRecord["input"]> = {}) => {
@@ -111,13 +112,21 @@ describe("TaskQueue", () => {
       allowedTools: ["mcp__mojito-linear__*"],
       maxTurns: 10,
     });
-    expect(typeof options.systemPrompt).toBe("string");
+    expect(options.systemPrompt).toBe(DEFAULT_PROMPTS.createTicket);
     expect(Object.keys(options.mcpServers!)).toEqual(["mojito-linear"]);
     expect(options.env).toBeDefined();
     expect(options.env).not.toHaveProperty("LINEAR_API_KEY");
     expect(options.env).not.toHaveProperty("ANTHROPIC_API_KEY");
     expect(options.env).not.toHaveProperty("ANTHROPIC_AUTH_TOKEN");
     expect(options.env).toHaveProperty("PATH");
+  });
+
+  it("runs on the create-ticket prompt from the settings as they are when the task starts", async () => {
+    const { tasks, queue, add, query } = setup({ prompts: () => ({ ...DEFAULT_PROMPTS, createTicket: "Write it in English." }) });
+    add("t1");
+    queue.enqueue("t1");
+    await settled(tasks, "t1");
+    expect(query.mock.calls[0][0].options!.systemPrompt).toBe("Write it in English.");
   });
 
   it("downloads the images and hands them to the model", async () => {

@@ -50,7 +50,8 @@ async function main(): Promise<void> {
   const bus = new EventBus();
   const linear = new LinearClient(cfg.linearApiKey);
   const tickets = new TicketCache({ linear, projects: () => projects.list().map((p) => p.name), bus });
-  const launch: LaunchDeps = { cfg, sessions, projects, bus, linear, tickets, ...defaultLaunchIo() };
+  const prompts = () => settings.get().prompts;
+  const launch: LaunchDeps = { cfg, sessions, projects, bus, linear, tickets, prompts, ...defaultLaunchIo() };
   // Nothing is re-enqueued at boot: `failInterrupted` above already failed whatever was in
   // flight, and those are retried from the UI.
   const taskQueue = new TaskQueue({
@@ -62,6 +63,7 @@ async function main(): Promise<void> {
     query,
     fetchImage: linearImageFetcher(cfg.linearApiKey),
     now: Date.now,
+    prompts,
   });
 
   const { ended, adopted, revived } = await reconcileSessions({

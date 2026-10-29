@@ -1,4 +1,5 @@
 import type { Effort, Model } from "./models";
+import type { Prompts } from "./prompts";
 
 export type SessionState = "starting" | "running" | "needs-input" | "idle" | "ended";
 export type SessionKind = "ticket" | "claude" | "shell";
@@ -10,6 +11,8 @@ export interface StatusDefault {
 
 export interface Settings {
   statusDefaults: Record<string, StatusDefault>;
+  /** Always complete: a prompt never edited answers its default. */
+  prompts: Prompts;
 }
 
 export interface ProjectRow {

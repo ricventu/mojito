@@ -3,9 +3,10 @@ import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { DefaultsCard } from "./DefaultsCard";
 import { ProjectsCard } from "./ProjectsCard";
+import { PromptsCard } from "./PromptsCard";
 import { ThemeCard } from "./ThemeCard";
 
-/** `/settings`: projects, per-status launch defaults and theme. Full-bleed, so it pays the safe-area insets itself. */
+/** `/settings`: projects, per-status launch defaults, prompts and theme. Full-bleed, so it pays the safe-area insets itself. */
 export function SettingsPage() {
   return (
     <main className="min-h-dvh pt-[var(--sat)] pr-[var(--sar)] pb-[var(--sab)] pl-[var(--sal)]">
@@ -20,6 +21,7 @@ export function SettingsPage() {
         </header>
         <ProjectsCard />
         <DefaultsCard />
+        <PromptsCard />
         <ThemeCard />
       </div>
     </main>

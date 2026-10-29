@@ -32,8 +32,9 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
 
 - `packages/shared` — types (`SessionMeta`, `TaskRecord`, `TicketSummary`, `BoardTickets`,
   `Settings`, `ProjectRow`), zod request bodies (`LaunchBody`, `ProjectBody`, `SettingsBody`,
-  `StatusBody`), `MojitoEvent`, `MODELS`/`EFFORTS`, `SESSION_GONE_CODE` (4404). Consumed as
-  source, no build; zod **4** everywhere (the Agent SDK's peer).
+  `PromptsBody`, `StatusBody`), `MojitoEvent`, `MODELS`/`EFFORTS`, `DEFAULT_PROMPTS`,
+  `SESSION_GONE_CODE` (4404). Consumed as source, no build; zod **4** everywhere (the Agent
+  SDK's peer).
 - `apps/server` — Node 22, Hono 4 on `@hono/node-server`, `ws` on the http `upgrade` event,
   `node-pty`, `better-sqlite3`. Built with tsup (`tsup.config.ts` bundles `@mojito/shared`
   — without `noExternal` the built server dies importing `.ts`).
@@ -59,12 +60,18 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   write hook settings (`<stateDir>/hooks/<id>.json`, mode 0600) → `newSession` → insert row
   `starting` → stall watch → Linear writes (In Progress + assign; failures become a
   `warning`, never fail the launch). Ticket id `mj-<TICKET>`, free sessions `mj-<slug>-<hex6>`.
-- **The prompt** (`sessions/prompt.ts`) is the whole instruction, in English, pinned
-  byte-for-byte by its test: read ticket X from Linear and execute it; when ready for
-  review, move it to "In Review" on Linear; use `superpowers:brainstorming` first only if the
-  ticket leaves design decisions open. Brainstorming is not a launch option — the session
-  decides it, like branches/worktrees. Nothing else.
+- **The prompt** is the whole instruction, in English: read ticket X from Linear and execute
+  it; when ready for review, move it to "In Review" on Linear; use `superpowers:brainstorming`
+  first only if the ticket leaves design decisions open. Brainstorming is not a launch option —
+  the session decides it, like branches/worktrees. Nothing else.
   Mojito writes In Progress; the session writes In Review; Done is the human's.
+- **Prompts are settings** (RIC-513): the ticket prompt (a template; `{ticket}` required,
+  filled by `buildTicketPrompt`) and the create-ticket system prompt. Defaults live in
+  `shared/src/prompts.ts` (`DEFAULT_PROMPTS`; the ticket one pinned byte-for-byte by
+  `prompt.test.ts`), one line per paragraph so they edit cleanly in a phone textarea. The
+  `prompts` settings key stores only the edits — a prompt equal to its default is dropped, so it
+  follows later changes to the shipped text. Read via `deps.prompts()` at each launch/task, no
+  restart. `PUT /api/settings` is partial: each top-level key sent replaces that part only.
 - **Live state** comes only from Claude Code hooks (`hookSettings.ts` → curl to
   `127.0.0.1:<port>/api/hook` with `x-mojito-token` and claude's hook JSON as body;
   `hookMap.ts`, `hooks.ts`). `ended` is sticky for hooks. Read from the body: SessionEnd

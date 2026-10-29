@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { EFFORTS, MODELS } from "./models";
+import { PromptsBody } from "./prompts";
 
 export const LaunchTicketBody = z.object({
   kind: z.literal("ticket"),
@@ -37,8 +38,10 @@ export const ProjectBody = z.object({
 });
 export type ProjectBody = z.infer<typeof ProjectBody>;
 
+/** A partial update: each key sent replaces that part of the settings, a key left out keeps it. */
 export const SettingsBody = z.object({
-  statusDefaults: z.record(z.string(), z.object({ model: z.enum(MODELS), effort: z.enum(EFFORTS) })),
+  statusDefaults: z.record(z.string(), z.object({ model: z.enum(MODELS), effort: z.enum(EFFORTS) })).optional(),
+  prompts: PromptsBody.optional(),
 });
 export type SettingsBody = z.infer<typeof SettingsBody>;
 

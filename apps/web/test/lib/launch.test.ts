@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { Settings, TicketSummary } from "@mojito/shared";
+import { DEFAULT_PROMPTS, type Settings, type TicketSummary } from "@mojito/shared";
 import { ApiError } from "@/lib/api";
 import { initialLaunchOptions, launchErrorAction } from "@/lib/launch";
 
 const settings: Settings = {
   statusDefaults: { Todo: { model: "sonnet", effort: "medium" } },
+  prompts: DEFAULT_PROMPTS,
 };
 
 function ticket(statusName: string): TicketSummary {

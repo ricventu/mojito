@@ -131,7 +131,7 @@ describe("importProjectsOnce", () => {
     const db = openDb(":memory:");
     const settings = new SettingsRepo(db);
     settings.markProjectsImported();
-    expect(Object.keys(settings.get())).toEqual(["statusDefaults"]);
+    expect(Object.keys(settings.get())).toEqual(["statusDefaults", "prompts"]);
   });
 });
 

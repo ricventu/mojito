@@ -1,4 +1,4 @@
-import type { Settings, StatusDefault } from "@mojito/shared";
+import { DEFAULT_PROMPTS, type PromptKey, type Settings, type SettingsBody, type StatusDefault } from "@mojito/shared";
 import type { Db } from "./db";
 
 const STATUSES = ["Backlog", "Todo", "In Progress", "In Review"] as const;
@@ -6,8 +6,10 @@ const STATUSES = ["Backlog", "Todo", "In Progress", "In Review"] as const;
 export function defaultSettings(): Settings {
   const statusDefaults: Record<string, StatusDefault> = {};
   for (const s of STATUSES) statusDefaults[s] = { model: "opus", effort: "high" };
-  return { statusDefaults };
+  return { statusDefaults, prompts: { ...DEFAULT_PROMPTS } };
 }
+
+const PROMPT_KEYS = Object.keys(DEFAULT_PROMPTS) as PromptKey[];
 
 export class SettingsRepo {
   constructor(private db: Db) {}
@@ -26,6 +28,11 @@ export class SettingsRepo {
     const out = defaultSettings();
     const stored = this.read("statusDefaults");
     if (stored && typeof stored === "object") Object.assign(out.statusDefaults, stored);
+    const prompts = this.read("prompts") as Record<string, unknown> | undefined;
+    for (const k of PROMPT_KEYS) {
+      const p = prompts?.[k];
+      if (typeof p === "string") out.prompts[k] = p;
+    }
     return out;
   }
 
@@ -44,10 +51,17 @@ export class SettingsRepo {
       .run();
   }
 
-  set(s: Settings): void {
+  /** Replaces each part `s` carries and keeps the others. */
+  set(s: SettingsBody): void {
     const put = this.db.prepare(
       "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
     );
-    put.run("statusDefaults", JSON.stringify(s.statusDefaults));
+    if (s.statusDefaults) put.run("statusDefaults", JSON.stringify(s.statusDefaults));
+    if (s.prompts) {
+      // Only the edits are stored: a prompt equal to its default keeps following the shipped
+      // text when a later version changes it.
+      const edited = Object.fromEntries(PROMPT_KEYS.flatMap((k) => (s.prompts![k] === DEFAULT_PROMPTS[k] ? [] : [[k, s.prompts![k]]])));
+      put.run("prompts", JSON.stringify(edited));
+    }
   }
 }

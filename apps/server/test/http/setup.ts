@@ -71,6 +71,7 @@ export function setup(over: Partial<AppDeps> = {}) {
     writeFile: vi.fn(),
     now: () => 1000,
     randomHex: () => "a1b2c3",
+    prompts: () => settings.get().prompts,
   };
   const closeSession = vi.fn(async (_name: string) => ({ closed: true }));
   const exists = vi.fn((_path: string) => true);

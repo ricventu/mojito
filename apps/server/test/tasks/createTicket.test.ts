@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { CREATE_TICKET_SYSTEM, buildCreateTicketMessage } from "../../src/tasks/createTicket";
+import { DEFAULT_PROMPTS } from "@mojito/shared";
+import { buildCreateTicketMessage } from "../../src/tasks/createTicket";
+
+const CREATE_TICKET_SYSTEM = DEFAULT_PROMPTS.createTicket;
 
 const input = { teamKey: "RIC", project: "Web", note: "the save button is broken", imageUrls: [] as string[] };
 
@@ -45,7 +48,7 @@ describe("buildCreateTicketMessage", () => {
   });
 });
 
-describe("CREATE_TICKET_SYSTEM", () => {
+describe("the default create-ticket prompt", () => {
   it("never asks questions, and names its own tools rather than a Linear MCP", () => {
     expect(CREATE_TICKET_SYSTEM).toContain("Do not ask questions: if the note is vague, create a ticket faithful to what it says.");
     expect(CREATE_TICKET_SYSTEM).not.toContain("ask in this terminal");
