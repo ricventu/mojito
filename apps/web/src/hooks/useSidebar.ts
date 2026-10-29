@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { isDocked, sidebarReducer, type SidebarModel } from "@/lib/sidebarState";
 
 /** localStorage key of the sidebar's pin: a preference of this browser, shared by its tabs. */
 export const SIDEBAR_PIN_KEY = "mojito2-sidebar-pinned";
@@ -16,7 +17,7 @@ export interface SidebarState {
   toggle(): void;
   /** Closes; a docked sidebar is unpinned too, so a reload does not bring it back. */
   close(): void;
-  /** Unpinning leaves the sidebar open, as an overlay. */
+  /** Pinning the overlay docks it; unpinning a docked sidebar closes it. */
   setPinned(p: boolean): void;
 }
 
@@ -37,28 +38,37 @@ function writePinned(p: boolean): void {
   }
 }
 
+function initialModel(): SidebarModel {
+  const pinned = readPinned();
+  const canPin = typeof window !== "undefined" && window.matchMedia(SIDEBAR_DOCK_QUERY).matches;
+  return { open: pinned && canPin, pinned };
+}
+
 /**
- * The live-session sidebar's open flag and pin. A pinned sidebar starts open, read
- * synchronously in the initialisers, so it docks on the first render: the terminal's
- * pty is not resized once for the bare page and again for the docked column.
+ * The live-session sidebar: storage and the media query around `sidebarReducer`. A pinned
+ * sidebar starts open, read synchronously in the initialiser, so it docks on the first
+ * render: the terminal's pty is not resized once for the bare page and again for the column.
  */
 export function useSidebar(): SidebarState {
   const canPin = useMediaQuery(SIDEBAR_DOCK_QUERY);
-  const [pinned, setPinnedState] = useState(readPinned);
-  const [open, setOpen] = useState(
-    () => pinned && typeof window !== "undefined" && window.matchMedia(SIDEBAR_DOCK_QUERY).matches,
-  );
-  const docked = open && pinned && canPin;
+  const [model, dispatch] = useReducer(sidebarReducer, undefined, initialModel);
+  // Adjusted during render, not in an effect: a docked sidebar crossing the breakpoint must
+  // not commit one frame as a modal overlay over the terminal before it closes.
+  const [seenCanPin, setSeenCanPin] = useState(canPin);
+  if (seenCanPin !== canPin) {
+    setSeenCanPin(canPin);
+    dispatch({ type: "canPinChanged", canPin });
+  }
 
-  const setPinned = (p: boolean) => {
-    writePinned(p);
-    setPinnedState(p);
-  };
-  const close = () => {
-    setOpen(false);
-    if (docked) setPinned(false);
-  };
-  const toggle = () => (docked ? close() : setOpen(!open));
+  useEffect(() => writePinned(model.pinned), [model.pinned]);
 
-  return { open, docked, canPin, pinned, toggle, close, setPinned };
+  return {
+    open: model.open,
+    docked: isDocked(model, canPin),
+    canPin,
+    pinned: model.pinned,
+    toggle: () => dispatch({ type: "toggle", canPin }),
+    close: () => dispatch({ type: "close", canPin }),
+    setPinned: (pinned) => dispatch({ type: "setPinned", pinned, canPin }),
+  };
 }

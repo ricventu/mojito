@@ -53,6 +53,20 @@ describe("surfaces that touch an edge pay for it", () => {
     expect(code(file)).toContain(token);
   });
 
+  // The docked sidebar's placement is its page's: fixed on the board, it touches the top,
+  // left and bottom edges itself; on the terminal the root pays all but the bottom one,
+  // which the column pays on a touch screen, like the accessory bar beside it.
+  it.each(["var(--sat)", "var(--sal)", "var(--sab)"])("the board's docked sidebar spends %s", (token) => {
+    const docked = code("src/components/board/Board.tsx").match(/dockedClassName="([^"]*)"/);
+    expect(docked?.[1]).toContain(`[${token}]`);
+  });
+
+  it("the terminal's docked sidebar pays --sab on a touch screen", () => {
+    expect(code("src/components/terminal/TerminalPage.tsx")).toMatch(
+      /dockedClassName=\{[^}]*"pointer-coarse:pb-\[var\(--sab\)\]"/,
+    );
+  });
+
   // The "terminated" panel mounts no accessory bar, so on a touch screen nothing else
   // pays the home indicator there: the root must keep its bottom inset in that branch.
   it("the terminal root pays --sab whenever the accessory bar is not mounted", () => {

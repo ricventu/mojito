@@ -54,14 +54,18 @@ function Panel({ sidebar, currentId, replace, inSheet }: Omit<Props, "dockedClas
     if (!sidebar.docked) sidebar.close();
   };
 
-  // Optimistic: the row moves at once; the server's `session.updated` confirms it. A failure
+  // Optimistic: the row moves at once; the server's `session.updated` confirms it. A refetch
+  // already in flight is cancelled first, or its older list would put the row back. A failure
   // re-reads the list rather than remembering what to roll back.
-  const setHidden = (id: string, next: boolean) => {
+  const setHidden = async (id: string, next: boolean) => {
+    await qc.cancelQueries({ queryKey: qk.sessions });
     qc.setQueryData<SessionMeta[]>(qk.sessions, (list) => list?.map((s) => (s.id === id ? { ...s, hidden: next } : s)));
-    apiJson<SessionMeta>(`/api/sessions/${encodeURIComponent(id)}`, "PATCH", { hidden: next }).catch((e: unknown) => {
+    try {
+      await apiJson<SessionMeta>(`/api/sessions/${encodeURIComponent(id)}`, "PATCH", { hidden: next });
+    } catch (e) {
       toast.error(e instanceof Error ? e.message : next ? "Hiding failed" : "Showing failed");
       void qc.invalidateQueries({ queryKey: qk.sessions });
-    });
+    }
   };
 
   const groupList = (groups: SidebarGroup[]) =>
@@ -76,7 +80,7 @@ function Panel({ sidebar, currentId, replace, inSheet }: Omit<Props, "dockedClas
               label={sessionLabel(s, ticketList)}
               current={s.id === currentId}
               onPick={() => pick(s.id)}
-              onHide={(next) => setHidden(s.id, next)}
+              onHide={(next) => void setHidden(s.id, next)}
             />
           ))}
         </ul>
