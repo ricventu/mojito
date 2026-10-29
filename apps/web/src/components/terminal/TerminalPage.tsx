@@ -15,6 +15,7 @@ import { useKeyboardOpen } from "@/hooks/useKeyboardOpen";
 import { useSessions } from "@/hooks/useSessions";
 import { useTickets } from "@/hooks/useTickets";
 import { ApiError, apiFetch } from "@/lib/api";
+import { boardHref } from "@/lib/boardReturn";
 import { qk } from "@/lib/queryKeys";
 import { safeHref } from "@/lib/url";
 import { attachImages, uploadImages } from "@/lib/terminal/imageInput";
@@ -101,7 +102,7 @@ export function TerminalPage() {
     mutationFn: () => apiFetch<unknown>(`/api/sessions/${encodeURIComponent(id)}`, { method: "DELETE" }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.sessions });
-      navigate("/");
+      navigate(boardHref());
     },
     // A 409 means claude would not leave: the session is untouched and this terminal is the way to it.
     onError: (e) =>
@@ -133,7 +134,7 @@ export function TerminalPage() {
       {!band.open && (
         <header className="flex items-center gap-2 border-b px-3 py-2">
           <Button asChild variant="ghost" size="sm" className="shrink-0">
-            <Link to="/">
+            <Link to={boardHref()}>
               <ArrowLeft size={16} /> <span className="max-[480px]:sr-only">Board</span>
             </Link>
           </Button>
@@ -161,7 +162,7 @@ export function TerminalPage() {
         <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-[#08090a] p-6 text-center text-neutral-300">
           <p className="text-sm">Session ended</p>
           <Button asChild variant="secondary" size="sm">
-            <Link to="/">
+            <Link to={boardHref()}>
               <ArrowLeft size={16} /> Back to the board
             </Link>
           </Button>

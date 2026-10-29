@@ -8,10 +8,12 @@ interface Props {
   sessions: SessionMeta[];
   onNewTicket: () => void;
   onNewSession: () => void;
+  /** Extra rows kept inside the sticky bar, under the title row. */
+  children?: React.ReactNode;
 }
 
 /** Sticky top bar. It pays the top safe-area inset itself: the board is full-bleed. */
-export function Toolbar({ sessions, onNewTicket, onNewSession }: Props) {
+export function Toolbar({ sessions, onNewTicket, onNewSession, children }: Props) {
   const waiting = needsInput(sessions);
 
   return (
@@ -42,6 +44,7 @@ export function Toolbar({ sessions, onNewTicket, onNewSession }: Props) {
           </Link>
         </Button>
       </div>
+      {children && <div className="mx-auto max-w-3xl px-4 pb-2">{children}</div>}
     </div>
   );
 }

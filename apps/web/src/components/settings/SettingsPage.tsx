@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
+import { boardHref } from "@/lib/boardReturn";
 import { DefaultsCard } from "./DefaultsCard";
 import { ProjectsCard } from "./ProjectsCard";
 import { PromptsCard } from "./PromptsCard";
@@ -13,7 +14,7 @@ export function SettingsPage() {
       <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-3">
         <header className="flex items-center gap-2">
           <Button asChild variant="ghost" size="sm" className="shrink-0">
-            <Link to="/">
+            <Link to={boardHref()}>
               <ArrowLeft size={16} /> Board
             </Link>
           </Button>

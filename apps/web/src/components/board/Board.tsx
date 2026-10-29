@@ -1,11 +1,15 @@
 import { useMemo, useState } from "react";
 import { TriangleAlert } from "lucide-react";
 import type { TicketSummary } from "@mojito/shared";
+import { useBoardFilters } from "@/hooks/useBoardFilters";
 import { useProjects } from "@/hooks/useProjects";
 import { useSessions } from "@/hooks/useSessions";
 import { useTasks } from "@/hooks/useTasks";
 import { useTickets } from "@/hooks/useTickets";
-import { groupBoard, linearBanner } from "@/lib/board";
+import { filterBoard, groupBoard, linearBanner } from "@/lib/board";
+import { isFiltered, NO_FILTERS } from "@/lib/filters";
+import { Button } from "@/components/ui/button";
+import { FilterBar } from "./FilterBar";
 import { ProjectSection } from "./ProjectSection";
 import { TaskStrip } from "./TaskStrip";
 import { Toolbar } from "./Toolbar";
@@ -35,9 +39,10 @@ export function Board() {
   const [selectedTicket, setSelectedTicket] = useState<TicketSummary | null>(null);
 
   const sessionList = useMemo(() => sessions.data ?? [], [sessions.data]);
+  const [filters, setFilters] = useBoardFilters();
   const sections = useMemo(
-    () => groupBoard(projects.data ?? [], tickets.data?.tickets ?? [], sessionList),
-    [projects.data, tickets.data, sessionList],
+    () => filterBoard(groupBoard(projects.data ?? [], tickets.data?.tickets ?? [], sessionList), filters),
+    [projects.data, tickets.data, sessionList, filters],
   );
   const banner = tickets.data ? linearBanner(tickets.data) : null;
   const loading = tickets.isPending || sessions.isPending || projects.isPending;
@@ -60,7 +65,9 @@ export function Board() {
 
   return (
     <div className="min-h-dvh overflow-x-clip pb-[var(--sab)]">
-      <Toolbar sessions={sessionList} onNewTicket={() => onNewTicket()} onNewSession={() => onNewSession()} />
+      <Toolbar sessions={sessionList} onNewTicket={() => onNewTicket()} onNewSession={() => onNewSession()}>
+        <FilterBar filters={filters} setFilters={setFilters} />
+      </Toolbar>
       <main className="mx-auto flex max-w-3xl flex-col gap-4 px-4 pt-3 pr-[max(1rem,var(--sar))] pb-6 pl-[max(1rem,var(--sal))]">
         {banner && <Banner text={banner} />}
         {refreshError && (
@@ -75,7 +82,16 @@ export function Board() {
         ) : loading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : sections.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No tickets and no sessions.</p>
+          isFiltered(filters) ? (
+            <div className="flex flex-col items-start gap-2">
+              <p className="text-sm text-muted-foreground">Nothing matches these filters.</p>
+              <Button variant="outline" size="sm" onClick={() => setFilters(NO_FILTERS)}>
+                Clear filters
+              </Button>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No tickets and no sessions.</p>
+          )
         ) : (
           sections.map((section) => (
             <ProjectSection

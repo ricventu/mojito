@@ -51,7 +51,7 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
       {section.active.length > 0 && <ul className="flex flex-col gap-2">{section.active.map(card)}</ul>}
 
       {section.backlog.length > 0 && (
-        <Collapsible className="group/backlog">
+        <Collapsible key={String(section.backlogOpen)} defaultOpen={section.backlogOpen} className="group/backlog">
           <CollapsibleTrigger className="flex w-full items-center gap-1 py-1 text-xs font-medium text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
             <ChevronRight size={14} className="transition-transform group-data-[state=open]/backlog:rotate-90" />
             Backlog ({section.backlog.length})

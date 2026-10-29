@@ -19,6 +19,9 @@ function applyEvent(qc: QueryClient, e: MojitoEvent) {
         e.task.archived ? removeById(list, e.task.id) : upsertById(list, e.task),
       );
       break;
+    case "settings.updated":
+      void qc.invalidateQueries({ queryKey: qk.settings });
+      break;
     case "tickets.changed":
       void qc.invalidateQueries({ queryKey: qk.tickets });
       break;
