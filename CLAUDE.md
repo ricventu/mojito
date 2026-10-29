@@ -31,8 +31,8 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
 ## Layout
 
 - `packages/shared` — types (`SessionMeta`, `TaskRecord`, `TicketSummary`, `BoardTickets`,
-  `Settings`, `ProjectRow`), zod request bodies (`LaunchBody`, `ProjectBody`, `SettingsBody`,
-  `PromptsBody`, `StatusBody`), `MojitoEvent`, `MODELS`/`EFFORTS`, `DEFAULT_PROMPTS`,
+  `Settings`, `ProjectRow`, `Favorite`), zod request bodies (`LaunchBody`, `ProjectBody`, `SettingsBody`,
+  `PromptsBody`, `FavoritesBody`, `StatusBody`, `SessionPatchBody`), `MojitoEvent`, `MODELS`/`EFFORTS`, `DEFAULT_PROMPTS`,
   `SESSION_GONE_CODE` (4404). Consumed as source, no build; zod **4** everywhere (the Agent
   SDK's peer).
 - `apps/server` — Node 22, Hono 4 on `@hono/node-server`, `ws` on the http `upgrade` event,
@@ -48,7 +48,8 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
 
 - **Persistence** (`src/db`): migrations are TS modules exporting SQL (`migrations/*.ts`,
   applied once each, in a transaction) — `.sql` imports break under vitest and `tsx watch`.
-  Tables: `projects`, `settings` (key/value JSON), `sessions`, `sdk_tasks`. Tickets are never
+  Tables: `projects`, `settings` (key/value JSON), `sessions` (`hidden` since migration 003),
+  `sdk_tasks`. Tickets are never
   stored: `tickets/cache.ts` polls Linear every 45 s, scoped to the mapped project names,
   coalesces concurrent refreshes, keeps the last list (`stale`) when Linear fails.
   `projects.json` (`~/.config/mojito/projects.json`) is imported once per database, then
@@ -71,7 +72,16 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   `prompt.test.ts`), one line per paragraph so they edit cleanly in a phone textarea. The
   `prompts` settings key stores only the edits — a prompt equal to its default is dropped, so it
   follows later changes to the shipped text. Read via `deps.prompts()` at each launch/task, no
-  restart. `PUT /api/settings` is partial: each top-level key sent replaces that part only.
+  restart. `PUT /api/settings` is partial: each top-level key sent replaces that part only,
+  and every success emits `settings.updated` (the web invalidates `qk.settings`, so a change on
+  one device shows on another).
+- **Favourites** (RIC-502) are the `favorites` settings key: `{name, search}[]`, validated by
+  shape only (≤ 50, name trimmed 1-60 and unique case-insensitively, `search` ≤ 2000) — the
+  server never interprets `search`, the client's `parseFilters` does.
+- **Hidden sessions**: `sessions.hidden` is sidebar-only state (the board, the waiting pill and
+  Kill ignore it), set by `PATCH /api/sessions/:id` (`SessionPatchBody`, strict: unknown id 404,
+  any other body 400; emits `session.updated`). A launch writes a fresh row, so a relaunched
+  session is visible again; adoption writes `false`, a revive keeps the row's value.
 - **Live state** comes only from Claude Code hooks (`hookSettings.ts` → curl to
   `<selfOrigin>/api/hook` — the configured host, loopback only for a wildcard bind — with
   `x-mojito-token` and claude's hook JSON as body; `hookMap.ts`, `hooks.ts`). `ended` is
@@ -126,6 +136,34 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
 - Board (`lib/board.ts` → `components/board`): one section per project, In Review → In
   Progress → Todo, Backlog collapsed; free sessions and sessions whose ticket is no longer on
   the board stay visible as loose rows (a live tmux never disappears from the UI).
+- **Board filters** (RIC-502): project (multi), status, text — the url is the only state
+  (`lib/filters.ts` codec, `hooks/useBoardFilters.ts`). Writes **replace** the history entry
+  (Back leaves the board, not one chip). `q` keeps its spaces in the live url (trimming would
+  eat the space typed between two words); `canonicalSearch` trims it, and favourites are saved
+  in and compared by that form. The search field keeps a local draft: react-router 8 applies
+  navigations asynchronously in a transition, so a url-controlled input loses caret and
+  keystrokes. `filterBoard` runs after `groupBoard`: a project filter drops General, a status
+  filter drops loose sessions and statuses outside `FILTER_STATUSES`; Backlog opens
+  (`backlogOpen`) when selected or `q` is set, so a search never hides a match in a closed
+  group. `lib/boardReturn.ts` keeps the last board search in `sessionStorage` (per tab) for the
+  terminal's Board link and Kill's navigation, best effort.
+- **Favourites** (`lib/favorites.ts`, `hooks/useFavorites.ts`): chips under the search row
+  (tap the active one = clear), saved from the filter sheet (a same-name save replaces in
+  place), managed in the Settings `FavoritesCard`. `save` is optimistic, then `PUT`; on error a
+  toast and a re-read, no remembered rollback.
+- **Session sidebar** (`components/sidebar`, `lib/sidebar.ts`, `hooks/useSidebar.ts`): every
+  non-`ended` session, unfiltered by the board, grouped by project (General last), newest
+  `createdAt` first — only immutable keys, so rows never jump when a state changes. Hide is
+  per row (optimistic `setQueryData`, a failed `PATCH` re-reads), with a "Hidden (n)" footer.
+  Unpinned it is a left `Sheet` overlay (never resizes the pty); pinned it is a docked `w-72`
+  column, only at ≥ 1024px (`useMediaQuery`), pin in `localStorage` (`mojito2-sidebar-pinned`,
+  read in the `useState` initialiser so it docks on the first render, no pty resize twice).
+  The open/pin state machine is `lib/sidebarState.ts`: unpinning a docked sidebar closes it;
+  below 1024px a docked sidebar closes and keeps its pin, re-docking above it. Picking a row
+  pushes from the board, **replaces** from a terminal (Back stays "the board"). A docked
+  sidebar is not rendered while the iOS keyboard is up.
+- Overlay sheets (filter, sidebar) draw their own ✕ (`showCloseButton={false}`): shadcn's
+  built-in one is absolutely positioned and ignores the safe-area insets.
 - Terminal (`components/terminal`, `lib/terminal`): `syncGeometry` always publishes the size,
   re-fit refused while the iOS keyboard is up; accessory bar (coarse pointers only), composer
   (`term.paste`, no CR — do not turn it into a paste box), buffer copy in a `<pre>`.
