@@ -1,6 +1,8 @@
+import { useRef } from "react";
 import type { Terminal } from "@xterm/xterm";
-import { Copy, SquarePen } from "lucide-react";
+import { Copy, ImagePlus, SquarePen } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { IMAGE_TYPES } from "@/lib/images";
 import { cn } from "@/lib/utils";
 
 /**
@@ -27,20 +29,24 @@ interface Props {
   onCompose(): void;
   /** Open the buffer copy overlay. */
   onCopy(): void;
+  /** Images picked for claude. */
+  onAttach(files: File[]): void;
   /** Is the mobile keyboard up? Then the bar's bottom edge is the keyboard's, not the home indicator's. */
   keyboardOpen: boolean;
 }
 
 /**
  * The touch key row under the terminal: composer first (the one slot that never needs a
- * swipe — the row scrolls and a phone shows about ten keys), the keys, then copy. Shown
- * only on a coarse pointer; a desktop has a keyboard.
+ * swipe — the row scrolls and a phone shows about ten keys), then the image picker, the
+ * keys, then copy. Shown only on a coarse pointer; a desktop has a keyboard, and pastes or
+ * drops its images on the terminal instead.
  *
  * Keys go through `term.input`, which fires `onData` exactly as a typed key does, so they
  * reach the pty by the same socket path. It pays the bottom safe-area inset itself —
  * except with the keyboard up, where paying it would spend rows on nothing.
  */
-export function AccessoryBar({ term, onCompose, onCopy, keyboardOpen }: Props) {
+export function AccessoryBar({ term, onCompose, onCopy, onAttach, keyboardOpen }: Props) {
+  const picker = useRef<HTMLInputElement>(null);
   return (
     <div
       className={cn(
@@ -59,6 +65,30 @@ export function AccessoryBar({ term, onCompose, onCopy, keyboardOpen }: Props) {
       >
         <SquarePen size={16} aria-hidden="true" />
       </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="shrink-0"
+        disabled={!term}
+        aria-label="Attach image"
+        title="Attach image"
+        onClick={() => picker.current?.click()}
+      >
+        <ImagePlus size={16} aria-hidden="true" />
+      </Button>
+      {/* The exact types, not image/*: iOS then hands a HEIC photo over as a JPEG. */}
+      <input
+        ref={picker}
+        type="file"
+        accept={IMAGE_TYPES.join(",")}
+        multiple
+        hidden
+        onChange={(e) => {
+          onAttach(Array.from(e.target.files ?? []));
+          e.target.value = "";
+        }}
+      />
       {KEYS.map((k) => (
         <Button
           key={k.label}

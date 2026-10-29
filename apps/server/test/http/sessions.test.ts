@@ -125,7 +125,7 @@ describe("DELETE /api/sessions/:id", () => {
       expect(closeSession).not.toHaveBeenCalled();
     });
 
-    it("removes an ended session, its hook file, and says so", async () => {
+    it("removes an ended session, its hook file, its images, and says so", async () => {
       const { req, sessions, events, removeFile, closeSession } = setup();
       sessions.insert(meta({ state: "ended" }));
       const res = await req("/api/sessions/mj-RIC-1?remove=1", { method: "DELETE" });
@@ -133,18 +133,20 @@ describe("DELETE /api/sessions/:id", () => {
       expect(sessions.get("mj-RIC-1")).toBeNull();
       expect(events).toEqual([{ type: "session.removed", id: "mj-RIC-1" }]);
       expect(removeFile).toHaveBeenCalledWith("/state/hooks/mj-RIC-1.json");
+      expect(removeFile).toHaveBeenCalledWith("/state/images/mj-RIC-1");
       expect(closeSession).not.toHaveBeenCalled();
     });
 
-    it("still removes the row when the hook file cannot be deleted", async () => {
+    it("still removes the row and the images when the hook file cannot be deleted", async () => {
       const { req, sessions, removeFile } = setup();
       sessions.insert(meta({ state: "ended" }));
-      removeFile.mockImplementation(() => {
-        throw new Error("ENOENT");
+      removeFile.mockImplementation((path) => {
+        if (path.endsWith(".json")) throw new Error("ENOENT");
       });
       const res = await req("/api/sessions/mj-RIC-1?remove=1", { method: "DELETE" });
       expect(res.status).toBe(200);
       expect(sessions.get("mj-RIC-1")).toBeNull();
+      expect(removeFile).toHaveBeenCalledWith("/state/images/mj-RIC-1");
     });
 
     it("answers 404 for an unknown session", async () => {

@@ -101,6 +101,12 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
 - **HTTP** (`http/`): all `/api/*` except `/health` need `x-mojito-token`; error bodies are
   always `{ error }`; `POST /api/sessions` → 201 `{session, warning?}` or `{error, sessionId?}`.
   Static web build served with SPA fallback (never for `/api` or `/ws`). Listen errors exit 1.
+- **Images for a session** (`POST /api/sessions/:id/images`, `sessions/images.ts`): claude's
+  own image paste reads the server's clipboard, never the browser's, so the client uploads
+  and pastes the returned absolute paths, which claude turns into `[Image #N]`. Stored in
+  `<stateDir>/images/<id>/` (0700/0600), never the repo — claude attaches a pasted image path
+  outside its cwd without a permission prompt and downscales big ones itself (both verified
+  on 2.1.312), hence the shared 10 MB cap. Deleted with the row (`?remove=1`).
 - **Create-ticket task** (`tasks/`): Agent SDK `query()` with `settingSources: []`,
   `tools: []`, an in-process MCP (`mojito-linear`: `list_labels`, `create_issue`) bound to the
   task's team/project, at most one issue per task; a task that created its issue is `done`
@@ -118,6 +124,9 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
 - Terminal (`components/terminal`, `lib/terminal`): `syncGeometry` always publishes the size,
   re-fit refused while the iOS keyboard is up; accessory bar (coarse pointers only), composer
   (`term.paste`, no CR — do not turn it into a paste box), buffer copy in a `<pre>`.
+  Images (`lib/terminal/imageInput.ts`): a paste with images and no text (capture phase on
+  the holder, ahead of xterm), a drop, or the accessory bar's picker (exact types, so iOS
+  hands HEIC over as JPEG) — uploaded, then the paths pasted into claude.
   Desktop mouse copy (`copySelection.ts`): a plain drag is **claude's own** selection, which
   it copies with an OSC 52 — reaching the browser only because the pty gateway sets
   `allow-passthrough on` at every attach, and handled by a write-only OSC 52 handler. A

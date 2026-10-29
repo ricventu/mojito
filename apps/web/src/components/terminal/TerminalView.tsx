@@ -5,6 +5,7 @@ import "@xterm/xterm/css/xterm.css";
 import { toast } from "sonner";
 import { SESSION_GONE_CODE } from "@mojito/shared";
 import { browserClipboard, copyText, echoFilter, osc52Text } from "@/lib/terminal/copySelection";
+import { droppedImages, pastedImages } from "@/lib/terminal/imageInput";
 import { xtermThinksItIsNode } from "@/lib/terminal/platform";
 import { syncGeometry } from "@/lib/terminal/terminalFit";
 import { terminalOptions } from "@/lib/terminal/terminalOptions";
@@ -27,6 +28,8 @@ interface Props {
   onExit(): void;
   /** The live `Terminal` once it exists, `null` when it is torn down (the keys, composer and copy overlay drive it). */
   onReady?(term: Terminal | null): void;
+  /** Images pasted or dropped on the terminal, for claude (`imageInput.ts`). */
+  onImages?(files: File[]): void;
 }
 
 /**
@@ -37,7 +40,7 @@ interface Props {
  * anchored to the bottom of its box, so rows the keyboard costs come off the top and
  * claude's input line stays on screen.
  */
-export function TerminalView({ sessionId, keyboardOpen, onExit, onReady }: Props) {
+export function TerminalView({ sessionId, keyboardOpen, onExit, onReady, onImages }: Props) {
   const holder = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -47,10 +50,12 @@ export function TerminalView({ sessionId, keyboardOpen, onExit, onReady }: Props
   const syncRef = useRef<() => void>(() => {});
   const onExitRef = useRef(onExit);
   const onReadyRef = useRef(onReady);
+  const onImagesRef = useRef(onImages);
   useLayoutEffect(() => {
     kbdRef.current = keyboardOpen;
     onExitRef.current = onExit;
     onReadyRef.current = onReady;
+    onImagesRef.current = onImages;
   });
 
   useEffect(() => {
@@ -254,6 +259,40 @@ export function TerminalView({ sessionId, keyboardOpen, onExit, onReady }: Props
     return () => {
       el.removeEventListener("touchstart", onStart, { capture: true });
       el.removeEventListener("touchmove", onMove, { capture: true });
+    };
+  }, []);
+
+  // Images pasted or dropped here go to claude as files (imageInput.ts): xterm would paste
+  // nothing of them. The paste listener is the holder's capture phase, so xterm's own, on its
+  // textarea inside, never sees an image paste — and still gets every paste with text.
+  useEffect(() => {
+    const el = holder.current;
+    if (!el) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const files = e.clipboardData ? pastedImages(e.clipboardData) : [];
+      if (files.length === 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onImagesRef.current?.(files);
+    };
+    // A drop only fires where dragover was cancelled; and a file dropped there must not
+    // become the page the browser navigates to.
+    const onDragOver = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!e.dataTransfer) return;
+      e.preventDefault();
+      const files = droppedImages(e.dataTransfer);
+      if (files.length > 0) onImagesRef.current?.(files);
+    };
+    el.addEventListener("paste", onPaste, { capture: true });
+    el.addEventListener("dragover", onDragOver);
+    el.addEventListener("drop", onDrop);
+    return () => {
+      el.removeEventListener("paste", onPaste, { capture: true });
+      el.removeEventListener("dragover", onDragOver);
+      el.removeEventListener("drop", onDrop);
     };
   }, []);
 

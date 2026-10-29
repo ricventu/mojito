@@ -38,7 +38,7 @@ export interface AppDeps {
   staticDir?: string;
   /** Project path validation. Default `fs.existsSync`. */
   exists?(path: string): boolean;
-  /** Deletes a session's hook settings file. Default `fs.rmSync`. */
+  /** Deletes a session's hook settings file or images dir. Default `fs.rmSync`, recursive. */
   removeFile?(path: string): void;
   now?(): number;
 }

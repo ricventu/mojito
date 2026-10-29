@@ -16,6 +16,7 @@ import { useSessions } from "@/hooks/useSessions";
 import { useTickets } from "@/hooks/useTickets";
 import { ApiError, apiFetch } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
+import { attachImages, uploadImages } from "@/lib/terminal/imageInput";
 import { cn } from "@/lib/utils";
 
 const KIND_LABEL: Record<SessionKind, string> = { ticket: "Ticket", claude: "Claude", shell: "Shell" };
@@ -76,6 +77,17 @@ export function TerminalPage() {
   const [panelState, setPanel] = useState<{ id: string; kind: "compose" | "copy" } | null>(null);
   const panel = panelState?.id === id ? panelState.kind : null;
   const togglePanel = (kind: "compose" | "copy") => setPanel(panel === kind ? null : { id, kind });
+
+  // Images pasted or dropped on the terminal, or picked from the accessory bar: uploaded,
+  // then their paths pasted into claude (imageInput.ts). Its `[Image #N]` is the success.
+  const attach = (files: File[]) => {
+    if (!term || files.length === 0) return;
+    const toastId = toast.loading(files.length === 1 ? "Uploading image…" : `Uploading ${files.length} images…`);
+    void attachImages(files, { upload: (fs) => uploadImages(id, fs), paste: (text) => term.paste(text) }).then((r) => {
+      if (r.ok) toast.dismiss(toastId);
+      else toast.error(r.error, { id: toastId });
+    });
+  };
 
   const session = sessions.data?.find((s) => s.id === id);
   const ticket = session?.ticket ? tickets.data?.tickets.find((t) => t.identifier === session.ticket) : undefined;
@@ -151,13 +163,20 @@ export function TerminalPage() {
         </div>
       ) : (
         <>
-          <TerminalView sessionId={id} keyboardOpen={band.open} onExit={() => setGoneId(id)} onReady={setTerm} />
+          <TerminalView
+            sessionId={id}
+            keyboardOpen={band.open}
+            onExit={() => setGoneId(id)}
+            onReady={setTerm}
+            onImages={attach}
+          />
           {term && panel === "compose" && <Composer term={term} onClose={() => setPanel(null)} />}
           {term && panel === "copy" && <CopyBuffer term={term} onClose={() => setPanel(null)} />}
           <AccessoryBar
             term={term}
             keyboardOpen={band.open}
             onCompose={() => togglePanel("compose")}
+            onAttach={attach}
             onCopy={() => togglePanel("copy")}
           />
         </>

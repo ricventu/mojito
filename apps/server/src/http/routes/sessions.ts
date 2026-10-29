@@ -5,15 +5,20 @@ import { Hono } from "hono";
 import type { AppDeps } from "../app";
 import { parseBody } from "../body";
 import { killSession } from "../../sessions/close";
+import { imagesDir, storeImages } from "../../sessions/images";
 import { launchFree, launchTicket } from "../../sessions/launch";
+import { validateImages, type ImageType } from "../../tasks/images";
 
 const NOT_CLOSED = "claude did not exit: open the terminal";
 
-export function sessionRoutes(deps: AppDeps): Hono {
-  const removeFile = deps.removeFile ?? ((path: string) => rmSync(path, { force: true }));
+const asList = (v: unknown): unknown[] => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 
-  // Forgetting an ended session: its row, and the hook settings it was launched with (which
-  // carry the token). Only an ended one — a live session's row is how the board reaches it.
+export function sessionRoutes(deps: AppDeps): Hono {
+  const removeFile = deps.removeFile ?? ((path: string) => rmSync(path, { recursive: true, force: true }));
+
+  // Forgetting an ended session: its row, the hook settings it was launched with (which carry
+  // the token), and the images pasted into it. Only an ended one — a live session's row is how
+  // the board reaches it.
   const remove = (id: string): { status: 200 } | { status: 404 | 409; error: string } => {
     const row = deps.sessions.get(id);
     if (!row) return { status: 404, error: `session not found: ${id}` };
@@ -22,10 +27,15 @@ export function sessionRoutes(deps: AppDeps): Hono {
     deps.bus.emit({ type: "session.removed", id });
     // A row id is a tmux name and never a path, but it is about to become one.
     if (basename(id) === id) {
-      try {
-        removeFile(join(deps.cfg.stateDir, "hooks", `${id}.json`));
-      } catch (err) {
-        console.error(`could not delete hook settings of ${id}:`, err);
+      for (const [what, path] of [
+        ["hook settings", join(deps.cfg.stateDir, "hooks", `${id}.json`)],
+        ["images", imagesDir(deps.cfg.stateDir, id)],
+      ]) {
+        try {
+          removeFile(path);
+        } catch (err) {
+          console.error(`could not delete ${what} of ${id}:`, err);
+        }
       }
     }
     return { status: 200 };
@@ -33,6 +43,25 @@ export function sessionRoutes(deps: AppDeps): Hono {
 
   return new Hono()
     .get("/sessions", (c) => c.json(deps.sessions.list()))
+    // Images for claude: claude's own image paste reads this machine's clipboard, never the
+    // browser's, so the client uploads them here and pastes the returned paths into the terminal.
+    .post("/sessions/:id/images", async (c) => {
+      const id = c.req.param("id");
+      const row = deps.sessions.get(id);
+      if (!row || basename(id) !== id) return c.json({ error: `session not found: ${id}` }, 404);
+      if (row.state === "ended") return c.json({ error: `session ended: ${id}` }, 409);
+      const body = await c.req.parseBody({ all: true });
+      const entries = [...asList(body["images[]"]), ...asList(body.images)];
+      if (entries.some((e) => !(e instanceof File))) return c.json({ error: "invalid image" }, 400);
+      const files = entries as File[];
+      if (files.length === 0) return c.json({ error: "no images" }, 400);
+      const valid = validateImages(files);
+      if (!valid.ok) return c.json({ error: valid.error }, 400);
+      const images = await Promise.all(
+        files.map(async (f) => ({ type: f.type as ImageType, bytes: new Uint8Array(await f.arrayBuffer()) })),
+      );
+      return c.json({ paths: storeImages(imagesDir(deps.cfg.stateDir, id), images) }, 201);
+    })
     .post("/sessions", async (c) => {
       const body = await parseBody(c, LaunchBody);
       if (!body.ok) return c.json({ error: body.error }, 400);
