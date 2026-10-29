@@ -32,6 +32,16 @@ describe("parseFilters", () => {
     ).toEqual({ projects: ["a"], statuses: ["In Review", "Backlog"], q: "" });
   });
 
+  it("orders projects by code unit, never by the device's locale", () => {
+    // Favourites are compared as strings across devices: the order must not depend on ICU.
+    expect(parseFilters(new URLSearchParams("project=b&project=%C3%A4&project=a&project=B")).projects).toEqual([
+      "B",
+      "a",
+      "b",
+      "ä",
+    ]);
+  });
+
   it("keeps q's spaces in the live url", () => {
     expect(parseFilters(new URLSearchParams(filterSearch({ ...NO_FILTERS, q: "foo " }))).q).toBe("foo ");
   });
@@ -39,7 +49,7 @@ describe("parseFilters", () => {
   it("round-trips awkward project names", () => {
     const f = { projects: ["R&D", "a=b", "c+d", "Città nuova"], statuses: [], q: "" };
     const parsed = parseFilters(new URLSearchParams(filterSearch(f)));
-    expect(parsed.projects).toEqual([...f.projects].sort((a, b) => a.localeCompare(b)));
+    expect(parsed.projects).toEqual([...f.projects].sort());
     expect(parseFilters(new URLSearchParams(filterSearch(parsed)))).toEqual(parsed);
   });
 });
@@ -49,6 +59,10 @@ describe("filterSearch", () => {
     expect(filterSearch({ projects: ["b", "a", "a"], statuses: ["Backlog", "In Review"], q: "x" })).toBe(
       "project=a&project=b&status=In+Review&status=Backlog&q=x",
     );
+  });
+
+  it("writes projects in code-unit order", () => {
+    expect(filterSearch({ projects: ["b", "a", "B"], statuses: [], q: "" })).toBe("project=B&project=a&project=b");
   });
 
   it("omits defaults", () => {

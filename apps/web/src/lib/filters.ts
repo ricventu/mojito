@@ -1,6 +1,8 @@
 // The board's filters live in the url and nowhere else. A project name is free text, so
 // `project` and `status` repeat, one parameter per value; no separator is safe to join on.
 
+import { byProjectName } from "@/lib/board";
+
 export const FILTER_STATUSES = ["In Review", "In Progress", "Todo", "Backlog"] as const;
 
 export interface BoardFilters {
@@ -11,10 +13,10 @@ export interface BoardFilters {
 
 export const NO_FILTERS: BoardFilters = { projects: [], statuses: [], q: "" };
 
-const byName = (a: string, b: string) => a.localeCompare(b);
-
+// Plain `sort()` (UTF-16 code units), not `localeCompare`: favourites are compared as strings
+// across devices, so the canonical form must not depend on the device's locale or ICU.
 function normProjects(values: string[]): string[] {
-  return [...new Set(values.filter((v) => v !== ""))].sort(byName);
+  return [...new Set(values.filter((v) => v !== ""))].sort();
 }
 
 function normStatuses(values: string[]): string[] {
@@ -55,5 +57,5 @@ export function filterCount(f: BoardFilters): number {
 
 /** Projects to offer in the sheet: the configured ones plus any selected one no longer configured. */
 export function sheetProjects(configured: string[], selected: string[]): string[] {
-  return [...new Set([...configured, ...selected])].sort(byName);
+  return [...new Set([...configured, ...selected])].sort(byProjectName);
 }

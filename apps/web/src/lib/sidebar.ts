@@ -1,4 +1,5 @@
 import type { ProjectRow, SessionMeta, TicketSummary } from "@mojito/shared";
+import { byProjectName } from "@/lib/board";
 
 export interface SidebarGroup {
   /** `null` is General: sessions with no (or no longer a configured) project. */
@@ -13,7 +14,7 @@ export interface SidebarGroup {
  * are immutable for a session's life, so a session asking for input never jumps.
  */
 export function sidebarGroups(projects: ProjectRow[], sessions: SessionMeta[]): SidebarGroup[] {
-  const names = projects.map((p) => p.name).sort((a, b) => a.localeCompare(b));
+  const names = projects.map((p) => p.name).sort(byProjectName);
   const known = new Set(names);
   const live = sessions
     .filter((s) => s.state !== "ended")

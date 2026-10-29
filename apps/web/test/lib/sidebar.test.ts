@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectRow, SessionMeta, TicketSummary } from "@mojito/shared";
+import { groupBoard } from "@/lib/board";
 import { sessionLabel, sidebarGroups, splitHidden } from "@/lib/sidebar";
 
 const project = (name: string): ProjectRow => ({ name, path: `/repos/${name}`, teamKey: "RIC" });
@@ -56,6 +57,15 @@ describe("sidebarGroups", () => {
       ],
     );
     expect(groups.map((g) => g.project)).toEqual(["Alpha", "Beta", null]);
+  });
+
+  it("orders groups exactly as the board orders its sections", () => {
+    const names = ["beta", "Alpha", "émile", "Zeta", "alpha2"];
+    const projects = names.map(project);
+    const sessions = [...names, null].map((p, i) => session(`mj-${i}`, { project: p }));
+    expect(sidebarGroups(projects, sessions).map((g) => g.project)).toEqual(
+      groupBoard(projects, [], sessions).map((s) => s.project),
+    );
   });
 
   it("an unmapped project goes to General", () => {

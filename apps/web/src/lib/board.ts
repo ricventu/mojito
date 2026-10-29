@@ -25,6 +25,9 @@ function statusRank(statusName: string): number {
   return i === -1 ? STATUS_ORDER.length : i;
 }
 
+/** Display order of project names (sections, sidebar groups, the filter sheet): a fixed locale, the same on every device. */
+export const byProjectName = (a: string, b: string): number => a.localeCompare(b, "en");
+
 /** The number after the last dash, so RIC-9 sorts before RIC-10. */
 function ticketNumber(identifier: string): number {
   return Number(identifier.slice(identifier.lastIndexOf("-") + 1)) || 0;
@@ -52,7 +55,7 @@ export function groupBoard(
   tickets: TicketSummary[],
   sessions: SessionMeta[],
 ): BoardSection[] {
-  const names = projects.map((p) => p.name).sort((a, b) => a.localeCompare(b));
+  const names = projects.map((p) => p.name).sort(byProjectName);
   const known = new Set(names);
   const carded = new Set(tickets.filter((t) => t.project !== null && known.has(t.project)).map((t) => t.identifier));
   const looseSessions = sessions

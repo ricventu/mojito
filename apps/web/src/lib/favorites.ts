@@ -1,4 +1,5 @@
 import type { Favorite } from "@mojito/shared";
+import { canonicalSearch, parseFilters } from "@/lib/filters";
 
 const sameName = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
@@ -47,8 +48,12 @@ export function removeFavorite(list: Favorite[], index: number): Favorite[] {
   return list.filter((_, i) => i !== index);
 }
 
-/** Index of the favourite whose search is `search`; `-1` for none. The bare board is never a favourite. */
+/**
+ * Index of the favourite whose search is `search` (a `canonicalSearch`); `-1` for none. The
+ * stored one is re-canonicalised, so one saved in another order still matches. The bare
+ * board is never a favourite.
+ */
 export function activeFavorite(list: Favorite[], search: string): number {
   if (search === "") return -1;
-  return list.findIndex((f) => f.search === search);
+  return list.findIndex((f) => canonicalSearch(parseFilters(new URLSearchParams(f.search))) === search);
 }

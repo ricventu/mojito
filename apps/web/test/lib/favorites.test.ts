@@ -110,6 +110,11 @@ describe("activeFavorite", () => {
     expect(activeFavorite([A, M, C], "project=mojito")).toBe(1);
   });
 
+  it("matches a favourite stored in another order", () => {
+    // Saved by an older build, or a device that sorted projects differently.
+    expect(activeFavorite([{ name: "Both", search: "q=x&project=b&project=a" }], "project=a&project=b&q=x")).toBe(0);
+  });
+
   it("is -1 for no match and for the bare board", () => {
     expect(activeFavorite([A, M], "q=nope")).toBe(-1);
     expect(activeFavorite([{ name: "Empty", search: "" }], "")).toBe(-1);
