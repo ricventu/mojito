@@ -140,7 +140,9 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   (`lib/filters.ts` codec, `hooks/useBoardFilters.ts`). Writes **replace** the history entry
   (Back leaves the board, not one chip). `q` keeps its spaces in the live url (trimming would
   eat the space typed between two words); `canonicalSearch` trims it, and favourites are saved
-  in and compared by that form. The search field keeps a local draft: react-router 8 applies
+  in and compared by that form. Its projects sort with plain `sort()`, never the device's
+  locale (favourites compare as strings across devices); display order (sections, sidebar,
+  sheet) is `byProjectName`, `localeCompare(b, "en")`. The search field keeps a local draft: react-router 8 applies
   navigations asynchronously in a transition, so a url-controlled input loses caret and
   keystrokes. `filterBoard` runs after `groupBoard`: a project filter drops General, a status
   filter drops loose sessions and statuses outside `FILTER_STATUSES`; Backlog opens
