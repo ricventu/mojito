@@ -81,3 +81,17 @@ export function osc52Text(data: string): string | null {
     return null;
   }
 }
+
+/**
+ * Drops a copy that repeats the previous one within `windowMs`. Under tmux, claude sends
+ * every OSC 52 twice — bare and DCS-wrapped (`raw+dcs`) — and tmux forwards both, so
+ * one selection would otherwise be copied, and announced, twice.
+ */
+export function echoFilter(windowMs: number): (text: string, now: number) => boolean {
+  let last: { text: string; at: number } | null = null;
+  return (text, now) => {
+    const echo = last !== null && last.text === text && now - last.at < windowMs;
+    last = { text, at: now };
+    return !echo;
+  };
+}

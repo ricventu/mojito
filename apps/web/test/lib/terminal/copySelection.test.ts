@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { copyText, osc52Text } from "@/lib/terminal/copySelection";
+import { copyText, echoFilter, osc52Text } from "@/lib/terminal/copySelection";
 
 describe("copyText", () => {
   it("writes through the async clipboard when there is one", async () => {
@@ -58,5 +58,25 @@ describe("osc52Text", () => {
     expect(osc52Text("c;not base64!")).toBeNull();
     expect(osc52Text("garbage")).toBeNull();
     expect(osc52Text("c;")).toBeNull();
+  });
+});
+
+describe("echoFilter", () => {
+  it("lets the first copy through and drops the same text right behind it", () => {
+    const fresh = echoFilter(500);
+    expect(fresh("hello", 1000)).toBe(true);
+    expect(fresh("hello", 1050)).toBe(false);
+  });
+
+  it("lets the same text through again once the window has passed", () => {
+    const fresh = echoFilter(500);
+    expect(fresh("hello", 1000)).toBe(true);
+    expect(fresh("hello", 1600)).toBe(true);
+  });
+
+  it("never drops a different text", () => {
+    const fresh = echoFilter(500);
+    expect(fresh("hello", 1000)).toBe(true);
+    expect(fresh("world", 1010)).toBe(true);
   });
 });

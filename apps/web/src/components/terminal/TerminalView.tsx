@@ -4,7 +4,7 @@ import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { toast } from "sonner";
 import { SESSION_GONE_CODE } from "@mojito/shared";
-import { browserClipboard, copyText, osc52Text } from "@/lib/terminal/copySelection";
+import { browserClipboard, copyText, echoFilter, osc52Text } from "@/lib/terminal/copySelection";
 import { xtermThinksItIsNode } from "@/lib/terminal/platform";
 import { syncGeometry } from "@/lib/terminal/terminalFit";
 import { terminalOptions } from "@/lib/terminal/terminalOptions";
@@ -117,9 +117,10 @@ export function TerminalView({ sessionId, keyboardOpen, onExit, onReady }: Props
           else toast.error("Copy failed");
         });
       };
+      const freshCopy = echoFilter(500);
       const onOsc52 = term.parser.registerOscHandler(52, (data) => {
         const text = osc52Text(data);
-        if (text) copyOut(text);
+        if (text && freshCopy(text, Date.now())) copyOut(text);
         return true;
       });
       let selectionChanged = false;
