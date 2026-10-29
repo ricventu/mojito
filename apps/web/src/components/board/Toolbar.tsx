@@ -1,4 +1,4 @@
-import { Plus, Settings, SquareTerminal } from "lucide-react";
+import { PanelLeft, Plus, Settings, SquareTerminal } from "lucide-react";
 import { Link } from "react-router";
 import type { SessionMeta } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
@@ -8,17 +8,29 @@ interface Props {
   sessions: SessionMeta[];
   onNewTicket: () => void;
   onNewSession: () => void;
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
   /** Extra rows kept inside the sticky bar, under the title row. */
   children?: React.ReactNode;
 }
 
 /** Sticky top bar. It pays the top safe-area inset itself: the board is full-bleed. */
-export function Toolbar({ sessions, onNewTicket, onNewSession, children }: Props) {
+export function Toolbar({ sessions, onNewTicket, onNewSession, sidebarOpen, onToggleSidebar, children }: Props) {
   const waiting = needsInput(sessions);
 
   return (
     <div className="sticky top-0 z-10 border-b bg-background/95 pt-[var(--sat)] pr-[var(--sar)] pl-[var(--sal)] backdrop-blur">
       <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-2">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0"
+          aria-label="Sessions"
+          aria-expanded={sidebarOpen}
+          onClick={onToggleSidebar}
+        >
+          <PanelLeft size={16} />
+        </Button>
         <h1 className="min-w-0 flex-1 truncate text-base font-semibold">Mojito</h1>
         {waiting.length > 0 && (
           <Button
