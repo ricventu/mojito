@@ -2,7 +2,9 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
+import { toast } from "sonner";
 import { SESSION_GONE_CODE } from "@mojito/shared";
+import { browserClipboard, copyText } from "@/lib/terminal/copySelection";
 import { xtermThinksItIsNode } from "@/lib/terminal/platform";
 import { syncGeometry } from "@/lib/terminal/terminalFit";
 import { terminalOptions } from "@/lib/terminal/terminalOptions";
@@ -105,6 +107,25 @@ export function TerminalView({ sessionId, keyboardOpen, onExit, onReady }: Props
       });
       const onData = term.onData(sendBytes);
 
+      // Copy-on-select: the next mouse move would clear the selection (copySelection.ts),
+      // so a release that ended a selection copies it. On window, after xterm's own
+      // document-level mouseup has finalized it.
+      let selectionChanged = false;
+      const onSelection = term.onSelectionChange(() => {
+        selectionChanged = true;
+      });
+      const onMouseUp = () => {
+        if (!selectionChanged) return;
+        selectionChanged = false;
+        const text = term.getSelection();
+        if (!text) return;
+        void copyText(text, browserClipboard()).then((ok) => {
+          if (ok) toast("Copied", { duration: 1500 });
+          else toast.error("Copy failed");
+        });
+      };
+      window.addEventListener("mouseup", onMouseUp);
+
       let closed = false;
       let retry: ReturnType<typeof setTimeout> | undefined;
       const connect = () => {
@@ -144,6 +165,8 @@ export function TerminalView({ sessionId, keyboardOpen, onExit, onReady }: Props
         clearTimeout(retry);
         observer.disconnect();
         onData.dispose();
+        onSelection.dispose();
+        window.removeEventListener("mouseup", onMouseUp);
         wsRef.current?.close();
         wsRef.current = null;
         syncRef.current = () => {};
