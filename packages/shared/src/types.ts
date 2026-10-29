@@ -51,6 +51,8 @@ export interface SessionMeta {
   alert: string | null;
   createdAt: number;
   lastEventAt: number;
+  /** Sidebar-only: tucked into the sidebar's Hidden footer. Nothing behavioural reads it. */
+  hidden: boolean;
 }
 
 export type TaskStatus = "queued" | "running" | "done" | "failed";

@@ -157,3 +157,46 @@ describe("DELETE /api/sessions/:id", () => {
     });
   });
 });
+
+describe("PATCH /api/sessions/:id", () => {
+  it("hides and unhides a session", async () => {
+    const { req, sessions, events } = setup();
+    sessions.insert(meta());
+    const res = await req("/api/sessions/mj-RIC-1", { method: "PATCH", json: { hidden: true } });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { hidden: boolean }).hidden).toBe(true);
+    expect(sessions.get("mj-RIC-1")?.hidden).toBe(true);
+    expect(events).toContainEqual({
+      type: "session.updated",
+      session: expect.objectContaining({ id: "mj-RIC-1", hidden: true }),
+    });
+    const back = await req("/api/sessions/mj-RIC-1", { method: "PATCH", json: { hidden: false } });
+    expect(((await back.json()) as { hidden: boolean }).hidden).toBe(false);
+  });
+
+  it("404s an unknown id", async () => {
+    const { req } = setup();
+    const res = await req("/api/sessions/mj-nope", { method: "PATCH", json: { hidden: true } });
+    expect(res.status).toBe(404);
+    expect(await res.json()).toHaveProperty("error");
+  });
+
+  it("refuses any other body", async () => {
+    const { req, sessions } = setup();
+    sessions.insert(meta());
+    for (const json of [{ hidden: "yes" }, { hidden: true, state: "ended" }]) {
+      const res = await req("/api/sessions/mj-RIC-1", { method: "PATCH", json });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toHaveProperty("error");
+    }
+    expect(sessions.get("mj-RIC-1")).toEqual(meta());
+  });
+
+  it("a state patch keeps hidden", async () => {
+    const { req, sessions } = setup();
+    sessions.insert(meta());
+    await req("/api/sessions/mj-RIC-1", { method: "PATCH", json: { hidden: true } });
+    sessions.patch("mj-RIC-1", { state: "idle" });
+    expect(sessions.get("mj-RIC-1")?.hidden).toBe(true);
+  });
+});

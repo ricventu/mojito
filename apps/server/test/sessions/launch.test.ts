@@ -87,6 +87,7 @@ const row = (over: Partial<SessionMeta>): SessionMeta => ({
   alert: null,
   createdAt: 1,
   lastEventAt: 1,
+  hidden: false,
   ...over,
 });
 
@@ -115,6 +116,7 @@ describe("launchTicket", () => {
       alert: null,
       createdAt: 1000,
       lastEventAt: 1000,
+      hidden: false,
     };
     expect(res).toEqual({ ok: true, session: expected });
     expect(deps.newSession).toHaveBeenCalledTimes(1);
@@ -309,6 +311,14 @@ describe("launchTicket", () => {
     expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "starting", model: "opus", effort: "high", createdAt: 1000 });
   });
 
+  it("a relaunch shows a hidden session again", async () => {
+    const { deps, sessions } = setup();
+    sessions.insert(row({ state: "ended", hidden: true }));
+    const res = await launchTicket(body(), deps);
+    expect(res.ok).toBe(true);
+    expect(sessions.get("mj-RIC-1")?.hidden).toBe(false);
+  });
+
   it("arms the startup stall watch", async () => {
     const { deps, sessions } = setup();
     await launchTicket(body(), deps);
@@ -336,6 +346,7 @@ describe("launchFree", () => {
       alert: null,
       createdAt: 1000,
       lastEventAt: 1000,
+      hidden: false,
     };
     expect(res).toEqual({ ok: true, session: expected });
     const settingsPath = "/state/hooks/mj-web-a1b2c3.json";

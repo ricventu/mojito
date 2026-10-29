@@ -45,5 +45,9 @@ export const SettingsBody = z.object({
 });
 export type SettingsBody = z.infer<typeof SettingsBody>;
 
+/** Only `hidden` can be changed on a session; anything else is refused. */
+export const SessionPatchBody = z.strictObject({ hidden: z.boolean() });
+export type SessionPatchBody = z.infer<typeof SessionPatchBody>;
+
 export const StatusBody = z.object({ status: z.string().min(1) });
 export type StatusBody = z.infer<typeof StatusBody>;

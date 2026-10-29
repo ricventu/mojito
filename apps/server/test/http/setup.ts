@@ -36,6 +36,7 @@ export const meta = (over: Partial<SessionMeta> = {}): SessionMeta => ({
   alert: null,
   createdAt: 1,
   lastEventAt: 1,
+  hidden: false,
   ...over,
 });
 

@@ -17,6 +17,7 @@ const meta = (id: string, state: SessionMeta["state"]): SessionMeta => ({
   alert: state === "needs-input" ? "x" : null,
   createdAt: 1,
   lastEventAt: 1,
+  hidden: false,
 });
 
 function setup(rows: SessionMeta[], tmux: string[]) {
@@ -68,6 +69,7 @@ describe("reconcileSessions", () => {
       alert: null,
       createdAt: 900,
       lastEventAt: 900,
+      hidden: false,
     });
     expect(events).toEqual([
       { type: "session.updated", session: sessions.get("mj-RIC-2") },

@@ -17,6 +17,7 @@ const meta = (state: SessionMeta["state"]): SessionMeta => ({
   alert: null,
   createdAt: 1,
   lastEventAt: 1,
+  hidden: false,
 });
 
 function setup(state: SessionMeta["state"], alive: boolean) {

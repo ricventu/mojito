@@ -64,6 +64,7 @@ export async function reconcileSessions(
       alert: null,
       createdAt: now,
       lastEventAt: now,
+      hidden: false,
     };
     deps.sessions.insert(session);
     deps.bus.emit({ type: "session.updated", session });

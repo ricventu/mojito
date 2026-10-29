@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import { basename, join } from "node:path";
-import { LaunchBody } from "@mojito/shared";
+import { LaunchBody, SessionPatchBody } from "@mojito/shared";
 import { Hono } from "hono";
 import type { AppDeps } from "../app";
 import { parseBody } from "../body";
@@ -73,6 +73,16 @@ export function sessionRoutes(deps: AppDeps): Hono {
       }
       const { session, warning } = result;
       return c.json(warning === undefined ? { session } : { session, warning }, 201);
+    })
+    .patch("/sessions/:id", async (c) => {
+      const id = c.req.param("id");
+      if (!deps.sessions.get(id)) return c.json({ error: `session not found: ${id}` }, 404);
+      const body = await parseBody(c, SessionPatchBody);
+      if (!body.ok) return c.json({ error: body.error }, 400);
+      const session = deps.sessions.patch(id, { hidden: body.data.hidden });
+      if (!session) return c.json({ error: `session not found: ${id}` }, 404);
+      deps.bus.emit({ type: "session.updated", session });
+      return c.json(session);
     })
     .delete("/sessions/:id", async (c) => {
       const id = c.req.param("id");

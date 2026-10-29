@@ -143,6 +143,7 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
       alert: null,
       createdAt: now,
       lastEventAt: now,
+      hidden: false,
     };
     record(deps, session);
     watchStartupStall(id, stallDeps(deps));
@@ -188,6 +189,7 @@ export async function launchFree(body: LaunchFreeBody, deps: LaunchDeps): Promis
     alert: null,
     createdAt: now,
     lastEventAt: now,
+    hidden: false,
   };
 
   if (body.kind === "shell") {

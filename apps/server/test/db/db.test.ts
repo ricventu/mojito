@@ -15,7 +15,7 @@ describe("migrate", () => {
     migrate(db);
     migrate(db);
     const rows = db.prepare("SELECT version FROM schema_migrations").all();
-    expect(rows).toEqual([{ version: 1 }, { version: 2 }]);
+    expect(rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
   });
   it("drops the brainstorming column and its stored default (v2)", () => {
     const db = openDb(":memory:");
@@ -26,6 +26,11 @@ describe("migrate", () => {
     const columns = (db.prepare("PRAGMA table_info(sessions)").all() as { name: string }[]).map((c) => c.name);
     expect(columns).not.toContain("brainstorming");
     expect(db.prepare("SELECT key FROM settings WHERE key = 'brainstormingDefault'").get()).toBeUndefined();
+  });
+  it("adds hidden, defaulting to 0", () => {
+    const db = openDb(":memory:");
+    const columns = db.prepare("PRAGMA table_info(sessions)").all() as { name: string; notnull: number; dflt_value: string | null }[];
+    expect(columns.find((c) => c.name === "hidden")).toMatchObject({ notnull: 1, dflt_value: "0" });
   });
   it("enforces foreign keys pragma", () => {
     const db = openDb(":memory:");
@@ -180,6 +185,7 @@ const session = (over: Partial<SessionMeta> = {}): SessionMeta => ({
   alert: null,
   createdAt: 1,
   lastEventAt: 1,
+  hidden: false,
   ...over,
 });
 
