@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ListFilter, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,25 @@ export function FilterBar({ filters, setFilters }: Props) {
   const [open, setOpen] = useState(false);
   const count = filterCount(filters);
 
+  // The input owns what is typed: the url follows through an asynchronous navigation, and an
+  // input driven straight from it is reset under the caret mid-edit. The draft re-syncs only
+  // when `q` changes to something this input did not write (a chip, Clear filters).
+  const [draft, setDraft] = useState(filters.q);
+  const written = useRef<string[]>([]);
+  useEffect(() => {
+    const at = written.current.indexOf(filters.q);
+    if (at !== -1) written.current = written.current.slice(at + 1);
+    else {
+      written.current = [];
+      setDraft(filters.q);
+    }
+  }, [filters.q]);
+  const type = (q: string) => {
+    setDraft(q);
+    written.current.push(q);
+    setFilters({ ...filters, q });
+  };
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
@@ -25,17 +44,20 @@ export function FilterBar({ filters, setFilters }: Props) {
             type="search"
             aria-label="Search tickets"
             placeholder="Search tickets…"
-            value={filters.q}
-            onChange={(e) => setFilters({ ...filters, q: e.target.value })}
+            value={draft}
+            onChange={(e) => type(e.target.value)}
             className="pr-9 pl-8 [&::-webkit-search-cancel-button]:appearance-none"
           />
-          {filters.q !== "" && (
+          {draft !== "" && (
             <Button
               variant="ghost"
               size="icon-sm"
               aria-label="Clear search"
               className="absolute top-1/2 right-0.5 -translate-y-1/2"
-              onClick={() => setFilters({ ...filters, q: "" })}
+              onClick={() => {
+                setDraft("");
+                setFilters({ ...filters, q: "" });
+              }}
             >
               <X size={14} />
             </Button>

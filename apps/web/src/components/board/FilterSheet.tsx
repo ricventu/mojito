@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { SHEET_CONTENT_CLASS } from "@/components/sheets/styles";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useProjects } from "@/hooks/useProjects";
@@ -35,10 +37,14 @@ function SaveFavorite({ filters }: { filters: BoardFilters }) {
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!isFiltered(filters)) return;
     const { list, replaced } = addFavorite(favorites, name, canonicalSearch(filters));
     if (list === favorites) return;
     save(list);
-    toast.success(replaced ? `Updated ${name.trim()}` : `Saved ${name.trim()}`);
+    // A same-name save keeps the stored name's capitalisation: name that one.
+    const typed = name.trim();
+    const stored = list.find((f) => f.name.toLowerCase() === typed.toLowerCase())?.name ?? typed;
+    toast.success(replaced ? `Updated ${stored}` : `Saved ${stored}`);
     setNaming(false);
     setName("");
   }
@@ -60,7 +66,7 @@ function SaveFavorite({ filters }: { filters: BoardFilters }) {
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
-      <Button type="submit" disabled={name.trim() === ""}>
+      <Button type="submit" disabled={name.trim() === "" || !isFiltered(filters)}>
         Save
       </Button>
     </form>
@@ -80,15 +86,19 @@ export function FilterSheet({ open, onOpenChange, filters, setFilters }: Props) 
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side={wide ? "right" : "bottom"}
+        showCloseButton={false}
         className={cn(
           "overflow-y-auto",
-          wide
-            ? "pt-[max(0rem,var(--sat))] pr-[var(--sar)]"
-            : "max-h-[92dvh] rounded-t-xl pb-[max(1rem,var(--sab))]",
+          wide ? "pt-[var(--sat)] pr-[var(--sar)] pb-[max(1rem,var(--sab))]" : SHEET_CONTENT_CLASS,
         )}
       >
-        <SheetHeader>
+        <SheetHeader className="flex-row items-center justify-between">
           <SheetTitle>Filters</SheetTitle>
+          <SheetClose asChild>
+            <Button variant="ghost" size="icon-sm" aria-label="Close">
+              <X size={16} />
+            </Button>
+          </SheetClose>
           <SheetDescription className="sr-only">Pick projects and statuses to show on the board.</SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-5 px-4">
@@ -128,7 +138,7 @@ export function FilterSheet({ open, onOpenChange, filters, setFilters }: Props) 
             </div>
           </fieldset>
         </div>
-        <div className="mt-auto flex flex-col gap-2 px-4 pb-4">
+        <div className="mt-auto flex flex-col gap-2 px-4">
           <Button variant="ghost" disabled={!isFiltered(filters)} onClick={() => setFilters(NO_FILTERS)}>
             Clear
           </Button>
