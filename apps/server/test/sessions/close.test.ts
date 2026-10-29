@@ -13,7 +13,6 @@ const meta = (state: SessionMeta["state"]): SessionMeta => ({
   cwd: "/repo/web",
   model: "opus",
   effort: "high",
-  brainstorming: false,
   state,
   alert: state === "needs-input" ? "claude is waiting for you" : null,
   createdAt: 1,

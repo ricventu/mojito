@@ -12,12 +12,11 @@ describe("/api/settings", () => {
 
   it("stores what PUT sends and answers it back", async () => {
     const { req, settings } = setup();
-    const next = { statusDefaults: { Todo: { model: "sonnet", effort: "low" } }, brainstormingDefault: true };
+    const next = { statusDefaults: { Todo: { model: "sonnet", effort: "low" } } };
     const res = await req("/api/settings", { method: "PUT", json: next });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, any>;
     expect(body.statusDefaults.Todo).toEqual({ model: "sonnet", effort: "low" });
-    expect(body.brainstormingDefault).toBe(true);
     expect(settings.get()).toEqual(body);
   });
 
@@ -25,7 +24,7 @@ describe("/api/settings", () => {
     const { req, settings } = setup();
     const res = await req("/api/settings", {
       method: "PUT",
-      json: { statusDefaults: { Todo: { model: "gpt", effort: "low" } }, brainstormingDefault: false },
+      json: { statusDefaults: { Todo: { model: "gpt", effort: "low" } } },
     });
     expect(res.status).toBe(400);
     expect(settings.get()).toEqual(defaultSettings());

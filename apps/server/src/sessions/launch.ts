@@ -124,7 +124,7 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
 
     const settingsPath = hookSettingsPath(deps.cfg, id);
     deps.writeFile(settingsPath, JSON.stringify(buildHookSettings(id, deps.cfg.port, deps.cfg.token)));
-    const command = claudeCommand(body.model, body.effort, settingsPath, buildTicketPrompt(body.ticket, body.brainstorming));
+    const command = claudeCommand(body.model, body.effort, settingsPath, buildTicketPrompt(body.ticket));
     const refused = await spawn(deps, id, cwd, command);
     if (refused) return refused;
 
@@ -137,7 +137,6 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
       cwd,
       model: body.model,
       effort: body.effort,
-      brainstorming: body.brainstorming,
       state: "starting",
       alert: null,
       createdAt: now,
@@ -184,7 +183,6 @@ export async function launchFree(body: LaunchFreeBody, deps: LaunchDeps): Promis
     project: body.project,
     ticket: null,
     cwd,
-    brainstorming: false,
     alert: null,
     createdAt: now,
     lastEventAt: now,

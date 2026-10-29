@@ -61,8 +61,9 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   `warning`, never fail the launch). Ticket id `mj-<TICKET>`, free sessions `mj-<slug>-<hex6>`.
 - **The prompt** (`sessions/prompt.ts`) is the whole instruction, in English, pinned
   byte-for-byte by its test: read ticket X from Linear and execute it; when ready for
-  review, move it to "In Review" on Linear; with brainstorming, one extra line asking for
-  `superpowers:brainstorming`. Nothing else — the session decides branches/worktrees itself.
+  review, move it to "In Review" on Linear; use `superpowers:brainstorming` first only if the
+  ticket leaves design decisions open. Brainstorming is not a launch option — the session
+  decides it, like branches/worktrees. Nothing else.
   Mojito writes In Progress; the session writes In Review; Done is the human's.
 - **Live state** comes only from Claude Code hooks (`hookSettings.ts` → curl to
   `127.0.0.1:<port>/api/hook` with `x-mojito-token` and claude's hook JSON as body;

@@ -6,7 +6,7 @@ const STATUSES = ["Backlog", "Todo", "In Progress", "In Review"] as const;
 export function defaultSettings(): Settings {
   const statusDefaults: Record<string, StatusDefault> = {};
   for (const s of STATUSES) statusDefaults[s] = { model: "opus", effort: "high" };
-  return { statusDefaults, brainstormingDefault: false };
+  return { statusDefaults };
 }
 
 export class SettingsRepo {
@@ -26,8 +26,6 @@ export class SettingsRepo {
     const out = defaultSettings();
     const stored = this.read("statusDefaults");
     if (stored && typeof stored === "object") Object.assign(out.statusDefaults, stored);
-    const brainstorming = this.read("brainstormingDefault");
-    if (typeof brainstorming === "boolean") out.brainstormingDefault = brainstorming;
     return out;
   }
 
@@ -50,9 +48,6 @@ export class SettingsRepo {
     const put = this.db.prepare(
       "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
     );
-    this.db.transaction(() => {
-      put.run("statusDefaults", JSON.stringify(s.statusDefaults));
-      put.run("brainstormingDefault", JSON.stringify(s.brainstormingDefault));
-    })();
+    put.run("statusDefaults", JSON.stringify(s.statusDefaults));
   }
 }

@@ -72,14 +72,13 @@ function StatusField({ ticket, teamKey }: { ticket: TicketSummary; teamKey: stri
   );
 }
 
-/** Model, effort and brainstorming, then Launch. Disabled while the request is in flight: a double tap is one POST. */
+/** Model and effort, then Launch. Disabled while the request is in flight: a double tap is one POST. */
 function LaunchForm({ ticket, settings, onClose }: { ticket: TicketSummary; settings: Settings; onClose: () => void }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const initial = initialLaunchOptions(ticket, settings);
   const [model, setModel] = useState<Model>(initial.model);
   const [effort, setEffort] = useState<Effort>(initial.effort);
-  const [brainstorming, setBrainstorming] = useState(initial.brainstorming);
 
   const launch = useMutation({
     mutationFn: () =>
@@ -88,7 +87,6 @@ function LaunchForm({ ticket, settings, onClose }: { ticket: TicketSummary; sett
         ticket: ticket.identifier,
         model,
         effort,
-        brainstorming,
       }),
     onSuccess: ({ session, warning }) => {
       void qc.invalidateQueries({ queryKey: qk.sessions });
@@ -111,10 +109,6 @@ function LaunchForm({ ticket, settings, onClose }: { ticket: TicketSummary; sett
   return (
     <div className="flex flex-col gap-4">
       <LaunchOptions idPrefix="ticket" model={model} effort={effort} onModel={setModel} onEffort={setEffort} />
-      <div className="flex items-center justify-between gap-3">
-        <Label htmlFor="ticket-brainstorming">Brainstorming</Label>
-        <Switch id="ticket-brainstorming" checked={brainstorming} onCheckedChange={setBrainstorming} />
-      </div>
       <Button disabled={launch.isPending} onClick={() => launch.mutate()}>
         <Play size={16} /> {launch.isPending ? "Launching…" : "Launch"}
       </Button>

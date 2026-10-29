@@ -10,7 +10,6 @@ export interface StatusDefault {
 
 export interface Settings {
   statusDefaults: Record<string, StatusDefault>;
-  brainstormingDefault: boolean;
 }
 
 export interface ProjectRow {
@@ -45,7 +44,6 @@ export interface SessionMeta {
   cwd: string;
   model: Model | null;
   effort: Effort | null;
-  brainstorming: boolean;
   state: SessionState;
   alert: string | null;
   createdAt: number;

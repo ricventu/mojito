@@ -26,7 +26,6 @@ function session(id: string, over: Partial<SessionMeta> = {}): SessionMeta {
     cwd: "/repos/Alpha",
     model: "opus",
     effort: "high",
-    brainstorming: false,
     state: "idle",
     alert: null,
     createdAt: 1,

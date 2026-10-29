@@ -6,7 +6,6 @@ export const LaunchTicketBody = z.object({
   ticket: z.string().regex(/^[A-Z][A-Z0-9]*-\d+$/),
   model: z.enum(MODELS),
   effort: z.enum(EFFORTS),
-  brainstorming: z.boolean(),
 });
 export type LaunchTicketBody = z.infer<typeof LaunchTicketBody>;
 
@@ -40,7 +39,6 @@ export type ProjectBody = z.infer<typeof ProjectBody>;
 
 export const SettingsBody = z.object({
   statusDefaults: z.record(z.string(), z.object({ model: z.enum(MODELS), effort: z.enum(EFFORTS) })),
-  brainstormingDefault: z.boolean(),
 });
 export type SettingsBody = z.infer<typeof SettingsBody>;
 

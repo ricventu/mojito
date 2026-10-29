@@ -15,7 +15,17 @@ describe("migrate", () => {
     migrate(db);
     migrate(db);
     const rows = db.prepare("SELECT version FROM schema_migrations").all();
-    expect(rows).toEqual([{ version: 1 }]);
+    expect(rows).toEqual([{ version: 1 }, { version: 2 }]);
+  });
+  it("drops the brainstorming column and its stored default (v2)", () => {
+    const db = openDb(":memory:");
+    db.exec("DELETE FROM schema_migrations WHERE version = 2");
+    db.exec("ALTER TABLE sessions ADD COLUMN brainstorming INTEGER NOT NULL DEFAULT 0");
+    db.exec(`INSERT INTO settings (key, value) VALUES ('brainstormingDefault', 'true')`);
+    migrate(db);
+    const columns = (db.prepare("PRAGMA table_info(sessions)").all() as { name: string }[]).map((c) => c.name);
+    expect(columns).not.toContain("brainstorming");
+    expect(db.prepare("SELECT key FROM settings WHERE key = 'brainstormingDefault'").get()).toBeUndefined();
   });
   it("enforces foreign keys pragma", () => {
     const db = openDb(":memory:");
@@ -121,26 +131,22 @@ describe("importProjectsOnce", () => {
     const db = openDb(":memory:");
     const settings = new SettingsRepo(db);
     settings.markProjectsImported();
-    expect(Object.keys(settings.get())).toEqual(["statusDefaults", "brainstormingDefault"]);
+    expect(Object.keys(settings.get())).toEqual(["statusDefaults"]);
   });
 });
 
 describe("SettingsRepo", () => {
   it("returns defaults on an empty db", () => {
     const s = new SettingsRepo(openDb(":memory:")).get();
-    expect(s.brainstormingDefault).toBe(false);
     expect(Object.keys(s.statusDefaults)).toEqual(["Backlog", "Todo", "In Progress", "In Review"]);
     expect(s.statusDefaults["Todo"]).toEqual({ model: "opus", effort: "high" });
   });
   it("merges stored values over defaults per status", () => {
     const repo = new SettingsRepo(openDb(":memory:"));
-    repo.set({ statusDefaults: { Todo: { model: "sonnet", effort: "low" } }, brainstormingDefault: true });
+    repo.set({ statusDefaults: { Todo: { model: "sonnet", effort: "low" } } });
     const s = repo.get();
     expect(s.statusDefaults["Todo"]).toEqual({ model: "sonnet", effort: "low" });
     expect(s.statusDefaults["In Review"]).toEqual({ model: "opus", effort: "high" });
-    expect(s.brainstormingDefault).toBe(true);
-    repo.set({ statusDefaults: {}, brainstormingDefault: false });
-    expect(repo.get().brainstormingDefault).toBe(false);
   });
 });
 
@@ -152,7 +158,6 @@ const session = (over: Partial<SessionMeta> = {}): SessionMeta => ({
   cwd: "/w",
   model: "opus",
   effort: "high",
-  brainstorming: true,
   state: "starting",
   alert: null,
   createdAt: 1,
@@ -161,13 +166,13 @@ const session = (over: Partial<SessionMeta> = {}): SessionMeta => ({
 });
 
 describe("SessionsRepo", () => {
-  it("round-trips, including booleans and nulls", () => {
+  it("round-trips, including nulls", () => {
     const repo = new SessionsRepo(openDb(":memory:"));
     repo.insert(session());
-    repo.insert(session({ id: "mj-shell-abc123", kind: "shell", ticket: null, project: null, model: null, effort: null, brainstorming: false }));
+    repo.insert(session({ id: "mj-shell-abc123", kind: "shell", ticket: null, project: null, model: null, effort: null }));
     expect(repo.get("mj-RIC-1")).toEqual(session());
     const shell = repo.get("mj-shell-abc123")!;
-    expect(shell).toMatchObject({ ticket: null, project: null, model: null, effort: null, brainstorming: false });
+    expect(shell).toMatchObject({ ticket: null, project: null, model: null, effort: null });
     expect(repo.list()).toHaveLength(2);
     expect(repo.get("zzz")).toBeNull();
   });

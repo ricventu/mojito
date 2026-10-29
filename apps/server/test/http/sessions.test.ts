@@ -16,7 +16,7 @@ describe("POST /api/sessions", () => {
     const { req, launch } = setup();
     const res = await req("/api/sessions", {
       method: "POST",
-      json: { kind: "ticket", ticket: "x", model: "opus", effort: "high", brainstorming: false },
+      json: { kind: "ticket", ticket: "x", model: "opus", effort: "high" },
     });
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toMatch(/ticket/);
@@ -44,7 +44,7 @@ describe("POST /api/sessions", () => {
     const { req } = setup();
     const res = await req("/api/sessions", {
       method: "POST",
-      json: { kind: "ticket", ticket: "RIC-9", model: "opus", effort: "high", brainstorming: false },
+      json: { kind: "ticket", ticket: "RIC-9", model: "opus", effort: "high" },
     });
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: "ticket not found: RIC-9" });
@@ -60,7 +60,7 @@ describe("POST /api/sessions", () => {
     sessions.insert(meta());
     const res = await req("/api/sessions", {
       method: "POST",
-      json: { kind: "ticket", ticket: "RIC-1", model: "opus", effort: "high", brainstorming: false },
+      json: { kind: "ticket", ticket: "RIC-1", model: "opus", effort: "high" },
     });
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "session already exists: mj-RIC-1", sessionId: "mj-RIC-1" });

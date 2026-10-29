@@ -14,13 +14,9 @@ export const EFFORT_LABELS: Record<Effort, string> = {
 /** What a launch starts from when nothing configured names the status. */
 export const FALLBACK: { model: Model; effort: Effort } = { model: "opus", effort: "high" };
 
-/** The model, effort and brainstorming a ticket's launch form starts from. */
-export function initialLaunchOptions(
-  ticket: TicketSummary,
-  settings: Settings,
-): { model: Model; effort: Effort; brainstorming: boolean } {
-  const { model, effort } = settings.statusDefaults[ticket.statusName] ?? FALLBACK;
-  return { model, effort, brainstorming: settings.brainstormingDefault };
+/** The model and effort a ticket's launch form starts from. */
+export function initialLaunchOptions(ticket: TicketSummary, settings: Settings): { model: Model; effort: Effort } {
+  return settings.statusDefaults[ticket.statusName] ?? FALLBACK;
 }
 
 /**

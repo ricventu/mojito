@@ -60,7 +60,6 @@ export async function reconcileSessions(
       cwd: "",
       model: null,
       effort: null,
-      brainstorming: false,
       state: "idle" as const,
       alert: null,
       createdAt: now,

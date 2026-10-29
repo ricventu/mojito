@@ -4,8 +4,6 @@ import { toast } from "sonner";
 import { SettingsBody, type Effort, type Model, type Settings } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { LaunchOptions } from "@/components/sheets/LaunchOptions";
 import { useSettings } from "@/hooks/useSettings";
 import { apiJson } from "@/lib/api";
@@ -18,7 +16,6 @@ const STATUSES = ["Backlog", "Todo", "In Progress", "In Review"] as const;
 function Form({ settings }: { settings: Settings }) {
   const qc = useQueryClient();
   const [defaults, setDefaults] = useState(settings.statusDefaults);
-  const [brainstorming, setBrainstorming] = useState(settings.brainstormingDefault);
   const [error, setError] = useState<string | null>(null);
 
   const save = useMutation({
@@ -36,7 +33,7 @@ function Form({ settings }: { settings: Settings }) {
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = SettingsBody.safeParse({ statusDefaults: defaults, brainstormingDefault: brainstorming });
+    const parsed = SettingsBody.safeParse({ statusDefaults: defaults });
     if (!parsed.success) {
       setError("Invalid values.");
       return;
@@ -60,13 +57,6 @@ function Form({ settings }: { settings: Settings }) {
             />
           </div>
         ))}
-        <div className="flex items-center justify-between gap-3 border-t pt-4">
-          <div className="min-w-0">
-            <Label htmlFor="default-brainstorming">Brainstorming by default</Label>
-            <p className="text-xs text-muted-foreground">New ticket launches start with brainstorming on.</p>
-          </div>
-          <Switch id="default-brainstorming" checked={brainstorming} onCheckedChange={setBrainstorming} />
-        </div>
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -82,7 +72,7 @@ function Form({ settings }: { settings: Settings }) {
   );
 }
 
-/** Per-status model and effort plus the brainstorming default, saved together with one PUT. */
+/** Per-status model and effort, saved together with one PUT. */
 export function DefaultsCard() {
   const settings = useSettings();
   return (

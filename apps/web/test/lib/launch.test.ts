@@ -5,7 +5,6 @@ import { initialLaunchOptions, launchErrorAction } from "@/lib/launch";
 
 const settings: Settings = {
   statusDefaults: { Todo: { model: "sonnet", effort: "medium" } },
-  brainstormingDefault: true,
 };
 
 function ticket(statusName: string): TicketSummary {
@@ -26,7 +25,6 @@ describe("initialLaunchOptions", () => {
     expect(initialLaunchOptions(ticket("Todo"), settings)).toEqual({
       model: "sonnet",
       effort: "medium",
-      brainstorming: true,
     });
   });
 
@@ -34,7 +32,6 @@ describe("initialLaunchOptions", () => {
     expect(initialLaunchOptions(ticket("Weird"), settings)).toEqual({
       model: "opus",
       effort: "high",
-      brainstorming: true,
     });
   });
 });

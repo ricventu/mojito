@@ -9,7 +9,6 @@ interface Row {
   cwd: string;
   model: SessionMeta["model"];
   effort: SessionMeta["effort"];
-  brainstorming: number;
   state: SessionMeta["state"];
   alert: string | null;
   created_at: number;
@@ -24,7 +23,6 @@ const toMeta = (r: Row): SessionMeta => ({
   cwd: r.cwd,
   model: r.model,
   effort: r.effort,
-  brainstorming: r.brainstorming === 1,
   state: r.state,
   alert: r.alert,
   createdAt: r.created_at,
@@ -48,10 +46,10 @@ export class SessionsRepo {
     this.db
       .prepare(
         `INSERT OR REPLACE INTO sessions
-           (id, kind, project, ticket, cwd, model, effort, brainstorming, state, alert, created_at, last_event_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, kind, project, ticket, cwd, model, effort, state, alert, created_at, last_event_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(m.id, m.kind, m.project, m.ticket, m.cwd, m.model, m.effort, m.brainstorming ? 1 : 0, m.state, m.alert, m.createdAt, m.lastEventAt);
+      .run(m.id, m.kind, m.project, m.ticket, m.cwd, m.model, m.effort, m.state, m.alert, m.createdAt, m.lastEventAt);
   }
 
   patch(id: string, p: Partial<Pick<SessionMeta, "state" | "alert" | "lastEventAt">>): SessionMeta | null {

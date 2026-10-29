@@ -71,7 +71,6 @@ const body = (over: Partial<LaunchTicketBody> = {}): LaunchTicketBody => ({
   ticket: "RIC-1",
   model: "opus",
   effort: "high",
-  brainstorming: false,
   ...over,
 });
 
@@ -83,7 +82,6 @@ const row = (over: Partial<SessionMeta>): SessionMeta => ({
   cwd: "/repo/web",
   model: "sonnet",
   effort: "low",
-  brainstorming: false,
   state: "running",
   alert: null,
   createdAt: 1,
@@ -112,7 +110,6 @@ describe("launchTicket", () => {
       cwd: "/repo/web",
       model: "opus",
       effort: "high",
-      brainstorming: false,
       state: "starting",
       alert: null,
       createdAt: 1000,
@@ -123,7 +120,7 @@ describe("launchTicket", () => {
     expect(deps.newSession).toHaveBeenCalledWith(
       "mj-RIC-1",
       "/repo/web",
-      `claude --model 'opus' --effort 'high' --settings '${settingsPath}' ${q(buildTicketPrompt("RIC-1", false))}`,
+      `claude --model 'opus' --effort 'high' --settings '${settingsPath}' ${q(buildTicketPrompt("RIC-1"))}`,
     );
     expect(JSON.parse(files.get(settingsPath)!)).toEqual(buildHookSettings("mj-RIC-1", 3100, "tok"));
     expect(sessions.get("mj-RIC-1")).toEqual(expected);
@@ -146,14 +143,13 @@ describe("launchTicket", () => {
     expect(order).toEqual(["newSession", "setStatus", "assignToMe"]);
   });
 
-  it("passes the brainstorming prompt and records the flag", async () => {
-    const { deps, sessions } = setup();
-    await launchTicket(body({ brainstorming: true, model: "sonnet", effort: "max" }), deps);
+  it("passes the model, effort and ticket prompt to claude", async () => {
+    const { deps } = setup();
+    await launchTicket(body({ model: "sonnet", effort: "max" }), deps);
     const cmd = vi.mocked(deps.newSession).mock.calls[0][2];
     expect(cmd).toBe(
-      `claude --model 'sonnet' --effort 'max' --settings '/state/hooks/mj-RIC-1.json' ${q(buildTicketPrompt("RIC-1", true))}`,
+      `claude --model 'sonnet' --effort 'max' --settings '/state/hooks/mj-RIC-1.json' ${q(buildTicketPrompt("RIC-1"))}`,
     );
-    expect(sessions.get("mj-RIC-1")?.brainstorming).toBe(true);
   });
 
   it("quotes an apostrophe in the settings path", async () => {
@@ -328,7 +324,6 @@ describe("launchFree", () => {
       cwd: "/repo/web",
       model: "opus",
       effort: "high",
-      brainstorming: false,
       state: "starting",
       alert: null,
       createdAt: 1000,

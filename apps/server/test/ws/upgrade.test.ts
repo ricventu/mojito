@@ -25,7 +25,6 @@ function setup() {
     cwd: "/repo/web",
     model: "opus",
     effort: "high",
-    brainstorming: false,
     state: "running",
     alert: null,
     createdAt: 1,

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { LaunchBody, LaunchTicketBody, ProjectBody, SettingsBody, StatusBody } from "../src/index";
 
 describe("LaunchTicketBody", () => {
-  const ok = { kind: "ticket", ticket: "RIC-12", model: "opus", effort: "high", brainstorming: true };
+  const ok = { kind: "ticket", ticket: "RIC-12", model: "opus", effort: "high" };
 
   it("accepts a valid ticket launch", () => {
     expect(LaunchTicketBody.safeParse(ok).success).toBe(true);
@@ -34,7 +34,7 @@ describe("LaunchBody", () => {
 
   it("routes a ticket launch to the ticket schema", () => {
     expect(
-      LaunchBody.safeParse({ kind: "ticket", ticket: "RIC-1", model: "fable", effort: "max", brainstorming: false }).success,
+      LaunchBody.safeParse({ kind: "ticket", ticket: "RIC-1", model: "fable", effort: "max" }).success,
     ).toBe(true);
     expect(LaunchBody.safeParse({ kind: "ticket", ticket: "RIC-1" }).success).toBe(false);
   });
@@ -66,7 +66,6 @@ describe("SettingsBody and StatusBody", () => {
   it("accepts a per-status defaults record", () => {
     const r = SettingsBody.safeParse({
       statusDefaults: { Todo: { model: "opus", effort: "high" } },
-      brainstormingDefault: false,
     });
     expect(r.success).toBe(true);
   });
@@ -74,7 +73,6 @@ describe("SettingsBody and StatusBody", () => {
   it("rejects an unknown model in the defaults", () => {
     const r = SettingsBody.safeParse({
       statusDefaults: { Todo: { model: "gpt", effort: "high" } },
-      brainstormingDefault: false,
     });
     expect(r.success).toBe(false);
   });
