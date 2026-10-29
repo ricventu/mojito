@@ -7,24 +7,6 @@
 import { apiFetch } from "@/lib/api";
 import { validateImages } from "@/lib/images";
 
-type Files = ArrayLike<File>;
-
-const images = (files: Files): File[] => Array.from(files).filter((f) => f.type.startsWith("image/"));
-
-/**
- * The images a paste brings, or none when it carries text: then the paste is xterm's, so
- * copying spreadsheet cells (text plus a picture of them) still pastes the cells. Any
- * `image/*` counts, so a type the server refuses is refused with a reason, not ignored.
- */
-export function pastedImages(data: { files: Files; getData(type: string): string }): File[] {
-  return data.getData("text/plain") ? [] : images(data.files);
-}
-
-/** The images a drop brings. */
-export function droppedImages(data: { files: Files }): File[] {
-  return images(data.files);
-}
-
 /** Uploads the images, then pastes their paths at claude's input line; nothing is pasted when either step refuses. */
 export async function attachImages(
   files: File[],

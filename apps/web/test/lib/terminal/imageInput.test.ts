@@ -1,40 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { attachImages, droppedImages, pastedImages } from "@/lib/terminal/imageInput";
+import { attachImages } from "@/lib/terminal/imageInput";
 
 const file = (name: string, type: string, size = 3) => new File([new Uint8Array(size)], name, { type });
-
-function clipboard(files: File[], text = "") {
-  return { files, getData: (type: string) => (type === "text/plain" ? text : "") };
-}
-
-describe("pastedImages", () => {
-  it("takes the images of a paste that carries no text", () => {
-    const shot = file("image.png", "image/png");
-    expect(pastedImages(clipboard([shot]))).toEqual([shot]);
-  });
-
-  it("leaves a paste with text to xterm, even with an image beside it", () => {
-    // A spreadsheet copy carries its cells as text and a picture of them as an image.
-    expect(pastedImages(clipboard([file("cells.png", "image/png")], "a\tb"))).toEqual([]);
-  });
-
-  it("takes an unsupported image too, so the refusal says why", () => {
-    const heic = file("photo.heic", "image/heic");
-    expect(pastedImages(clipboard([heic]))).toEqual([heic]);
-  });
-
-  it("ignores files that are not images", () => {
-    expect(pastedImages(clipboard([file("notes.pdf", "application/pdf")]))).toEqual([]);
-  });
-});
-
-describe("droppedImages", () => {
-  it("takes the images of a drop, in order", () => {
-    const a = file("a.png", "image/png");
-    const b = file("b.jpg", "image/jpeg");
-    expect(droppedImages({ files: [a, file("x.txt", "text/plain"), b] })).toEqual([a, b]);
-  });
-});
 
 describe("attachImages", () => {
   it("uploads the images and pastes their paths for claude, space-separated with a trailing space", async () => {

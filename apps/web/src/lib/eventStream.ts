@@ -1,7 +1,18 @@
 import type { MojitoEvent } from "@mojito/shared";
 
-/** How long to wait before dialling again after the socket closes. */
-export const EVENT_RETRY_MS = 2000;
+/** The first wait before dialling again after the socket closes; it doubles per failed dial. */
+export const EVENT_RETRY_MS = 1000;
+/** The longest wait between dials: a server down for a while is still found within this. */
+export const EVENT_RETRY_MAX_MS = 15_000;
+
+/**
+ * The wait before the next dial, after `failures` closes with no successful open between them:
+ * 1 s, 2 s, 4 s … up to `EVENT_RETRY_MAX_MS`. A fixed short wait hammered a server that was
+ * down (a deploy, a crash loop) from every open tab; an open resets the count.
+ */
+export function retryDelay(failures: number): number {
+  return Math.min(EVENT_RETRY_MS * 2 ** Math.max(0, failures - 1), EVENT_RETRY_MAX_MS);
+}
 
 /**
  * The bits of `WebSocket` this module touches. Narrow on purpose: it is what lets the
@@ -48,7 +59,8 @@ const defaultSchedule: Schedule = (fn, ms) => {
 };
 
 /**
- * Keeps an event socket dialled, reconnecting after every close, and reports each
+ * Keeps an event socket dialled, reconnecting after every close with a backoff (`retryDelay`),
+ * and reports each
  * connection through `onConnect` so the caller can resync what it missed.
  *
  * Returns the disposer: it stops the retry loop *and* closes the live socket, so a
@@ -63,14 +75,19 @@ export function openEventStream(
   let socket: EventSocket | null = null;
   let cancelRetry: (() => void) | null = null;
   let disposed = false;
+  let failures = 0;
 
   const dial = () => {
     socket = connect();
-    socket.onopen = () => onConnect?.();
+    socket.onopen = () => {
+      failures = 0;
+      onConnect?.();
+    };
     socket.onmessage = (m) => onEvent(JSON.parse(m.data) as MojitoEvent);
     socket.onclose = () => {
       if (disposed) return;
-      cancelRetry = schedule(dial, EVENT_RETRY_MS);
+      failures += 1;
+      cancelRetry = schedule(dial, retryDelay(failures));
     };
   };
   dial();

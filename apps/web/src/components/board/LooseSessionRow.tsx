@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { SquareTerminal, Trash2 } from "lucide-react";
+import { Power, SquareTerminal, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import type { SessionMeta } from "@mojito/shared";
@@ -91,7 +91,7 @@ export function LooseSessionRow({ session }: { session: SessionMeta }) {
               if (window.confirm(`Kill the ${label} session?`)) kill.mutate();
             }}
           >
-            <Trash2 size={14} /> Kill
+            <Power size={14} /> Kill
           </Button>
         )
       )}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Play, SquareTerminal, Trash2 } from "lucide-react";
+import { Play, Power, SquareTerminal } from "lucide-react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import type { Effort, Model, SessionMeta, Settings, TicketSummary } from "@mojito/shared";
@@ -15,8 +15,9 @@ import { useSessions } from "@/hooks/useSessions";
 import { useSettings } from "@/hooks/useSettings";
 import { ApiError, apiFetch, apiJson } from "@/lib/api";
 import { sessionForTicket } from "@/lib/board";
-import { initialLaunchOptions, launchErrorAction } from "@/lib/launch";
+import { launchErrorAction, launchOptions, type LaunchPicks } from "@/lib/launch";
 import { qk } from "@/lib/queryKeys";
+import { safeHref } from "@/lib/url";
 import { LaunchOptions } from "./LaunchOptions";
 import { SHEET_CONTENT_CLASS } from "./styles";
 
@@ -25,41 +26,77 @@ const errorMessage = (e: unknown, fallback: string) => (e instanceof Error ? e.m
 
 /**
  * The ticket's status as a pill in the header; tapping it moves the ticket among its team's states
- * (Linear's own list). A plain badge until those states load, or when the project has no team.
+ * (Linear's own list). `teamKey` is undefined while projects load and null for a project that is
+ * not mapped; until the states are in, the pill is a plain badge — and when they cannot be had,
+ * a line beside it says why, with a retry where one can help.
  */
-function StatusPill({ ticket, teamKey }: { ticket: TicketSummary; teamKey: string | undefined }) {
+function StatusPill({
+  ticket,
+  status,
+  teamKey,
+  onMove,
+}: {
+  ticket: TicketSummary;
+  status: string;
+  teamKey: string | null | undefined;
+  onMove: (status: string | null) => void;
+}) {
   const qc = useQueryClient();
-  const [status, setStatus] = useState(ticket.statusName);
   const states = useQuery({
     queryKey: ["ticket-states", teamKey],
     queryFn: () => apiFetch<string[]>(`/api/tickets/states?team=${encodeURIComponent(teamKey ?? "")}`),
-    enabled: teamKey !== undefined,
+    enabled: !!teamKey,
     staleTime: 5 * 60_000,
   });
   const move = useMutation({
     mutationFn: (next: string) =>
       apiJson<unknown>(`/api/tickets/${encodeURIComponent(ticket.identifier)}/status`, "POST", { status: next }),
+    onMutate: (next) => onMove(next),
     onSuccess: (_data, next) => toast.success(`${ticket.identifier} → ${next}`),
-    onError: (e, _next, previous) => {
-      setStatus(previous as string);
+    onError: (e) => {
+      onMove(null);
       toast.error(errorMessage(e, "Status change failed"));
     },
     onSettled: () => qc.invalidateQueries({ queryKey: qk.tickets }),
-    onMutate: () => status,
   });
 
-  if (!teamKey || !states.data) return <Badge variant="secondary">{status}</Badge>;
+  if (!teamKey || !states.data || states.data.length === 0) {
+    const why =
+      teamKey === null
+        ? `${ticket.project ?? "this ticket"} is not a mapped project`
+        : states.isError
+          ? `states did not load: ${errorMessage(states.error, "error")}`
+          : states.data?.length === 0
+            ? `team ${teamKey} has no states`
+            : null;
+    return (
+      <>
+        <Badge variant="secondary">{status}</Badge>
+        {why && (
+          <span className="text-xs text-muted-foreground">
+            Read-only: {why}
+            {states.isError && (
+              <>
+                {" · "}
+                <button
+                  type="button"
+                  className="underline underline-offset-2 disabled:opacity-50"
+                  disabled={states.isFetching}
+                  onClick={() => void states.refetch()}
+                >
+                  Retry
+                </button>
+              </>
+            )}
+          </span>
+        )}
+      </>
+    );
+  }
   const options = states.data.includes(status) ? states.data : [status, ...states.data];
 
   return (
-    <Select
-      value={status}
-      disabled={move.isPending}
-      onValueChange={(next) => {
-        setStatus(next);
-        move.mutate(next);
-      }}
-    >
+    <Select value={status} disabled={move.isPending} onValueChange={(next) => move.mutate(next)}>
       <SelectTrigger
         aria-label="Status"
         className="h-auto gap-1 rounded-full border-transparent bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground shadow-none hover:bg-secondary/80 dark:bg-secondary dark:hover:bg-secondary/80 [&_svg]:size-3"
@@ -77,13 +114,26 @@ function StatusPill({ ticket, teamKey }: { ticket: TicketSummary; teamKey: strin
   );
 }
 
-/** Model and effort, then Launch. Disabled while the request is in flight: a double tap is one POST. */
-function LaunchForm({ ticket, settings, onClose }: { ticket: TicketSummary; settings: Settings; onClose: () => void }) {
+/**
+ * Model and effort, then Launch. Disabled while the request is in flight: a double tap is one POST.
+ * Both start from the defaults of the status shown in the header, and keep following it — a status
+ * moved in this sheet brings its own defaults — until the human picks one by hand.
+ */
+function LaunchForm({
+  ticket,
+  status,
+  settings,
+  onClose,
+}: {
+  ticket: TicketSummary;
+  status: string;
+  settings: Settings;
+  onClose: () => void;
+}) {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const initial = initialLaunchOptions(ticket, settings);
-  const [model, setModel] = useState<Model>(initial.model);
-  const [effort, setEffort] = useState<Effort>(initial.effort);
+  const [picks, setPicks] = useState<LaunchPicks>({});
+  const { model, effort } = launchOptions(status, settings, picks);
 
   const launch = useMutation({
     mutationFn: () =>
@@ -113,7 +163,13 @@ function LaunchForm({ ticket, settings, onClose }: { ticket: TicketSummary; sett
 
   return (
     <div className="flex flex-col gap-4">
-      <LaunchOptions idPrefix="ticket" model={model} effort={effort} onModel={setModel} onEffort={setEffort} />
+      <LaunchOptions
+        idPrefix="ticket"
+        model={model}
+        effort={effort}
+        onModel={(m) => setPicks((p) => ({ ...p, model: m }))}
+        onEffort={(e) => setPicks((p) => ({ ...p, effort: e }))}
+      />
       <Button disabled={launch.isPending} onClick={() => launch.mutate()}>
         <Play size={16} /> {launch.isPending ? "Launching…" : "Launch"}
       </Button>
@@ -158,7 +214,7 @@ function LiveSession({ ticket, session, onClose }: { ticket: TicketSummary; sess
             if (window.confirm(`Kill the ${ticket.identifier} session?`)) kill.mutate();
           }}
         >
-          <Trash2 size={16} /> Kill
+          <Power size={16} /> Kill
         </Button>
       </div>
     </div>
@@ -177,22 +233,25 @@ export function TicketSheet({ ticket, onClose }: Props) {
   const settings = useSettings();
   const session = sessionForTicket(sessions.data ?? [], ticket.identifier);
   const live = session !== null && session.state !== "ended";
-  const teamKey = projects.data?.find((p) => p.name === ticket.project)?.teamKey;
+  const teamKey = projects.data ? (projects.data.find((p) => p.name === ticket.project)?.teamKey ?? null) : undefined;
+  // A move made here, shown at once and kept: Linear answers the refetch a beat later.
+  const [movedTo, setMovedTo] = useState<string | null>(null);
+  const status = movedTo ?? ticket.statusName;
 
   return (
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="bottom" className={SHEET_CONTENT_CLASS}>
         <SheetHeader className="pr-12">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <a
-              href={ticket.url}
+              href={safeHref(ticket.url)}
               target="_blank"
               rel="noreferrer"
               className="w-fit font-mono text-xs text-muted-foreground underline-offset-2 hover:underline"
             >
               {ticket.identifier}
             </a>
-            <StatusPill ticket={ticket} teamKey={teamKey} />
+            <StatusPill ticket={ticket} status={status} teamKey={teamKey} onMove={setMovedTo} />
           </div>
           <SheetTitle className="leading-snug break-words">{ticket.title}</SheetTitle>
           <SheetDescription className="sr-only">Status and session launch for {ticket.identifier}</SheetDescription>
@@ -201,7 +260,7 @@ export function TicketSheet({ ticket, onClose }: Props) {
           {live ? (
             <LiveSession ticket={ticket} session={session} onClose={onClose} />
           ) : settings.data ? (
-            <LaunchForm ticket={ticket} settings={settings.data} onClose={onClose} />
+            <LaunchForm ticket={ticket} status={status} settings={settings.data} onClose={onClose} />
           ) : (
             <p className="text-sm text-muted-foreground">
               {settings.error ? errorMessage(settings.error, "Settings unavailable") : "Loading…"}

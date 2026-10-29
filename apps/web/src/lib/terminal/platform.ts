@@ -19,9 +19,10 @@ import { Terminal } from "@xterm/xterm";
  *
  * The fix is not ported blindly. Vite does not shim `process` for the browser: the
  * built chunk keeps the guard verbatim with `process` a free global, which a browser
- * does not define, so xterm's own detection is right. `xtermThinksItIsNode` is the
- * probe that says so at runtime (in a dev console: it must answer `false`), and
- * `detectPlatform` is the answer xterm is expected to reach.
+ * does not define, so xterm's own detection is right. `platform.build.test.ts` holds it
+ * there: it bundles xterm with the app's Vite config and runs it as a Mac browser would.
+ * `xtermThinksItIsNode` is the same check at runtime (TerminalView warns in dev if it ever
+ * answers `true`), and `detectPlatform` is the answer xterm is expected to reach.
  */
 
 /** The flags xterm's keyboard and selection paths branch on, from the navigator's two strings. Same lists as xterm's `common/Platform.ts`. */

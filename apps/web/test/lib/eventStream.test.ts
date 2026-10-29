@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { openEventStream, EVENT_RETRY_MS, type EventSocket, type Schedule } from "@/lib/eventStream";
+import { openEventStream, retryDelay, EVENT_RETRY_MS, EVENT_RETRY_MAX_MS, type EventSocket, type Schedule } from "@/lib/eventStream";
 import type { MojitoEvent } from "@mojito/shared";
 
 /** A socket whose open/message/close can be driven by hand, like a real one is by the network. */
@@ -72,6 +72,29 @@ describe("openEventStream", () => {
 
     sockets[1].open();
     expect(onConnect).toHaveBeenCalledTimes(2);
+  });
+
+  it("backs off while the server stays unreachable, and starts over after an open", () => {
+    const sockets = Array.from({ length: 8 }, fakeSocket);
+    let dialled = 0;
+    const clock = fakeClock();
+    openEventStream(() => sockets[dialled++].socket, { onEvent: vi.fn() }, clock.schedule);
+
+    const waits: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      sockets[i].drop();
+      waits.push(clock.pending[0].ms);
+      clock.run();
+    }
+    expect(waits).toEqual([1000, 2000, 4000, 8000, EVENT_RETRY_MAX_MS, EVENT_RETRY_MAX_MS]);
+
+    sockets[6].open();
+    sockets[6].drop();
+    expect(clock.pending[0].ms).toBe(EVENT_RETRY_MS);
+  });
+
+  it("retryDelay doubles from EVENT_RETRY_MS up to the cap", () => {
+    expect([1, 2, 3, 4, 5, 50].map(retryDelay)).toEqual([1000, 2000, 4000, 8000, 15000, 15000]);
   });
 
   it("keeps delivering events over the reconnected socket", () => {

@@ -5,7 +5,7 @@ import "@xterm/xterm/css/xterm.css";
 import { toast } from "sonner";
 import { SESSION_GONE_CODE } from "@mojito/shared";
 import { browserClipboard, copyText, echoFilter, osc52Text } from "@/lib/terminal/copySelection";
-import { droppedImages, pastedImages } from "@/lib/terminal/imageInput";
+import { dragHasFiles, droppedImages, pastedImages } from "@/lib/images";
 import { terminalKeyHandler } from "@/lib/terminal/keyHandler";
 import { xtermThinksItIsNode } from "@/lib/terminal/platform";
 import { syncGeometry } from "@/lib/terminal/terminalFit";
@@ -272,7 +272,7 @@ export function TerminalView({ sessionId, keyboardOpen, onExit, onReady, onImage
     // A drop only fires where dragover was cancelled; and a file dropped there must not
     // become the page the browser navigates to.
     const onDragOver = (e: DragEvent) => {
-      if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
+      if (dragHasFiles(e.dataTransfer?.types)) e.preventDefault();
     };
     const onDrop = (e: DragEvent) => {
       if (!e.dataTransfer) return;

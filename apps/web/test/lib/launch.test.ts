@@ -1,39 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_PROMPTS, type Settings, type TicketSummary } from "@mojito/shared";
+import { DEFAULT_PROMPTS, type Settings } from "@mojito/shared";
 import { ApiError } from "@/lib/api";
-import { initialLaunchOptions, launchErrorAction } from "@/lib/launch";
+import { launchErrorAction, launchOptions } from "@/lib/launch";
 
 const settings: Settings = {
   statusDefaults: { Todo: { model: "sonnet", effort: "medium" } },
   prompts: DEFAULT_PROMPTS,
 };
 
-function ticket(statusName: string): TicketSummary {
-  return {
-    identifier: "RIC-1",
-    title: "t",
-    url: "https://linear.app/x/issue/RIC-1",
-    statusName,
-    statusType: "unstarted",
-    project: "Alpha",
-    labels: [],
-    assignedToMe: false,
-  };
-}
-
-describe("initialLaunchOptions", () => {
+describe("launchOptions", () => {
   it("uses the status default when there is one", () => {
-    expect(initialLaunchOptions(ticket("Todo"), settings)).toEqual({
-      model: "sonnet",
-      effort: "medium",
-    });
+    expect(launchOptions("Todo", settings)).toEqual({ model: "sonnet", effort: "medium" });
   });
 
   it("falls back to opus/high for an unknown status", () => {
-    expect(initialLaunchOptions(ticket("Weird"), settings)).toEqual({
-      model: "opus",
-      effort: "high",
-    });
+    expect(launchOptions("Weird", settings)).toEqual({ model: "opus", effort: "high" });
+  });
+
+  it("follows a status change for whatever the human has not picked", () => {
+    expect(launchOptions("Weird", settings, { effort: "low" })).toEqual({ model: "opus", effort: "low" });
+    expect(launchOptions("Todo", settings, { effort: "low" })).toEqual({ model: "sonnet", effort: "low" });
+    expect(launchOptions("Todo", settings, { model: "haiku", effort: "max" })).toEqual({ model: "haiku", effort: "max" });
   });
 });
 

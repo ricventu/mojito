@@ -44,7 +44,13 @@ export function Board() {
   // A failed refetch keeps the last data on screen; only a query that never had any is fatal.
   const queries = [tickets, sessions, projects];
   const failure = queries.find((q) => q.data === undefined && q.error)?.error;
-  const refreshError = queries.find((q) => q.data !== undefined && q.error)?.error;
+  const refreshError = [...queries, tasks].find((q) => q.data !== undefined && q.error)?.error;
+  // Tasks are not the board: a list that never loaded is a banner, not a failed page.
+  const tasksError = tasks.data === undefined ? tasks.error : null;
+  // The sheet follows the ticket as refetches change it (its status, after a move made there).
+  const openTicket = selectedTicket
+    ? (tickets.data?.tickets.find((t) => t.identifier === selectedTicket.identifier) ?? selectedTicket)
+    : null;
 
   // `{ project }` is the section the sheet was opened from; `{}` is the toolbar's, with none preselected.
   const [newTicket, setNewTicket] = useState<{ project?: string } | null>(null);
@@ -59,6 +65,9 @@ export function Board() {
         {banner && <Banner text={banner} />}
         {refreshError && (
           <Banner text={`Refresh failed: ${refreshError instanceof Error ? refreshError.message : "error"}`} />
+        )}
+        {tasksError && (
+          <Banner text={`Background tasks unavailable: ${tasksError instanceof Error ? tasksError.message : "error"}`} />
         )}
         <TaskStrip tasks={tasks.data ?? []} />
         {failure ? (
@@ -81,7 +90,7 @@ export function Board() {
           ))
         )}
       </main>
-      {selectedTicket && <TicketSheet ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />}
+      {openTicket && <TicketSheet ticket={openTicket} onClose={() => setSelectedTicket(null)} />}
       {newTicket && <NewTicketSheet project={newTicket.project} onClose={() => setNewTicket(null)} />}
       {newSession && <NewSessionSheet project={newSession.project} onClose={() => setNewSession(null)} />}
     </div>

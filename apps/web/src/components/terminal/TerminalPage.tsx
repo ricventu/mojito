@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Terminal } from "@xterm/xterm";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, X } from "lucide-react";
+import { ArrowLeft, Power } from "lucide-react";
 import { Link, Navigate, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import type { SessionKind, SessionMeta, TicketSummary } from "@mojito/shared";
@@ -16,19 +16,24 @@ import { useSessions } from "@/hooks/useSessions";
 import { useTickets } from "@/hooks/useTickets";
 import { ApiError, apiFetch } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
+import { safeHref } from "@/lib/url";
 import { attachImages, uploadImages } from "@/lib/terminal/imageInput";
 import { cn } from "@/lib/utils";
 
 const KIND_LABEL: Record<SessionKind, string> = { ticket: "Ticket", claude: "Claude", shell: "Shell" };
 
-/** Who the session is: the ticket (id, live status and title) or `<kind> · <project>`. */
+/**
+ * Who the session is: the ticket (id, live status and title) or `<kind> · <project>`. The status
+ * never shrinks; the title takes whatever width is left, down to none on a narrow phone.
+ */
 function Identity({ session, ticket }: { session: SessionMeta; ticket: TicketSummary | undefined }) {
   if (session.ticket) {
+    const href = safeHref(ticket?.url);
     return (
       <div className="flex min-w-0 flex-1 items-center gap-2 text-sm">
-        {ticket?.url ? (
+        {href ? (
           <a
-            href={ticket.url}
+            href={href}
             target="_blank"
             rel="noreferrer"
             className="shrink-0 font-mono font-semibold underline-offset-2 hover:underline"
@@ -39,7 +44,7 @@ function Identity({ session, ticket }: { session: SessionMeta; ticket: TicketSum
           <span className="shrink-0 font-mono font-semibold">{session.ticket}</span>
         )}
         {ticket && (
-          <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground max-[480px]:hidden">
+          <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">
             {ticket.statusName}
           </span>
         )}
@@ -129,7 +134,7 @@ export function TerminalPage() {
         <header className="flex items-center gap-2 border-b px-3 py-2">
           <Button asChild variant="ghost" size="sm" className="shrink-0">
             <Link to="/">
-              <ArrowLeft size={16} /> Board
+              <ArrowLeft size={16} /> <span className="max-[480px]:sr-only">Board</span>
             </Link>
           </Button>
           {session ? <Identity session={session} ticket={ticket} /> : <div className="flex-1" />}
@@ -148,7 +153,7 @@ export function TerminalPage() {
               if (window.confirm("Kill this session?")) kill.mutate();
             }}
           >
-            <X size={16} /> Kill
+            <Power size={16} /> <span className="max-[480px]:sr-only">Kill</span>
           </Button>
         </header>
       )}

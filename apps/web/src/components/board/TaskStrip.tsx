@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { apiJson } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
+import { safeHref } from "@/lib/url";
 
 const STATUS: Record<TaskStatus, { label: string; className: string }> = {
   queued: { label: "Queued", className: "text-muted-foreground" },
@@ -36,7 +37,7 @@ function TaskCard({ task }: { task: TaskRecord }) {
               <span className="text-xs text-muted-foreground">{task.input.project}</span>
               {task.result && (
                 <a
-                  href={task.result.url}
+                  href={safeHref(task.result.url)}
                   target="_blank"
                   rel="noreferrer"
                   className="font-mono text-xs underline-offset-2 hover:underline"

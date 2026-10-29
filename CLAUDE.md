@@ -73,16 +73,20 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   follows later changes to the shipped text. Read via `deps.prompts()` at each launch/task, no
   restart. `PUT /api/settings` is partial: each top-level key sent replaces that part only.
 - **Live state** comes only from Claude Code hooks (`hookSettings.ts` → curl to
-  `127.0.0.1:<port>/api/hook` with `x-mojito-token` and claude's hook JSON as body;
-  `hookMap.ts`, `hooks.ts`). `ended` is sticky for hooks. Read from the body: SessionEnd
-  `reason: "clear"` is ignored (a `/clear` must not end a live session); Notification maps to
+  `<selfOrigin>/api/hook` — the configured host, loopback only for a wildcard bind — with
+  `x-mojito-token` and claude's hook JSON as body; `hookMap.ts`, `hooks.ts`). `ended` is
+  sticky for hooks. Read from the body: SessionEnd `reason: "clear"` is ignored (a `/clear`
+  must not end a live session) and the SessionStart `source: "clear"` after it maps to idle;
+  Notification maps to
   needs-input only for blocking types (`permission_prompt`, `elicitation_dialog`, …) — the
   ~60 s `idle_prompt` after every Stop would otherwise turn every finished session amber.
   `startupStall.ts` flips a session still `starting` after 20 s to needs-input (the
   workspace-trust prompt fires no hook).
 - **tmux** (`tmux/tmux.ts`): always **exact targets** — `=name` for sessions, `=name:` for
   panes. tmux matches `-t` by prefix, and `mj-RIC-49` is a prefix of `mj-RIC-49x`: a bare
-  target once sent Kill's Ctrl-D to the wrong claude. `closeSession` never forces (Ctrl-C,
+  target once sent Kill's Ctrl-D to the wrong claude. `hasSession` answers false only when
+  tmux says the session/server is not there; any other failure rejects (unreachable is not
+  dead — the pty gateway then closes 1011, retryable). `closeSession` never forces (Ctrl-C,
   then Ctrl-D re-sent each poll; claude that will not leave → 409). New sessions start in a
   systemd scope of their own (`outsideService`) so they survive `mojito2` restarts.
 - **Reconcile at boot** (`reconcile.ts`): rows with no tmux → ended; `mj-*` tmux with no row
@@ -92,7 +96,8 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   keys; the Agent SDK additionally drops `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN` so it
   always runs on the subscription.
 - **WebSockets** (`ws/upgrade.ts`): `?token=` required. `/ws/events` = one JSON
-  `MojitoEvent` per message (fire-and-forget bus; clients refetch on every connect).
+  `MojitoEvent` per message (fire-and-forget bus; clients refetch on every connect and
+  redial with a 1 s → 15 s backoff).
   `/ws/pty/<id>` attaches only to `mj-` ids with a row; an unknown one gets close **4404**
   (the client must not reconnect); a gone tmux marks the row ended. Protocol at the top of
   `ws/pty.ts`: binary = keys, text `{"resize":{cols,rows}}` sent on **every** (re)connect
@@ -133,7 +138,8 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   Shift/Option+drag is xterm's, **copied on release**: claude's any-motion mouse tracking
   makes xterm clear it on the next mouse move, so Cmd+C/right-click never find it.
   xterm's platform detection was verified correct under Vite, so v1's
-  `restoreTerminalPlatform` is not ported; a dev-only warning fires if that ever changes.
+  `restoreTerminalPlatform` is not ported; `platform.build.test.ts` bundles xterm with the
+  app's Vite config and fails if anything starts shimming `process` (a dev warning too).
 - Safe areas: `--sat/--sar/--sab/--sal` in `index.css`; every edge surface pays its inset;
   `test/safeArea.test.ts` guards it.
 - Copy is English, like everything else in v2 (code, comments, server messages, agent

@@ -1,7 +1,6 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import { Board } from "@/components/board/Board";
 import { RouteError } from "@/components/RouteError";
-import { SettingsPage } from "@/components/settings/SettingsPage";
 import { chunkLoaded, sessionStore } from "@/lib/chunkReload";
 
 export const router = createBrowserRouter([
@@ -19,7 +18,15 @@ export const router = createBrowserRouter([
             return { Component: m.TerminalPage };
           }),
       },
-      { path: "/settings", element: <SettingsPage /> },
+      // Lazy too: Settings is the only page that validates with zod (the shared request schemas).
+      {
+        path: "/settings",
+        lazy: () =>
+          import("@/components/settings/SettingsPage").then((m) => {
+            chunkLoaded(sessionStore());
+            return { Component: m.SettingsPage };
+          }),
+      },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },

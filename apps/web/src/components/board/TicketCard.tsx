@@ -2,6 +2,7 @@ import type { KeyboardEvent } from "react";
 import type { SessionMeta, TicketSummary } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
 import { Badge } from "@/components/ui/badge";
+import { safeHref } from "@/lib/url";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -36,7 +37,7 @@ export function TicketCard({ ticket, session, selected, onOpen }: Props) {
     >
       <div className="px-3 pt-2">
         <a
-          href={ticket.url}
+          href={safeHref(ticket.url)}
           target="_blank"
           rel="noreferrer"
           className="font-mono text-xs text-muted-foreground underline-offset-2 hover:underline"

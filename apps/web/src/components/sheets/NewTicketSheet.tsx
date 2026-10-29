@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Textarea } from "@/components/ui/textarea";
 import { useProjects } from "@/hooks/useProjects";
 import { apiFetch } from "@/lib/api";
-import { IMAGE_TYPES, validateImages } from "@/lib/images";
+import { IMAGE_TYPES, dragHasFiles, pastedImages, validateImages } from "@/lib/images";
 import { qk } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
 import { SHEET_CONTENT_CLASS } from "./styles";
@@ -29,6 +29,9 @@ export function NewTicketSheet({ project: preselected, onClose }: Props) {
   const [note, setNote] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
+  // dragenter/dragleave fire again for every child the pointer crosses (the label, the textarea):
+  // a bare leave turned the ring off over each one. Counted, only the last leave ends the drag.
+  const dragDepth = useRef(0);
   const input = useRef<HTMLInputElement>(null);
 
   const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
@@ -62,16 +65,31 @@ export function NewTicketSheet({ project: preselected, onClose }: Props) {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Create failed"),
   });
 
+  // A paste with text is the textarea's: Word and spreadsheets put a picture of the text on the
+  // clipboard beside it, which must not turn up as an image (pastedImages).
   const onPaste = (e: ClipboardEvent) => {
-    const pasted = Array.from(e.clipboardData.files);
+    const pasted = pastedImages(e.clipboardData);
     if (pasted.length === 0) return;
-    // Only swallow the paste when it carries no text, so copying from a spreadsheet still pastes its cells.
-    if (!e.clipboardData.getData("text/plain")) e.preventDefault();
+    e.preventDefault();
     addFiles(pasted);
   };
+  // Only a drag of files is ours; a drag of text is left to the textarea, which drops it in place.
+  const onDragEnter = (e: DragEvent) => {
+    if (!dragHasFiles(e.dataTransfer.types)) return;
+    dragDepth.current += 1;
+    setDragging(true);
+  };
+  const onDragLeave = (e: DragEvent) => {
+    if (!dragHasFiles(e.dataTransfer.types)) return;
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDragging(false);
+  };
   const onDrop = (e: DragEvent) => {
-    e.preventDefault();
+    dragDepth.current = 0;
     setDragging(false);
+    if (!dragHasFiles(e.dataTransfer.types)) return;
+    e.preventDefault();
+    // Every file, not only images: a dropped PDF is refused with a reason rather than ignored.
     addFiles(Array.from(e.dataTransfer.files));
   };
 
@@ -103,11 +121,11 @@ export function NewTicketSheet({ project: preselected, onClose }: Props) {
 
           <div
             className={cn("flex flex-col gap-1.5 rounded-lg", dragging && "ring-2 ring-ring")}
+            onDragEnter={onDragEnter}
             onDragOver={(e) => {
-              e.preventDefault();
-              setDragging(true);
+              if (dragHasFiles(e.dataTransfer.types)) e.preventDefault();
             }}
-            onDragLeave={() => setDragging(false)}
+            onDragLeave={onDragLeave}
             onDrop={onDrop}
           >
             <Label htmlFor="new-ticket-note">Note</Label>
