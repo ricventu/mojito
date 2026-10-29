@@ -1,5 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+/* Layered, so the utilities that place the terminal (TerminalView) win over it: an unlayered
+   `.xterm { position: relative }` beats any layered rule and pinned the terminal to the top. */
+@import "@xterm/xterm/css/xterm.css" layer(base);
 
 @custom-variant dark (&:is(.dark *));
 

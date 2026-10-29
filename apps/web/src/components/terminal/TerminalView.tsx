@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
-import "@xterm/xterm/css/xterm.css";
 import { toast } from "sonner";
 import { SESSION_GONE_CODE } from "@mojito/shared";
 import { browserClipboard, copyText, echoFilter, osc52Text } from "@/lib/terminal/copySelection";
