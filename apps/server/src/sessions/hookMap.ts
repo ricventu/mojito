@@ -40,6 +40,8 @@ export interface HookPayload {
   reason?: string;
   /** Notification: what it is about (`permission_prompt`, `idle_prompt`, `auth_success`, …). */
   notification_type?: string;
+  /** SessionStart: how the session started (`startup`, `resume`, `clear`, `compact`). */
+  source?: string;
 }
 
 export function hookPayload(body: unknown): HookPayload {
@@ -48,6 +50,7 @@ export function hookPayload(body: unknown): HookPayload {
   const out: HookPayload = {};
   if (typeof b.reason === "string") out.reason = b.reason;
   if (typeof b.notification_type === "string") out.notification_type = b.notification_type;
+  if (typeof b.source === "string") out.source = b.source;
   return out;
 }
 
@@ -77,11 +80,14 @@ export function isNoiseHook(event: HookEventName, payload: HookPayload): boolean
  * that has ended never comes back through one (a relaunch is a new row), so a late SessionStart
  * or an idle Notification must not resurrect it — only the boot-time reconcile does, for a row
  * whose tmux is demonstrably alive. Only needs-input carries an alert; every other state clears it.
+ * The SessionStart of a `/clear` leaves claude at an empty prompt, waiting: idle, not running —
+ * no Stop follows it to say so.
  */
-export function mapHook(event: HookEventName, current: SessionState): HookOutcome {
+export function mapHook(event: HookEventName, current: SessionState, payload: HookPayload = {}): HookOutcome {
   if (current === "ended") return { state: "ended", alert: null };
   switch (event) {
     case "SessionStart":
+      return { state: payload.source === "clear" ? "idle" : "running", alert: null };
     case "UserPromptSubmit":
     case "PostToolUse":
       return { state: "running", alert: null };

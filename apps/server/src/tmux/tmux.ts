@@ -40,12 +40,28 @@ export function tmuxAvailable(): boolean {
   }
 }
 
+// What tmux prints when the session is really not there: the name is unknown to a running
+// server, or there is no server at all (`no server running` when the socket refuses,
+// `error connecting … (No such file or directory)` when it was never created).
+const GONE = /can't find session|no server running|error connecting to .*\(No such file or directory\)/;
+
+/** tmux's failure says the session does not exist, as opposed to tmux failing to answer. */
+export function isSessionGone(err: unknown): boolean {
+  return GONE.test(String((err as { stderr?: unknown }).stderr ?? ""));
+}
+
+/**
+ * Whether the session exists. Answers false only when tmux says it does not; any other failure
+ * (tmux missing, timed out, a socket it cannot open) rejects, because "could not ask" is not
+ * "gone" — taken as gone, a transient hiccup during a terminal attach marked a live session ended.
+ */
 export async function hasSession(name: string): Promise<boolean> {
   try {
     await pexec("tmux", ["has-session", "-t", sessionTarget(name)]);
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    if (isSessionGone(err)) return false;
+    throw err;
   }
 }
 

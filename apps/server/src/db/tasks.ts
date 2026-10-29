@@ -14,14 +14,25 @@ interface Row {
   updated_at: number;
 }
 
+// A JSON column that does not parse (a hand-edited or truncated row) reads as its fallback
+// instead of throwing out of every list() — one bad row would take the whole task panel down.
+function parseJson<T>(text: string | null, fallback: T): T {
+  if (text === null) return fallback;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 const toTask = (r: Row): TaskRecord => ({
   id: r.id,
   type: r.type,
-  input: JSON.parse(r.input),
+  input: parseJson(r.input, { project: "", note: "", imageUrls: [] }),
   status: r.status,
-  log: JSON.parse(r.log),
+  log: parseJson(r.log, []),
   error: r.error,
-  result: r.result === null ? null : JSON.parse(r.result),
+  result: parseJson(r.result, null),
   archived: r.archived === 1,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
@@ -59,10 +70,12 @@ export class TasksRepo {
       );
   }
 
+  /** Patches the fields `p` sets; one present but `undefined` is left as it was, not bound as such. */
   update(id: string, p: Partial<TaskRecord>): TaskRecord | null {
     const cur = this.get(id);
     if (!cur) return null;
-    const next: TaskRecord = { ...cur, ...p, id };
+    const set = Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined));
+    const next: TaskRecord = { ...cur, ...set, id };
     this.db
       .prepare(
         `UPDATE sdk_tasks SET type = ?, input = ?, status = ?, log = ?, error = ?, result = ?, archived = ?,

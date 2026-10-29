@@ -2,10 +2,23 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { loadConfig, loadEnvFile } from "../src/config";
+import { loadConfig, loadEnvFile, selfOrigin } from "../src/config";
 import { resetMojitoOnlyKeys, sanitizeEnv } from "../src/env/childEnv";
 
 const KEYS = { MOJITO_TOKEN: "tok", LINEAR_API_KEY: "lin_api_x", HOME: "/home/me" };
+
+describe("selfOrigin", () => {
+  it("reaches a wildcard bind through loopback", () => {
+    expect(selfOrigin({ host: "0.0.0.0", port: 3100 })).toBe("http://127.0.0.1:3100");
+    expect(selfOrigin({ host: "::", port: 3100 })).toBe("http://127.0.0.1:3100");
+  });
+
+  it("uses any other host as configured, bracketing IPv6", () => {
+    expect(selfOrigin({ host: "127.0.0.1", port: 3100 })).toBe("http://127.0.0.1:3100");
+    expect(selfOrigin({ host: "100.64.0.7", port: 4000 })).toBe("http://100.64.0.7:4000");
+    expect(selfOrigin({ host: "::1", port: 3100 })).toBe("http://[::1]:3100");
+  });
+});
 
 describe("loadConfig", () => {
   it("throws naming the missing token", () => {

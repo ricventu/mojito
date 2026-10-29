@@ -12,6 +12,7 @@ import type { LaunchDeps } from "../sessions/launch";
 import type { TaskQueue } from "../tasks/runner";
 import type { TicketCache } from "../tickets/cache";
 import type { closeSession } from "../tmux/tmux";
+import { tokenMatches } from "../token";
 import { errorMessage } from "./body";
 import { healthRoutes } from "./routes/health";
 import { hookRoutes } from "./routes/hook";
@@ -56,7 +57,7 @@ export function createApp(deps: AppDeps): Hono {
   // that is the first-visit handoff the client strips, not a credential the API accepts.
   app.use("/api/*", async (c, next) => {
     if (c.req.path === "/api/health") return next();
-    if (c.req.header("x-mojito-token") !== deps.cfg.token) return c.json({ error: "unauthorized" }, 401);
+    if (!tokenMatches(c.req.header("x-mojito-token"), deps.cfg.token)) return c.json({ error: "unauthorized" }, 401);
     return next();
   });
 

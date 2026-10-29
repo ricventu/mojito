@@ -43,10 +43,11 @@ export interface HookDeps {
 export function handleHook(id: string, event: string, deps: HookDeps, body?: unknown): void {
   try {
     if (!isHookEvent(event)) return;
-    if (isNoiseHook(event, hookPayload(body))) return;
+    const payload = hookPayload(body);
+    if (isNoiseHook(event, payload)) return;
     const before = deps.sessions.get(id);
     if (!before || before.state === "ended") return;
-    const next = mapHook(event, before.state);
+    const next = mapHook(event, before.state, payload);
     const changed = next.state !== before.state || next.alert !== before.alert;
     const session = deps.sessions.patch(id, { state: next.state, alert: next.alert, lastEventAt: deps.now() });
     if (changed && session) deps.bus.emit({ type: "session.updated", session });

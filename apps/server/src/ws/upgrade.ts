@@ -6,6 +6,7 @@ import type { SessionsRepo } from "../db/sessions";
 import type { EventBus } from "../events/bus";
 import { markEnded } from "../sessions/reconcile";
 import { PREFIX } from "../tmux/tmux";
+import { tokenMatches } from "../token";
 import { attachEvents } from "./events";
 import { markAlive } from "./heartbeat";
 import { attachPty } from "./pty";
@@ -45,7 +46,7 @@ function ptySessionId(pathname: string): string {
 export function handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, deps: UpgradeDeps): void {
   try {
     const url = new URL(req.url ?? "", "http://localhost");
-    if (url.searchParams.get("token") !== deps.token) {
+    if (!tokenMatches(url.searchParams.get("token"), deps.token)) {
       socket.destroy();
       return;
     }

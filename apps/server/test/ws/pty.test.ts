@@ -76,7 +76,7 @@ describe("attachPty", () => {
     spy.mockRestore();
   });
 
-  it("does not report a session whose existence check failed: unreachable is not dead", async () => {
+  it("does not report a session whose existence check failed, and lets the client retry", async () => {
     const ws = fakeWs();
     const onGone = vi.fn();
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -88,7 +88,10 @@ describe("attachPty", () => {
       capturePane: vi.fn(async () => ""),
       onGone,
     });
-    await vi.waitFor(() => expect(ws.close).toHaveBeenCalledWith(SESSION_GONE_CODE, expect.any(String)));
+    // Unreachable is not dead: no onGone, and not SESSION_GONE_CODE either, which would stop the
+    // client's reconnect for good over what may be a passing hiccup.
+    await vi.waitFor(() => expect(ws.close).toHaveBeenCalledWith(1011, expect.any(String)));
+    expect(ws.close).not.toHaveBeenCalledWith(SESSION_GONE_CODE, expect.any(String));
     expect(onGone).not.toHaveBeenCalled();
     spy.mockRestore();
   });

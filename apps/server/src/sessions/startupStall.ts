@@ -29,7 +29,11 @@ export interface StallDeps {
  */
 export function watchStartupStall(id: string, deps: StallDeps): void {
   const schedule = deps.setTimeout ?? setTimeout;
-  const timer = schedule(() => void settle(id, deps), STALL_GRACE_MS);
+  // A tmux that cannot be asked leaves the session as it is: not knowing is no reason to flip it.
+  const timer = schedule(
+    () => void settle(id, deps).catch((err) => console.error(`startup stall check for ${id} failed:`, err)),
+    STALL_GRACE_MS,
+  );
   // A pending stall check must never be the reason the process stays up.
   (timer as { unref?: () => void } | undefined)?.unref?.();
 }

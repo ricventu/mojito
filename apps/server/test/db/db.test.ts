@@ -50,6 +50,24 @@ describe("ProjectsRepo", () => {
     repo.remove("Backend");
     expect(repo.list().map((p) => p.name)).toEqual(["Web"]);
   });
+
+  it("refuses a rename onto a name another project has, changing nothing", () => {
+    const repo = new ProjectsRepo(openDb(":memory:"));
+    repo.upsert({ name: "Web", path: "/w", teamKey: "RIC" });
+    repo.upsert({ name: "Api", path: "/a", teamKey: "RIC" });
+    expect(() => repo.rename("Api", { name: "Web", path: "/b", teamKey: "OPS" })).toThrow(/already exists: Web/);
+    expect(repo.list()).toEqual([
+      { name: "Api", path: "/a", teamKey: "RIC" },
+      { name: "Web", path: "/w", teamKey: "RIC" },
+    ]);
+  });
+
+  it("a rename to the same name just updates the row", () => {
+    const repo = new ProjectsRepo(openDb(":memory:"));
+    repo.upsert({ name: "Web", path: "/w", teamKey: "RIC" });
+    repo.rename("Web", { name: "Web", path: "/w2", teamKey: "RIC" });
+    expect(repo.get("Web")?.path).toBe("/w2");
+  });
 });
 
 describe("importProjectsJson", () => {
@@ -238,6 +256,21 @@ describe("TasksRepo", () => {
     const u = repo.update("t1", { status: "done", result: { identifier: "RIC-9", url: "http://x" }, archived: true, updatedAt: 7 });
     expect(u).toMatchObject({ status: "done", result: { identifier: "RIC-9", url: "http://x" }, archived: true, updatedAt: 7 });
     expect(repo.update("zzz", { status: "done" })).toBeNull();
+  });
+  it("update leaves a field passed as undefined as it was", () => {
+    const repo = new TasksRepo(openDb(":memory:"));
+    repo.insert(task({ error: "boom" }));
+    const u = repo.update("t1", { status: "running", error: undefined, result: undefined, archived: undefined });
+    expect(u).toMatchObject({ status: "running", error: "boom", result: null, archived: false });
+    expect(repo.get("t1")).toEqual(u);
+  });
+  it("reads a row with unparseable JSON columns as their fallbacks instead of throwing", () => {
+    const db = openDb(":memory:");
+    const repo = new TasksRepo(db);
+    repo.insert(task());
+    db.prepare("UPDATE sdk_tasks SET input = '{', log = 'nope', result = '[' WHERE id = 't1'").run();
+    expect(repo.get("t1")).toMatchObject({ input: { project: "", note: "", imageUrls: [] }, log: [], result: null });
+    expect(repo.list()).toHaveLength(1);
   });
   it("appendLog appends lines in order", () => {
     const repo = new TasksRepo(openDb(":memory:"));

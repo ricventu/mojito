@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { newSession, parseGlobalEnvironment, outsideService, q, DuplicateSessionError, PREFIX } from "../../src/tmux/tmux";
+import { newSession, parseGlobalEnvironment, outsideService, q, DuplicateSessionError, PREFIX, isSessionGone } from "../../src/tmux/tmux";
 import { resetMojitoOnlyKeys } from "../../src/env/childEnv";
 
 function recorder() {
@@ -38,6 +38,24 @@ describe("q", () => {
 describe("PREFIX", () => {
   it("is mj-", () => {
     expect(PREFIX).toBe("mj-");
+  });
+});
+
+// The stderr texts are tmux 3.6's own, captured from a real has-session.
+describe("isSessionGone", () => {
+  const failed = (stderr: string) => Object.assign(new Error("Command failed"), { stderr });
+
+  it("is true when tmux says the session or its server does not exist", () => {
+    expect(isSessionGone(failed("can't find session: mj-RIC-1\n"))).toBe(true);
+    expect(isSessionGone(failed("no server running on /tmp/tmux-1000/default\n"))).toBe(true);
+    expect(isSessionGone(failed("error connecting to /tmp/tmux-1000/default (No such file or directory)\n"))).toBe(true);
+  });
+
+  it("is false for a tmux that failed to answer: not knowing is not gone", () => {
+    expect(isSessionGone(failed("error connecting to /tmp/tmux-1000/default (Permission denied)\n"))).toBe(false);
+    expect(isSessionGone(failed("server exited unexpectedly\n"))).toBe(false);
+    expect(isSessionGone(Object.assign(new Error("spawn tmux ENOENT"), { code: "ENOENT" }))).toBe(false);
+    expect(isSessionGone(Object.assign(new Error("timed out"), { killed: true, stderr: "" }))).toBe(false);
   });
 });
 

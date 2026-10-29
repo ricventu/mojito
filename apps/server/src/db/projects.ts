@@ -31,8 +31,10 @@ export class ProjectsRepo {
       .run(p.name, p.path, p.teamKey);
   }
 
+  /** Moves `old` to `p.name`; throws, changing nothing, when another project already has that name. */
   rename(old: string, p: ProjectRow): void {
     this.db.transaction(() => {
+      if (p.name !== old && this.get(p.name)) throw new Error(`project already exists: ${p.name}`);
       this.db.prepare("DELETE FROM projects WHERE name = ?").run(old);
       this.upsert(p);
     })();

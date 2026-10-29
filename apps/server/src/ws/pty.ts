@@ -12,7 +12,8 @@
  * - close code `SESSION_GONE_CODE` (4404, from `@mojito/shared`): the tmux session does not
  *   exist. The client must NOT reconnect on it. Any other close is a candidate for retry.
  *   The gateway also reports it through `onGone`, so a row still showing `running` for a tmux
- *   that died with no SessionEnd (a crash, a kill from outside) is marked ended.
+ *   that died with no SessionEnd (a crash, a kill from outside) is marked ended. A tmux that
+ *   fails to answer is not "gone": that closes with 1011, which the client retries.
  *
  * The resize frame is load-bearing. The pty is spawned at 80x24 unless a resize has
  * already arrived, and the client's resize is the only thing that ever corrects it — so
@@ -210,9 +211,10 @@ export function attachPty(ws: WebSocket, id: string, deps: Partial<AttachDeps> =
         });
     })
     .catch((err) => {
-      // A failed existence check is treated as gone rather than spawning a doomed attach — but
-      // not reported through onGone: a tmux that could not be asked is not known to be dead.
+      // tmux could not be asked (hasSession rejects only then): the session is not known to be
+      // dead, so no onGone and no SESSION_GONE_CODE — a retryable close, and the client's
+      // reconnect asks again.
       console.error("session existence check failed:", err);
-      ws.close(SESSION_GONE_CODE, "session gone");
+      ws.close(1011, "session check failed");
     });
 }

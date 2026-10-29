@@ -57,6 +57,21 @@ describe("watchStartupStall", () => {
     expect(events).toEqual([]);
   });
 
+  it("leaves the session alone, without an unhandled rejection, when tmux cannot be asked", async () => {
+    const sessions = new SessionsRepo(openDb(":memory:"));
+    sessions.insert(meta("starting"));
+    const bus = new EventBus();
+    const events: MojitoEvent[] = [];
+    bus.subscribe((e) => events.push(e));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    watchStartupStall("mj-RIC-1", { sessions, bus, hasSession: vi.fn(async () => Promise.reject(new Error("tmux hung"))) });
+    await vi.advanceTimersByTimeAsync(STALL_GRACE_MS);
+    expect(sessions.get("mj-RIC-1")?.state).toBe("starting");
+    expect(events).toEqual([]);
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
   it("leaves a session whose tmux is gone alone", async () => {
     const { sessions, events } = setup("starting", false);
     await vi.advanceTimersByTimeAsync(STALL_GRACE_MS);

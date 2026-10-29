@@ -210,7 +210,9 @@ v2-install-service:
 ## install or build never replaces the running server. The install is --frozen-lockfile: a
 ## lockfile out of step with the manifests is a broken commit, not something to re-resolve on
 ## the server. A restart is not a success until /api/health answers, which it must within
-## 30s (the unit's own MOJITO2_PORT, 3100 unless overridden in the caller's environment).
+## 30s. It is asked where the server listens: MOJITO2_PORT/MOJITO2_HOST from the caller's
+## environment, else the unit's Environment=, else .env.local (the server's own precedence),
+## else 3100 on loopback; a wildcard host is reached through 127.0.0.1 (config.ts#selfOrigin).
 v2-deploy:
 	@if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then \
 		if ! git pull --ff-only; then exit 1; fi; \
@@ -218,7 +220,12 @@ v2-deploy:
 	if ! pnpm install --frozen-lockfile; then exit 1; fi; \
 	if ! pnpm v2:build; then exit 1; fi; \
 	if ! systemctl --user restart "$(V2_SERVICE)"; then exit 1; fi; \
-	url="http://127.0.0.1:$${MOJITO2_PORT:-3100}/api/health"; \
+	unitenv() { systemctl --user show -p Environment --value "$(V2_SERVICE)" 2>/dev/null | tr ' ' '\n' | sed -n "s/^$$1=//p" | tail -n 1; }; \
+	dotenv() { sed -n "s/^$$1=//p" .env.local 2>/dev/null | tail -n 1 | tr -d "\"'"; }; \
+	port="$${MOJITO2_PORT:-$$(unitenv MOJITO2_PORT)}"; port="$${port:-$$(dotenv MOJITO2_PORT)}"; \
+	host="$${MOJITO2_HOST:-$$(unitenv MOJITO2_HOST)}"; host="$${host:-$$(dotenv MOJITO2_HOST)}"; \
+	case "$$host" in ""|0.0.0.0|::) host=127.0.0.1 ;; *:*) host="[$$host]" ;; esac; \
+	url="http://$$host:$${port:-3100}/api/health"; \
 	for i in $$(seq 1 30); do \
 		if curl -fsS -m 2 "$$url" >/dev/null 2>&1; then \
 			echo "OK — $(V2_SERVICE) restarted and healthy"; exit 0; \

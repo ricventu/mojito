@@ -50,6 +50,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
 }
 
 /**
+ * The origin Mojito's own children (the hook curls) reach the server at. A wildcard bind
+ * (`0.0.0.0`, `::`) listens on loopback too, so that is used; any other host is the only
+ * address the server answers on, so it is used as configured — a hard-coded 127.0.0.1 never
+ * reached a server bound to, say, a Tailscale address.
+ */
+export function selfOrigin(cfg: Pick<ServerConfig, "host" | "port">): string {
+  const host = cfg.host === "0.0.0.0" || cfg.host === "::" || cfg.host === "" ? "127.0.0.1" : cfg.host;
+  return `http://${host.includes(":") ? `[${host}]` : host}:${cfg.port}`;
+}
+
+/**
  * Loads a dotenv file into `process.env`, the way the old app's loader did: a key already
  * set in the environment wins over the file. Whatever the file adds is registered with
  * `registerEnvFileKeys`, so a credential added to `.env.local` later is scrubbed from every

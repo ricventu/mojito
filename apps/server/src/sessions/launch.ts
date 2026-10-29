@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
 import { LaunchTicketBody, type Effort, type LaunchFreeBody, type Model, type Prompts, type SessionMeta } from "@mojito/shared";
-import type { ServerConfig } from "../config";
+import { selfOrigin, type ServerConfig } from "../config";
 import type { ProjectsRepo } from "../db/projects";
 import type { SessionsRepo } from "../db/sessions";
 import type { EventBus } from "../events/bus";
@@ -125,7 +125,7 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
     }
 
     const settingsPath = hookSettingsPath(deps.cfg, id);
-    deps.writeFile(settingsPath, JSON.stringify(buildHookSettings(id, deps.cfg.port, deps.cfg.token)));
+    deps.writeFile(settingsPath, JSON.stringify(buildHookSettings(id, selfOrigin(deps.cfg), deps.cfg.token)));
     const command = claudeCommand(body.model, body.effort, settingsPath, buildTicketPrompt(body.ticket, deps.prompts().ticket));
     const refused = await spawn(deps, id, cwd, command);
     if (refused) return refused;
@@ -203,7 +203,7 @@ export async function launchFree(body: LaunchFreeBody, deps: LaunchDeps): Promis
     return { ok: false, status: 400, error: "model and effort are required for a claude session" };
   }
   const settingsPath = hookSettingsPath(deps.cfg, id);
-  deps.writeFile(settingsPath, JSON.stringify(buildHookSettings(id, deps.cfg.port, deps.cfg.token)));
+  deps.writeFile(settingsPath, JSON.stringify(buildHookSettings(id, selfOrigin(deps.cfg), deps.cfg.token)));
   const refused = await spawn(deps, id, cwd, claudeCommand(body.model, body.effort, settingsPath));
   if (refused) return refused;
   const session: SessionMeta = {

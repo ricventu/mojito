@@ -26,6 +26,11 @@ describe("mapHook", () => {
   it("a late SessionStart takes a stalled launch back to running", () => {
     expect(mapHook("SessionStart", "needs-input")).toEqual({ state: "running", alert: null });
   });
+
+  it("the SessionStart of a /clear leaves the session idle, waiting at an empty prompt", () => {
+    expect(mapHook("SessionStart", "running", { source: "clear" })).toEqual({ state: "idle", alert: null });
+    expect(mapHook("SessionStart", "idle", { source: "startup" })).toEqual({ state: "running", alert: null });
+  });
 });
 
 describe("isHookEvent", () => {
@@ -42,6 +47,7 @@ describe("hookPayload", () => {
     expect(hookPayload({ hook_event_name: "Notification", message: "m", notification_type: "idle_prompt" })).toEqual({
       notification_type: "idle_prompt",
     });
+    expect(hookPayload({ hook_event_name: "SessionStart", source: "clear" })).toEqual({ source: "clear" });
   });
 
   it("is empty for a missing, non-object or mistyped body", () => {

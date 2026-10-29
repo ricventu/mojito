@@ -91,13 +91,13 @@ describe("handleHook", () => {
   });
 
   // `/clear` is SessionEnd (reason "clear") then SessionStart, in the same live claude.
-  it("ignores the SessionEnd a /clear fires, so the SessionStart after it still lands", () => {
-    const { sessions, events, deps } = setup(meta({ state: "idle", lastEventAt: 7 }));
+  it("ignores the SessionEnd a /clear fires, and the SessionStart after it leaves the session idle", () => {
+    const { sessions, events, deps } = setup(meta({ state: "running", lastEventAt: 7 }));
     handleHook("mj-RIC-1", "SessionEnd", deps, { hook_event_name: "SessionEnd", reason: "clear" });
-    expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "idle", lastEventAt: 7 });
+    expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "running", lastEventAt: 7 });
     expect(events).toEqual([]);
     handleHook("mj-RIC-1", "SessionStart", deps, { hook_event_name: "SessionStart", source: "clear" });
-    expect(sessions.get("mj-RIC-1")?.state).toBe("running");
+    expect(sessions.get("mj-RIC-1")?.state).toBe("idle");
   });
 
   it("ignores an idle_prompt Notification: a finished session stays idle, not amber", () => {
