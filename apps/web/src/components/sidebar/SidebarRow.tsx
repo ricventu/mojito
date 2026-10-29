@@ -1,4 +1,5 @@
 import { Eye, EyeOff } from "lucide-react";
+import { Link } from "react-router";
 import type { SessionMeta, SessionState } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,20 +16,29 @@ interface Props {
   session: SessionMeta;
   label: { primary: string; secondary: string };
   current: boolean;
+  /** Replace the history entry instead of pushing one (picking from a terminal). */
+  replace: boolean;
+  /** A plain click on the row; a modified click opens a new tab and leaves the page alone. */
   onPick(): void;
   onHide(hidden: boolean): void;
 }
 
-/** One live session: its state dot and label open its terminal; the eye beside it hides or shows it. */
-export function SidebarRow({ session, label, current, onPick, onHide }: Props) {
+/**
+ * One live session: its state dot and label are a link to its terminal (so Cmd/middle-click
+ * and a long-press work as on any link); the eye beside it hides or shows it.
+ */
+export function SidebarRow({ session, label, current, replace, onPick, onHide }: Props) {
   const dot = DOT[session.state];
   const { primary, secondary } = label;
 
   return (
     <li className={cn("flex items-center gap-1 rounded-md pr-1", current && "bg-accent text-accent-foreground")}>
-      <button
-        type="button"
-        onClick={onPick}
+      <Link
+        to={`/session/${encodeURIComponent(session.id)}`}
+        replace={replace}
+        onClick={(e) => {
+          if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) onPick();
+        }}
         aria-current={current ? "page" : undefined}
         className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-1.5 text-left outline-none hover:bg-accent/60 focus-visible:ring-[3px] focus-visible:ring-ring/50"
       >
@@ -40,7 +50,7 @@ export function SidebarRow({ session, label, current, onPick, onHide }: Props) {
           </span>
           {secondary && <span className="truncate text-xs text-muted-foreground">{secondary}</span>}
         </span>
-      </button>
+      </Link>
       <Button
         variant="ghost"
         size="icon-sm"

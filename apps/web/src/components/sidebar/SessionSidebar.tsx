@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { EyeOff, Pin, PinOff, X } from "lucide-react";
-import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import type { SessionMeta } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
@@ -31,7 +30,6 @@ function Panel({ sidebar, currentId, replace, inSheet }: Omit<Props, "dockedClas
   const sessions = useSessions();
   const tickets = useTickets();
   const projects = useProjects();
-  const navigate = useNavigate();
   const qc = useQueryClient();
   const [showHidden, setShowHidden] = useState(false);
   const hiddenRef = useRef<HTMLDivElement>(null);
@@ -49,8 +47,8 @@ function Panel({ sidebar, currentId, replace, inSheet }: Omit<Props, "dockedClas
     if (expanded) hiddenRef.current?.scrollIntoView({ block: "nearest" });
   }, [expanded]);
 
-  const pick = (id: string) => {
-    navigate(`/session/${encodeURIComponent(id)}`, { replace });
+  // The row's link navigates; a pick only closes the overlay.
+  const pick = () => {
     if (!sidebar.docked) sidebar.close();
   };
 
@@ -79,7 +77,8 @@ function Panel({ sidebar, currentId, replace, inSheet }: Omit<Props, "dockedClas
               session={s}
               label={sessionLabel(s, ticketList)}
               current={s.id === currentId}
-              onPick={() => pick(s.id)}
+              replace={replace ?? false}
+              onPick={pick}
               onHide={(next) => void setHidden(s.id, next)}
             />
           ))}
