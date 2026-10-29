@@ -104,7 +104,7 @@ export class TasksRepo {
   /** Startup reconciliation: work in flight at shutdown never finished. */
   failInterrupted(now: number): number {
     return this.db
-      .prepare("UPDATE sdk_tasks SET status = 'failed', error = 'interrotto dal riavvio', updated_at = ? WHERE status IN ('queued', 'running')")
+      .prepare("UPDATE sdk_tasks SET status = 'failed', error = 'interrupted by a restart', updated_at = ? WHERE status IN ('queued', 'running')")
       .run(now).changes;
   }
 }

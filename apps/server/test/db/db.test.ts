@@ -286,7 +286,7 @@ describe("TasksRepo", () => {
     repo.insert(task({ id: "d", status: "done" }));
     repo.insert(task({ id: "f", status: "failed", error: "boom" }));
     expect(repo.failInterrupted(99)).toBe(2);
-    expect(repo.get("q")).toMatchObject({ status: "failed", error: "interrotto dal riavvio", updatedAt: 99 });
+    expect(repo.get("q")).toMatchObject({ status: "failed", error: "interrupted by a restart", updatedAt: 99 });
     expect(repo.get("r")?.status).toBe("failed");
     expect(repo.get("d")?.status).toBe("done");
     expect(repo.get("f")?.error).toBe("boom");
