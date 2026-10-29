@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { SESSION_GONE_CODE } from "@mojito/shared";
 import { browserClipboard, copyText, echoFilter, osc52Text } from "@/lib/terminal/copySelection";
 import { droppedImages, pastedImages } from "@/lib/terminal/imageInput";
+import { terminalKeyHandler } from "@/lib/terminal/keyHandler";
 import { xtermThinksItIsNode } from "@/lib/terminal/platform";
 import { syncGeometry } from "@/lib/terminal/terminalFit";
 import { terminalOptions } from "@/lib/terminal/terminalOptions";
@@ -101,15 +102,8 @@ export function TerminalView({ sessionId, keyboardOpen, onExit, onReady, onImage
       };
       syncRef.current = sync;
 
-      // Enter submits in claude's TUI; Shift+Enter must insert a newline. xterm sends a
-      // bare CR either way, so Shift+Enter is intercepted and sent as LF (`chat:newline`).
-      term.attachCustomKeyEventHandler((e) => {
-        if (e.type === "keydown" && e.key === "Enter" && e.shiftKey) {
-          sendBytes("\n");
-          return false;
-        }
-        return true;
-      });
+      // Shift+Enter is claude's newline, sent as LF (keyHandler.ts).
+      term.attachCustomKeyEventHandler(terminalKeyHandler(sendBytes));
       const onData = term.onData(sendBytes);
 
       // Both mouse selections reach the clipboard here (copySelection.ts): claude's own,
