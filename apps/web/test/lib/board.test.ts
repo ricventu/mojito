@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { BoardTickets, ProjectRow, SessionMeta, TicketSummary } from "@mojito/shared";
-import { groupBoard, linearBanner, needsInput, sessionForTicket } from "@/lib/board";
+import { filterBoard, groupBoard, linearBanner, needsInput, sessionForTicket } from "@/lib/board";
+import { NO_FILTERS, type BoardFilters } from "@/lib/filters";
 
 const project = (name: string): ProjectRow => ({ name, path: `/repos/${name}`, teamKey: "RIC" });
 
@@ -214,5 +215,124 @@ describe("linearBanner", () => {
 
   it("gives the error when there never was any data", () => {
     expect(linearBanner({ ...base, error: "401 unauthorized" })).toBe("Linear unreachable: 401 unauthorized");
+  });
+});
+
+describe("filterBoard", () => {
+  const filters = (over: Partial<BoardFilters>): BoardFilters => ({ ...NO_FILTERS, ...over });
+  const ids = (ts: TicketSummary[]) => ts.map((t) => t.identifier);
+
+  it("changes nothing with no filters", () => {
+    const sections = groupBoard(
+      [project("Alpha")],
+      [ticket("RIC-1", "Todo"), ticket("RIC-2", "Backlog")],
+      [session("mj-free-aaaaaa", { project: null })],
+    );
+    expect(filterBoard(sections, NO_FILTERS)).toEqual(sections);
+  });
+
+  it("a project filter keeps only those sections and drops General", () => {
+    const sections = groupBoard(
+      [project("Alpha"), project("Beta")],
+      [ticket("RIC-1", "Todo", "Alpha"), ticket("RIC-2", "Todo", "Beta")],
+      [session("mj-free-aaaaaa", { project: null })],
+    );
+    expect(sections.map((s) => s.project)).toEqual(["Alpha", "Beta", null]);
+    expect(filterBoard(sections, filters({ projects: ["Beta"] })).map((s) => s.project)).toEqual(["Beta"]);
+  });
+
+  it("a selected unknown project matches nothing", () => {
+    const sections = groupBoard([project("Alpha")], [ticket("RIC-1", "Todo")], []);
+    expect(filterBoard(sections, filters({ projects: ["Gone"] }))).toEqual([]);
+  });
+
+  it("a status filter keeps only those tickets, ORed", () => {
+    const sections = groupBoard(
+      [project("Alpha")],
+      [ticket("RIC-1", "In Review"), ticket("RIC-2", "Todo"), ticket("RIC-3", "In Progress")],
+      [],
+    );
+    const [section] = filterBoard(sections, filters({ statuses: ["Todo", "In Review"] }));
+    expect(ids(section.active)).toEqual(["RIC-1", "RIC-2"]);
+  });
+
+  it("a status filter hides other statuses and loose sessions", () => {
+    const sections = groupBoard(
+      [project("Alpha")],
+      [ticket("RIC-1", "Todo"), ticket("RIC-2", "QA")],
+      [session("mj-free-aaaaaa")],
+    );
+    const [section] = filterBoard(sections, filters({ statuses: ["Todo"] }));
+    expect(ids(section.active)).toEqual(["RIC-1"]);
+    expect(section.loose).toEqual([]);
+  });
+
+  it("the Backlog group shows only with no status or Backlog selected", () => {
+    const sections = groupBoard([project("Alpha")], [ticket("RIC-1", "Todo"), ticket("RIC-2", "Backlog")], []);
+    const [todo] = filterBoard(sections, filters({ statuses: ["Todo"] }));
+    expect(todo.backlog).toEqual([]);
+    expect(todo.backlogOpen).toBe(false);
+    const [backlog] = filterBoard(sections, filters({ statuses: ["Backlog"] }));
+    expect(ids(backlog.backlog)).toEqual(["RIC-2"]);
+    expect(backlog.backlogOpen).toBe(true);
+    expect(backlog.active).toEqual([]);
+  });
+
+  it("a search matches identifier, title and labels, case-insensitively", () => {
+    const bug = { ...ticket("RIC-4", "Todo"), labels: ["Bug"] };
+    const sections = groupBoard(
+      [project("Alpha")],
+      [ticket("RIC-2", "Todo"), ticket("RIC-3", "Todo"), bug],
+      [],
+    );
+    const active = (q: string) => ids(filterBoard(sections, filters({ q }))[0].active);
+    expect(active("ric-2")).toEqual(["RIC-2"]);
+    expect(active("TITLE ric-3")).toEqual(["RIC-3"]);
+    expect(active("bug")).toEqual(["RIC-4"]);
+  });
+
+  it("a search trims q", () => {
+    const sections = groupBoard([project("Alpha")], [ticket("RIC-1", "Todo"), ticket("RIC-2", "Todo")], []);
+    expect(ids(filterBoard(sections, filters({ q: "  ric-2 " }))[0].active)).toEqual(["RIC-2"]);
+  });
+
+  it("a search opens a Backlog group with a match", () => {
+    const sections = groupBoard(
+      [project("Alpha"), project("Beta")],
+      [
+        ticket("RIC-1", "Backlog", "Alpha"),
+        ticket("RIC-2", "Todo", "Alpha"),
+        ticket("RIC-3", "Backlog", "Beta"),
+        ticket("RIC-4", "Todo", "Beta"),
+      ],
+      [],
+    );
+    const only = filterBoard(sections, filters({ q: "ric-1" }));
+    expect(only.map((s) => s.project)).toEqual(["Alpha"]);
+    expect(ids(only[0].backlog)).toEqual(["RIC-1"]);
+    expect(only[0].backlogOpen).toBe(true);
+    const mixed = filterBoard(sections, filters({ q: "ric-2" }));
+    expect(mixed[0].backlog).toEqual([]);
+    expect(mixed[0].backlogOpen).toBe(false);
+  });
+
+  it("a search matches loose sessions by ticket, id or kind", () => {
+    const sections = groupBoard(
+      [project("Alpha")],
+      [],
+      [session("mj-sh-aaaaaa", { kind: "shell" }), session("mj-cl-bbbbbb", { kind: "claude" })],
+    );
+    const [section] = filterBoard(sections, filters({ q: "shell" }));
+    expect(section.loose.map((s) => s.id)).toEqual(["mj-sh-aaaaaa"]);
+    expect(filterBoard(sections, filters({ q: "bbbbbb" }))[0].loose.map((s) => s.id)).toEqual(["mj-cl-bbbbbb"]);
+  });
+
+  it("drops sections left empty", () => {
+    const sections = groupBoard(
+      [project("Alpha"), project("Beta")],
+      [ticket("RIC-1", "Todo", "Alpha"), ticket("RIC-2", "Backlog", "Beta")],
+      [],
+    );
+    expect(filterBoard(sections, filters({ statuses: ["Todo"] })).map((s) => s.project)).toEqual(["Alpha"]);
   });
 });

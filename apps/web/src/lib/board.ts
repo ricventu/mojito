@@ -1,4 +1,5 @@
 import type { BoardTickets, ProjectRow, SessionMeta, TicketSummary } from "@mojito/shared";
+import type { BoardFilters } from "@/lib/filters";
 
 /** Board order of the active statuses; any other non-Backlog status sorts after the last of these. */
 export const STATUS_ORDER = ["In Review", "In Progress", "Todo"];
@@ -8,6 +9,8 @@ export interface BoardSection {
   project: string | null;
   active: TicketSummary[];
   backlog: TicketSummary[];
+  /** Whether the Backlog group starts open: a Backlog status filter or a search is looking inside it. */
+  backlogOpen: boolean;
   /**
    * Sessions with no ticket card to hang off, newest first: free sessions, and ticket sessions
    * whose ticket is not on the board (Done, Canceled, moved to another project, past the
@@ -62,12 +65,46 @@ export function groupBoard(
       project,
       active: own.filter((t) => t.statusName !== "Backlog").sort(byStatusThenIdentifier),
       backlog: own.filter((t) => t.statusName === "Backlog").sort(byIdentifier),
+      backlogOpen: false,
       loose: looseSessions.filter((s) => (s.project !== null && known.has(s.project) ? s.project : null) === project),
     };
   };
 
   return [...names, null]
     .map(section)
+    .filter((s) => s.active.length + s.backlog.length + s.loose.length > 0);
+}
+
+/**
+ * The board narrowed by the url filters, after `groupBoard`. A project filter keeps those
+ * sections (General never matches one). A status filter keeps those active tickets (any status
+ * outside `FILTER_STATUSES` is hidden with it), shows Backlog only if selected, and hides
+ * loose sessions, which have no status. `q` matches ticket identifier, title and labels, and
+ * loose sessions by ticket, id or kind. A section left empty is dropped.
+ */
+export function filterBoard(sections: BoardSection[], f: BoardFilters): BoardSection[] {
+  const q = f.q.trim().toLowerCase();
+  const hasStatus = f.statuses.length > 0;
+  const has = (text: string) => text.toLowerCase().includes(q);
+  const ticketMatches = (t: TicketSummary) =>
+    q === "" || has(t.identifier) || has(t.title) || t.labels.some(has);
+  const sessionMatches = (s: SessionMeta) => q === "" || has(s.ticket ?? "") || has(s.id) || has(s.kind);
+  const backlogShown = !hasStatus || f.statuses.includes("Backlog");
+
+  return sections
+    .filter((s) => f.projects.length === 0 || (s.project !== null && f.projects.includes(s.project)))
+    .map((s) => {
+      const backlog = backlogShown ? s.backlog.filter(ticketMatches) : [];
+      return {
+        project: s.project,
+        active: s.active.filter(
+          (t) => (!hasStatus || f.statuses.includes(t.statusName)) && ticketMatches(t),
+        ),
+        backlog,
+        backlogOpen: backlog.length > 0 && (f.statuses.includes("Backlog") || q !== ""),
+        loose: hasStatus ? [] : s.loose.filter(sessionMatches),
+      };
+    })
     .filter((s) => s.active.length + s.backlog.length + s.loose.length > 0);
 }
 
