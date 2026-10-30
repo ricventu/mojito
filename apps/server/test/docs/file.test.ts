@@ -22,6 +22,8 @@ beforeAll(() => {
   writeFileSync(join(outside, "x.md"), "# x\n");
   writeFileSync(join(tmp, "repo-old", "a.md"), "# old\n");
   symlinkSync(join(outside, "x.md"), join(root, "out.md"));
+  writeFileSync(join(root, ".env"), "SECRET=1\n");
+  symlinkSync(join(root, ".env"), join(root, "docs", "evil.md"));
   mkdirSync(join(root, "d.md"));
 });
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
@@ -48,6 +50,10 @@ describe("resolveDocPath", () => {
   it("expands ~/ to HOME, then treats it as absolute", () => {
     expect(resolveDocPath("~/b.md", root, [root, other], other)).toBe(join(other, "b.md"));
     expect(resolveDocPath("~/x.md", root, [root, other], outside)).toBeNull();
+  });
+
+  it("refuses a markdown name that is a symlink to a file that is not markdown, even inside the root", () => {
+    expect(resolveDocPath("docs/evil.md", root, [root], home)).toBeNull();
   });
 
   it("refuses a symlink pointing out of the root", () => {

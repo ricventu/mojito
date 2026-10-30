@@ -178,6 +178,17 @@ describe("findLinks: markdown paths", () => {
     expect(one("at ./x.md")).toEqual([["doc", "x.md"]]);
   });
 
+  it("takes accented names whole", () => {
+    expect(one("at docs/spec-perché.md now")).toEqual([["doc", "docs/spec-perché.md"]]);
+    expect(one("at docs/perché-spec.md")).toEqual([["doc", "docs/perché-spec.md"]]);
+  });
+
+  it("drops the @ of a mention, linking the path only", () => {
+    expect(docsAt(["> read @docs/x.md please"], PHONE_COLS, 0)).toEqual([["doc", "docs/x.md"]]);
+    const [link] = findLinks(0, () => "> read @docs/x.md please".padEnd(PHONE_COLS), PHONE_COLS, { docs: true });
+    expect(link?.start).toEqual({ row: 0, char: 8 });
+  });
+
   it("is no link with a .. segment, another extension or glued to a word", () => {
     expect(one("at ../x.md")).toEqual([]);
     expect(one("at docs/../x.md")).toEqual([]);

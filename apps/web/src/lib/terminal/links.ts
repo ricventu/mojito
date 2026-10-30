@@ -37,9 +37,10 @@
  * gets that text glued on — nothing in the buffer tells it from a wrap.
  *
  * The same joined line also yields markdown paths (`docs/superpowers/specs/x.md`, `~/x.md`,
- * an absolute one) when the terminal has somewhere to open them — the docs viewer, which asks
- * the server what the path means. A path with a `..` segment is no link (the server would refuse
- * it), nor is one inside a URL, and paths with spaces are a known limit.
+ * an absolute one, a mention's `@docs/x.md` without its `@`) when the terminal has somewhere to
+ * open them — the docs viewer, which asks the server what the path means. A path with a `..`
+ * segment is no link (the server would refuse it), nor is one inside a URL, and paths with
+ * spaces are a known limit.
  */
 import type { IBufferLine, ILink, ILinkProvider, Terminal } from "@xterm/xterm";
 
@@ -47,9 +48,13 @@ import type { IBufferLine, ILink, ILinkProvider, Terminal } from "@xterm/xterm";
 // minus trailing punctuation and brackets.
 const URL_REGEX = /(https?|HTTPS?):[/]{2}[^\s"'!*(){}|\\\^<>`]*[^\s"':,.!?{}|\\\^~\[\]`()<>]/;
 
-// A markdown path: an optional ~/, / or ./ then segments ending in .md, not glued to a path
-// character on the left nor to a word or a further segment on the right.
-const DOC_REGEX = /(?<![\w./~@+-])(?:~\/|\/|\.\/)?(?:[\w.@+-]+\/)*[\w.@+-]+\.md(?![\w/])/gi;
+// A markdown path: an optional ~/, / or ./ (or the @ of a mention) then segments ending in .md,
+// not glued to a path character on the left nor to a word or a further segment on the right.
+// Letters are Unicode's (`spec-perché.md`), combining marks included.
+const DOC_REGEX =
+  /(?<![\p{L}\p{M}\p{N}_./~@+-])(?:~\/|\/|\.\/|@)?(?:[\p{L}\p{M}\p{N}_.@+-]+\/)*[\p{L}\p{M}\p{N}_.@+-]+\.md(?![\p{L}\p{M}\p{N}_/])/giu;
+/** What a path's link leaves out in front: a `./` (the same document) or a mention's `@`. */
+const DOC_LEAD = /^(?:\.\/|@)/;
 
 /** Bounds on how much of the screen one logical line may draw from. */
 export const MAX_ROWS = 40;
@@ -195,7 +200,8 @@ export function findLinks(row: number, getRow: RowReader, cols: number, opts: { 
     const from = m.index;
     const to = from + m[0].length;
     if (m[0].split("/").includes("..") || urls.some(([a, b]) => from < b && to > a)) continue;
-    add("doc", m[0].replace(/^\.\//, ""), from, m[0].length);
+    const lead = DOC_LEAD.exec(m[0])?.[0].length ?? 0;
+    add("doc", m[0].slice(lead), from + lead, m[0].length - lead);
   }
   return links;
 }

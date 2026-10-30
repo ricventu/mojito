@@ -24,7 +24,8 @@ const orNone = async (run: GitRun, args: string[], cwd: string): Promise<string[
  * A project's markdown, newest first: what `git ls-files` sees in the root, tracked or not,
  * `.gitignore` respected and nested checkouts left out. Only that listing may throw (`GitError`:
  * not a repo, a timeout). With a ticket, its own documents — the id as a token of the path, the id
- * in the body (`git grep`, fixed string, whole word), or what its branch touched — best-effort.
+ * in the body (`git grep`, fixed string, whole word, paths relative to the root whatever
+ * `grep.fullName` says), or what its branch touched — best-effort.
  */
 export async function readDocList(checkout: string, ticket: string | null, run: GitRun): Promise<DocList> {
   const where = await docRoot(checkout, ticket, run);
@@ -45,7 +46,7 @@ export async function readDocList(checkout: string, ticket: string | null, run: 
 
   const token = ticketToken(ticket);
   const [mentioned, touched] = await Promise.all([
-    orNone(run, ["grep", "-l", "-z", "-I", "-i", "-w", "-F", "--untracked", "-e", ticket, "--", MARKDOWN], root),
+    orNone(run, ["grep", "--no-full-name", "-l", "-z", "-I", "-i", "-w", "-F", "--untracked", "-e", ticket, "--", MARKDOWN], root),
     where.branch && where.base
       ? orNone(run, ["diff", "--name-only", "-z", "--relative", `${where.base.hash}...${where.branch.hash}`, "--", MARKDOWN], root)
       : Promise.resolve([]),

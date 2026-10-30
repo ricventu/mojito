@@ -157,11 +157,12 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   respected, nested worktrees never descended into, `-z` so odd names arrive as themselves), each
   `stat`ed, newest first; only that call may fail the list (409 with git's words). A ticket's own
   are the id as a whole token of the path (`ticketToken`, shared with `findTicketBranch`) ∪ `git grep
-  -F -w -i --untracked` on bodies ∪ the md its branch touched against its base — best-effort;
+  --no-full-name -F -w -i --untracked` on bodies ∪ the md its branch touched against its base — best-effort;
   `CLAUDE.md` lands in every ticket's group (it cites them all). v2 sessions work in the checkout,
   so the id is what finds a ticket's spec, not a branch. The path guard (`resolveDocPath`) answers
   400, never 404: `isDocPath`, a relative path stays inside the root, an absolute (or `~/`) one only
-  inside one of the repo's live worktrees, re-checked after `realpath`. Read from disk, so an
+  inside one of the repo's live worktrees, re-checked after `realpath` (still inside, still `.md`:
+  a `notes.md` symlinked to `.env` is refused). Read from disk, so an
   uncommitted spec is readable; over 512 KB → 413.
 - **Create-ticket task** (`tasks/`): Agent SDK `query()` with `settingSources: []`,
   `tools: []`, an in-process MCP (`mojito-linear`: `list_labels`, `create_issue`) bound to the

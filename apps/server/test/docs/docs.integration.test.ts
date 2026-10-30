@@ -111,6 +111,13 @@ describe("readDocList: a ticket's documents", () => {
     expect(list.ticketDocs).toEqual(["docs/ric-7-plan.md", "docs/b.md", "docs/a.md"]);
   });
 
+  it("finds a body mention in a subdirectory project even when the repo asks grep for full names", async () => {
+    const dir = repo("fullname", { "web/docs/a.md": "Ticket: RIC-30\n", "api/b.md": "RIC-30 too\n" });
+    git(dir, "config", "grep.fullName", "true");
+    const list = await readDocList(join(dir, "web"), "RIC-30", readGit);
+    expect(list.ticketDocs).toEqual(["docs/a.md"]);
+  });
+
   it("adds what the ticket's branch touched, once it is on disk in the root", async () => {
     const dir = repo("branchdiff");
     branch(dir, "ricventu/ric-8-x", { "docs/plain.md": "# no id in here\n" });

@@ -26,8 +26,8 @@ function real(dir: string): string {
  * The security boundary of the file route: the absolute file a caller's `path` names, or null
  * (a 400, never a 404 — "not found" would say whether the file exists). A relative path resolves
  * against `root`; an absolute one (`~/` expands to `home`) must lie inside one of `allowed`. The
- * file's realpath is checked again, so a symlink cannot point out; a missing file skips that step
- * and is reported by the read.
+ * file's realpath is checked again — inside, and markdown — so a symlink can neither point out
+ * nor at a file that is not a document; a missing file skips that step and is reported by the read.
  */
 export function resolveDocPath(path: string, root: string, allowed: string[], home: string): string | null {
   if (!isDocPath(path)) return null;
@@ -41,7 +41,8 @@ export function resolveDocPath(path: string, root: string, allowed: string[], ho
   } catch {
     return abs;
   }
-  return roots.some((r) => inside(real(r), target)) ? target : null;
+  // The target is checked as the name was: a `notes.md` linking to `.env` is not markdown.
+  return /\.md$/i.test(target) && roots.some((r) => inside(real(r), target)) ? target : null;
 }
 
 /** A document's text: a missing path or anything not a regular file is not found; past the cap, too large. */
