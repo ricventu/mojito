@@ -29,19 +29,30 @@ async function readBody(res: Response): Promise<unknown> {
  * one — the browser adds the multipart boundary); see `apiJson` for the json case.
  */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await send(path, init);
+  const body = await readBody(res);
+  if (!res.ok) throw failure(res, body);
+  return body as T;
+}
+
+/** `apiFetch` for a binary answer (an image): the bytes as a blob; a failure reads as `apiFetch`'s. */
+export async function apiBlob(path: string): Promise<Blob> {
+  const res = await send(path, {});
+  if (!res.ok) throw failure(res, await readBody(res));
+  return res.blob();
+}
+
+function send(path: string, init: RequestInit): Promise<Response> {
   const headers = new Headers(init.headers);
   headers.set("x-mojito-token", getToken());
-  const res = await fetch(path, { ...init, headers });
-  const body = await readBody(res);
-  if (!res.ok) {
-    if (res.status === 401) clearToken();
-    const message =
-      body && typeof body === "object" && "error" in body && typeof body.error === "string"
-        ? body.error
-        : res.statusText;
-    throw new ApiError(res.status, message, body);
-  }
-  return body as T;
+  return fetch(path, { ...init, headers });
+}
+
+function failure(res: Response, body: unknown): ApiError {
+  if (res.status === 401) clearToken();
+  const message =
+    body && typeof body === "object" && "error" in body && typeof body.error === "string" ? body.error : res.statusText;
+  return new ApiError(res.status, message, body);
 }
 
 /** `apiFetch` with a json body. */

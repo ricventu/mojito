@@ -4,12 +4,20 @@ import { LaunchBody, SessionPatchBody } from "@mojito/shared";
 import { Hono } from "hono";
 import type { AppDeps } from "../app";
 import { parseBody } from "../body";
+import { expandHome } from "../../homePath";
 import { killSession } from "../../sessions/close";
 import { imagesDir, storeImages } from "../../sessions/images";
 import { launchFree, launchTicket } from "../../sessions/launch";
+import { readImageFile, resolveImagePath } from "../../sessions/viewImage";
 import { validateImages, type ImageType } from "../../tasks/images";
 
 const NOT_CLOSED = "claude did not exit: open the terminal";
+
+const IMAGE_ERRORS = {
+  "not-found": [404, "image not found"],
+  "too-large": [413, "image too large"],
+  "not-image": [415, "not an image"],
+} as const;
 
 const asList = (v: unknown): unknown[] => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 
@@ -61,6 +69,29 @@ export function sessionRoutes(deps: AppDeps): Hono {
         files.map(async (f) => ({ type: f.type as ImageType, bytes: new Uint8Array(await f.arrayBuffer()) })),
       );
       return c.json({ paths: storeImages(imagesDir(deps.cfg.stateDir, id), images) }, 201);
+    })
+    // An image path claude printed, for the terminal's viewer (resolveImagePath: where it may
+    // be, readImageFile: what may be served). Sandboxed and never sniffed, so the answer can
+    // only ever render as the image its bytes declare.
+    .get("/sessions/:id/image", (c) => {
+      const id = c.req.param("id");
+      const row = deps.sessions.get(id);
+      if (!row) return c.json({ error: `session not found: ${id}` }, 404);
+      const path = c.req.query("path");
+      if (!path) return c.json({ error: "path is required" }, 400);
+      const abs = resolveImagePath(path, expandHome(row.cwd, deps.cfg.home), deps.cfg.home);
+      if (!abs) return c.json({ error: "not an image path" }, 400);
+      const read = readImageFile(abs);
+      if (!read.ok) {
+        const [status, error] = IMAGE_ERRORS[read.reason];
+        return c.json({ error }, status);
+      }
+      return c.body(new Uint8Array(read.bytes), 200, {
+        "content-type": read.type,
+        "x-content-type-options": "nosniff",
+        "content-security-policy": "sandbox; default-src 'none'",
+        "cache-control": "no-store",
+      });
     })
     .post("/sessions", async (c) => {
       const body = await parseBody(c, LaunchBody);

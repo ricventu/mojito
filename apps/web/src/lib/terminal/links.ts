@@ -40,20 +40,27 @@
  * an absolute one, a mention's `@docs/x.md` without its `@`) when the terminal has somewhere to
  * open them — the docs viewer, which asks the server what the path means. A path with a `..`
  * segment is no link (the server would refuse it), nor is one inside a URL, and paths with
- * spaces are a known limit.
+ * spaces are a known limit. Image paths (`IMAGE_PATH_EXTENSIONS`: a screenshot claude took) are
+ * found by the same rule, for the image viewer.
  */
 import type { IBufferLine, ILink, ILinkProvider, Terminal } from "@xterm/xterm";
+import { IMAGE_PATH_EXTENSIONS } from "@mojito/shared";
 
 // `@xterm/addon-web-links`' matcher (MIT): http(s):// up to the first whitespace or quote,
 // minus trailing punctuation and brackets.
 const URL_REGEX = /(https?|HTTPS?):[/]{2}[^\s"'!*(){}|\\\^<>`]*[^\s"':,.!?{}|\\\^~\[\]`()<>]/;
 
-// A markdown path: an optional ~/, / or ./ (or the @ of a mention) then segments ending in .md,
-// not glued to a path character on the left nor to a word or a further segment on the right.
-// Letters are Unicode's (`spec-perché.md`), combining marks included.
-const DOC_REGEX =
-  /(?<![\p{L}\p{M}\p{N}_./~@+-])(?:~\/|\/|\.\/|@)?(?:[\p{L}\p{M}\p{N}_.@+-]+\/)*[\p{L}\p{M}\p{N}_.@+-]+\.md(?![\p{L}\p{M}\p{N}_/])/giu;
-/** What a path's link leaves out in front: a `./` (the same document) or a mention's `@`. */
+// A path to a file of one of `extensions`: an optional ~/, / or ./ (or the @ of a mention) then
+// segments ending in the extension, not glued to a path character on the left nor to a word or
+// a further segment on the right. Letters are Unicode's (`spec-perché.md`), combining marks included.
+const pathRegex = (extensions: readonly string[]) =>
+  new RegExp(
+    `(?<![\\p{L}\\p{M}\\p{N}_./~@+-])(?:~\\/|\\/|\\.\\/|@)?(?:[\\p{L}\\p{M}\\p{N}_.@+-]+\\/)*[\\p{L}\\p{M}\\p{N}_.@+-]+\\.(?:${extensions.join("|")})(?![\\p{L}\\p{M}\\p{N}_/])`,
+    "giu",
+  );
+const DOC_REGEX = pathRegex(["md"]);
+const IMAGE_REGEX = pathRegex(IMAGE_PATH_EXTENSIONS);
+/** What a path's link leaves out in front: a `./` (the same file) or a mention's `@`. */
 const DOC_LEAD = /^(?:\.\/|@)/;
 
 /** Bounds on how much of the screen one logical line may draw from. */
@@ -69,8 +76,8 @@ export interface RowChar {
 }
 
 export interface FoundLink {
-  /** An http(s) URL, or a markdown path for the docs viewer. */
-  kind: "url" | "doc";
+  /** An http(s) URL, a markdown path for the docs viewer, or an image path for the image viewer. */
+  kind: "url" | "doc" | "image";
   text: string;
   start: RowChar;
   /** Inclusive: the URL's last character. */
@@ -177,10 +184,15 @@ function isUrl(candidate: string): boolean {
 }
 
 /**
- * The URLs crossing `row` — and with `docs`, the markdown paths — joined across the rows a
- * program wrapped them over.
+ * The URLs crossing `row` — with `docs` the markdown paths, with `images` the image paths —
+ * joined across the rows a program wrapped them over.
  */
-export function findLinks(row: number, getRow: RowReader, cols: number, opts: { docs?: boolean } = {}): FoundLink[] {
+export function findLinks(
+  row: number,
+  getRow: RowReader,
+  cols: number,
+  opts: { docs?: boolean; images?: boolean } = {},
+): FoundLink[] {
   const pieces = logicalLine(row, getRow, cols);
   const joined = pieces.map((p) => p.body).join("");
   const links: FoundLink[] = [];
@@ -195,14 +207,17 @@ export function findLinks(row: number, getRow: RowReader, cols: number, opts: { 
     urls.push([m.index, m.index + m[0].length]);
     add("url", m[0], m.index, m[0].length);
   }
-  if (!opts.docs) return links;
-  for (const m of joined.matchAll(DOC_REGEX)) {
-    const from = m.index;
-    const to = from + m[0].length;
-    if (m[0].split("/").includes("..") || urls.some(([a, b]) => from < b && to > a)) continue;
-    const lead = DOC_LEAD.exec(m[0])?.[0].length ?? 0;
-    add("doc", m[0].slice(lead), from + lead, m[0].length - lead);
-  }
+  const paths = (kind: "doc" | "image", regex: RegExp) => {
+    for (const m of joined.matchAll(regex)) {
+      const from = m.index;
+      const to = from + m[0].length;
+      if (m[0].split("/").includes("..") || urls.some(([a, b]) => from < b && to > a)) continue;
+      const lead = DOC_LEAD.exec(m[0])?.[0].length ?? 0;
+      add(kind, m[0].slice(lead), from + lead, m[0].length - lead);
+    }
+  };
+  if (opts.docs) paths("doc", DOC_REGEX);
+  if (opts.images) paths("image", IMAGE_REGEX);
   return links;
 }
 
@@ -225,10 +240,11 @@ export function cellOfChar(line: CellLine, char: number): number {
   return Math.max(line.length - 1, 0);
 }
 
-/** What a tapped link does: a URL opens out of the app; a doc path only when `openDoc` is given. */
+/** What a tapped link does: a URL opens out of the app; a doc or an image path only when its opener is given. */
 export interface LinkHandlers {
   openUrl(url: string): void;
   openDoc?(path: string): void;
+  openImage?(path: string): void;
 }
 
 /**
@@ -242,7 +258,8 @@ export function terminalLinkProvider(term: Terminal, handlers: () => LinkHandler
       const buffer = term.buffer.active;
       const getRow = (row: number) => buffer.getLine(row)?.translateToString(false);
       const links: ILink[] = [];
-      for (const found of findLinks(y - 1, getRow, term.cols, { docs: !!handlers().openDoc })) {
+      const { openDoc, openImage } = handlers();
+      for (const found of findLinks(y - 1, getRow, term.cols, { docs: !!openDoc, images: !!openImage })) {
         const first = buffer.getLine(found.start.row);
         const last = buffer.getLine(found.end.row);
         if (!first || !last) continue;
@@ -253,9 +270,10 @@ export function terminalLinkProvider(term: Terminal, handlers: () => LinkHandler
             end: { x: cellOfChar(last, found.end.char) + 1, y: found.end.row + 1 },
           },
           activate: () => {
-            const { openUrl, openDoc } = handlers();
+            const { openUrl, openDoc, openImage } = handlers();
             if (found.kind === "url") openUrl(found.text);
-            else openDoc?.(found.text);
+            else if (found.kind === "doc") openDoc?.(found.text);
+            else openImage?.(found.text);
           },
         });
       }

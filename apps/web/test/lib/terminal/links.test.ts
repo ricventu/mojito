@@ -219,3 +219,52 @@ describe("findLinks: markdown paths", () => {
     expect(linksAt(["● Write(docs/superpowers/specs/x.md)"], PHONE_COLS, 0)).toEqual([]);
   });
 });
+
+describe("findLinks: image paths", () => {
+  /** With image paths on (every session has them), and doc paths too as on a project's. */
+  const at = (rows: string[], row = 0, cols = PHONE_COLS) =>
+    findLinks(row, (i) => rows[i]?.padEnd(cols, " "), cols, { docs: true, images: true }).map((l) => [l.kind, l.text]);
+
+  it("finds png, jpeg, gif and webp paths in any case", () => {
+    expect(at(["saved to shots/a.png and b.JPG"])).toEqual([
+      ["image", "shots/a.png"],
+      ["image", "b.JPG"],
+    ]);
+    expect(at(["x.jpeg, y.gif, z.webp"])).toEqual([
+      ["image", "x.jpeg"],
+      ["image", "y.gif"],
+      ["image", "z.webp"],
+    ]);
+  });
+
+  it("takes ~/, absolute and ./ paths and a mention, as markdown paths do", () => {
+    expect(at(["at ~/p/a.png"])).toEqual([["image", "~/p/a.png"]]);
+    expect(at(["at ./a.png"])).toEqual([["image", "a.png"]]);
+    expect(at(["> look at @shots/a.png"])).toEqual([["image", "shots/a.png"]]);
+  });
+
+  it("joins claude's scratchpad path across the rows it wrapped", () => {
+    const path =
+      "/tmp/claude-1000/-home-ricventu-code-mojito/419d8a67-2f04-4ed7-9491-45cce0b79bc5/scratchpad/after/desk-board.png";
+    const rows = ["  " + path.slice(0, 45), "  " + path.slice(45, 90), "  " + path.slice(90)];
+    for (const row of [0, 1, 2]) expect(at(rows, row)).toEqual([["image", path]]);
+  });
+
+  it("is no link for svg, a .. segment, or inside a URL", () => {
+    expect(at(["at a/logo.svg"])).toEqual([]);
+    expect(at(["at ../a.png"])).toEqual([]);
+    expect(at(["see https://x.io/a.png now"])).toEqual([["url", "https://x.io/a.png"]]);
+  });
+
+  it("finds a doc and an image on one row", () => {
+    expect(at(["docs/a.md shows a.png"])).toEqual([
+      ["doc", "docs/a.md"],
+      ["image", "a.png"],
+    ]);
+  });
+
+  it("offers no image links unless asked", () => {
+    expect(linksAt(["saved to shots/a.png"], PHONE_COLS, 0)).toEqual([]);
+    expect(docsAt(["saved to shots/a.png"], PHONE_COLS, 0)).toEqual([]);
+  });
+});

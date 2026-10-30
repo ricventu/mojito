@@ -10,6 +10,7 @@ import { SessionSidebar } from "@/components/sidebar/SessionSidebar";
 import { AccessoryBar } from "@/components/terminal/AccessoryBar";
 import { Composer } from "@/components/terminal/Composer";
 import { CopyBuffer } from "@/components/terminal/CopyBuffer";
+import { ImageViewer } from "@/components/terminal/ImageViewer";
 import { TerminalView } from "@/components/terminal/TerminalView";
 import { Button } from "@/components/ui/button";
 import { useKeyboardOpen } from "@/hooks/useKeyboardOpen";
@@ -91,6 +92,9 @@ export function TerminalPage() {
   const [panelState, setPanel] = useState<{ id: string; kind: "compose" | "copy" } | null>(null);
   const panel = panelState?.id === id ? panelState.kind : null;
   const togglePanel = (kind: "compose" | "copy") => setPanel(panel === kind ? null : { id, kind });
+  // An image path tapped in the output, shown over the terminal. Keyed by id, as the panels.
+  const [imageState, setImage] = useState<{ id: string; path: string } | null>(null);
+  const image = imageState?.id === id ? imageState.path : null;
 
   // Images pasted or dropped on the terminal, or picked from the accessory bar: uploaded,
   // then their paths pasted into claude (imageInput.ts). Its `[Image #N]` is the success.
@@ -233,9 +237,11 @@ export function TerminalPage() {
               onReady={setTerm}
               onImages={attach}
               openDoc={openDoc}
+              openImage={(path) => setImage({ id, path })}
             />
             {term && panel === "compose" && <Composer term={term} onClose={() => setPanel(null)} />}
             {term && panel === "copy" && <CopyBuffer term={term} onClose={() => setPanel(null)} />}
+            {image && <ImageViewer key={image} sessionId={id} path={image} onClose={() => setImage(null)} />}
             <AccessoryBar
               term={term}
               keyboardOpen={band.open}

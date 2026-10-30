@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, apiFetch, apiJson } from "@/lib/api";
+import { ApiError, apiBlob, apiFetch, apiJson } from "@/lib/api";
 import { clearToken, getToken, setToken } from "@/lib/token";
 
 function respond(status: number, body: unknown, statusText = "") {
@@ -67,5 +67,28 @@ describe("apiJson", () => {
     expect(init.method).toBe("POST");
     expect(init.body).toBe('{"ticket":"RIC-1"}');
     expect(new Headers(init.headers).get("content-type")).toBe("application/json");
+  });
+});
+
+describe("apiBlob", () => {
+  beforeEach(() => { setToken("tok"); });
+  afterEach(() => { vi.unstubAllGlobals(); clearToken(); });
+
+  it("sends the token and answers the bytes as a blob of their type", async () => {
+    const f = vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/png" } }));
+    vi.stubGlobal("fetch", f);
+    const blob = await apiBlob("/api/sessions/x/image?path=a.png");
+    expect(blob.type).toBe("image/png");
+    expect([...new Uint8Array(await blob.arrayBuffer())]).toEqual([1, 2, 3]);
+    const init = (f.mock.calls[0] as unknown as [string, RequestInit])[1];
+    expect(new Headers(init.headers).get("x-mojito-token")).toBe("tok");
+  });
+
+  it("throws the server's error like apiFetch, a 401 clearing the token", async () => {
+    respond(415, { error: "not an image" });
+    await expect(apiBlob("/api/x")).rejects.toMatchObject({ status: 415, message: "not an image" });
+    respond(401, { error: "unauthorized" });
+    await expect(apiBlob("/api/x")).rejects.toMatchObject({ status: 401 });
+    expect(getToken()).toBe("");
   });
 });

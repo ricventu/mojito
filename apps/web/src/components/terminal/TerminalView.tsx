@@ -33,6 +33,8 @@ interface Props {
   onImages?(files: File[]): void;
   /** A tapped markdown path; without it, paths in the output are plain text (`links.ts`). */
   openDoc?(path: string): void;
+  /** A tapped image path; without it, they are plain text too. */
+  openImage?(path: string): void;
 }
 
 /**
@@ -43,7 +45,7 @@ interface Props {
  * anchored to the bottom of its box, so rows the keyboard costs come off the top and
  * claude's input line stays on screen.
  */
-export function TerminalView({ sessionId, keyboardOpen, onExit, onReady, onImages, openDoc }: Props) {
+export function TerminalView({ sessionId, keyboardOpen, onExit, onReady, onImages, openDoc, openImage }: Props) {
   const holder = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -55,12 +57,14 @@ export function TerminalView({ sessionId, keyboardOpen, onExit, onReady, onImage
   const onReadyRef = useRef(onReady);
   const onImagesRef = useRef(onImages);
   const openDocRef = useRef(openDoc);
+  const openImageRef = useRef(openImage);
   useLayoutEffect(() => {
     kbdRef.current = keyboardOpen;
     onExitRef.current = onExit;
     onReadyRef.current = onReady;
     onImagesRef.current = onImages;
     openDocRef.current = openDoc;
+    openImageRef.current = openImage;
   });
 
   useEffect(() => {
@@ -82,13 +86,15 @@ export function TerminalView({ sessionId, keyboardOpen, onExit, onReady, onImage
       }
       const fit = new FitAddon();
       term.loadAddon(fit);
-      // http(s) URLs open in a new tab on click or tap, markdown paths in the docs viewer —
+      // http(s) URLs open in a new tab on click or tap, markdown paths in the docs viewer, image
+      // paths in the image viewer —
       // joined across the rows claude wrapped them over, which WebLinksAddon cannot do against
       // tmux (links.ts).
       const links = term.registerLinkProvider(
         terminalLinkProvider(term, () => ({
           openUrl: (url) => window.open(url, "_blank", "noopener,noreferrer"),
           openDoc: openDocRef.current,
+          openImage: openImageRef.current,
         })),
       );
       term.open(el);

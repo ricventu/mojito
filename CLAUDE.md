@@ -114,6 +114,12 @@ phone at `https://ai-tonic.<tailnet>.ts.net/` (Tailscale Serve → 8700). The se
   `<stateDir>/images/<id>/` (0700/0600), never the repo — claude attaches a pasted image path
   outside its cwd without a permission prompt and downscales big ones itself (both verified
   on 2.1.312), hence the shared 10 MB cap. Deleted with the row (`?remove=1`).
+  The other way, `GET /api/sessions/:id/image?path` (`sessions/viewImage.ts`) serves an image path
+  claude printed, for the terminal's viewer: relative to the session's cwd, `~/` from HOME, an
+  absolute one **anywhere** — the token already opens a shell in every session, and a fence would
+  miss claude's scratchpad (`/tmp/claude-<uid>/…`). What keeps it a viewer: `isImagePath`, a
+  regular file ≤ 10 MB, the type sniffed from the bytes (a `.png` holding `.env` is 415), served
+  `nosniff`, `CSP: sandbox`, `no-store`.
 - **Pull / Push** (`git/`, `POST /api/projects/:name/pull|push` → `GitSyncResult`): git with no
   shell, `LC_ALL=C` (sync.ts reads its messages) and `GIT_TERMINAL_PROMPT=0`. Pull = fetch, then
   fast-forward if only behind, rebase onto `@{u}` if diverged **on a clean tree**; push = push to
@@ -255,7 +261,10 @@ phone at `https://ai-tonic.<tailnet>.ts.net/` (Tailscale Serve → 8700). The se
   when they end at the block's measured wrap width; a marker row (`● `) takes the indent of
   the row below it. The same joined line yields markdown paths (`kind: "doc"`) when the page
   passes `openDoc` (a session with a project): they open the docs viewer, which lets the server
-  decide what the path means; a `..` segment or a path inside a URL is no link.
+  decide what the path means; a `..` segment or a path inside a URL is no link. Image paths
+  (`IMAGE_PATH_EXTENSIONS` in shared: png/jpeg/gif/webp, never SVG — it could script Mojito's
+  origin) match by the same rule in **every** session, General too, and open `ImageViewer` over
+  the terminal (pty untouched), fetched with the token header into an object URL (`apiBlob`).
   xterm's platform detection was verified correct under Vite, so v1's
   `restoreTerminalPlatform` is not ported; `platform.build.test.ts` bundles xterm with the
   app's Vite config and fails if anything starts shimming `process` (a dev warning too).
