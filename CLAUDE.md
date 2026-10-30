@@ -132,6 +132,20 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   fixed id `mj-<slug>-git`: a live one is answered `alreadyOpen`, never doubled). Failures with
   nothing to resolve (no upstream, detached, network) are 422 `{error}`; one op per project at a
   time (409). `test/git/sync.test.ts` runs real git in a temp dir with the global config off.
+- **Git graph** (RIC-505, `git/graph.ts`, `ticketBranch.ts`, `defaultBranch.ts`, `commit.ts`,
+  `http/routes/gitGraph.ts`): read-only — `GET /api/projects/:name/git/graph?skip&ticket`,
+  `…/git/commits/:hash` and `…/commits/:hash/diff?path&from`. Never a `fetch` or any write: the
+  graph shows what the last Pull saw. Reads run through `readGit` (10 s), Pull/Push keep `runGit`
+  (120 s). Hash shape (`isValidHash`) and ticket shape (`isValidTicket`, both in `@mojito/shared`)
+  are checked before any git call, the hash is resolved with `rev-parse --verify` and only the full
+  one goes on. A page is 200 commits (git asked for 201 — the extra only says `hasMore`), files cap
+  300, diff cap 256 KB cut at a line end. A `GitError` is a 409 with git's words (500 chars);
+  `GitError.exitCode` is null on a timeout, so a commit is "not found" (404) only on exit 1 — a
+  timeout or "not a repo" must not read as a missing commit. `findTicketBranch` (the ticket id as a
+  whole token of a branch name; local beats `origin/`, then worktree, then newest) is pure and
+  reusable — a merge gate can ask it the same question. Diff pathspecs are `:(top,literal)<path>`:
+  name-status paths are repo-root-relative and a project may be a subdirectory of its repo, and a
+  name must not be a glob.
 - **Create-ticket task** (`tasks/`): Agent SDK `query()` with `settingSources: []`,
   `tools: []`, an in-process MCP (`mojito-linear`: `list_labels`, `create_issue`) bound to the
   task's team/project, at most one issue per task; a task that created its issue is `done`
@@ -148,6 +162,18 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   the board stay visible as loose rows (a live tmux never disappears from the UI).
 - Project header: Pull / Push icons (`GitButtons`, `lib/gitSync.ts`) — a toast, or on a conflict
   the git session's terminal (pushed, from the board).
+- **Git graph page** (RIC-505, `/git/:project`, `components/git`, `lib/git`, `hooks/useGitGraph.ts`):
+  `ticket`/`commit`/`file`/`from` are the only view state (`lib/git/url.ts` is the one codec —
+  `gitHref` for entry points, `parseGitSearch` drops what makes no sense). Entry points: project
+  header, ticket sheet (ticket highlighted), terminal header (`icon-sm`, absent for General).
+  `gitKeys` lives **outside `qk`** on purpose: `useEvents` invalidates every `qk` value on each
+  reconnect, and the graph is a snapshot — rows jumping under the reader is worse than one fetch
+  behind. No focus/reconnect refetch; Reload and a Pull/Push (every outcome, a conflict too —
+  `GitButtons` invalidates `gitKeys.graphs(project)`) refresh it. `pageCommits` drops commits a
+  later `--skip` page repeats when the repo moved between pages. "Is there an in-app entry
+  behind" is react-router's `window.history.state.idx` (`useBackOr`, `lib/git/sheetNav.ts`), never
+  `location.key`: a `replace` keeps idx but changes the key. Closing the commit sheet from a diff
+  returns to the graph (two steps back when the details entry sits over it, else a replace).
 - **Board filters** (RIC-502): project (multi), status, text — the url is the only state
   (`lib/filters.ts` codec, `hooks/useBoardFilters.ts`). Writes **replace** the history entry
   (Back leaves the board, not one chip). `q` keeps its spaces in the live url (trimming would
