@@ -157,8 +157,9 @@ else `master`; else null (the strip names the branch alone).
   what it brought in against its first parent, not the combined diff (which lists only
   conflicts).
 - **Diff**: `show --format= --patch -M --no-color --no-ext-diff --diff-merges=first-parent
-  <full> -- :(literal)<path> [:(literal)<from>]`. Literal pathspecs: no glob magic from a
-  query value. Passing `from` too keeps a rename a rename. Output starts at the first `@@`
+  <full> -- :(top,literal)<path> [:(top,literal)<from>]`. Literal pathspecs from the repo root
+  (`top`): no glob magic from a query value, and the paths name-status listed match even when
+  the project is a subdirectory of its repo. Passing `from` too keeps a rename a rename. Output starts at the first `@@`
   (the `diff --git`/`index`/`---`/`+++` header is dropped); `Binary files … differ` →
   `binary: true`, no patch; over 256 KB → cut at the last full line, `truncated: true`.
 

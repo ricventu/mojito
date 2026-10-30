@@ -94,6 +94,18 @@ describe("readCommit", () => {
   });
 });
 
+describe("a project on a subdirectory of its repo", () => {
+  it("lists repo-root paths and diffs them", async () => {
+    const sub = join(repo, "dir");
+    const details = await readCommit(sub, renameCommit, readGit);
+    expect(details?.files.map((f) => f.path)).toContain(WEIRD);
+    const diff = await readDiff(sub, renameCommit, WEIRD, null, readGit);
+    expect(diff?.patch).toContain("+odd content");
+    const renamed = await readDiff(sub, renameCommit, "b.txt", "a.txt", readGit);
+    expect(renamed?.patch).toContain("+four");
+  });
+});
+
 describe("readDiff", () => {
   it("diffs a renamed file as a rename when given its old path", async () => {
     const diff = await readDiff(repo, renameCommit, "b.txt", "a.txt", readGit);

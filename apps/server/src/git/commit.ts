@@ -71,11 +71,15 @@ export async function readCommit(cwd: string, hash: string, run: GitRun): Promis
   };
 }
 
-/** `from` is a rename's old path: giving both keeps the diff a rename instead of a delete and an add. */
+/**
+ * Paths are the repo-root-relative ones `--name-status` lists, so `top` anchors them there even when
+ * `cwd` is a subdirectory of the repo; `literal` keeps a query value from being a glob.
+ * `from` is a rename's old path: giving both keeps the diff a rename instead of a delete and an add.
+ */
 export async function readDiff(cwd: string, hash: string, path: string, from: string | null, run: GitRun): Promise<CommitDiff | null> {
   const full = await resolve(cwd, hash, run);
   if (!full) return null;
-  const paths = [path, ...(from ? [from] : [])].map((p) => `:(literal)${p}`);
+  const paths = [path, ...(from ? [from] : [])].map((p) => `:(top,literal)${p}`);
   const out = await run(["show", "--format=", "--patch", "-M", "--no-color", "--no-ext-diff", "--diff-merges=first-parent", full, "--", ...paths], cwd);
   return parsePatch(out);
 }
