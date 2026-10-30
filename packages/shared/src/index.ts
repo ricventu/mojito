@@ -5,3 +5,4 @@ export * from "./api";
 export * from "./pty";
 export * from "./prompts";
 export * from "./git";
+export * from "./docs";
