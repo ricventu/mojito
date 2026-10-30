@@ -336,6 +336,8 @@ Quando i sotto-progetti necessari sono portati, `mojito2` prende porta e nome de
 servizio attuale e il vecchio codice (`src/`, `server.ts`, Next, relativi test) viene
 rimosso in un commit dedicato. Il prefisso tmux `mj-` resta.
 
+Carried out on 2026-10-30 (RIC-511): `docs/superpowers/specs/2026-10-30-cut-over-design.md`.
+
 ## Roadmap dei sotto-progetti successivi
 
 Ordine da decidere di volta in volta; ognuno con spec e piano propri.

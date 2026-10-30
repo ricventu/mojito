@@ -1,32 +1,23 @@
-# Mojito v2
+# Mojito
 
 Mojito manages Linear tickets per project and runs them as Claude Code sessions in tmux,
-shown in the browser through xterm. **This is the `v2` branch**: the rewrite lives in a
-pnpm workspace under `apps/` and `packages/`. The old Next.js app (`src/`, `server.ts`,
-`tests/`, `next.config.mjs`) is still in the tree but is **v1, developed on `main`** in the
-`~/code/mojito` checkout — do not change it from here. Work for v2 happens in `apps/` and
-`packages/` only. Design: `docs/superpowers/specs/2026-10-28-mojito-rewrite-core-design.md`.
+shown in the browser through xterm. A pnpm workspace under `apps/` and `packages/`. Core
+design: `docs/superpowers/specs/2026-10-28-mojito-rewrite-core-design.md`.
 
-**v2 is a rethink, not a port.** v1 is a reference for *what* a feature does and which
-problems it already ran into (its `CLAUDE.md`, `git show main:CLAUDE.md`, records many) —
-never for *how*. Every feature is redesigned for v2's stack and made better: simpler, fewer
-controls, a better interaction where one exists, phone-first. Do not copy v1's structure,
-components or file layout; when a ticket references v1 code, read it to learn the
-requirements and the pitfalls, then design the v2 solution and propose it before coding.
+**This is v2, a rewrite that replaced the Next.js app** (cut-over: RIC-511,
+`docs/superpowers/specs/2026-10-30-cut-over-design.md`). The old app is kept at the `v1`
+tag: a reference for *what* a feature did and which problems it ran into (its `CLAUDE.md`,
+`git show v1:CLAUDE.md`, records many) — never for *how*. A feature that still exists only
+there (the `mojito` CLI, RIC-507; PWA and self-update, RIC-508) is redesigned for this
+stack and made better: simpler, fewer controls, a better interaction where one exists,
+phone-first. Read v1 for the requirements and the pitfalls, then design and propose before
+coding.
 
-v1 and v2 run side by side on the Linux box and never share state:
-
-| | v1 | v2 |
-|---|---|---|
-| branch / checkout | `main`, `~/code/mojito` | `v2`, `~/code/mojito-v2` |
-| service | `mojito.service` (8700) | `mojito2.service` (3100) |
-| state | `~/.local/state/mojito` | `~/.local/state/mojito2` (SQLite `mojito.db`) |
-| tmux ids | `mojito-…` | `mj-…` |
-| phone URL | `https://ai-tonic.<tailnet>.ts.net/` | `…ts.net:8443/` (Tailscale Serve → 3100) |
-
-`.env.local` in `~/code/mojito-v2` is a symlink to v1's: the token (`MOJITO_TOKEN`) and the
-Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_PORT`,
-`MOJITO2_HOST` — v2 deliberately ignores v1's `MOJITO_PORT`/`MOJITO_HOST`).
+On the Linux box: `main` checked out in `~/code/mojito`, `mojito.service` on 8700
+(127.0.0.1), state in `~/.local/state/mojito` (SQLite `mojito.db`), tmux ids `mj-…`, the
+phone at `https://ai-tonic.<tailnet>.ts.net/` (Tailscale Serve → 8700). The server reads
+`.env.local` at the repo root: `MOJITO_TOKEN`, `LINEAR_API_KEY`, `MOJITO_PORT`,
+`MOJITO_HOST`. `~/.local/state/mojito-v1` is the old app's state, kept as an archive.
 
 ## Layout
 
@@ -42,9 +33,6 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   — without `noExternal` the built server dies importing `.ts`).
 - `apps/web` — React 19, Vite, Tailwind 4, shadcn/ui (Radix) under `src/components/ui`,
   react-router, TanStack Query, `@xterm/xterm` 6 (DOM renderer, no WebGL), lucide icons.
-  `vite.config.ts` sets `css.postcss: {}` so Vite does not pick up v1's Tailwind 3 PostCSS
-  config at the repo root; the root `tsconfig.json` excludes `apps`/`packages` so v1's
-  `next build` never compiles v2.
 
 ## Server
 
@@ -100,11 +88,11 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   tmux says the session/server is not there; any other failure rejects (unreachable is not
   dead — the pty gateway then closes 1011, retryable). `closeSession` never forces (Ctrl-C,
   then Ctrl-D re-sent each poll; claude that will not leave → 409). New sessions start in a
-  systemd scope of their own (`outsideService`) so they survive `mojito2` restarts.
+  systemd scope of their own (`outsideService`) so they survive `mojito` restarts.
 - **Reconcile at boot** (`reconcile.ts`): rows with no tmux → ended; `mj-*` tmux with no row
   → adopted; ended rows whose tmux is alive → revived to idle.
 - **Child environment** (`env/childEnv.ts`): nothing spawned gets raw `process.env` —
-  `spawnEnv()`/`sanitizeEnv()` scrub `.env.local` keys (diffed at load), `MOJITO2_*`, bundler
+  `spawnEnv()`/`sanitizeEnv()` scrub `.env.local` keys (diffed at load), `MOJITO_*`, bundler
   keys; the Agent SDK additionally drops `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN` so it
   always runs on the subscription.
 - **WebSockets** (`ws/upgrade.ts`): `?token=` required. `/ws/events` = one JSON
@@ -232,7 +220,7 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   `createdAt` first — only immutable keys, so rows never jump when a state changes. Hide is
   per row (optimistic `setQueryData`, a failed `PATCH` re-reads), with a "Hidden (n)" footer.
   Unpinned it is a left `Sheet` overlay (never resizes the pty); pinned it is a docked `w-72`
-  column, only at ≥ 1024px (`useMediaQuery`), pin in `localStorage` (`mojito2-sidebar-pinned`,
+  column, only at ≥ 1024px (`useMediaQuery`), pin in `localStorage` (`mojito-sidebar-pinned`,
   read in the `useReducer` initialiser so it docks on the first render, no pty resize twice).
   The open/pin state machine is `lib/sidebarState.ts`: closing a docked sidebar — unpin, ✕ or
   the toggle — also **drops the pin** (as v1 did: a kept pin would re-dock it on the next
@@ -265,21 +253,22 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   app's Vite config and fails if anything starts shimming `process` (a dev warning too).
 - Safe areas: `--sat/--sar/--sab/--sal` in `index.css`; every edge surface pays its inset;
   `test/safeArea.test.ts` guards it.
-- Copy is English, like everything else in v2 (code, comments, server messages, agent
+- Copy is English, like everything else (code, comments, server messages, agent
   prompts); the only Italian left is the create-ticket agent's output (tickets on Linear).
   Only Tailwind utilities + shadcn components; icons are lucide with `size`.
 
 ## Commands
 
 ```bash
-pnpm v2:dev                    # server (tsx watch, :3100) + Vite (:5173, proxies /api and /ws)
-pnpm v2:test && pnpm v2:typecheck
-pnpm v2:build                  # apps/web/dist + apps/server/dist/main.js
-make v2-deploy                 # from ~/code/mojito-v2: pull (if tracked), frozen install,
-                               # build, restart mojito2, wait for /api/health
-journalctl --user -u mojito2   # logs
+pnpm dev                       # server (tsx watch, pinned to :3100) + Vite (:5173, proxies /api and /ws)
+pnpm test && pnpm typecheck
+pnpm build                     # apps/web/dist + apps/server/dist/main.js
+make deploy                    # from ~/code/mojito: pull (if tracked), frozen install,
+                               # build, restart mojito, wait for /api/health
+make install-service           # copy deploy/mojito.service, enable, (re)start
+journalctl --user -u mojito    # logs
 ```
 
 The tmux integration test drives a real tmux with `mj-test-*` sessions and can be flaky
 under load — re-run it alone before believing a failure. Never let a test touch other tmux
-sessions: the box runs live v1 and v2 agents.
+sessions: the box runs live agents.

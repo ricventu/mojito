@@ -1,168 +1,68 @@
 # Mojito
 
-Next.js + TypeScript app (GUI + local server) that launches and monitors Claude Code
-ticket-lifecycle sessions, with Mojito-owned prompts and Linear writes. See
-[`CLAUDE.md`](./CLAUDE.md) for architecture.
+Mojito manages Linear tickets per project and runs them as Claude Code sessions in tmux,
+shown in the browser (phone first) through xterm. A pnpm workspace:
 
-## Running
+- `apps/server` — Node 22, Hono, SQLite (`better-sqlite3`), tmux, `node-pty`; serves the API,
+  the websockets and the built client from one process.
+- `apps/web` — React 19, Vite, Tailwind 4, shadcn/ui, xterm.
+- `packages/shared` — types and zod schemas both sides use.
 
-```bash
-make start
-```
+See [`CLAUDE.md`](./CLAUDE.md) for the architecture.
 
-Starts the dev server (Mac kept awake via `caffeinate`) and prints every reachable
-URL: **Local**, **Wi-Fi/LAN**, and — when the tailnet is up — **Tailscale**.
+## Configuration
 
-```bash
-make prod
-```
+The server reads `.env.local` at the repo root (variables already set in the environment
+win). Nothing it reads there reaches the sessions' environment.
 
-Same conveniences — `caffeinate`, the URL banner, a health supervisor that restarts a
-wedged server, and automatic pickup of source changes — but the app is served from an
-optimized `next build`, so the GUI is noticeably faster. Use it when you're *running*
-Mojito rather than working on it.
+- `MOJITO_TOKEN` — required; every `/api` call and websocket carries it.
+- `LINEAR_API_KEY` — required.
+- `MOJITO_PORT` — port (default `8700`).
+- `MOJITO_HOST` — bind address (default `127.0.0.1`). The box has a public address: keep it
+  on loopback and reach it through Tailscale Serve.
+- `MOJITO_STATE_DIR` — state (default `~/.local/state/mojito`: the SQLite `mojito.db`, hook
+  settings, uploaded images).
+- `MOJITO_PROJECTS` — a `projects.json` imported once into a new database (default
+  `~/.config/mojito/projects.json`); after that, projects are edited in Settings.
 
-The trade-off is no HMR: a source change under `src/` (or in `server.ts` /
-`next.config.mjs` / `tailwind.config.ts` / `postcss.config.mjs` / `package.json` /
-`tsconfig.json`) triggers `tsc --noEmit` and then a full rebuild, and the app is **down
-for the length of that build**. The typecheck runs first, while the old build is still
-being served, so a typo costs no downtime — the rebuild only starts once the tree is
-clean. `public/` is not watched: Next serves it from disk, no rebuild needed.
+A port already in use makes the server exit with an error rather than stay up without
+listening.
 
-Config lives in `.env.local`:
-
-- `MOJITO_PORT` — port to bind (default `4711`).
-- `MOJITO_HOST` — address to bind (default `0.0.0.0`). Set `127.0.0.1` on a host reached
-  only through `tailscale serve`, so the plain-http port is never exposed on a public interface.
-- `MOJITO_TOKEN` — auth token; when set, the printed URLs include `?token=…`.
-
-Tests: `npx tsc --noEmit && npx vitest run`.
-
-## Install it as an app
-
-Mojito is a PWA, so it can be installed to a home screen or a dock and run without
-browser chrome. What you have to do first depends entirely on the browser, because
-**Chromium only offers "Install" on a secure origin** and `server.ts` speaks plain
-http:
-
-| Browser | What to do |
-| --- | --- |
-| **Safari, iOS** | Open any of the URLs above → Share → *Add to Home Screen*. Works over http. |
-| **Safari, macOS** | Open any of the URLs above → Share → *Add to Dock*. Works over http. |
-| **Chrome/Edge, on this Mac** | Open the **Local** URL. `localhost` is the one http origin browsers trust, so the install button is already in the address bar. |
-| **Chrome/Edge/Android, anywhere else** | Needs HTTPS — run `make https` once, then open the **Tailscale Serve** URL. |
+## Development
 
 ```bash
-make https      # tailscale serve --bg $PORT  →  https://<host>.<tailnet>.ts.net
-make https-off  # tear it down again
+pnpm install
+pnpm dev                       # server (tsx watch, :3100) + Vite (:5173, proxies /api and /ws)
+pnpm test && pnpm typecheck
 ```
 
-`make https` is a one-time setup: Tailscale Serve runs in the background, survives
-reboots, and terminates TLS with a real Let's Encrypt certificate, so there is no
-certificate warning to click through — which matters, because a browser does *not*
-treat an origin with a certificate error as secure and would refuse to install
-anyway. It adds a front door without closing any: the http URLs keep working.
+`pnpm dev` pins the server to 3100, so it never collides with the service on 8700. It uses
+the same state dir unless `MOJITO_STATE_DIR` says otherwise.
 
-Two things worth knowing once installed:
+## Deploy (Linux box)
 
-- **The token is per-install.** `start_url` is `/` and carries no token, and an
-  installed app does not necessarily share `localStorage` with the browser you
-  installed it from (iOS gives home-screen apps their own container). Expect the
-  token gate once on first launch; it is remembered from then on.
-- **Serve is also a secure context**, which is the one thing that would let the
-  phone use `navigator.clipboard`. Mojito does not currently take advantage of
-  that — the terminal's copy path is still the accessory bar's text view.
-
-The icons come from `public/icon.svg`; run `scripts/gen-icons.sh` after editing it to
-re-cut the PNGs.
-
-## Remote access over Tailscale
-
-To open Mojito from your phone on any network, use the **Tailscale** URL printed by
-`make start` (`http://<tailnet-ip>:<port>/?token=…`). The server binds `0.0.0.0`, so a
-device on your tailnet reaches the Mac's tailnet IP directly over WireGuard — no public
-exposure, no HTTPS or Tailscale Serve needed.
-
-### Shields Up gotcha
-
-Tailscale's **Shields Up** mode blocks *all* incoming connections to your Mac from the
-tailnet. Crucially, `tailscale ping` / disco still succeed, so the tunnel *looks* healthy.
-
-**Symptom:** the phone browser shows `ERR_CONNECTION_TIMED_OUT` on the Tailscale URL,
-while `tailscale ping <mac>` returns a pong.
+Mojito runs as a systemd user unit from the `main` checkout in `~/code/mojito`:
 
 ```bash
-# Allow inbound — required for the phone to reach Mojito:
-tailscale set --shields-up=false
-
-# Re-block all inbound connections from the tailnet:
-tailscale set --shields-up=true
-
-# Check the current state:
-tailscale debug prefs | grep -i shields
+pnpm build                     # apps/web/dist + apps/server/dist/main.js
+make install-service           # copies deploy/mojito.service, enables and (re)starts it
+make deploy                    # pull --ff-only (if tracked), frozen install, build, restart,
+                               # then waits up to 30 s for /api/health
+journalctl --user -u mojito    # logs
 ```
 
-`--shields-up` is a persistent Tailscale preference (survives reboots), so if remote
-access silently stops working, check this first.
+tmux sessions start in a systemd scope of their own, so they survive a restart of the
+service.
 
-## Mojito v2
-
-Riscrittura del nucleo di Mojito come workspace pnpm, accanto all'app Next.js attuale
-(che non viene toccata): `apps/server` (Hono + SQLite + tmux), `apps/web` (Vite + React,
-Tailwind e shadcn) e `packages/shared` (tipi e schemi condivisi). Convive con la vecchia
-app: porta `3100` invece di `4711`, servizio `mojito2` invece di `mojito`, stato in
-`~/.local/state/mojito2` (`MOJITO_STATE_DIR` lo sovrascrive; il database è
-`mojito.db`), prefisso tmux `mj-`. `LINEAR_API_KEY` e `MOJITO_TOKEN` si leggono da
-variabili d'ambiente o da `.env.local` nella radice del repo, condivisi con la vecchia app,
-e non arrivano mai nell'ambiente delle sessioni.
-
-Porta e indirizzo sono invece solo di v2:
-
-- `MOJITO2_PORT` — porta (default `3100`).
-- `MOJITO2_HOST` — indirizzo (default `127.0.0.1`).
-
-`MOJITO_PORT` e `MOJITO_HOST` vengono ignorati di proposito: stanno nello stesso
-`.env.local` e appartengono alla vecchia app. Una porta già occupata fa uscire il server
-con errore invece di lasciarlo vivo senza ascoltare.
-
-v2 ascolta solo su `127.0.0.1`, come la vecchia app: la macchina ha un indirizzo pubblico
-e non va esposta. Dal Mac e dal telefono si passa da Tailscale Serve su una porta a parte,
-senza toccare la configurazione della vecchia app (serve root, oppure una volta
+The phone reaches it through Tailscale Serve (needs root once, or
 `sudo tailscale set --operator=$USER`):
 
 ```bash
-tailscale serve --bg --https=8443 3100   # poi https://<host>.<tailnet>.ts.net:8443
+tailscale serve --bg 8700      # https://<host>.<tailnet>.ts.net/
 ```
 
-Sviluppo, con server (`tsx watch`, porta 3100) e Vite (porta 5173) in parallelo:
+If the phone times out while `tailscale ping` still answers, check Tailscale's Shields Up
+(`tailscale debug prefs | grep -i shields`): it blocks every inbound connection from the
+tailnet.
 
-```bash
-pnpm v2:dev
-```
-
-Build di produzione e avvio da un solo processo, che serve API, websocket e client da
-`:3100`:
-
-```bash
-pnpm v2:build   # apps/web/dist e apps/server/dist/main.js
-pnpm v2:start
-```
-
-Come servizio systemd utente (Linux), accanto a `mojito.service`. v2 vive sul branch `v2`,
-in un checkout suo, `~/code/mojito-v2` (`git worktree add ~/code/mojito-v2 v2` dal
-checkout principale), con `.env.local` come link a quello di `~/code/mojito`: v1 resta su
-`main` in `~/code/mojito` e i due deploy non si toccano. I comandi vanno lanciati da
-`~/code/mojito-v2`:
-
-```bash
-pnpm v2:build
-make v2-install-service   # rifiuta se manca apps/server/dist/main.js; copia l'unità, enable --now
-make v2-deploy            # pull --ff-only (se il branch ha un upstream), pnpm install --frozen-lockfile, build, restart,
-                          # poi attende /api/health fino a 30s e fallisce se non risponde
-```
-
-L'unità parte da `~/code/mojito-v2` e non ha un `EnvironmentFile`: il server legge da solo
-`.env.local`. Le sessioni tmux nascono in uno scope systemd a parte, quindi sopravvivono
-al riavvio del servizio. Log: `journalctl --user -u mojito2`.
-
-Test: `pnpm v2:test && pnpm v2:typecheck`.
+The previous app (Next.js) is kept at the `v1` tag.
