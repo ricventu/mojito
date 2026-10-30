@@ -51,6 +51,10 @@ describe("surfaces that touch an edge pay for it", () => {
     ["src/components/sidebar/SessionSidebar.tsx", "var(--sab)"],
     ["src/components/git/GitGraphPage.tsx", "var(--sat)"],
     ["src/components/git/GitGraphPage.tsx", "var(--sab)"],
+    ["src/components/git/CommitSheet.tsx", "var(--sar)"],
+    ["src/components/git/CommitSheet.tsx", "var(--sal)"],
+    ["src/components/git/CommitSheet.tsx", "var(--sab)"],
+    ["src/components/git/DiffView.tsx", "var(--sab)"],
   ])("%s spends %s", (file, token) => {
     expect(code(file)).toContain(token);
   });

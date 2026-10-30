@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, FolderGit2, Loader2, RotateCw } from "lucide-react";
+import { ArrowLeft, Loader2, RotateCw } from "lucide-react";
 import { Link, Navigate, useParams, useSearchParams } from "react-router";
-import type { GraphCommit, GraphRef } from "@mojito/shared";
+import type { GraphCommit } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
 import { useBackOr, useGitGraph } from "@/hooks/useGitGraph";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -10,12 +10,14 @@ import { ApiError } from "@/lib/api";
 import { boardHref } from "@/lib/boardReturn";
 import { highlightChain, highlightSummary } from "@/lib/git/highlight";
 import { layoutGraph, type GraphRow } from "@/lib/git/layout";
-import { pageCommits } from "@/lib/git/pages";
+import { pageCommits, refsOf } from "@/lib/git/pages";
 import { relativeTime } from "@/lib/git/time";
 import { gitHref, parseGitSearch } from "@/lib/git/url";
 import { gitKeys } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
+import { CommitSheet } from "./CommitSheet";
 import { GraphLanes } from "./GraphLanes";
+import { RefChip } from "./RefChip";
 
 /** The highlighted tip is scrolled into view on first load only when it is past this many rows. */
 const SCROLL_PAST = 10;
@@ -49,6 +51,7 @@ function GraphView({ project }: { project: string }) {
     [commits, highlight],
   );
   const summary = first ? highlightSummary(highlight, ticket) : null;
+  const openRefs = useMemo(() => (view.commit ? refsOf(commits, view.commit) : []), [commits, view.commit]);
 
   // On first load, bring the highlighted tip into view when it is not among the first rows.
   const scrolledFor = useRef<string | null>(null);
@@ -161,6 +164,16 @@ function GraphView({ project }: { project: string }) {
           </>
         )}
       </div>
+      {view.commit && (
+        <CommitSheet
+          project={project}
+          ticket={ticket}
+          hash={view.commit}
+          file={view.file}
+          from={view.from}
+          refs={openRefs}
+        />
+      )}
     </main>
   );
 }
@@ -248,27 +261,5 @@ function CommitRow({ commit: c, row, cols, height, narrow, href, current, inChai
         </>
       )}
     </Link>
-  );
-}
-
-/** Local branch (a folder icon when checked out in a worktree), `origin/…`, or tag, each told apart by its look. */
-function RefChip({ gitRef: r, highlighted }: { gitRef: GraphRef; highlighted: boolean }) {
-  return (
-    <span
-      className={cn(
-        "flex h-4.5 min-w-0 shrink items-center gap-0.5 rounded px-1 text-[10px] leading-none font-medium",
-        highlighted
-          ? "bg-primary text-primary-foreground"
-          : r.kind === "local"
-            ? "bg-secondary text-secondary-foreground"
-            : r.kind === "remote"
-              ? "border text-muted-foreground"
-              : "border border-dashed text-muted-foreground",
-      )}
-      title={r.kind === "tag" ? `tag ${r.name}` : r.name}
-    >
-      {r.worktree && <FolderGit2 size={10} className="shrink-0" aria-label="checked out in a worktree" />}
-      <span className="truncate">{r.name}</span>
-    </span>
   );
 }
