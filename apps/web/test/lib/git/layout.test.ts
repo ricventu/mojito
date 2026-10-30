@@ -84,10 +84,14 @@ describe("layoutGraph", () => {
   });
 
   it("reuses a lane already waiting for a merge parent", () => {
-    // a opens lane 1 for p, then b merges p again
-    const { rows } = layoutGraph([c("a", "z", "p"), c("b", "z", "p"), c("z"), c("p")], opts);
+    // a opens lane 1 for p; b (a new tip, lane 2) merges p again: a curve into lane 1, no new slot
+    const { rows, laneCount } = layoutGraph([c("a", "z", "p"), c("b", "z", "p"), c("z"), c("p")], opts);
+    const pColor = rows[0]!.bottom.find((s) => s.to === 1 && s.from === 0)!.color;
     const second = rows[1]!;
+    expect(second.lane).toBe(2);
+    expect(second.bottom).toContainEqual({ from: 2, to: 1, color: pColor });
     expect(second.bottom.filter((s) => s.from === 1 && s.to === 1)).toHaveLength(1);
+    expect(laneCount).toBe(3);
   });
 
   it("keeps the colour along first parents and gives a merge lane a new one", () => {
