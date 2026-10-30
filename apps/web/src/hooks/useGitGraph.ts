@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { useLocation, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import type { CommitDetails, CommitDiff, GitGraphPage } from "@mojito/shared";
 import { apiFetch } from "@/lib/api";
 import { gitKeys } from "@/lib/queryKeys";
@@ -53,17 +53,25 @@ export function useDiff(project: string, hash: string | null, file: string | nul
 }
 
 /**
+ * react-router's index of the current history entry: 0 for the entry the tab was opened on, kept
+ * across replaces (which give an entry a fresh `location.key`, so the key cannot tell the first one).
+ */
+export function historyIndex(): number {
+  const idx = (window.history.state as { idx?: unknown } | null)?.idx;
+  return typeof idx === "number" ? idx : 0;
+}
+
+/**
  * Back that stays in the app: history back when there is an entry of ours to go back to, else
  * (a link opened in a fresh tab) `fallback`, replacing the current entry.
  */
 export function useBackOr(): (fallback: string) => void {
   const navigate = useNavigate();
-  const location = useLocation();
   return useCallback(
     (fallback: string) => {
-      if (location.key !== "default") void navigate(-1);
+      if (historyIndex() > 0) void navigate(-1);
       else void navigate(fallback, { replace: true });
     },
-    [navigate, location.key],
+    [navigate],
   );
 }

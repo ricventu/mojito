@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import type { CommitDetails, CommitFile, GraphRef } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { useCommit } from "@/hooks/useGitGraph";
+import { historyIndex, useCommit } from "@/hooks/useGitGraph";
 import { gitHref } from "@/lib/git/url";
 import { closeMove, diffEntryState } from "@/lib/git/sheetNav";
 import { browserClipboard, copyText } from "@/lib/terminal/copySelection";
@@ -38,7 +38,7 @@ export function CommitSheet({ project, ticket, hash, file, from, refs }: Props) 
   const close = () => {
     if (closedAt.current === location.key) return;
     closedAt.current = location.key;
-    const move = closeMove(file !== null, location.key, location.state);
+    const move = closeMove(file !== null, historyIndex(), location.state);
     if (move.kind === "back") void navigate(-move.steps);
     else void navigate(gitHref(project, { ticket }), { replace: true });
   };
@@ -111,7 +111,6 @@ function Details({
   details: CommitDetails;
   refs: GraphRef[];
 }) {
-  const location = useLocation();
   const message = d.message.trimEnd();
   const cut = message.indexOf("\n");
   const subject = cut < 0 ? message : message.slice(0, cut);
@@ -146,7 +145,7 @@ function Details({
               <FileRow
                 file={f}
                 href={gitHref(project, { ticket, commit: hash, file: f.path, from: f.from ?? null })}
-                state={diffEntryState(location.key)}
+                state={diffEntryState(historyIndex())}
               />
             </li>
           ))}
