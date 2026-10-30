@@ -1,4 +1,4 @@
-/** localStorage key of the access token (the v1 app used its own, so the two can coexist). */
+/** localStorage key of the access token (the v1 app's own key: a phone that had it keeps it). */
 export const TOKEN_KEY = "mojito-token";
 
 /**

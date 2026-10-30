@@ -42,7 +42,8 @@ Next's entries.
 `childEnv.ts` scrubs `MOJITO_*` (the prefix already covers port and host). The unit sets no
 port: `.env.local` carries `MOJITO_PORT=8700`/`MOJITO_HOST=127.0.0.1`. The server's `dev`
 script pins `MOJITO_PORT=3100` (the caller's environment wins over `.env.local`), which is
-where Vite proxies, so `pnpm dev` on the box never collides with the service on 8700.
+where Vite proxies, and `MOJITO_STATE_DIR=~/.local/state/mojito-dev`, so `pnpm dev` on the
+box never collides with the service on 8700 nor opens its database.
 
 **C — docs.** `CLAUDE.md` loses the v1/v2 preamble and table; `README.md` is rewritten for
 v2 in English; `.env.example` lists what v2 reads; the core spec's Cut-over section points
@@ -57,8 +58,8 @@ In order:
    commit, no force), `git push origin main`, `git push origin --delete v2`.
 2. **Build** in `~/code/mojito`: delete `.next/`, `pnpm install --frozen-lockfile`,
    `pnpm build`. `.env.local` is untouched.
-3. **Switch.** Stop `mojito` and `mojito2`; `mv ~/.local/state/mojito ~/.local/state/mojito-v1`
-   (an archive, read by nothing), `mv ~/.local/state/mojito2 ~/.local/state/mojito`;
+3. **Switch.** Stop `mojito` and `mojito2`; `mv ~/.local/state/mojito2 ~/.local/state/mojito`
+   (v1's state is `~/.mojito-state`, left in place);
    `make install-service` (overwrites the `mojito.service` unit, enables and starts it);
    disable `mojito2`, delete its unit, `daemon-reload`; `/api/health` on 8700 answers.
    tmux sessions live in scopes of their own and survive.
@@ -69,10 +70,10 @@ In order:
 
 Known effects: a session's hooks carry the origin it was launched with
 (`http://127.0.0.1:3100`), so a v2 session alive across the switch keeps running but its
-state stops updating — the only one alive is RIC-511's own, to be killed afterwards. The
-phone asks for the token once: the origin changes (`:8443` → `/`) and the keys are renamed.
+state stops updating — the only one alive is RIC-511's own, to be killed afterwards. At `/`
+the phone keeps v1's stored token: `mojito-token` is the key v1 used.
 
-**Rollback.** Stop `mojito`; swap the two state dirs back; restore v1's unit
+**Rollback.** Stop `mojito`; `mv ~/.local/state/mojito ~/.local/state/mojito2`; restore v1's unit
 (`WorkingDirectory=%h/code/mojito`, `EnvironmentFile=%h/code/mojito/.env.local`,
 `ExecStart=/usr/bin/env pnpm start`) and `git checkout v1` + `pnpm install` + `pnpm build`
 in a checkout of the tag.

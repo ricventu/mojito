@@ -36,8 +36,9 @@ pnpm dev                       # server (tsx watch, :3100) + Vite (:5173, proxie
 pnpm test && pnpm typecheck
 ```
 
-`pnpm dev` pins the server to 3100, so it never collides with the service on 8700. It uses
-the same state dir unless `MOJITO_STATE_DIR` says otherwise.
+`pnpm dev` pins the server to 3100 and `~/.local/state/mojito-dev`, so it never collides
+with the service on 8700 nor opens its database (live `mj-*` sessions are adopted into the dev
+database, which is harmless).
 
 ## Deploy (Linux box)
 

@@ -17,7 +17,7 @@ On the Linux box: `main` checked out in `~/code/mojito`, `mojito.service` on 870
 (127.0.0.1), state in `~/.local/state/mojito` (SQLite `mojito.db`), tmux ids `mj-…`, the
 phone at `https://ai-tonic.<tailnet>.ts.net/` (Tailscale Serve → 8700). The server reads
 `.env.local` at the repo root: `MOJITO_TOKEN`, `LINEAR_API_KEY`, `MOJITO_PORT`,
-`MOJITO_HOST`. `~/.local/state/mojito-v1` is the old app's state, kept as an archive.
+`MOJITO_HOST`. `~/.mojito-state` is the old app's state, left in place.
 
 ## Layout
 
@@ -260,7 +260,7 @@ phone at `https://ai-tonic.<tailnet>.ts.net/` (Tailscale Serve → 8700). The se
 ## Commands
 
 ```bash
-pnpm dev                       # server (tsx watch, pinned to :3100) + Vite (:5173, proxies /api and /ws)
+pnpm dev                       # server (tsx watch, :3100, ~/.local/state/mojito-dev) + Vite (:5173, proxies /api and /ws)
 pnpm test && pnpm typecheck
 pnpm build                     # apps/web/dist + apps/server/dist/main.js
 make deploy                    # from ~/code/mojito: pull (if tracked), frozen install,
