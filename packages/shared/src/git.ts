@@ -60,3 +60,13 @@ export interface CommitDiff {
   binary: boolean;
   truncated: boolean;
 }
+
+/** A commit hash as the graph sends it and the commit routes take it: abbreviated or full, lowercase. */
+export const HASH_RE = /^[0-9a-f]{7,40}$/;
+
+/** A Linear ticket id: team key, dash, number. */
+export const TICKET_RE = /^[A-Za-z][A-Za-z0-9]*-\d+$/;
+
+export const isValidHash = (s: string): boolean => HASH_RE.test(s);
+
+export const isValidTicket = (s: string): boolean => TICKET_RE.test(s);
