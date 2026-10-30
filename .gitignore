@@ -1,23 +1,17 @@
 node_modules/
-.next/
 *.tsbuildinfo
 .env
 .env.local
 *.log
-.mojito-state/
-.prod-supervisor.pid
 
 .worktrees/
 .claude/worktrees/
 .superpowers/
-tsconfig.tsbuildinfo
 
-# Exactly one lockfile. Turbopack picks the project root by looking for one, and
-# `npm ci` on the Linux deploy box would happily use a stray package-lock.json
-# instead of pnpm-lock.yaml (RIC-240). An accidental `npm install` still writes
-# this file — this keeps it from ever being committed alongside pnpm's.
+# Exactly one lockfile: an accidental `npm install` or `yarn` writes its own, and this
+# keeps it from ever being committed alongside pnpm's.
 package-lock.json
 yarn.lock
 
-# Build output of the rewrite (apps/server, apps/web).
+# Build output (apps/server, apps/web).
 dist/

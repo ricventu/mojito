@@ -8,8 +8,6 @@ const API = "http://127.0.0.1:3100";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
-  // An inline (empty) config stops Vite walking up to the v1 app's postcss.config, which runs Tailwind 3.
-  css: { postcss: {} },
   server: {
     proxy: {
       "/api": { target: API },
