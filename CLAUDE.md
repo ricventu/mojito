@@ -34,7 +34,8 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   `Settings`, `ProjectRow`, `Favorite`), zod request bodies (`LaunchBody`, `ProjectBody`, `SettingsBody`,
   `PromptsBody`, `FavoritesBody`, `StatusBody`, `SessionPatchBody`), `MojitoEvent`, `MODELS`/`EFFORTS`, `DEFAULT_PROMPTS`,
   `SESSION_GONE_CODE` (4404), the git graph types (`GitGraphPage`, `GraphCommit`, `GraphRef`,
-  `GraphHighlight`, `CommitDetails`, `CommitFile`, `CommitDiff`) and `isValidHash`/`isValidTicket`. Consumed as source, no build; zod **4** everywhere (the Agent
+  `GraphHighlight`, `CommitDetails`, `CommitFile`, `CommitDiff`) and `isValidHash`/`isValidTicket`, the docs
+  types (`DocEntry`, `DocList`, `DocFile`, `DOC_MAX_BYTES`) and `isDocPath`. Consumed as source, no build; zod **4** everywhere (the Agent
   SDK's peer).
 - `apps/server` — Node 22, Hono 4 on `@hono/node-server`, `ws` on the http `upgrade` event,
   `node-pty`, `better-sqlite3`. Built with tsup (`tsup.config.ts` bundles `@mojito/shared`
@@ -148,6 +149,20 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   reusable — a merge gate can ask it the same question. Diff pathspecs are `:(top,literal)<path>`:
   name-status paths are repo-root-relative and a project may be a subdirectory of its repo, and a
   name must not be a glob.
+- **Docs** (RIC-506, `docs/`, `http/routes/docs.ts`): read-only — `GET /api/projects/:name/docs?ticket`
+  → `DocList`, `…/docs/file?path&ticket` → `DocFile`. The root is the project checkout, unless the
+  ticket's branch (`findTicketBranch`) is checked out in another live worktree: then that worktree
+  plus the checkout's `--show-prefix` (`docRoot`; any failure → the checkout). The list is `git
+  ls-files -z --cached --others --exclude-standard` of `:(icase)*.md` in the root (`.gitignore`
+  respected, nested worktrees never descended into, `-z` so odd names arrive as themselves), each
+  `stat`ed, newest first; only that call may fail the list (409 with git's words). A ticket's own
+  are the id as a whole token of the path (`ticketToken`, shared with `findTicketBranch`) ∪ `git grep
+  -F -w -i --untracked` on bodies ∪ the md its branch touched against its base — best-effort;
+  `CLAUDE.md` lands in every ticket's group (it cites them all). v2 sessions work in the checkout,
+  so the id is what finds a ticket's spec, not a branch. The path guard (`resolveDocPath`) answers
+  400, never 404: `isDocPath`, a relative path stays inside the root, an absolute (or `~/`) one only
+  inside one of the repo's live worktrees, re-checked after `realpath`. Read from disk, so an
+  uncommitted spec is readable; over 512 KB → 413.
 - **Create-ticket task** (`tasks/`): Agent SDK `query()` with `settingSources: []`,
   `tools: []`, an in-process MCP (`mojito-linear`: `list_labels`, `create_issue`) bound to the
   task's team/project, at most one issue per task; a task that created its issue is `done`
@@ -180,6 +195,16 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   First load scrolls to the tip only with a ticket (the project view opens at the top). The
   checkout strip (no ticket) never says "merged" — a branch 0 ahead of its upstream is only
   behind; no base → no chain, nothing dimmed.
+- **Docs page** (RIC-506, `/docs/:project?ticket&path`, `components/docs`, `lib/docs`,
+  `hooks/useDocs.ts`): `lib/docs/url.ts` is the codec (`docsHref` drops a leading `./`); opening a
+  document pushes, so Back steps document → list → origin. Entry points: project header, ticket
+  sheet (beside Git), terminal header (absent for General), and `.md` paths in the terminal.
+  With a ticket the list shows its group first, then "All documents". `docKeys` lives outside `qk`
+  (as `gitKeys`), `gcTime: 0`, no focus refetch: each entry reads afresh, Reload resets; the list
+  is not read under an open document. `MarkdownView`: `react-markdown` + `remark-gfm`, no raw HTML,
+  `prose` from `@tailwindcss/typography`; links by `classifyHref` — http(s) a new tab, mailto plain,
+  a relative `.md` the viewer (resolved against the document's directory, climbing above a relative
+  root is inert), anything else inert text; images show their alt text only (no fetch).
 - **Board filters** (RIC-502): project (multi), status, text — the url is the only state
   (`lib/filters.ts` codec, `hooks/useBoardFilters.ts`). Writes **replace** the history entry
   (Back leaves the board, not one chip). `q` keeps its spaces in the live url (trimming would
@@ -231,7 +256,9 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   own link provider — not `WebLinksAddon`, which joins rows only on xterm's soft-wrap flag,
   and nothing from tmux ever carries it. Rows a program wrapped are joined on their bodies
   when they end at the block's measured wrap width; a marker row (`● `) takes the indent of
-  the row below it.
+  the row below it. The same joined line yields markdown paths (`kind: "doc"`) when the page
+  passes `openDoc` (a session with a project): they open the docs viewer, which lets the server
+  decide what the path means; a `..` segment or a path inside a URL is no link.
   xterm's platform detection was verified correct under Vite, so v1's
   `restoreTerminalPlatform` is not ported; `platform.build.test.ts` bundles xterm with the
   app's Vite config and fails if anything starts shimming `process` (a dev warning too).
