@@ -3,6 +3,7 @@ import type { SessionMeta, TicketSummary } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { sessionForTicket, type BoardSection } from "@/lib/board";
+import { GitButtons } from "./GitButtons";
 import { LooseSessionRow } from "./LooseSessionRow";
 import { TicketCard } from "./TicketCard";
 
@@ -33,6 +34,7 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
     <section className="flex flex-col gap-2">
       <header className="flex items-center gap-2">
         <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{name}</h2>
+        {project !== null && <GitButtons project={project} />}
         {project !== null && (
           <Button variant="ghost" size="icon-sm" aria-label={`New ticket in ${name}`} onClick={() => onNewTicket(project)}>
             <Plus size={16} />

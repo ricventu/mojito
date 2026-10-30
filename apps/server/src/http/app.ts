@@ -14,6 +14,7 @@ import type { TicketCache } from "../tickets/cache";
 import type { closeSession } from "../tmux/tmux";
 import { tokenMatches } from "../token";
 import { errorMessage } from "./body";
+import { gitRoutes, type GitSync } from "./routes/git";
 import { healthRoutes } from "./routes/health";
 import { hookRoutes } from "./routes/hook";
 import { projectRoutes } from "./routes/projects";
@@ -35,6 +36,8 @@ export interface AppDeps {
   launch: LaunchDeps;
   closeSession: typeof closeSession;
   taskQueue: Pick<TaskQueue, "enqueue" | "retry">;
+  /** A project's Pull and Push. Default: real git (`defaultGitSync`). */
+  git?: GitSync;
   /** The built web client; with none, only `/api` is served. */
   staticDir?: string;
   /** Project path validation. Default `fs.existsSync`. */
@@ -64,6 +67,7 @@ export function createApp(deps: AppDeps): Hono {
   app.route("/api", healthRoutes());
   app.route("/api", hookRoutes(deps));
   app.route("/api", projectRoutes(deps));
+  app.route("/api", gitRoutes(deps));
   app.route("/api", settingsRoutes(deps));
   app.route("/api", ticketRoutes(deps));
   app.route("/api", sessionRoutes(deps));

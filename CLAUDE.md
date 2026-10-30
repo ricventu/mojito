@@ -122,6 +122,16 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   `<stateDir>/images/<id>/` (0700/0600), never the repo — claude attaches a pasted image path
   outside its cwd without a permission prompt and downscales big ones itself (both verified
   on 2.1.312), hence the shared 10 MB cap. Deleted with the row (`?remove=1`).
+- **Pull / Push** (`git/`, `POST /api/projects/:name/pull|push` → `GitSyncResult`): git with no
+  shell, `LC_ALL=C` (sync.ts reads its messages) and `GIT_TERMINAL_PROMPT=0`. Pull = fetch, then
+  fast-forward if only behind, rebase onto `@{u}` if diverged **on a clean tree**; push = push to
+  the upstream (`-u origin HEAD` with none), never forced, and a rejection for being behind runs
+  the pull and retries once. Mojito never stashes and never leaves a half-done repo — ticket
+  sessions share the checkout: a rebase conflict is aborted, and that or uncommitted changes in
+  the way is a `conflict`, handed to the project's git session (`launchGitResolve`, opus/xhigh,
+  fixed id `mj-<slug>-git`: a live one is answered `alreadyOpen`, never doubled). Failures with
+  nothing to resolve (no upstream, detached, network) are 422 `{error}`; one op per project at a
+  time (409). `test/git/sync.test.ts` runs real git in a temp dir with the global config off.
 - **Create-ticket task** (`tasks/`): Agent SDK `query()` with `settingSources: []`,
   `tools: []`, an in-process MCP (`mojito-linear`: `list_labels`, `create_issue`) bound to the
   task's team/project, at most one issue per task; a task that created its issue is `done`
@@ -136,6 +146,8 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
 - Board (`lib/board.ts` → `components/board`): one section per project, In Review → In
   Progress → Todo, Backlog collapsed; free sessions and sessions whose ticket is no longer on
   the board stay visible as loose rows (a live tmux never disappears from the UI).
+- Project header: Pull / Push icons (`GitButtons`, `lib/gitSync.ts`) — a toast, or on a conflict
+  the git session's terminal (pushed, from the board).
 - **Board filters** (RIC-502): project (multi), status, text — the url is the only state
   (`lib/filters.ts` codec, `hooks/useBoardFilters.ts`). Writes **replace** the history entry
   (Back leaves the board, not one chip). `q` keeps its spaces in the live url (trimming would

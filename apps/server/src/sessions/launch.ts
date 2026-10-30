@@ -1,17 +1,18 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
-import { LaunchTicketBody, type Effort, type LaunchFreeBody, type Model, type Prompts, type SessionMeta } from "@mojito/shared";
+import { LaunchTicketBody, type Effort, type GitOp, type LaunchFreeBody, type Model, type Prompts, type SessionMeta } from "@mojito/shared";
 import { selfOrigin, type ServerConfig } from "../config";
 import type { ProjectsRepo } from "../db/projects";
 import type { SessionsRepo } from "../db/sessions";
 import type { EventBus } from "../events/bus";
+import type { SyncConflict } from "../git/sync";
 import { expandHome } from "../homePath";
 import type { LinearClient } from "../linear/client";
 import type { TicketCache } from "../tickets/cache";
 import { DuplicateSessionError, PREFIX, hasSession, newSession, q } from "../tmux/tmux";
 import { buildHookSettings } from "./hookSettings";
-import { buildTicketPrompt } from "./prompt";
+import { buildGitResolvePrompt, buildTicketPrompt } from "./prompt";
 import { watchStartupStall } from "./startupStall";
 
 export interface LaunchDeps {
@@ -218,4 +219,64 @@ export async function launchFree(body: LaunchFreeBody, deps: LaunchDeps): Promis
   record(deps, session);
   watchStartupStall(id, stallDeps(deps));
   return { ok: true, session };
+}
+
+export type GitResolveResult =
+  | { ok: true; session: SessionMeta; alreadyOpen: boolean }
+  | { ok: false; status: 400 | 409; error: string };
+
+/**
+ * The Claude session that finishes a Pull or Push Mojito stopped short of (`git/sync.ts`). One
+ * per project — `mj-<slug>-git` — so a second conflict while it is still open answers that
+ * session rather than putting two Claudes on one repository. Opus at xhigh effort, inlined like
+ * v1's: reconciling diverged history is the hardest reading a session here gets asked to do.
+ */
+export async function launchGitResolve(
+  req: { project: string; op: GitOp; conflict: SyncConflict },
+  deps: LaunchDeps,
+): Promise<GitResolveResult> {
+  const project = deps.projects.get(req.project);
+  if (!project) return { ok: false, status: 400, error: `project not mapped: ${req.project}` };
+  const cwd = expandHome(project.path, deps.cfg.home);
+  if (!usableDir(deps, cwd)) return { ok: false, status: 400, error: `project path not found: ${cwd}` };
+
+  const id = `${PREFIX}${slug(req.project)}-git`;
+  if (launching.has(id)) return { ok: false, status: 409, error: `session already starting: ${id}` };
+  launching.add(id);
+  try {
+    const existing = deps.sessions.get(id);
+    if (existing && existing.state !== "ended") {
+      if (await deps.hasSession(id)) return { ok: true, session: existing, alreadyOpen: true };
+      const ended = deps.sessions.patch(id, { state: "ended" });
+      if (ended) deps.bus.emit({ type: "session.updated", session: ended });
+    }
+
+    const model: Model = "opus";
+    const effort: Effort = "xhigh";
+    const settingsPath = hookSettingsPath(deps.cfg, id);
+    deps.writeFile(settingsPath, JSON.stringify(buildHookSettings(id, selfOrigin(deps.cfg), deps.cfg.token)));
+    const refused = await spawn(deps, id, cwd, claudeCommand(model, effort, settingsPath, buildGitResolvePrompt(req.op, req.conflict)));
+    if (refused) return { ok: false, status: 409, error: `session already exists: ${id}` };
+
+    const now = deps.now();
+    const session: SessionMeta = {
+      id,
+      kind: "claude",
+      project: req.project,
+      ticket: null,
+      cwd,
+      model,
+      effort,
+      state: "starting",
+      alert: null,
+      createdAt: now,
+      lastEventAt: now,
+      hidden: false,
+    };
+    record(deps, session);
+    watchStartupStall(id, stallDeps(deps));
+    return { ok: true, session, alreadyOpen: false };
+  } finally {
+    launching.delete(id);
+  }
 }

@@ -7,9 +7,9 @@ import { SessionsRepo } from "../../src/db/sessions";
 import { EventBus } from "../../src/events/bus";
 import { DuplicateSessionError, q } from "../../src/tmux/tmux";
 import { buildHookSettings } from "../../src/sessions/hookSettings";
-import { buildTicketPrompt } from "../../src/sessions/prompt";
+import { buildGitResolvePrompt, buildTicketPrompt } from "../../src/sessions/prompt";
 import { STALL_GRACE_MS } from "../../src/sessions/startupStall";
-import { launchFree, launchTicket, type LaunchDeps } from "../../src/sessions/launch";
+import { launchFree, launchGitResolve, launchTicket, type LaunchDeps } from "../../src/sessions/launch";
 
 const cfg: ServerConfig = {
   port: 3100,
@@ -433,5 +433,58 @@ describe("launchFree", () => {
       sessionId: "mj-web-a1b2c3",
     });
     expect(sessions.list()).toEqual([]);
+  });
+});
+
+describe("launchGitResolve", () => {
+  const conflict = { status: "conflict" as const, branch: "main", upstream: "origin/main", reason: "conflicts in a.txt" };
+  const req = { project: "Web", op: "pull" as const, conflict };
+
+  it("opens the project's git session on opus/xhigh with the resolve prompt", async () => {
+    const { deps, sessions, events } = setup();
+    const res = await launchGitResolve(req, deps);
+    const expected: SessionMeta = {
+      id: "mj-web-git",
+      kind: "claude",
+      project: "Web",
+      ticket: null,
+      cwd: "/repo/web",
+      model: "opus",
+      effort: "xhigh",
+      state: "starting",
+      alert: null,
+      createdAt: 1000,
+      lastEventAt: 1000,
+      hidden: false,
+    };
+    expect(res).toEqual({ ok: true, session: expected, alreadyOpen: false });
+    expect(deps.newSession).toHaveBeenCalledWith(
+      "mj-web-git",
+      "/repo/web",
+      `claude --model 'opus' --effort 'xhigh' --settings '/state/hooks/mj-web-git.json' ${q(buildGitResolvePrompt("pull", conflict))}`,
+    );
+    expect(sessions.get("mj-web-git")).toEqual(expected);
+    expect(events).toEqual([{ type: "session.updated", session: expected }]);
+  });
+
+  it("answers the live git session instead of opening a second one", async () => {
+    const { deps, sessions } = setup();
+    const live = row({ id: "mj-web-git", kind: "claude", ticket: null, state: "idle" });
+    sessions.insert(live);
+    expect(await launchGitResolve(req, deps)).toEqual({ ok: true, session: live, alreadyOpen: true });
+    expect(deps.newSession).not.toHaveBeenCalled();
+  });
+
+  it("ends a row whose tmux is gone and opens the session afresh", async () => {
+    const { deps, sessions } = setup({ hasSession: vi.fn(async () => false) });
+    sessions.insert(row({ id: "mj-web-git", kind: "claude", ticket: null, state: "idle", hidden: true }));
+    const res = await launchGitResolve(req, deps);
+    expect(res).toMatchObject({ ok: true, alreadyOpen: false, session: { state: "starting", hidden: false } });
+    expect(deps.newSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses an unmapped project", async () => {
+    const { deps } = setup();
+    expect(await launchGitResolve({ ...req, project: "Nope" }, deps)).toEqual({ ok: false, status: 400, error: "project not mapped: Nope" });
   });
 });

@@ -76,3 +76,17 @@ export interface TaskRecord {
   createdAt: number;
   updatedAt: number;
 }
+
+export type GitOp = "pull" | "push";
+
+/**
+ * What a project's Pull or Push answered (`POST /api/projects/:name/pull|push`). A pull that
+ * cannot finish cleanly (a rebase conflict, uncommitted changes in the way) leaves the repo as it
+ * was and hands it to a Claude session in the checkout: `conflict` names it, `alreadyOpen` when
+ * the project's git session was already running and was not launched again.
+ */
+export type GitSyncResult =
+  | { status: "updated"; branch: string; from: string; to: string; commits: number }
+  | { status: "up-to-date"; branch: string }
+  | { status: "pushed"; branch: string; commits: number; pulled: number }
+  | { status: "conflict"; session: SessionMeta; alreadyOpen: boolean };

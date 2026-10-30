@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTicketPrompt } from "../../src/sessions/prompt";
+import { buildGitResolvePrompt, buildTicketPrompt } from "../../src/sessions/prompt";
 
 describe("buildTicketPrompt", () => {
   it("is the exact text", () => {
@@ -13,5 +13,25 @@ describe("buildTicketPrompt", () => {
 
   it("leaves any other brace alone", () => {
     expect(buildTicketPrompt("RIC-7", "{ticket}: {project} $& $1")).toBe("RIC-7: {project} $& $1");
+  });
+});
+
+describe("buildGitResolvePrompt", () => {
+  const conflict = { status: "conflict" as const, branch: "main", upstream: "origin/main", reason: "rebasing conflicts in:\na.txt" };
+
+  it("names the operation, the branch, the upstream and why Mojito stopped", () => {
+    const prompt = buildGitResolvePrompt("pull", conflict);
+    expect(prompt).toContain("Pull of branch main");
+    expect(prompt).toContain("origin/main");
+    expect(prompt).toContain("rebasing conflicts in:\na.txt");
+    expect(prompt).toMatch(/never force-push/i);
+    expect(prompt).toContain("Do not push.");
+  });
+
+  it("asks a push's session to push once it is resolved", () => {
+    const prompt = buildGitResolvePrompt("push", conflict);
+    expect(prompt).toContain("Push of branch main");
+    expect(prompt).not.toContain("Do not push.");
+    expect(prompt).toMatch(/then push it/);
   });
 });
