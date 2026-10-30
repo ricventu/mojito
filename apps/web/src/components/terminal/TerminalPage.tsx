@@ -27,32 +27,35 @@ import { cn } from "@/lib/utils";
 const KIND_LABEL: Record<SessionKind, string> = { ticket: "Ticket", claude: "Claude", shell: "Shell" };
 
 /**
- * Who the session is: the ticket (id, live status and title) or `<kind> · <project>`. The status
- * never shrinks; the title takes whatever width is left, down to none on a narrow phone.
+ * Who the session is: the ticket (id, live status and title) or `<kind> · <project>`, in whatever
+ * width the header leaves: the title gives way first, then the status, the id last.
  */
 function Identity({ session, ticket }: { session: SessionMeta; ticket: TicketSummary | undefined }) {
   if (session.ticket) {
     const href = safeHref(ticket?.url);
+    // Never paints over the badge. The id ellipsizes rather than being clipped into another
+    // ticket's id (RIC-505 shown as RIC-5); status and title share one truncating span, so their
+    // spacing goes with them instead of eating the id's width.
     return (
-      <div className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+      <div className="flex min-w-0 flex-1 items-center overflow-hidden text-sm">
         {href ? (
           <a
             href={href}
             target="_blank"
             rel="noreferrer"
-            className="shrink-0 font-mono font-semibold underline-offset-2 hover:underline"
+            className="min-w-0 truncate font-mono font-semibold underline-offset-2 hover:underline"
           >
             {session.ticket}
           </a>
         ) : (
-          <span className="shrink-0 font-mono font-semibold">{session.ticket}</span>
+          <span className="min-w-0 truncate font-mono font-semibold">{session.ticket}</span>
         )}
         {ticket && (
-          <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">
-            {ticket.statusName}
+          <span className="min-w-0 flex-1 truncate text-muted-foreground">
+            <span className="ml-2 text-xs">{ticket.statusName}</span>
+            <span className="ml-2">{ticket.title}</span>
           </span>
         )}
-        {ticket && <span className="min-w-0 flex-1 truncate text-muted-foreground">{ticket.title}</span>}
       </div>
     );
   }
