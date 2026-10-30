@@ -20,6 +20,7 @@ export function useGitGraph(project: string, ticket: string | null) {
         `${base(project)}/graph?skip=${pageParam}${ticket ? `&ticket=${encodeURIComponent(ticket)}` : ""}`,
       ),
     initialPageParam: 0,
+    // Raw page lengths, not the deduplicated rows (`pageCommits`): that is what `--skip` counts.
     getNextPageParam: (last, pages) =>
       last.hasMore ? pages.reduce((n, p) => n + p.commits.length, 0) : undefined,
     staleTime: Infinity,

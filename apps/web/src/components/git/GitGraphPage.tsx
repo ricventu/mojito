@@ -10,6 +10,7 @@ import { ApiError } from "@/lib/api";
 import { boardHref } from "@/lib/boardReturn";
 import { highlightChain, highlightSummary } from "@/lib/git/highlight";
 import { layoutGraph, type GraphRow } from "@/lib/git/layout";
+import { pageCommits } from "@/lib/git/pages";
 import { relativeTime } from "@/lib/git/time";
 import { gitHref, parseGitSearch } from "@/lib/git/url";
 import { gitKeys } from "@/lib/queryKeys";
@@ -39,7 +40,7 @@ function GraphView({ project }: { project: string }) {
 
   const pages = graph.data?.pages;
   const first = pages?.[0];
-  const commits = useMemo(() => pages?.flatMap((p) => p.commits) ?? [], [pages]);
+  const commits = useMemo(() => (pages ? pageCommits(pages) : []), [pages]);
   const layout = useMemo(() => layoutGraph(commits, { maxLanes }), [commits, maxLanes]);
   const cols = Math.max(1, Math.min(layout.laneCount, maxLanes));
   const highlight = first?.highlight ?? null;
