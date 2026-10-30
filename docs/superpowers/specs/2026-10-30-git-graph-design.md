@@ -180,7 +180,7 @@ interface CommitDiff { patch: string; binary: boolean; truncated: boolean }
 
 `highlight` is null on pages after the first; the client keeps the first page's. On the
 first page with `ticket` and no matching branch it is null too — the strip then says "No
-branch for … yet".
+branch for …".
 
 ## 3. Web
 
