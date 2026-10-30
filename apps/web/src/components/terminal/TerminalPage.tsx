@@ -1,12 +1,13 @@
 import { useState } from "react";
 import type { Terminal } from "@xterm/xterm";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, FileText, GitGraph, PanelLeft, Power } from "lucide-react";
+import { ArrowLeft, FileText, GitGraph, Power } from "lucide-react";
 import { Link, Navigate, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import type { SessionKind, SessionMeta, TicketSummary } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
-import { SessionSidebar } from "@/components/sidebar/SessionSidebar";
+import { useKeyboardUp } from "@/components/AppShell";
+import { SidebarToggle } from "@/components/sidebar/SidebarToggle";
 import { AccessoryBar } from "@/components/terminal/AccessoryBar";
 import { Composer } from "@/components/terminal/Composer";
 import { CopyBuffer } from "@/components/terminal/CopyBuffer";
@@ -15,7 +16,6 @@ import { TerminalView } from "@/components/terminal/TerminalView";
 import { Button } from "@/components/ui/button";
 import { useKeyboardOpen } from "@/hooks/useKeyboardOpen";
 import { useSessions } from "@/hooks/useSessions";
-import { useSidebar } from "@/hooks/useSidebar";
 import { useTickets } from "@/hooks/useTickets";
 import { ApiError, apiFetch } from "@/lib/api";
 import { boardHref } from "@/lib/boardReturn";
@@ -79,7 +79,7 @@ export function TerminalPage() {
   const sessions = useSessions();
   const tickets = useTickets();
   const band = useKeyboardOpen();
-  const sidebar = useSidebar();
+  useKeyboardUp(band.open);
   const navigate = useNavigate();
   const qc = useQueryClient();
   // Keyed by id: the route reuses this component when one terminal links to another.
@@ -140,38 +140,20 @@ export function TerminalPage() {
     // The bottom inset is the root's to pay only where the accessory bar is not: a fine
     // pointer hides it, and the "terminated" panel never mounts it, touch or not. Where
     // the bar is mounted on a touch screen it pays the inset itself. Never with the
-    // keyboard up, whose top edge is then the band's bottom.
+    // keyboard up, whose top edge is then the band's bottom. It starts after a docked sidebar
+    // (AppShell): TerminalView's ResizeObserver re-fits once on dock and undock — never while
+    // the keyboard is up, when the shell takes a docked sidebar away (`useKeyboardUp`).
     <div
       className={cn(
-        "fixed inset-x-0 top-0 flex h-dvh flex-row overscroll-none bg-background pt-[var(--sat)] pr-[var(--sar)] pl-[var(--sal)]",
+        "fixed top-0 right-0 left-[var(--dock-width)] flex h-dvh flex-row overscroll-none bg-background pt-[var(--sat)] pr-[var(--sar)] pl-[var(--sal)]",
         !band.open && (gone ? "pb-[var(--sab)]" : "pb-[var(--sab)] pointer-coarse:pb-0"),
       )}
       style={band.rootStyle}
     >
-      {/* Docked, the sidebar is a column beside the terminal: TerminalView's ResizeObserver
-          re-fits once on dock and undock. Not while the keyboard is up, nor with a width
-          transition, which would finish after the re-fit. */}
-      {!(band.open && sidebar.docked) && (
-        <SessionSidebar
-          sidebar={sidebar}
-          currentId={id}
-          replace
-          dockedClassName={gone ? undefined : "pointer-coarse:pb-[var(--sab)]"}
-        />
-      )}
       <div className="flex min-w-0 flex-1 flex-col">
         {!band.open && (
           <header className="flex items-center gap-2 border-b px-3 py-2">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="shrink-0"
-              aria-label="Sessions"
-              aria-expanded={sidebar.open}
-              onClick={sidebar.toggle}
-            >
-              <PanelLeft size={16} />
-            </Button>
+            <SidebarToggle />
             <Button asChild variant="ghost" size="sm" className="shrink-0">
               <Link to={boardHref()}>
                 <ArrowLeft size={16} /> <span className="max-[480px]:sr-only">Board</span>

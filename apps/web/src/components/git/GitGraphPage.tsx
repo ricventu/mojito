@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, RotateCw } from "lucide-react";
 import { Link, Navigate, useParams, useSearchParams } from "react-router";
 import type { GraphCommit } from "@mojito/shared";
+import { SidebarToggle } from "@/components/sidebar/SidebarToggle";
 import { Button } from "@/components/ui/button";
 import { useBackOr, useGitGraph } from "@/hooks/useGitGraph";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -71,10 +72,12 @@ function GraphView({ project }: { project: string }) {
   };
 
   return (
-    <main className="flex min-h-dvh flex-col pr-[var(--sar)] pb-[var(--sab)] pl-[var(--sal)]">
+    // It starts after a docked session sidebar (AppShell), which pays the left inset there.
+    <main className="ml-[var(--dock-width)] flex min-h-dvh flex-col pr-[var(--sar)] pb-[var(--sab)] pl-[var(--sal)]">
       {/* Sticky, so Back and Reload stay in reach down a long log: it pays the top inset itself. */}
       <div className="sticky top-0 z-10 border-b bg-background pt-[var(--sat)]">
         <header className="mx-auto flex w-full max-w-5xl items-center gap-2 px-3 py-2">
+          <SidebarToggle />
           <Button variant="ghost" size="sm" className="shrink-0" onClick={() => back(boardHref())}>
             <ArrowLeft size={16} /> <span className="max-[480px]:sr-only">Back</span>
           </Button>

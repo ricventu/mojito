@@ -4,14 +4,11 @@ import type { TicketSummary } from "@mojito/shared";
 import { useBoardFilters } from "@/hooks/useBoardFilters";
 import { useProjects } from "@/hooks/useProjects";
 import { useSessions } from "@/hooks/useSessions";
-import { useSidebar } from "@/hooks/useSidebar";
 import { useTasks } from "@/hooks/useTasks";
 import { useTickets } from "@/hooks/useTickets";
 import { filterBoard, groupBoard, linearBanner } from "@/lib/board";
 import { isFiltered, NO_FILTERS } from "@/lib/filters";
 import { Button } from "@/components/ui/button";
-import { SessionSidebar } from "@/components/sidebar/SessionSidebar";
-import { cn } from "@/lib/utils";
 import { FilterBar } from "./FilterBar";
 import { ProjectSection } from "./ProjectSection";
 import { TaskStrip } from "./TaskStrip";
@@ -38,7 +35,6 @@ export function Board() {
   const sessions = useSessions();
   const tasks = useTasks();
   const projects = useProjects();
-  const sidebar = useSidebar();
   // The ticket whose sheet is open; the sheet is mounted from here once it exists.
   const [selectedTicket, setSelectedTicket] = useState<TicketSummary | null>(null);
 
@@ -68,18 +64,12 @@ export function Board() {
   const onNewSession = (project?: string) => setNewSession({ project });
 
   return (
-    // A docked sidebar is fixed on the left and pays its own insets; the page makes room for it.
-    <div className={cn("min-h-dvh overflow-x-clip pb-[var(--sab)]", sidebar.docked && "pl-72")}>
-      <SessionSidebar
-        sidebar={sidebar}
-        dockedClassName="fixed inset-y-0 left-0 z-20 pt-[var(--sat)] pb-[var(--sab)] pl-[var(--sal)]"
-      />
+    // A docked sidebar (AppShell) is fixed on the left and pays its own insets; the page starts after it.
+    <div className="min-h-dvh overflow-x-clip pb-[var(--sab)] pl-[var(--dock-width)]">
       <Toolbar
         sessions={sessionList}
         onNewTicket={() => onNewTicket()}
         onNewSession={() => onNewSession()}
-        sidebarOpen={sidebar.open}
-        onToggleSidebar={sidebar.toggle}
       >
         <FilterBar filters={filters} setFilters={setFilters} />
       </Toolbar>

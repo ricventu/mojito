@@ -223,7 +223,10 @@ phone at `https://ai-tonic.<tailnet>.ts.net/` (Tailscale Serve → 8700). The se
   queued variables are the optimistic state, so a refetch mid-queue can neither flash an older
   list nor be the next write's base. `settings.updated` does not invalidate while writes are
   queued; the queue re-reads once it drains. Error → toast, no remembered rollback.
-- **Session sidebar** (`components/sidebar`, `lib/sidebar.ts`, `hooks/useSidebar.ts`): every
+- **Session sidebar** (`components/sidebar`, `lib/sidebar.ts`, `hooks/useSidebar.ts`): drawn
+  once for every page by the layout route `AppShell` (a pinned one stays put from page to page;
+  pages reach it through `useAppSidebar`/`SidebarToggle`, and each starts after it with
+  `[var(--dock-width)]`, guarded by `safeArea.test.ts`). Every
   non-`ended` session, unfiltered by the board, grouped by project (General last), newest
   `createdAt` first — only immutable keys, so rows never jump when a state changes. Hide is
   per row (optimistic `setQueryData`, a failed `PATCH` re-reads), with a "Hidden (n)" footer.
@@ -234,8 +237,9 @@ phone at `https://ai-tonic.<tailnet>.ts.net/` (Tailscale Serve → 8700). The se
   the toggle — also **drops the pin** (as v1 did: a kept pin would re-dock it on the next
   open); below 1024px a docked sidebar closes and keeps its pin, re-docking above it. Rows are
   `<Link>`s (Cmd/middle-click, iOS long-press; a plain click closes the overlay). Picking a row
-  pushes from the board, **replaces** from a terminal (Back stays "the board"). A docked
-  sidebar is not rendered while the iOS keyboard is up.
+  pushes from the board, **replaces** from a terminal (Back stays "the board"; the shell reads
+  `/session/:id`). A docked sidebar is not rendered while the iOS keyboard is up (the terminal
+  tells the shell, `useKeyboardUp`, in a layout effect).
 - **Desktop first, phone complete.** The board column is `max-w-6xl`, an `@container`: from
   `@2xl` (by its own width, which a docked sidebar narrows) each project's active tickets are
   kanban columns Todo → In Progress → In Review (`kanbanColumns`: all three even when empty, so

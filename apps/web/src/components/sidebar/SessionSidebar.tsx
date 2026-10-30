@@ -21,12 +21,10 @@ interface Props {
   currentId?: string;
   /** Replace the history entry when a row is picked: from a terminal, Back keeps meaning the board. */
   replace?: boolean;
-  /** Placement of the docked column, which is the page's to decide (fixed on the board, a flex child on the terminal). */
-  dockedClassName?: string;
 }
 
 /** The header, the grouped list and the hidden footer: the same in the docked column and the overlay. */
-function Panel({ sidebar, currentId, replace, inSheet }: Omit<Props, "dockedClassName"> & { inSheet: boolean }) {
+function Panel({ sidebar, currentId, replace, inSheet }: Props & { inSheet: boolean }) {
   const sessions = useSessions();
   const tickets = useTickets();
   const projects = useProjects();
@@ -142,16 +140,18 @@ function Panel({ sidebar, currentId, replace, inSheet }: Omit<Props, "dockedClas
 }
 
 /**
- * The live sessions, wherever the user is. Docked, it is a column the page places
- * (`dockedClassName`); otherwise an overlay from the left, so the pty is never resized for a
- * peek. Both pay the insets of the edges they touch: the overlay here, the docked column
- * through its page's class.
+ * The live sessions, wherever the user is (AppShell draws it once for every page). Docked, it
+ * is a fixed column on the left, which the pages start after; otherwise an overlay from the
+ * left, so the pty is never resized for a peek. Both pay the insets of the edges they touch.
  */
-export function SessionSidebar({ sidebar, currentId, replace = false, dockedClassName }: Props) {
+export function SessionSidebar({ sidebar, currentId, replace = false }: Props) {
   if (sidebar.docked) {
     return (
       // `data-sidebar-docked` sets `--dock-width` (index.css), which must stay equal to `w-72`.
-      <aside data-sidebar-docked className={cn("flex w-72 shrink-0 flex-col border-r bg-background", dockedClassName)}>
+      <aside
+        data-sidebar-docked
+        className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r bg-background pt-[var(--sat)] pb-[var(--sab)] pl-[var(--sal)]"
+      >
         <Panel sidebar={sidebar} currentId={currentId} replace={replace} inSheet={false} />
       </aside>
     );

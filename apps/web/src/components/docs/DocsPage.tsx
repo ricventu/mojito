@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, RotateCw } from "lucide-react";
 import { Link, Navigate, useParams, useSearchParams } from "react-router";
 import type { DocEntry } from "@mojito/shared";
+import { SidebarToggle } from "@/components/sidebar/SidebarToggle";
 import { Button } from "@/components/ui/button";
 import { useDocFile, useDocList } from "@/hooks/useDocs";
 import { useBackOr } from "@/hooks/useGitGraph";
@@ -36,10 +37,12 @@ function DocsView({ project }: { project: string }) {
   const reload = () => void qc.resetQueries({ queryKey: docKeys.project(project) });
 
   return (
-    <main className="flex min-h-dvh flex-col pr-[var(--sar)] pb-[var(--sab)] pl-[var(--sal)]">
+    // It starts after a docked session sidebar (AppShell), which pays the left inset there.
+    <main className="ml-[var(--dock-width)] flex min-h-dvh flex-col pr-[var(--sar)] pb-[var(--sab)] pl-[var(--sal)]">
       {/* Sticky, so Back and Reload stay in reach down a long document: it pays the top inset itself. */}
       <div className="sticky top-0 z-10 border-b bg-background pt-[var(--sat)]">
         <header className="mx-auto flex w-full max-w-3xl items-center gap-2 px-3 py-2">
+          <SidebarToggle />
           <Button variant="ghost" size="sm" className="shrink-0" onClick={() => back(path ? docsHref(project, { ticket }) : boardHref())}>
             <ArrowLeft size={16} /> <span className="max-[480px]:sr-only">Back</span>
           </Button>
