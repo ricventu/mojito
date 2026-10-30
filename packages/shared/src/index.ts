@@ -4,3 +4,4 @@ export * from "./events";
 export * from "./api";
 export * from "./pty";
 export * from "./prompts";
+export * from "./git";

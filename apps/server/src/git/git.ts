@@ -16,26 +16,34 @@ export class GitError extends Error {
 }
 
 /**
- * git with no shell, in the environment every child gets, plus `LC_ALL=C` (the messages sync.ts
- * reads must be English whatever the locale) and `GIT_TERMINAL_PROMPT=0` (a missing credential
- * fails at once instead of waiting on a prompt nobody sees until the timeout). 120 s covers a
- * slow fetch or push; the large buffer keeps a long output from failing a command that worked.
+ * A runner for git with no shell, in the environment every child gets, plus `LC_ALL=C` (the
+ * messages sync.ts reads must be English whatever the locale) and `GIT_TERMINAL_PROMPT=0` (a
+ * missing credential fails at once instead of waiting on a prompt nobody sees until the
+ * timeout). The large buffer keeps a long output from failing a command that worked.
  */
-export const runGit: GitRun = (args, cwd) =>
-  new Promise((resolve, reject) => {
-    execFile(
-      "git",
-      args,
-      {
-        cwd,
-        timeout: 120_000,
-        maxBuffer: 64 * 1024 * 1024,
-        encoding: "utf8",
-        env: { ...spawnEnv(), LC_ALL: "C", GIT_TERMINAL_PROMPT: "0" },
-      },
-      (err, stdout, stderr) => {
-        if (err) reject(new GitError(args, [stdout, stderr || err.message].filter(Boolean).join("\n")));
-        else resolve(stdout);
-      },
-    );
-  });
+export const gitRunner =
+  (timeoutMs: number): GitRun =>
+  (args, cwd) =>
+    new Promise((resolve, reject) => {
+      execFile(
+        "git",
+        args,
+        {
+          cwd,
+          timeout: timeoutMs,
+          maxBuffer: 64 * 1024 * 1024,
+          encoding: "utf8",
+          env: { ...spawnEnv(), LC_ALL: "C", GIT_TERMINAL_PROMPT: "0" },
+        },
+        (err, stdout, stderr) => {
+          if (err) reject(new GitError(args, [stdout, stderr || err.message].filter(Boolean).join("\n")));
+          else resolve(stdout);
+        },
+      );
+    });
+
+/** Pull and push: 120 s covers a slow fetch or push. */
+export const runGit: GitRun = gitRunner(120_000);
+
+/** The reads behind the graph and commit views: a repo that cannot answer in 10 s is not read. */
+export const readGit: GitRun = gitRunner(10_000);
