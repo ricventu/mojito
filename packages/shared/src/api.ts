@@ -7,6 +7,8 @@ export const LaunchTicketBody = z.object({
   ticket: z.string().regex(/^[A-Z][A-Z0-9]*-\d+$/),
   model: z.enum(MODELS),
   effort: z.enum(EFFORTS),
+  /** Ask the session to work in a git worktree of its own rather than in the shared checkout. */
+  worktree: z.boolean().optional(),
 });
 export type LaunchTicketBody = z.infer<typeof LaunchTicketBody>;
 

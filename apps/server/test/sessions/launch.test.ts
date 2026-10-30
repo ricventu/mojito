@@ -155,6 +155,13 @@ describe("launchTicket", () => {
     );
   });
 
+  it("asks for a worktree in the prompt when the launch does", async () => {
+    const { deps } = setup();
+    await launchTicket(body({ worktree: true }), deps);
+    const cmd = vi.mocked(deps.newSession).mock.calls[0][2];
+    expect(cmd).toBe(`claude --model 'opus' --effort 'high' --settings '/state/hooks/mj-RIC-1.json' ${q(buildTicketPrompt("RIC-1", DEFAULT_PROMPTS.ticket, true))}`);
+  });
+
   it("uses the ticket prompt from the settings as they are at launch", async () => {
     const { deps } = setup({ prompts: () => ({ ...DEFAULT_PROMPTS, ticket: "Work on {ticket}, it's urgent." }) });
     await launchTicket(body(), deps);

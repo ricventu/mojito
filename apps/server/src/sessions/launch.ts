@@ -127,7 +127,7 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
 
     const settingsPath = hookSettingsPath(deps.cfg, id);
     deps.writeFile(settingsPath, JSON.stringify(buildHookSettings(id, selfOrigin(deps.cfg), deps.cfg.token)));
-    const command = claudeCommand(body.model, body.effort, settingsPath, buildTicketPrompt(body.ticket, deps.prompts().ticket));
+    const command = claudeCommand(body.model, body.effort, settingsPath, buildTicketPrompt(body.ticket, deps.prompts().ticket, body.worktree));
     const refused = await spawn(deps, id, cwd, command);
     if (refused) return refused;
 

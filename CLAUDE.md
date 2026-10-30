@@ -54,7 +54,9 @@ phone at `https://ai-tonic.<tailnet>.ts.net/` (Tailscale Serve → 8700). The se
 - **The prompt** is the whole instruction, in English: read ticket X from Linear and execute
   it; when ready for review, move it to "In Review" on Linear; use `superpowers:brainstorming`
   first only if the ticket leaves design decisions open. Brainstorming is not a launch option —
-  the session decides it, like branches/worktrees. Nothing else.
+  the session decides it, like branches. Nothing else, except the ticket sheet's "Work in a
+  worktree" switch (off by default, `LaunchTicketBody.worktree`): on, `buildTicketPrompt` appends
+  the fixed `WORKTREE_INSTRUCTION` (not a setting) as the last line.
   Mojito writes In Progress; the session writes In Review; Done is the human's.
 - **Prompts are settings** (RIC-513): the ticket prompt (a template; `{ticket}` required,
   filled by `buildTicketPrompt`) and the create-ticket system prompt. Defaults live in

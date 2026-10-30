@@ -7,6 +7,7 @@ import type { Effort, Model, SessionMeta, Settings, TicketSummary } from "@mojit
 import { StateBadge } from "@/components/StateBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
@@ -117,7 +118,7 @@ function StatusPill({
 }
 
 /**
- * Model and effort, then Launch. Disabled while the request is in flight: a double tap is one POST.
+ * Model, effort and worktree (off unless asked), then Launch. Disabled while the request is in flight: a double tap is one POST.
  * Both start from the defaults of the status shown in the header, and keep following it — a status
  * moved in this sheet brings its own defaults — until the human picks one by hand.
  */
@@ -135,6 +136,7 @@ function LaunchForm({
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [picks, setPicks] = useState<LaunchPicks>({});
+  const [worktree, setWorktree] = useState(false);
   const { model, effort } = launchOptions(status, settings, picks);
 
   const launch = useMutation({
@@ -144,6 +146,7 @@ function LaunchForm({
         ticket: ticket.identifier,
         model,
         effort,
+        worktree,
       }),
     onSuccess: ({ session, warning }) => {
       void qc.invalidateQueries({ queryKey: qk.sessions });
@@ -172,6 +175,10 @@ function LaunchForm({
         onModel={(m) => setPicks((p) => ({ ...p, model: m }))}
         onEffort={(e) => setPicks((p) => ({ ...p, effort: e }))}
       />
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor="ticket-worktree">Work in a worktree</Label>
+        <Switch id="ticket-worktree" checked={worktree} onCheckedChange={setWorktree} />
+      </div>
       <Button disabled={launch.isPending} onClick={() => launch.mutate()}>
         <Play size={16} /> {launch.isPending ? "Launching…" : "Launch"}
       </Button>

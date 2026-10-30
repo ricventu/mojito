@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildGitResolvePrompt, buildTicketPrompt } from "../../src/sessions/prompt";
+import { WORKTREE_INSTRUCTION, buildGitResolvePrompt, buildTicketPrompt } from "../../src/sessions/prompt";
 
 describe("buildTicketPrompt", () => {
   it("is the exact text", () => {
@@ -13,6 +13,11 @@ describe("buildTicketPrompt", () => {
 
   it("leaves any other brace alone", () => {
     expect(buildTicketPrompt("RIC-7", "{ticket}: {project} $& $1")).toBe("RIC-7: {project} $& $1");
+  });
+
+  it("ends with the worktree instruction only when asked", () => {
+    expect(buildTicketPrompt("RIC-7", "Do {ticket}.", true)).toBe(`Do RIC-7.\n${WORKTREE_INSTRUCTION}`);
+    expect(buildTicketPrompt("RIC-7", "Do {ticket}.", false)).toBe("Do RIC-7.");
   });
 });
 
