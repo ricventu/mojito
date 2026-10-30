@@ -16,18 +16,25 @@ SHELL := /bin/bash
 ## help: list targets
 help:
 	@echo "Targets:"
-	@echo "  make install-service  install and start $(SERVICE) (systemd --user, port 8700)"
-	@echo "  make deploy  git pull --ff-only (if tracked), pnpm install, pnpm build, restart $(SERVICE)"
+	@echo "  make install-service  install and start the service (systemd --user on Linux, LaunchAgent on macOS)"
+	@echo "  make deploy  git pull --ff-only (if tracked), pnpm install, pnpm build, restart the service"
 
-## install-service: Mojito (apps/server + apps/web) as a systemd user unit. The unit's
+## install-service: Mojito (apps/server + apps/web) as a systemd user unit on Linux, or as
+## the com.mojito.server LaunchAgent on macOS (deploy/launchd.sh, run it from the shell you
+## use Mojito from: its PATH and locale are baked into the plist). The unit's
 ## WorkingDirectory is ~/code/mojito, so run this from there, after `pnpm build`: an unbuilt
 ## checkout is refused rather than installed as a unit that crash-loops on a missing
 ## dist/main.js. Every command's exit status is checked by hand: make 3.81 ignores
 ## .SHELLFLAGS, so there is no `-e` to lean on (see the header note).
 SERVICE ?= mojito.service
 UNIT_DIR ?= $(HOME)/.config/systemd/user
+UNAME := $(shell uname -s)
 install-service:
-	@if [ ! -f apps/server/dist/main.js ]; then \
+	@if [ "$(UNAME)" = Darwin ]; then \
+		if ! deploy/launchd.sh install; then exit 1; fi; \
+		exit 0; \
+	fi; \
+	if [ ! -f apps/server/dist/main.js ]; then \
 		echo "apps/server/dist/main.js is missing: run 'pnpm build' first (in ~/code/mojito)" >&2; \
 		exit 1; \
 	fi; \
@@ -38,8 +45,9 @@ install-service:
 	if ! systemctl --user restart "$(SERVICE)"; then exit 1; fi; \
 	echo "OK — $(SERVICE) installed and started (status: systemctl --user status $(SERVICE))"
 
-## deploy: update Mojito in place and restart it. Run it from ~/code/mojito, the checkout the
-## unit serves. The pull runs only when the branch tracks a remote. Each step aborts the
+## deploy: update Mojito in place and restart it. Run it from the checkout the service serves
+## (~/code/mojito on the box). On macOS the restart rewrites the LaunchAgent's plist, so a
+## node switched under nvm is picked up together with the modules just built for it. The pull runs only when the branch tracks a remote. Each step aborts the
 ## deploy, so a failed pull, install or build never replaces the running server. The install
 ## is --frozen-lockfile: a lockfile out of step with the manifests is a broken commit, not
 ## something to re-resolve on the server. A restart is not a success until /api/health
@@ -53,7 +61,13 @@ deploy:
 	fi; \
 	if ! pnpm install --frozen-lockfile; then exit 1; fi; \
 	if ! pnpm build; then exit 1; fi; \
-	if ! systemctl --user restart "$(SERVICE)"; then exit 1; fi; \
+	if [ "$(UNAME)" = Darwin ]; then \
+		if ! deploy/launchd.sh restart; then exit 1; fi; \
+		logs="$(HOME)/Library/Logs/Mojito/mojito.log"; \
+	else \
+		if ! systemctl --user restart "$(SERVICE)"; then exit 1; fi; \
+		logs="journalctl --user -u $(SERVICE)"; \
+	fi; \
 	unitenv() { systemctl --user show -p Environment --value "$(SERVICE)" 2>/dev/null | tr ' ' '\n' | sed -n "s/^$$1=//p" | tail -n 1; }; \
 	dotenv() { sed -n "s/^$$1=//p" .env.local 2>/dev/null | tail -n 1 | tr -d "\"'"; }; \
 	port="$${MOJITO_PORT:-$$(unitenv MOJITO_PORT)}"; port="$${port:-$$(dotenv MOJITO_PORT)}"; \
@@ -62,11 +76,11 @@ deploy:
 	url="http://$$host:$${port:-8700}/api/health"; \
 	for i in $$(seq 1 30); do \
 		if curl -fsS -m 2 "$$url" >/dev/null 2>&1; then \
-			echo "OK — $(SERVICE) restarted and healthy"; exit 0; \
+			echo "OK — Mojito restarted and healthy"; exit 0; \
 		fi; \
 		sleep 1; \
 	done; \
-	echo "$(SERVICE) restarted but $$url did not answer within 30s (journalctl --user -u $(SERVICE))" >&2; \
+	echo "Mojito restarted but $$url did not answer within 30s ($$logs)" >&2; \
 	exit 1
 
 .PHONY: help install-service deploy

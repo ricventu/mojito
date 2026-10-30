@@ -55,6 +55,22 @@ journalctl --user -u mojito    # logs
 tmux sessions start in a systemd scope of their own, so they survive a restart of the
 service.
 
+## Deploy (macOS)
+
+The same two targets run Mojito as the `com.mojito.server` LaunchAgent (`deploy/launchd.sh`):
+
+```bash
+pnpm build
+make install-service           # writes ~/Library/LaunchAgents/com.mojito.server.plist and loads it
+make deploy                    # pull, frozen install, build, rewrite the plist, reload, health
+tail -F ~/Library/Logs/Mojito/mojito.log
+```
+
+Run both from the shell you use Mojito from: its PATH (node, tmux, claude) and locale are
+baked into the plist, which every deploy rewrites, so a node switched under nvm is picked up
+by the next deploy. `caffeinate` keeps the Mac awake while the server runs. Stopping the job
+leaves the tmux sessions running.
+
 The phone reaches it through Tailscale Serve (needs root once, or
 `sudo tailscale set --operator=$USER`):
 

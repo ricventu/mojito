@@ -269,6 +269,11 @@ make install-service           # copy deploy/mojito.service, enable, (re)start
 journalctl --user -u mojito    # logs
 ```
 
+On macOS the same two targets drive the `com.mojito.server` LaunchAgent through
+`deploy/launchd.sh`, which rewrites the plist on every restart: launchd gives a job no PATH
+or locale, so both are baked from the calling shell, and node must be the one `pnpm install`
+just built node-pty/better-sqlite3 against. Logs: `~/Library/Logs/Mojito/mojito.log`.
+
 The tmux integration test drives a real tmux with `mj-test-*` sessions and can be flaky
 under load — re-run it alone before believing a failure. Never let a test touch other tmux
 sessions: the box runs live agents.
