@@ -14,6 +14,8 @@
   --sar: env(safe-area-inset-right, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
   --sal: env(safe-area-inset-left, 0px);
+  /* What a docked session sidebar takes of the left edge: modals centre on the rest. */
+  --dock-width: 0px;
 
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -44,6 +46,10 @@
   --graph-5: oklch(0.6 0.12 200);
   --graph-6: oklch(0.6 0.2 350);
   --graph-7: oklch(0.6 0.15 115);
+}
+
+:root:has([data-sidebar-docked]) {
+  --dock-width: 18rem;
 }
 
 .dark {

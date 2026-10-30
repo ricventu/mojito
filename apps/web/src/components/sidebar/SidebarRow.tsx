@@ -25,14 +25,15 @@ interface Props {
 
 /**
  * One live session: its state dot and label are a link to its terminal (so Cmd/middle-click
- * and a long-press work as on any link); the eye beside it hides or shows it.
+ * and a long-press work as on any link); the eye beside it hides or shows it — with a mouse,
+ * only on hover or focus, so a column of eyes does not out-shout the labels.
  */
 export function SidebarRow({ session, label, current, replace, onPick, onHide }: Props) {
   const dot = DOT[session.state];
   const { primary, secondary } = label;
 
   return (
-    <li className={cn("flex items-center gap-1 rounded-md pr-1", current && "bg-accent text-accent-foreground")}>
+    <li className={cn("group/row flex items-center gap-1 rounded-md pr-1", current && "bg-accent text-accent-foreground")}>
       <Link
         to={`/session/${encodeURIComponent(session.id)}`}
         replace={replace}
@@ -54,7 +55,7 @@ export function SidebarRow({ session, label, current, replace, onPick, onHide }:
       <Button
         variant="ghost"
         size="icon-sm"
-        className="shrink-0 text-muted-foreground"
+        className="shrink-0 text-muted-foreground pointer-fine:opacity-0 pointer-fine:group-hover/row:opacity-100 pointer-fine:focus-visible:opacity-100"
         aria-label={session.hidden ? `Show ${primary}` : `Hide ${primary}`}
         onClick={() => onHide(!session.hidden)}
       >

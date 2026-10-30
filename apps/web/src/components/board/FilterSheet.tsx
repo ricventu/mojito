@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { SHEET_CONTENT_CLASS } from "@/components/sheets/styles";
+import { BOTTOM_SHEET_CLASS } from "@/components/sheets/styles";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useProjects } from "@/hooks/useProjects";
@@ -102,7 +102,7 @@ export function FilterSheet({ open, onOpenChange, filters, setFilters }: Props) 
         showCloseButton={false}
         className={cn(
           "overflow-y-auto",
-          wide ? "pt-[var(--sat)] pr-[var(--sar)] pb-[max(1rem,var(--sab))]" : SHEET_CONTENT_CLASS,
+          wide ? "pt-[var(--sat)] pr-[var(--sar)] pb-[max(1rem,var(--sab))]" : BOTTOM_SHEET_CLASS,
         )}
       >
         <SheetHeader className="flex-row items-center justify-between">

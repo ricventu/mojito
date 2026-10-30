@@ -20,7 +20,7 @@ export function Toolbar({ sessions, onNewTicket, onNewSession, sidebarOpen, onTo
 
   return (
     <div className="sticky top-0 z-10 border-b bg-background/95 pt-[var(--sat)] pr-[var(--sar)] pl-[var(--sal)] backdrop-blur">
-      <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-2">
+      <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2">
         <Button
           variant="ghost"
           size="icon-sm"
@@ -56,7 +56,7 @@ export function Toolbar({ sessions, onNewTicket, onNewSession, sidebarOpen, onTo
           </Link>
         </Button>
       </div>
-      {children && <div className="mx-auto max-w-3xl px-4 pb-2">{children}</div>}
+      {children && <div className="mx-auto max-w-6xl px-4 pb-2">{children}</div>}
     </div>
   );
 }

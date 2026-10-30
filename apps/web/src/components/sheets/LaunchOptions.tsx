@@ -9,14 +9,17 @@ interface Props {
   effort: Effort;
   onModel: (model: Model) => void;
   onEffort: (effort: Effort) => void;
+  /** From `sm` the labels are for screen readers only: the caller heads the columns once. */
+  columnLabels?: boolean;
 }
 
 /** The Model / Effort pair shared by the ticket launch and the new-session sheets. */
-export function LaunchOptions({ idPrefix, model, effort, onModel, onEffort }: Props) {
+export function LaunchOptions({ idPrefix, model, effort, onModel, onEffort, columnLabels = false }: Props) {
+  const labelClass = columnLabels ? "sm:sr-only" : undefined;
   return (
     <div className="grid grid-cols-2 gap-3">
       <div className="flex min-w-0 flex-col gap-1.5">
-        <Label htmlFor={`${idPrefix}-model`}>Model</Label>
+        <Label htmlFor={`${idPrefix}-model`} className={labelClass}>Model</Label>
         <Select value={model} onValueChange={(v) => onModel(v as Model)}>
           <SelectTrigger id={`${idPrefix}-model`} className="w-full">
             <SelectValue />
@@ -31,7 +34,7 @@ export function LaunchOptions({ idPrefix, model, effort, onModel, onEffort }: Pr
         </Select>
       </div>
       <div className="flex min-w-0 flex-col gap-1.5">
-        <Label htmlFor={`${idPrefix}-effort`}>Effort</Label>
+        <Label htmlFor={`${idPrefix}-effort`} className={labelClass}>Effort</Label>
         <Select value={effort} onValueChange={(v) => onEffort(v as Effort)}>
           <SelectTrigger id={`${idPrefix}-effort`} className="w-full">
             <SelectValue />

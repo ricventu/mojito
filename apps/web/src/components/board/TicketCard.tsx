@@ -30,7 +30,7 @@ export function TicketCard({ ticket, session, selected, onOpen }: Props) {
   return (
     <li
       className={cn(
-        "rounded-lg border bg-card text-card-foreground",
+        "flex flex-col rounded-lg border bg-card text-card-foreground",
         waiting && "border-amber-500/60",
         selected && "ring-2 ring-ring",
       )}
@@ -50,7 +50,7 @@ export function TicketCard({ ticket, session, selected, onOpen }: Props) {
         tabIndex={0}
         onClick={open}
         onKeyDown={onKeyDown}
-        className="flex cursor-pointer flex-col gap-1.5 rounded-b-lg px-3 pt-1 pb-2.5 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className="flex flex-1 cursor-pointer flex-col gap-1.5 rounded-b-lg px-3 pt-1 pb-2.5 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
       >
         <p className="min-w-0 text-sm leading-snug font-medium break-words">{ticket.title}</p>
         <div className="flex flex-wrap items-center gap-1.5">

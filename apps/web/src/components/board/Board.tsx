@@ -83,7 +83,7 @@ export function Board() {
       >
         <FilterBar filters={filters} setFilters={setFilters} />
       </Toolbar>
-      <main className="mx-auto flex max-w-3xl flex-col gap-4 px-4 pt-3 pr-[max(1rem,var(--sar))] pb-6 pl-[max(1rem,var(--sal))]">
+      <main className="@container mx-auto flex max-w-6xl flex-col gap-4 px-4 pt-3 pr-[max(1rem,var(--sar))] pb-6 pl-[max(1rem,var(--sal))]">
         {banner && <Banner text={banner} />}
         {refreshError && (
           <Banner text={`Refresh failed: ${refreshError instanceof Error ? refreshError.message : "error"}`} />

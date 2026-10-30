@@ -230,6 +230,12 @@ phone at `https://ai-tonic.<tailnet>.ts.net/` (Tailscale Serve → 8700). The se
   `<Link>`s (Cmd/middle-click, iOS long-press; a plain click closes the overlay). Picking a row
   pushes from the board, **replaces** from a terminal (Back stays "the board"). A docked
   sidebar is not rendered while the iOS keyboard is up.
+- **Desktop first, phone complete.** The board column is `max-w-6xl`, an `@container` whose cards
+  run in 1/2/3 columns by its own width (a docked sidebar narrows it). The board's modals (ticket,
+  new ticket, new session) and the commit sheet are a bottom sheet below `sm` and a centred dialog
+  from `sm` (`sheets/styles.ts`, pure CSS: a resize never remounts an open modal), centred on the
+  column beside a docked sidebar: the `aside` carries `data-sidebar-docked`, which sets
+  `--dock-width` (`index.css`, must equal its `w-72`). The filter sheet stays a right drawer.
 - Overlay sheets (filter, sidebar) draw their own ✕ (`showCloseButton={false}`): shadcn's
   built-in one is absolutely positioned and ignores the safe-area insets.
 - Terminal (`components/terminal`, `lib/terminal`): `syncGeometry` always publishes the size,

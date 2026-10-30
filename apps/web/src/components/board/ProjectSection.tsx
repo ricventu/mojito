@@ -6,6 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { sessionForTicket, type BoardSection } from "@/lib/board";
 import { docsHref } from "@/lib/docs/url";
 import { gitHref } from "@/lib/git/url";
+import { cn } from "@/lib/utils";
 import { GitButtons } from "./GitButtons";
 import { LooseSessionRow } from "./LooseSessionRow";
 import { TicketCard } from "./TicketCard";
@@ -18,6 +19,9 @@ interface Props {
   onNewTicket: (project?: string) => void;
   onNewSession: (project?: string) => void;
 }
+
+/** Cards and rows: one column on a phone, two or three as the board's column widens (a container query: a docked sidebar narrows it). */
+const LIST_CLASS = "grid gap-2 @2xl:grid-cols-2 @5xl:grid-cols-3";
 
 /** One project: its active tickets, a closed Backlog group, then its loose sessions. */
 export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket, onNewTicket, onNewSession }: Props) {
@@ -67,7 +71,7 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
         </Button>
       </header>
 
-      {section.active.length > 0 && <ul className="flex flex-col gap-2">{section.active.map(card)}</ul>}
+      {section.active.length > 0 && <ul className={LIST_CLASS}>{section.active.map(card)}</ul>}
 
       {section.backlog.length > 0 && (
         <Collapsible key={String(section.backlogOpen)} defaultOpen={section.backlogOpen} className="group/backlog">
@@ -76,13 +80,13 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
             Backlog ({section.backlog.length})
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <ul className="flex flex-col gap-2 pt-1">{section.backlog.map(card)}</ul>
+            <ul className={cn(LIST_CLASS, "pt-1")}>{section.backlog.map(card)}</ul>
           </CollapsibleContent>
         </Collapsible>
       )}
 
       {section.loose.length > 0 && (
-        <ul className="flex flex-col gap-2">
+        <ul className={LIST_CLASS}>
           {section.loose.map((s) => (
             <LooseSessionRow key={s.id} session={s} />
           ))}

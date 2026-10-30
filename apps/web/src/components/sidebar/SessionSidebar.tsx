@@ -150,7 +150,8 @@ function Panel({ sidebar, currentId, replace, inSheet }: Omit<Props, "dockedClas
 export function SessionSidebar({ sidebar, currentId, replace = false, dockedClassName }: Props) {
   if (sidebar.docked) {
     return (
-      <aside className={cn("flex w-72 shrink-0 flex-col border-r bg-background", dockedClassName)}>
+      // `data-sidebar-docked` sets `--dock-width` (index.css), which must stay equal to `w-72`.
+      <aside data-sidebar-docked className={cn("flex w-72 shrink-0 flex-col border-r bg-background", dockedClassName)}>
         <Panel sidebar={sidebar} currentId={currentId} replace={replace} inSheet={false} />
       </aside>
     );

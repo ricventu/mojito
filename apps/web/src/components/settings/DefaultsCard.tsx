@@ -44,9 +44,15 @@ function Form({ settings }: { settings: Settings }) {
 
   return (
     <form onSubmit={submit}>
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-4 sm:gap-2">
+        {/* From `sm`, a table: one line per status, Model and Effort heading the columns once. */}
+        <div aria-hidden className="hidden text-sm font-medium sm:grid sm:grid-cols-[7rem_1fr_1fr] sm:gap-3">
+          <span />
+          <span>Model</span>
+          <span>Effort</span>
+        </div>
         {STATUSES.map((status) => (
-          <div key={status} className="flex flex-col gap-1.5">
+          <div key={status} className="flex flex-col gap-1.5 sm:grid sm:grid-cols-[7rem_1fr] sm:items-center sm:gap-3">
             <span className="text-sm font-medium">{status}</span>
             <LaunchOptions
               idPrefix={`default-${status.replace(/\s+/g, "-").toLowerCase()}`}
@@ -54,6 +60,7 @@ function Form({ settings }: { settings: Settings }) {
               effort={rowOf(status).effort}
               onModel={(model) => patch(status, { model })}
               onEffort={(effort) => patch(status, { effort })}
+              columnLabels
             />
           </div>
         ))}

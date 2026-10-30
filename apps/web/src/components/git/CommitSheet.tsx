@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import type { CommitDetails, CommitFile, GraphRef } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
+import { CENTRED_ON_WIDE_CLASS } from "@/components/sheets/styles";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { historyIndex, useCommit } from "@/hooks/useGitGraph";
 import { gitHref } from "@/lib/git/url";
@@ -54,7 +55,10 @@ export function CommitSheet({ project, ticket, hash, file, from, refs }: Props) 
       <SheetContent
         side="bottom"
         showCloseButton={false}
-        className="h-[90dvh] gap-0 rounded-t-xl pr-[var(--sar)] pl-[var(--sal)] sm:mx-auto sm:max-w-5xl"
+        className={cn(
+          "h-[90dvh] gap-0 rounded-t-xl pr-[var(--sar)] pl-[var(--sal)] sm:h-[85dvh] sm:max-w-5xl",
+          CENTRED_ON_WIDE_CLASS,
+        )}
       >
         <SheetHeader className="shrink-0 flex-row items-center gap-1 border-b py-2 pr-2 pl-4">
           <SheetTitle className="font-mono text-sm">
