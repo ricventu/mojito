@@ -1,5 +1,5 @@
 /** localStorage key of the theme preference (the v1 app used its own, so the two can coexist). */
-export const THEME_KEY = "mojito2-theme";
+export const THEME_KEY = "mojito-theme";
 
 export type Theme = "dark" | "light";
 

@@ -5,11 +5,11 @@
   "packageManager": "pnpm@11.0.9",
   "type": "module",
   "scripts": {
-    "v2:dev": "pnpm -r --parallel --filter \"./apps/*\" dev",
-    "v2:build": "pnpm -r --filter \"./apps/*\" --filter \"./packages/*\" build",
-    "v2:start": "pnpm --filter @mojito/server start",
-    "v2:test": "pnpm -r --filter \"./apps/*\" --filter \"./packages/*\" test",
-    "v2:typecheck": "pnpm -r --filter \"./apps/*\" --filter \"./packages/*\" typecheck"
+    "dev": "pnpm -r --parallel --filter \"./apps/*\" dev",
+    "build": "pnpm -r --filter \"./apps/*\" --filter \"./packages/*\" build",
+    "start": "pnpm --filter @mojito/server start",
+    "test": "pnpm -r --filter \"./apps/*\" --filter \"./packages/*\" test",
+    "typecheck": "pnpm -r --filter \"./apps/*\" --filter \"./packages/*\" typecheck"
   },
   "engines": {
     "node": ">=22"

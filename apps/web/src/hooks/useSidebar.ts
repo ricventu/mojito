@@ -3,7 +3,7 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { isDocked, sidebarReducer, type SidebarModel } from "@/lib/sidebarState";
 
 /** localStorage key of the sidebar's pin: a preference of this browser, shared by its tabs. */
-export const SIDEBAR_PIN_KEY = "mojito2-sidebar-pinned";
+export const SIDEBAR_PIN_KEY = "mojito-sidebar-pinned";
 /** Where a pinned sidebar docks; below it the pin is not offered and a remembered one is ignored. */
 export const SIDEBAR_DOCK_QUERY = "(min-width: 1024px)";
 

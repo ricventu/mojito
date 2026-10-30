@@ -1,5 +1,5 @@
 /** localStorage key of the access token (the v1 app used its own, so the two can coexist). */
-export const TOKEN_KEY = "mojito2-token";
+export const TOKEN_KEY = "mojito-token";
 
 /**
  * Decide the initial access token on page load.

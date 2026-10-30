@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { setup } from "./http/setup";
 
 // The wiring between the server and the built web client, over a real socket: what `pnpm
-// v2:start` serves is `createApp({ staticDir: apps/web/dist })`, so a fake dist stands in for it.
+// start` serves is `createApp({ staticDir: apps/web/dist })`, so a fake dist stands in for it.
 const INDEX = "<!doctype html><title>Mojito</title><div id=root></div>";
 
 let dir: string;

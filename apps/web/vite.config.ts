@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 
+// `pnpm dev` pins the server to 3100 (apps/server/package.json), clear of the service on 8700.
 const API = "http://127.0.0.1:3100";
 
 export default defineConfig({

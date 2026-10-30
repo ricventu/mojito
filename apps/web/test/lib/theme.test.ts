@@ -24,10 +24,10 @@ describe("readTheme", () => {
 });
 
 describe("writeTheme", () => {
-  it("stores under the mojito2 key", () => {
+  it("stores under the mojito key", () => {
     const seen: [string, string][] = [];
     writeTheme("light", { setItem: (k, v) => void seen.push([k, v]) });
-    expect(seen).toEqual([["mojito2-theme", "light"]]);
+    expect(seen).toEqual([["mojito-theme", "light"]]);
   });
 
   it("swallows a throwing store", () => {

@@ -42,11 +42,11 @@ describe("token store", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("persists under mojito2-token and reads it back", () => {
+  it("persists under mojito-token and reads it back", () => {
     setToken("abc");
     expect(getToken()).toBe("abc");
     expect(localStorage.getItem(TOKEN_KEY)).toBe("abc");
-    expect(TOKEN_KEY).toBe("mojito2-token");
+    expect(TOKEN_KEY).toBe("mojito-token");
   });
 
   it("clearToken forgets it everywhere and notifies subscribers", () => {

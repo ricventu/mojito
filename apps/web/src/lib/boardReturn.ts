@@ -1,5 +1,5 @@
 /** sessionStorage key of the board's last search: per browser tab, so two tabs keep two filter sets. */
-export const BOARD_SEARCH_KEY = "mojito2-board-search";
+export const BOARD_SEARCH_KEY = "mojito-board-search";
 
 function defaultStore(): Storage | null {
   return typeof sessionStorage !== "undefined" ? sessionStorage : null;

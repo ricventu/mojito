@@ -6,7 +6,7 @@
  */
 
 /** sessionStorage key: set just before the one reload, cleared once the chunk loads or the error shows. */
-export const CHUNK_RELOAD_KEY = "mojito2-chunk-reload";
+export const CHUNK_RELOAD_KEY = "mojito-chunk-reload";
 
 // What a failed dynamic import says, per engine (Chromium, Firefox, Safari), plus Vite's own
 // preload failure for a chunk's CSS or its dependencies.

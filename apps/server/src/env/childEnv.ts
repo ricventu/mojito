@@ -28,8 +28,7 @@ export type EnvLike = Record<string, string | undefined>;
 // Whole families that only ever describe how Mojito itself was started.
 const DROP_PREFIXES = [
   "npm_", // npm run-script's own block (npm_config_*, npm_package_*, npm_lifecycle_*, ...)
-  "MOJITO_", // Mojito's port, auth token, state dir: config for the server, noise for a session
-  "MOJITO2_", // v2's own port and host, the same kind of config
+  "MOJITO_", // Mojito's port, host, auth token, state dir: config for the server, noise for a session
 ];
 
 const DROP_EXACT = new Set([

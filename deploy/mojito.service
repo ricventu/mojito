@@ -1,0 +1,22 @@
+[Unit]
+Description=Mojito
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/code/mojito
+# No EnvironmentFile: the server reads <repoRoot>/.env.local itself (MOJITO_PORT, default
+# 8700; MOJITO_HOST, default 127.0.0.1 — the phone reaches it through Tailscale Serve) and
+# scrubs what it adds from every child's environment, so the token and the Linear key never
+# reach a session.
+# systemd --user starts with a minimal PATH; node and pnpm live in /usr/bin and /usr/local/bin.
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env pnpm start
+Restart=on-failure
+RestartSec=3
+# tmux sessions are started in a scope of their own (tmux.ts#outsideService), so a restart
+# takes the server down and leaves them running.
+KillMode=control-group
+
+[Install]
+WantedBy=default.target
