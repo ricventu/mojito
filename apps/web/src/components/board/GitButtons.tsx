@@ -6,7 +6,7 @@ import type { GitOp, GitSyncResult } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
 import { apiJson } from "@/lib/api";
 import { gitSyncAction } from "@/lib/gitSync";
-import { qk } from "@/lib/queryKeys";
+import { gitKeys, qk } from "@/lib/queryKeys";
 
 const OPS = [
   { op: "pull", label: "Pull", Icon: ArrowDownToLine },
@@ -24,6 +24,9 @@ export function GitButtons({ project }: { project: string }) {
   const sync = useMutation({
     mutationFn: (op: GitOp) => apiJson<GitSyncResult>(`/api/projects/${encodeURIComponent(project)}/${op}`, "POST"),
     onSuccess: (result, op) => {
+      // Every outcome moved (or may have moved) the repo, a conflict included: the graph is a
+      // snapshot, so this is what keeps an open one honest.
+      void qc.invalidateQueries({ queryKey: gitKeys.graphs(project) });
       const action = gitSyncAction(op, result);
       if (action.kind === "toast") {
         toast.success(action.message);

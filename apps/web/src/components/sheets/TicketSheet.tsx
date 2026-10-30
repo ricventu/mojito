@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Play, Power, SquareTerminal } from "lucide-react";
-import { useNavigate } from "react-router";
+import { GitGraph, Play, Power, SquareTerminal } from "lucide-react";
+import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 import type { Effort, Model, SessionMeta, Settings, TicketSummary } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
@@ -15,6 +15,7 @@ import { useSessions } from "@/hooks/useSessions";
 import { useSettings } from "@/hooks/useSettings";
 import { ApiError, apiFetch, apiJson } from "@/lib/api";
 import { sessionForTicket } from "@/lib/board";
+import { gitHref } from "@/lib/git/url";
 import { launchErrorAction, launchOptions, type LaunchPicks } from "@/lib/launch";
 import { qk } from "@/lib/queryKeys";
 import { safeHref } from "@/lib/url";
@@ -257,6 +258,13 @@ export function TicketSheet({ ticket, onClose }: Props) {
           <SheetDescription className="sr-only">Status and session launch for {ticket.identifier}</SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-5 px-4">
+          {ticket.project && (
+            <Button asChild variant="outline">
+              <Link to={gitHref(ticket.project, { ticket: ticket.identifier })} onClick={onClose}>
+                <GitGraph size={16} /> Git
+              </Link>
+            </Button>
+          )}
           {live ? (
             <LiveSession ticket={ticket} session={session} onClose={onClose} />
           ) : settings.data ? (

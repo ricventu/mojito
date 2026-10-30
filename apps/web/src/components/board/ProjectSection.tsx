@@ -1,8 +1,10 @@
-import { ChevronRight, Plus, SquareTerminal } from "lucide-react";
+import { ChevronRight, GitGraph, Plus, SquareTerminal } from "lucide-react";
+import { Link } from "react-router";
 import type { SessionMeta, TicketSummary } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { sessionForTicket, type BoardSection } from "@/lib/board";
+import { gitHref } from "@/lib/git/url";
 import { GitButtons } from "./GitButtons";
 import { LooseSessionRow } from "./LooseSessionRow";
 import { TicketCard } from "./TicketCard";
@@ -34,6 +36,13 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
     <section className="flex flex-col gap-2">
       <header className="flex items-center gap-2">
         <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{name}</h2>
+        {project !== null && (
+          <Button asChild variant="ghost" size="icon-sm">
+            <Link to={gitHref(project)} aria-label={`Git graph of ${project}`} title="Git graph">
+              <GitGraph size={16} />
+            </Link>
+          </Button>
+        )}
         {project !== null && <GitButtons project={project} />}
         {project !== null && (
           <Button variant="ghost" size="icon-sm" aria-label={`New ticket in ${name}`} onClick={() => onNewTicket(project)}>
