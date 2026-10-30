@@ -8,10 +8,10 @@ design: `docs/superpowers/specs/2026-10-28-mojito-rewrite-core-design.md`.
 `docs/superpowers/specs/2026-10-30-cut-over-design.md`). The old app is kept at the `v1`
 tag: a reference for *what* a feature did and which problems it ran into (its `CLAUDE.md`,
 `git show v1:CLAUDE.md`, records many) — never for *how*. A feature that still exists only
-there (the `mojito` CLI, RIC-507; PWA and self-update, RIC-508) is redesigned for this
-stack and made better: simpler, fewer controls, a better interaction where one exists,
-phone-first. Read v1 for the requirements and the pitfalls, then design and propose before
-coding.
+there is redesigned for this stack and made better: simpler, fewer controls, a better
+interaction where one exists, phone-first. Read v1 for the requirements and the pitfalls,
+then design and propose before coding. Dropped on purpose: the `mojito` CLI (RIC-507),
+the in-app "Pull & deploy" and the service worker (RIC-508) — `make deploy` updates Mojito.
 
 On the Linux box: `main` checked out in `~/code/mojito`, `mojito.service` on 8700
 (127.0.0.1), state in `~/.local/state/mojito` (SQLite `mojito.db`), tmux ids `mj-…`, the
@@ -253,6 +253,13 @@ phone at `https://ai-tonic.<tailnet>.ts.net/` (Tailscale Serve → 8700). The se
   app's Vite config and fails if anything starts shimming `process` (a dev warning too).
 - Safe areas: `--sat/--sar/--sab/--sal` in `index.css`; every edge surface pays its inset;
   `test/safeArea.test.ts` guards it.
+- **Installable app** (RIC-508): `public/manifest.webmanifest` + icons, linked from
+  `index.html`. Its `id`/`start_url`/`scope` are `/`, v1's: the Mac's Safari Dock app was
+  installed from v1's manifest at `http://localhost:8700/`, and a changed id strands it.
+  No service worker (useless offline, and a cache would fight a deploy). The PNGs were
+  rasterized from `icon.svg` by v1's `gen-icons.sh` (not ported): redraw → regenerate by
+  hand. `test/manifest.test.ts` guards the id and that every listed icon exists — a renamed
+  one silently un-installs the app in Chromium.
 - Copy is English, like everything else (code, comments, server messages, agent
   prompts); the only Italian left is the create-ticket agent's output (tickets on Linear).
   Only Tailwind utilities + shadcn components; icons are lucide with `size`.
