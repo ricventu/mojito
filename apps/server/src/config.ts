@@ -58,10 +58,10 @@ export function selfOrigin(cfg: Pick<ServerConfig, "host" | "port">): string {
 }
 
 /**
- * Loads a dotenv file into `process.env`, the way the old app's loader did: a key already
- * set in the environment wins over the file. Whatever the file adds is registered with
- * `registerEnvFileKeys`, so a credential added to `.env.local` later is scrubbed from every
- * child's environment without anyone updating a list. A missing file is not an error.
+ * Loads a dotenv file into `process.env`: a key already set in the environment wins over
+ * the file. Whatever the file adds is registered with `registerEnvFileKeys`, so a credential
+ * added to `.env.local` later is scrubbed from every child's environment without anyone
+ * updating a list. A missing file is not an error.
  */
 export function loadEnvFile(path: string): void {
   if (!existsSync(path)) return;

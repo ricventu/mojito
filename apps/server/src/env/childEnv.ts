@@ -1,54 +1,51 @@
 import { dirname, join } from "node:path";
 
 /**
- * Mojito's own process environment is not a neutral base for the things it spawns.
- * `npm start` runs `cross-env NODE_ENV=production tsx server.ts`, so the server carries
- * `NODE_ENV=production`, npm's whole `npm_*` block, and a PATH prefixed with the
- * `node_modules/.bin` chain of Mojito's own repo; `loadEnvConfig` then adds Mojito's
- * `.env.local` on top, credentials included. Every one of those used to reach the shell of
- * every agent session, because a tmux session inherits the environment of whoever started
- * the tmux server (RIC-207).
+ * Mojito's own process environment is not a neutral base for the things it spawns. The
+ * service runs `pnpm start`, so the server carries the package manager's run-script block
+ * (`npm_*`, `INIT_CWD`, `NODE`) and a PATH prefixed with the `node_modules/.bin` chain of
+ * Mojito's own repo; `loadEnvFile` (config.ts) then adds Mojito's `.env.local` on top,
+ * credentials included. Every one of those would reach the shell of every agent session,
+ * because a tmux session inherits the environment of whoever started the tmux server.
  *
- * The damage is silent and destructive rather than cosmetic: with `NODE_ENV=production` a
- * bare `pnpm install` skips devDependencies *and removes the ones already installed*,
- * printing them with a `-` prefix and exiting 0. It reads as a successful install while
- * `node_modules/.bin` is emptied out. `npm ci` and `yarn install` have the same hazard, and
- * the leading PATH entries shadow a workspace's own binaries with Mojito's.
+ * The damage is silent and destructive rather than cosmetic (RIC-207, from the old app,
+ * which ran under `NODE_ENV=production`): with that set, a bare `pnpm install` skips
+ * devDependencies *and removes the ones already installed*, printing them with a `-` prefix
+ * and exiting 0. It reads as a successful install while `node_modules/.bin` is emptied out.
+ * `npm ci` and `yarn install` have the same hazard, and the leading PATH entries shadow a
+ * workspace's own binaries with Mojito's.
  *
- * So: everything Mojito spawns on a session's behalf — the tmux sessions, the pty that
- * attaches to them, a repo's own `scripts/init-worktree.sh` — gets its environment from
- * here instead of straight from `process.env`.
+ * So: everything Mojito spawns — the tmux sessions, the pty that attaches to them, git, the
+ * Agent SDK's claude — gets its environment from here instead of straight from `process.env`.
  */
 
-// `process.env`, structurally. Next's type augmentation makes NODE_ENV a *required* member
-// of NodeJS.ProcessEnv, which a sanitized environment by definition does not have — so the
-// looser shape is the one this module can honestly speak in.
+// `process.env`, structurally: a plain record of what may or may not be set.
 export type EnvLike = Record<string, string | undefined>;
 
 // Whole families that only ever describe how Mojito itself was started.
 const DROP_PREFIXES = [
-  "npm_", // npm run-script's own block (npm_config_*, npm_package_*, npm_lifecycle_*, ...)
+  "npm_", // the run-script block npm and pnpm set (npm_config_*, npm_lifecycle_*, ...)
+  "pnpm_", // pnpm's config for the run; case-sensitive, so the user's PNPM_HOME stays
   "MOJITO_", // Mojito's port, host, auth token, state dir: config for the server, noise for a session
 ];
 
 const DROP_EXACT = new Set([
   "NODE_ENV", // the headline of RIC-207
-  "NODE", // npm points this at the node binary that ran Mojito, not the workspace's
-  "INIT_CWD", // npm's record of where `npm start` was invoked
+  "NODE", // the package manager points this at the binary that ran Mojito, not the workspace's
+  "INIT_CWD", // the package manager's record of where `pnpm start` was invoked
+  "PNPM_SCRIPT_SRC_DIR", // pnpm's record of the package whose script runs Mojito
   "_", // the invoking shell's "last argv[0]"; every shell resets it anyway
-  "__NEXT_PROCESSED_ENV", // marker left by @next/env after it loaded Mojito's .env files
+  "__NEXT_PROCESSED_ENV", // the old app's @next/env marker; a shell it started may carry it
   "LINEAR_API_KEY", // Mojito is the only Linear client; a session has no business holding it
-  // Next's bundler-selection variables (RIC-246). `next()` writes TURBOPACK into Mojito's
-  // own process the moment the server boots, and these are the exact keys any *other*
-  // repo's `next` command consults to pick a bundler (`getBundlerFromEnv`,
-  // `parseBundlerArgs`). Leaked, they either override that repo's choice or collide with
-  // it outright: a session running `pnpm dev --webpack` exits 1 with "Multiple bundler
-  // flags set: TURBOPACK=1, --webpack" and takes its Playwright suite down with it.
-  // Dropped unconditionally, unlike the .env keys below, because a value already present
-  // when Mojito boots is exactly the case that self-perpetuates — Mojito launched from a
-  // shell of a session a leaking Mojito created inherits it and hands it on. A bundler is
-  // per-project by definition anyway, so even a hand-exported one has no business
-  // deciding for a repo that never asked.
+  // Next's bundler-selection variables (RIC-246). The old app's `next()` wrote TURBOPACK into
+  // its own process, and these are the exact keys any repo's `next` command consults to pick
+  // a bundler (`getBundlerFromEnv`, `parseBundlerArgs`). Leaked, they either override that
+  // repo's choice or collide with it outright: a session running `pnpm dev --webpack` exits 1
+  // with "Multiple bundler flags set: TURBOPACK=1, --webpack". Dropped unconditionally, unlike
+  // the .env keys below, because a value already present when Mojito boots is exactly the case
+  // that self-perpetuates — Mojito started from the shell of a session that inherited it hands
+  // it on. A bundler is per-project by definition anyway, so even a hand-exported one has no
+  // business deciding for a repo that never asked.
   "TURBOPACK",
   "NEXT_RSPACK",
   "IS_TURBOPACK_TEST",
@@ -56,10 +53,11 @@ const DROP_EXACT = new Set([
   "NEXT_TEST_USE_RSPACK",
 ]);
 
-// Keys that reached process.env from Mojito's .env files at boot. Registered by server.ts
-// (it diffs process.env across loadEnvConfig) so a key added to .env.local later is scrubbed
-// without anyone having to remember this list. Vars the user exported in their own shell are
-// deliberately NOT in here: those are their environment, inherited as they would be anywhere.
+// Keys that reached process.env from Mojito's .env file at boot. Registered by config.ts's
+// `loadEnvFile` (it diffs process.env across the load), so a key added to .env.local later is
+// scrubbed without anyone having to remember this list. Vars the user exported in their own
+// shell are deliberately NOT in here: those are their environment, inherited as they would be
+// anywhere.
 let mojitoOnlyKeys = new Set<string>();
 
 export function registerMojitoOnlyKeys(keys: Iterable<string>): void {
@@ -103,17 +101,26 @@ function isMojitoOnly(key: string): boolean {
 }
 
 /**
- * PATH with npm's injected prefix removed. `npm run` prepends `<dir>/node_modules/.bin`
- * for the package directory and every one of its ancestors, plus its own node-gyp shim
- * directory. Anchoring on npm's `npm_config_local_prefix` (the package root) is what keeps
- * this safe: a `node_modules/.bin` the user's profile put on PATH for some other project
- * doesn't match the chain and stays. With no local prefix to anchor on, npm never ran, so
- * there is nothing to strip.
+ * Where a package manager's run-script started: npm's `npm_config_local_prefix`, else pnpm's
+ * `PNPM_SCRIPT_SRC_DIR` (pnpm sets no local prefix). Undefined when neither ran Mojito.
  */
-export function sanitizePath(pathValue: string, localPrefix: string | undefined): string {
-  if (!localPrefix) return pathValue;
+export function scriptDir(env: EnvLike): string | undefined {
+  return env.npm_config_local_prefix || env.PNPM_SCRIPT_SRC_DIR || undefined;
+}
+
+/**
+ * PATH with the package manager's injected prefix removed. `npm run` prepends
+ * `<dir>/node_modules/.bin` for the package directory and every one of its ancestors, pnpm
+ * the package's and the workspace root's; both add their own node-gyp shim directory.
+ * Anchoring on the script's directory (`scriptDir`) is what keeps this safe: a
+ * `node_modules/.bin` the user's profile put on PATH for some other project doesn't match the
+ * chain and stays. With no directory to anchor on, no package manager ran, so there is
+ * nothing to strip.
+ */
+export function sanitizePath(pathValue: string, scriptDir: string | undefined): string {
+  if (!scriptDir) return pathValue;
   const injected = new Set<string>();
-  for (let dir = localPrefix; ; dir = dirname(dir)) {
+  for (let dir = scriptDir; ; dir = dirname(dir)) {
     injected.add(join(dir, "node_modules", ".bin"));
     if (dirname(dir) === dir) break;
   }
@@ -128,7 +135,7 @@ export function sanitizeEnv(env: EnvLike): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
     if (value === undefined || isMojitoOnly(key)) continue;
-    out[key] = key === "PATH" ? sanitizePath(value, env.npm_config_local_prefix) : value;
+    out[key] = key === "PATH" ? sanitizePath(value, scriptDir(env)) : value;
   }
   return out;
 }
@@ -149,7 +156,7 @@ export function tmuxEnvArgs(globalEnv: Record<string, string>): string[] {
   const args: string[] = [];
   for (const [key, value] of Object.entries(globalEnv)) {
     if (key === "PATH") {
-      const clean = sanitizePath(value, globalEnv.npm_config_local_prefix);
+      const clean = sanitizePath(value, scriptDir(globalEnv));
       if (clean !== value) args.push("-e", `PATH=${clean}`);
       continue;
     }
@@ -159,11 +166,7 @@ export function tmuxEnvArgs(globalEnv: Record<string, string>): string[] {
   return args;
 }
 
-/**
- * `sanitizeEnv` in the shape child_process wants. The cast is the honest direction: an
- * environment with no NODE_ENV cannot satisfy Next's NODE_ENV-required `ProcessEnv`, and
- * having no NODE_ENV is the entire point.
- */
+/** `sanitizeEnv` in the shape child_process wants. */
 export function spawnEnv(env: EnvLike = process.env): NodeJS.ProcessEnv {
   return sanitizeEnv(env) as NodeJS.ProcessEnv;
 }

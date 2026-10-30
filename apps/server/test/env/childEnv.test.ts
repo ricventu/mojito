@@ -51,6 +51,54 @@ beforeEach(() => {
   resetMojitoOnlyKeys();
 });
 
+// What the service's `pnpm start` (→ `pnpm --filter @mojito/server start`) hands the server,
+// as measured on the box: pnpm sets no npm_config_local_prefix, so it is PNPM_SCRIPT_SRC_DIR
+// that says where the injected node_modules/.bin chain is anchored.
+const GYP = "/home/me/.local/share/pnpm/package-manager-store/v11/links/@pnpm/exe/11.0.9/abc/node_modules/@pnpm/exe/dist/node-gyp-bin";
+const PNPM_PATH = [
+  "/home/me/code/mojito/apps/server/node_modules/.bin",
+  GYP,
+  "/home/me/code/mojito/node_modules/.bin",
+  "/home/me/code/mojito/node_modules/.bin",
+  GYP,
+  "/home/me/code/mojito/node_modules/.bin",
+  "/home/me/.local/bin",
+  "/usr/local/bin",
+  "/usr/bin",
+  "/bin",
+].join(":");
+const PNPM_CLEAN_PATH = ["/home/me/.local/bin", "/usr/local/bin", "/usr/bin", "/bin"].join(":");
+const PNPM_STARTED = {
+  HOME: "/home/me",
+  PATH: PNPM_PATH,
+  PNPM_HOME: "/home/me/.local/share/pnpm",
+  INIT_CWD: "/home/me/code/mojito",
+  NODE: "/home/me/.local/share/pnpm/pnpm",
+  npm_command: "run-script",
+  npm_lifecycle_event: "start",
+  PNPM_SCRIPT_SRC_DIR: "/home/me/code/mojito/apps/server",
+  pnpm_config_verify_deps_before_run: "false",
+};
+
+describe("sanitizeEnv, under pnpm", () => {
+  it("strips the node_modules/.bin chain pnpm prepends to PATH", () => {
+    expect(sanitizeEnv(PNPM_STARTED).PATH).toBe(PNPM_CLEAN_PATH);
+  });
+
+  // pnpm_config_verify_deps_before_run=false would silently change how pnpm behaves in a session.
+  it("drops pnpm's own run-script variables", () => {
+    const clean = sanitizeEnv(PNPM_STARTED);
+    expect(clean).not.toHaveProperty("PNPM_SCRIPT_SRC_DIR");
+    expect(clean).not.toHaveProperty("pnpm_config_verify_deps_before_run");
+    expect(clean).not.toHaveProperty("npm_lifecycle_event");
+  });
+
+  // PNPM_HOME is the user's own (where pnpm's global binaries live), set by their profile.
+  it("keeps the user's PNPM_HOME", () => {
+    expect(sanitizeEnv(PNPM_STARTED).PNPM_HOME).toBe("/home/me/.local/share/pnpm");
+  });
+});
+
 describe("sanitizeEnv", () => {
   it("drops NODE_ENV, so a session's package manager never runs in production mode", () => {
     expect(sanitizeEnv(POLLUTED)).not.toHaveProperty("NODE_ENV");
@@ -201,6 +249,13 @@ describe("tmuxEnvArgs", () => {
   it("replaces a globally polluted PATH with the sanitized one", () => {
     const args = tmuxEnvArgs({ PATH: NPM_PATH, npm_config_local_prefix: "/Users/me/code/Mojito/mojito" });
     expect(args).toContain(`PATH=${CLEAN_PATH}`);
+  });
+
+  it("replaces a PATH a pnpm-started Mojito left in the global environment", () => {
+    const args = tmuxEnvArgs(PNPM_STARTED as Record<string, string>);
+    expect(args).toContain(`PATH=${PNPM_CLEAN_PATH}`);
+    expect(args).toContain("PNPM_SCRIPT_SRC_DIR=");
+    expect(args).not.toContain("PNPM_HOME=");
   });
 
   it("leaves a clean global PATH alone rather than restating it", () => {
