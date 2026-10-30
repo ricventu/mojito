@@ -33,7 +33,8 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
 - `packages/shared` — types (`SessionMeta`, `TaskRecord`, `TicketSummary`, `BoardTickets`,
   `Settings`, `ProjectRow`, `Favorite`), zod request bodies (`LaunchBody`, `ProjectBody`, `SettingsBody`,
   `PromptsBody`, `FavoritesBody`, `StatusBody`, `SessionPatchBody`), `MojitoEvent`, `MODELS`/`EFFORTS`, `DEFAULT_PROMPTS`,
-  `SESSION_GONE_CODE` (4404). Consumed as source, no build; zod **4** everywhere (the Agent
+  `SESSION_GONE_CODE` (4404), the git graph types (`GitGraphPage`, `GraphCommit`, `GraphRef`,
+  `GraphHighlight`, `CommitDetails`, `CommitFile`, `CommitDiff`) and `isValidHash`/`isValidTicket`. Consumed as source, no build; zod **4** everywhere (the Agent
   SDK's peer).
 - `apps/server` — Node 22, Hono 4 on `@hono/node-server`, `ws` on the http `upgrade` event,
   `node-pty`, `better-sqlite3`. Built with tsup (`tsup.config.ts` bundles `@mojito/shared`
@@ -139,7 +140,8 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   (120 s). Hash shape (`isValidHash`) and ticket shape (`isValidTicket`, both in `@mojito/shared`)
   are checked before any git call, the hash is resolved with `rev-parse --verify` and only the full
   one goes on. A page is 200 commits (git asked for 201 — the extra only says `hasMore`), files cap
-  300, diff cap 256 KB cut at a line end. A `GitError` is a 409 with git's words (500 chars);
+  300, diff cap 256 KB cut at a line end. A `GitError` is a 409 with git's words (500 chars; a
+  timeout reads `git did not answer within N s`, a NUL in `path`/`from` is a 400 before git);
   `GitError.exitCode` is null on a timeout, so a commit is "not found" (404) only on exit 1 — a
   timeout or "not a repo" must not read as a missing commit. `findTicketBranch` (the ticket id as a
   whole token of a branch name; local beats `origin/`, then worktree, then newest) is pure and
@@ -168,12 +170,16 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   header, ticket sheet (ticket highlighted), terminal header (`icon-sm`, absent for General).
   `gitKeys` lives **outside `qk`** on purpose: `useEvents` invalidates every `qk` value on each
   reconnect, and the graph is a snapshot — rows jumping under the reader is worse than one fetch
-  behind. No focus/reconnect refetch; Reload and a Pull/Push (every outcome, a conflict too —
+  behind. `gcTime: 0`: each entry to the page is a fresh read, never a refetch under the reader.
+  No focus/reconnect refetch; Reload and a Pull/Push (every outcome, a conflict too —
   `GitButtons` invalidates `gitKeys.graphs(project)`) refresh it. `pageCommits` drops commits a
   later `--skip` page repeats when the repo moved between pages. "Is there an in-app entry
   behind" is react-router's `window.history.state.idx` (`useBackOr`, `lib/git/sheetNav.ts`), never
   `location.key`: a `replace` keeps idx but changes the key. Closing the commit sheet from a diff
   returns to the graph (two steps back when the details entry sits over it, else a replace).
+  First load scrolls to the tip only with a ticket (the project view opens at the top). The
+  checkout strip (no ticket) never says "merged" — a branch 0 ahead of its upstream is only
+  behind; no base → no chain, nothing dimmed.
 - **Board filters** (RIC-502): project (multi), status, text — the url is the only state
   (`lib/filters.ts` codec, `hooks/useBoardFilters.ts`). Writes **replace** the history entry
   (Back leaves the board, not one chip). `q` keeps its spaces in the live url (trimming would

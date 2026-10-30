@@ -69,11 +69,14 @@ Page header: Back (history back when the previous entry is ours, else the board)
 
 - with `ticket`: that ticket's branch — `ric-505-git-graph · 3 ahead · 12 behind
   origin/main`, `… · merged into origin/main`, `… · even with origin/main`; no matching
-  branch → `No branch for RIC-505 yet`;
+  branch → `No branch for RIC-505` (no "yet": the branch may be merged and deleted, or the
+  ticket committed straight to the trunk);
 - without `ticket`: the branch checked out in the project's checkout, measured the same way
-  (on `main`: `main · 2 ahead · 0 behind origin/main` — what Pull/Push are about to do);
-  detached HEAD → no strip;
-- no default branch found → the branch name alone.
+  (on `main`: `main · 2 ahead · 0 behind origin/main` — what Pull/Push are about to do), but
+  **never "merged"**: `… · even with origin/main` at its tip, else `… · N ahead · M behind
+  origin/main` (a local `main` 0 ahead and 3 behind is behind, not merged); detached HEAD →
+  no strip;
+- no default branch found → the branch name alone, and no chain: nothing is dimmed.
 
 "Even with" is when the tip *is* the base's tip; "merged" is when nothing is ahead
 otherwise. The server's `merged` (ahead = 0) cannot tell a fresh branch from a merged one,
@@ -212,7 +215,9 @@ branch for … yet".
   page answer for the old one cannot land in the new one.
 - `useCommit(project, hash)`, `useDiff(project, hash, file, from)`: plain queries,
   `staleTime: Infinity` — a commit never changes.
-- The graph is a snapshot: `staleTime: Infinity`, `refetchOnWindowFocus: false`, and it is
+- The graph is a snapshot: `staleTime: Infinity`, `refetchOnWindowFocus: false`, `gcTime: 0`
+  (dropped once the page unmounts, so each entry is a fresh read, never a refetch under the
+  reader), and it is
   not among the queries `useEvents` invalidates on (re)connect — rows jumping while you read
   is worse than being one fetch behind. **`gitKeys` lives apart from `qk`**: `useEvents`
   invalidates every `Object.values(qk)` on connect. Reload invalidates `gitKeys.project(p)`;
@@ -225,11 +230,12 @@ branch for … yet".
   - **Row**: a `<Link>` that pushes `?commit=`. Below 480px two lines, ≥ 44px: ref chips +
     subject, then short hash · relative date; above, one line. Ref chips: local (with a
     worktree icon when checked out), `origin/…`, tag; they shrink before the subject does.
-    The highlighted branch's chip and chain use the primary colour; with a highlight, other
-    rows are dimmed.
+    The highlighted branch's chip and chain use the primary colour; with a non-empty chain
+    (a highlight with a base), other rows are dimmed.
   - Lane cap 5 below 480px, 12 above (`useMediaQuery`).
-  - On first load, the highlighted tip is scrolled into view when it is not among the
-    first rows.
+  - On first load, a ticket's tip is scrolled into view when it is not among the first
+    rows; only with a ticket — the plain project view opens at the top (the checkout's
+    branch can sit far below the newest commits).
   - An `IntersectionObserver` sentinel loads the next page; a failed page keeps the rows
     and turns the sentinel into a Retry button.
 - `GraphLanes`: one `aria-hidden` SVG per row; straight segments for `from === to`, a
@@ -277,6 +283,7 @@ Web (`apps/web/test/lib/git/`):
 - `layout.test.ts` — linear, fork + merge, octopus, parallel tips, parent outside the
   window, lane reuse after a merge (the stray-segment case), colour along first parents,
   the cap and `hiddenLanes`.
-- `highlight.test.ts` — chain for unmerged / merged / fresh branches; every summary text.
+- `highlight.test.ts` — chain for unmerged / merged / fresh branches, none without a base;
+  every summary text, the checkout view never "merged".
 - `diff.test.ts`, `url.test.ts` — line kinds; url round trip.
 - `safeArea.test.ts` — the new page.
