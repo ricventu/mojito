@@ -41,11 +41,14 @@ const BULLET_PANE = [
 const linksAt = (rows: string[], cols: number, row: number) =>
   findLinks(row, (i) => rows[i]?.padEnd(cols, " "), cols);
 const textsAt = (rows: string[], cols: number, row: number) => linksAt(rows, cols, row).map((l) => l.text);
+/** With doc paths on, as a terminal whose session has a project. */
+const docsAt = (rows: string[], cols: number, row: number) =>
+  findLinks(row, (i) => rows[i]?.padEnd(cols, " "), cols, { docs: true }).map((l) => [l.kind, l.text]);
 
 describe("findLinks", () => {
   it("joins a URL claude wrapped inside its own margins", () => {
     const links = linksAt(AUTH_PANE, PHONE_COLS, 5);
-    expect(links).toEqual([{ text: AUTH_URL, start: { row: 5, char: 2 }, end: { row: 8, char: 5 } }]);
+    expect(links).toEqual([{ kind: "url", text: AUTH_URL, start: { row: 5, char: 2 }, end: { row: 8, char: 5 } }]);
   });
 
   it("reports the link from every row it spans, so each of them is clickable", () => {
@@ -58,7 +61,7 @@ describe("findLinks", () => {
   it("joins a URL wrapped under a bullet, whose marker fills the first row's margin", () => {
     for (const row of [4, 5]) {
       expect(linksAt(BULLET_PANE, PHONE_COLS, row)).toEqual([
-        { text: MR_URL, start: { row: 4, char: 13 }, end: { row: 5, char: 39 } },
+        { kind: "url", text: MR_URL, start: { row: 4, char: 13 }, end: { row: 5, char: 39 } },
       ]);
     }
   });
@@ -88,7 +91,7 @@ describe("findLinks", () => {
 
   it("finds a URL that fits on one row", () => {
     expect(linksAt(["see https://example.com/docs for more"], PHONE_COLS, 0)).toEqual([
-      { text: "https://example.com/docs", start: { row: 0, char: 4 }, end: { row: 0, char: 27 } },
+      { kind: "url", text: "https://example.com/docs", start: { row: 0, char: 4 }, end: { row: 0, char: 27 } },
     ]);
   });
 
@@ -153,5 +156,55 @@ describe("cellOfChar", () => {
   it("counts every character of a cell carrying a combining mark", () => {
     // "é" is two characters in one cell: char 2 is the next cell.
     expect(cellOfChar(line(["é", "x"]), 2)).toBe(1);
+  });
+});
+
+describe("findLinks: markdown paths", () => {
+  const one = (line: string) => docsAt([line], PHONE_COLS, 0);
+
+  it("finds the path inside claude's tool call", () => {
+    expect(one("● Write(docs/superpowers/specs/x.md)")).toEqual([["doc", "docs/superpowers/specs/x.md"]]);
+  });
+
+  it("leaves out backticks, a line suffix and a full stop", () => {
+    expect(one("Spec at `docs/a.md`.")).toEqual([["doc", "docs/a.md"]]);
+    expect(one("see docs/a.md:12 there")).toEqual([["doc", "docs/a.md"]]);
+    expect(one("Read README.md.")).toEqual([["doc", "README.md"]]);
+  });
+
+  it("takes ~/, absolute and ./ paths, dropping the ./", () => {
+    expect(one("at ~/notes/x.md")).toEqual([["doc", "~/notes/x.md"]]);
+    expect(one("at /home/me/r/X.MD")).toEqual([["doc", "/home/me/r/X.MD"]]);
+    expect(one("at ./x.md")).toEqual([["doc", "x.md"]]);
+  });
+
+  it("is no link with a .. segment, another extension or glued to a word", () => {
+    expect(one("at ../x.md")).toEqual([]);
+    expect(one("at docs/../x.md")).toEqual([]);
+    expect(one("at a/b.mdx")).toEqual([]);
+    expect(one("at a/b.md/c")).toEqual([]);
+  });
+
+  it("joins a path claude wrapped inside its margins", () => {
+    const rows = ["  Spec at docs/superpowers/specs/2026-10-30-d", "  ocs-viewer-design.md and the plan next."];
+    const path = "docs/superpowers/specs/2026-10-30-docs-viewer-design.md";
+    for (const row of [0, 1]) expect(docsAt(rows, PHONE_COLS, row)).toEqual([["doc", path]]);
+  });
+
+  it("keeps a URL ending in .md a URL", () => {
+    expect(one("see https://github.com/o/r/blob/main/README.md now")).toEqual([
+      ["url", "https://github.com/o/r/blob/main/README.md"],
+    ]);
+  });
+
+  it("finds both kinds on one row", () => {
+    expect(one("docs/a.md and https://x.io")).toEqual([
+      ["url", "https://x.io"],
+      ["doc", "docs/a.md"],
+    ]);
+  });
+
+  it("offers no doc links unless asked", () => {
+    expect(linksAt(["● Write(docs/superpowers/specs/x.md)"], PHONE_COLS, 0)).toEqual([]);
   });
 });

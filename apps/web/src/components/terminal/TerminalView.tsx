@@ -6,7 +6,7 @@ import { SESSION_GONE_CODE } from "@mojito/shared";
 import { browserClipboard, copyText, echoFilter, osc52Text } from "@/lib/terminal/copySelection";
 import { dragHasFiles, droppedImages, pastedImages } from "@/lib/images";
 import { terminalKeyHandler } from "@/lib/terminal/keyHandler";
-import { urlLinkProvider } from "@/lib/terminal/links";
+import { terminalLinkProvider } from "@/lib/terminal/links";
 import { xtermThinksItIsNode } from "@/lib/terminal/platform";
 import { syncGeometry } from "@/lib/terminal/terminalFit";
 import { terminalOptions } from "@/lib/terminal/terminalOptions";
@@ -31,6 +31,8 @@ interface Props {
   onReady?(term: Terminal | null): void;
   /** Images pasted or dropped on the terminal, for claude (`imageInput.ts`). */
   onImages?(files: File[]): void;
+  /** A tapped markdown path; without it, paths in the output are plain text (`links.ts`). */
+  openDoc?(path: string): void;
 }
 
 /**
@@ -41,7 +43,7 @@ interface Props {
  * anchored to the bottom of its box, so rows the keyboard costs come off the top and
  * claude's input line stays on screen.
  */
-export function TerminalView({ sessionId, keyboardOpen, onExit, onReady, onImages }: Props) {
+export function TerminalView({ sessionId, keyboardOpen, onExit, onReady, onImages, openDoc }: Props) {
   const holder = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -52,11 +54,13 @@ export function TerminalView({ sessionId, keyboardOpen, onExit, onReady, onImage
   const onExitRef = useRef(onExit);
   const onReadyRef = useRef(onReady);
   const onImagesRef = useRef(onImages);
+  const openDocRef = useRef(openDoc);
   useLayoutEffect(() => {
     kbdRef.current = keyboardOpen;
     onExitRef.current = onExit;
     onReadyRef.current = onReady;
     onImagesRef.current = onImages;
+    openDocRef.current = openDoc;
   });
 
   useEffect(() => {
@@ -78,10 +82,14 @@ export function TerminalView({ sessionId, keyboardOpen, onExit, onReady, onImage
       }
       const fit = new FitAddon();
       term.loadAddon(fit);
-      // http(s) URLs open in a new tab on click or tap — joined across the rows claude
-      // wrapped them over, which WebLinksAddon cannot do against tmux (links.ts).
+      // http(s) URLs open in a new tab on click or tap, markdown paths in the docs viewer —
+      // joined across the rows claude wrapped them over, which WebLinksAddon cannot do against
+      // tmux (links.ts).
       const links = term.registerLinkProvider(
-        urlLinkProvider(term, (url) => window.open(url, "_blank", "noopener,noreferrer")),
+        terminalLinkProvider(term, () => ({
+          openUrl: (url) => window.open(url, "_blank", "noopener,noreferrer"),
+          openDoc: openDocRef.current,
+        })),
       );
       term.open(el);
       fit.fit();

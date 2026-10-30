@@ -35,12 +35,21 @@
  *
  * Known limit: a URL that genuinely ends at the wrap width with unrelated text right below
  * gets that text glued on — nothing in the buffer tells it from a wrap.
+ *
+ * The same joined line also yields markdown paths (`docs/superpowers/specs/x.md`, `~/x.md`,
+ * an absolute one) when the terminal has somewhere to open them — the docs viewer, which asks
+ * the server what the path means. A path with a `..` segment is no link (the server would refuse
+ * it), nor is one inside a URL, and paths with spaces are a known limit.
  */
 import type { IBufferLine, ILink, ILinkProvider, Terminal } from "@xterm/xterm";
 
 // `@xterm/addon-web-links`' matcher (MIT): http(s):// up to the first whitespace or quote,
 // minus trailing punctuation and brackets.
 const URL_REGEX = /(https?|HTTPS?):[/]{2}[^\s"'!*(){}|\\\^<>`]*[^\s"':,.!?{}|\\\^~\[\]`()<>]/;
+
+// A markdown path: an optional ~/, / or ./ then segments ending in .md, not glued to a path
+// character on the left nor to a word or a further segment on the right.
+const DOC_REGEX = /(?<![\w./~@+-])(?:~\/|\/|\.\/)?(?:[\w.@+-]+\/)*[\w.@+-]+\.md(?![\w/])/gi;
 
 /** Bounds on how much of the screen one logical line may draw from. */
 export const MAX_ROWS = 40;
@@ -55,6 +64,8 @@ export interface RowChar {
 }
 
 export interface FoundLink {
+  /** An http(s) URL, or a markdown path for the docs viewer. */
+  kind: "url" | "doc";
   text: string;
   start: RowChar;
   /** Inclusive: the URL's last character. */
@@ -160,16 +171,31 @@ function isUrl(candidate: string): boolean {
   }
 }
 
-/** The URLs crossing `row`, joined across the rows a program wrapped them over. */
-export function findLinks(row: number, getRow: RowReader, cols: number): FoundLink[] {
+/**
+ * The URLs crossing `row` — and with `docs`, the markdown paths — joined across the rows a
+ * program wrapped them over.
+ */
+export function findLinks(row: number, getRow: RowReader, cols: number, opts: { docs?: boolean } = {}): FoundLink[] {
   const pieces = logicalLine(row, getRow, cols);
   const joined = pieces.map((p) => p.body).join("");
   const links: FoundLink[] = [];
+  const urls: [number, number][] = [];
+  const add = (kind: FoundLink["kind"], text: string, from: number, length: number) => {
+    const start = locate(pieces, from);
+    const end = locate(pieces, from + length - 1);
+    if (start && end && start.row <= row && end.row >= row) links.push({ kind, text, start, end });
+  };
   for (const m of joined.matchAll(new RegExp(URL_REGEX.source, "g"))) {
     if (!isUrl(m[0])) continue;
-    const start = locate(pieces, m.index);
-    const end = locate(pieces, m.index + m[0].length - 1);
-    if (start && end && start.row <= row && end.row >= row) links.push({ text: m[0], start, end });
+    urls.push([m.index, m.index + m[0].length]);
+    add("url", m[0], m.index, m[0].length);
+  }
+  if (!opts.docs) return links;
+  for (const m of joined.matchAll(DOC_REGEX)) {
+    const from = m.index;
+    const to = from + m[0].length;
+    if (m[0].split("/").includes("..") || urls.some(([a, b]) => from < b && to > a)) continue;
+    add("doc", m[0].replace(/^\.\//, ""), from, m[0].length);
   }
   return links;
 }
@@ -193,17 +219,24 @@ export function cellOfChar(line: CellLine, char: number): number {
   return Math.max(line.length - 1, 0);
 }
 
+/** What a tapped link does: a URL opens out of the app; a doc path only when `openDoc` is given. */
+export interface LinkHandlers {
+  openUrl(url: string): void;
+  openDoc?(path: string): void;
+}
+
 /**
  * The xterm link provider over `findLinks`. Ranges are xterm's: 1-based rows of the active
- * buffer (scrollback included), `end.x` the link's last cell.
+ * buffer (scrollback included), `end.x` the link's last cell. `handlers` is read at each call,
+ * so it may change without the provider being registered again.
  */
-export function urlLinkProvider(term: Terminal, open: (url: string) => void): ILinkProvider {
+export function terminalLinkProvider(term: Terminal, handlers: () => LinkHandlers): ILinkProvider {
   return {
     provideLinks(y, callback) {
       const buffer = term.buffer.active;
       const getRow = (row: number) => buffer.getLine(row)?.translateToString(false);
       const links: ILink[] = [];
-      for (const found of findLinks(y - 1, getRow, term.cols)) {
+      for (const found of findLinks(y - 1, getRow, term.cols, { docs: !!handlers().openDoc })) {
         const first = buffer.getLine(found.start.row);
         const last = buffer.getLine(found.end.row);
         if (!first || !last) continue;
@@ -213,7 +246,11 @@ export function urlLinkProvider(term: Terminal, open: (url: string) => void): IL
             start: { x: cellOfChar(first, found.start.char) + 1, y: found.start.row + 1 },
             end: { x: cellOfChar(last, found.end.char) + 1, y: found.end.row + 1 },
           },
-          activate: (_event, text) => open(text),
+          activate: () => {
+            const { openUrl, openDoc } = handlers();
+            if (found.kind === "url") openUrl(found.text);
+            else openDoc?.(found.text);
+          },
         });
       }
       callback(links);

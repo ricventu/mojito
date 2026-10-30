@@ -104,6 +104,11 @@ export function TerminalPage() {
   };
 
   const session = sessions.data?.find((s) => s.id === id);
+  // A markdown path claude printed opens in its project's docs; General sessions have none.
+  const docsProject = session?.project ?? null;
+  const openDoc = docsProject
+    ? (path: string) => void navigate(docsHref(docsProject, { ticket: session?.ticket, path }))
+    : undefined;
   const ticket = session?.ticket ? tickets.data?.tickets.find((t) => t.identifier === session.ticket) : undefined;
 
   const kill = useMutation({
@@ -227,6 +232,7 @@ export function TerminalPage() {
               onExit={() => setGoneId(id)}
               onReady={setTerm}
               onImages={attach}
+              openDoc={openDoc}
             />
             {term && panel === "compose" && <Composer term={term} onClose={() => setPanel(null)} />}
             {term && panel === "copy" && <CopyBuffer term={term} onClose={() => setPanel(null)} />}
