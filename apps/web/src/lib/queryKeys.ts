@@ -21,3 +21,13 @@ export const gitKeys = {
   diff: (project: string, hash: string, file: string, from: string | null) =>
     ["git", project, "diff", hash, file, from] as const,
 };
+
+/**
+ * The docs page's queries, outside `qk` for the same reason as `gitKeys`: a reconnect must not
+ * re-read a document under the reader. Reload refreshes them explicitly.
+ */
+export const docKeys = {
+  project: (project: string) => ["docs", project] as const,
+  list: (project: string, ticket: string | null) => ["docs", project, "list", ticket] as const,
+  file: (project: string, ticket: string | null, path: string) => ["docs", project, "file", ticket, path] as const,
+};

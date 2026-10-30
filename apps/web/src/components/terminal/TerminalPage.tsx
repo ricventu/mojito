@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Terminal } from "@xterm/xterm";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, GitGraph, PanelLeft, Power } from "lucide-react";
+import { ArrowLeft, FileText, GitGraph, PanelLeft, Power } from "lucide-react";
 import { Link, Navigate, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import type { SessionKind, SessionMeta, TicketSummary } from "@mojito/shared";
@@ -18,6 +18,7 @@ import { useSidebar } from "@/hooks/useSidebar";
 import { useTickets } from "@/hooks/useTickets";
 import { ApiError, apiFetch } from "@/lib/api";
 import { boardHref } from "@/lib/boardReturn";
+import { docsHref } from "@/lib/docs/url";
 import { gitHref } from "@/lib/git/url";
 import { qk } from "@/lib/queryKeys";
 import { safeHref } from "@/lib/url";
@@ -182,6 +183,17 @@ export function TerminalPage() {
                   title="Git graph"
                 >
                   <GitGraph size={16} />
+                </Link>
+              </Button>
+            )}
+            {session?.project && (
+              <Button asChild variant="ghost" size="icon-sm" className="shrink-0">
+                <Link
+                  to={docsHref(session.project, { ticket: session.ticket })}
+                  aria-label={`Docs of ${session.project}`}
+                  title="Docs"
+                >
+                  <FileText size={16} />
                 </Link>
               </Button>
             )}

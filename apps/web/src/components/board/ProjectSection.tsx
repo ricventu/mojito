@@ -1,9 +1,10 @@
-import { ChevronRight, GitGraph, Plus, SquareTerminal } from "lucide-react";
+import { ChevronRight, FileText, GitGraph, Plus, SquareTerminal } from "lucide-react";
 import { Link } from "react-router";
 import type { SessionMeta, TicketSummary } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { sessionForTicket, type BoardSection } from "@/lib/board";
+import { docsHref } from "@/lib/docs/url";
 import { gitHref } from "@/lib/git/url";
 import { GitButtons } from "./GitButtons";
 import { LooseSessionRow } from "./LooseSessionRow";
@@ -40,6 +41,13 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
           <Button asChild variant="ghost" size="icon-sm">
             <Link to={gitHref(project)} aria-label={`Git graph of ${project}`} title="Git graph">
               <GitGraph size={16} />
+            </Link>
+          </Button>
+        )}
+        {project !== null && (
+          <Button asChild variant="ghost" size="icon-sm">
+            <Link to={docsHref(project)} aria-label={`Docs of ${project}`} title="Docs">
+              <FileText size={16} />
             </Link>
           </Button>
         )}

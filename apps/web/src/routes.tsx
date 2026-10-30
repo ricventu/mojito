@@ -36,6 +36,15 @@ export const router = createBrowserRouter([
             return { Component: m.GitGraphPage };
           }),
       },
+      // Lazy: only the docs page needs the markdown parser.
+      {
+        path: "/docs/:project",
+        lazy: () =>
+          import("@/components/docs/DocsPage").then((m) => {
+            chunkLoaded(sessionStore());
+            return { Component: m.DocsPage };
+          }),
+      },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },

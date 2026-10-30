@@ -54,6 +54,10 @@ describe("surfaces that touch an edge pay for it", () => {
     ["src/components/git/CommitSheet.tsx", "var(--sar)"],
     ["src/components/git/CommitSheet.tsx", "var(--sal)"],
     ["src/components/git/CommitSheet.tsx", "var(--sab)"],
+    ["src/components/docs/DocsPage.tsx", "var(--sat)"],
+    ["src/components/docs/DocsPage.tsx", "var(--sar)"],
+    ["src/components/docs/DocsPage.tsx", "var(--sab)"],
+    ["src/components/docs/DocsPage.tsx", "var(--sal)"],
     ["src/components/git/DiffView.tsx", "var(--sab)"],
   ])("%s spends %s", (file, token) => {
     expect(code(file)).toContain(token);
