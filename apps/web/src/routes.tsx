@@ -27,6 +27,15 @@ export const router = createBrowserRouter([
             return { Component: m.SettingsPage };
           }),
       },
+      // Lazy: only the git page needs the graph layout and its rows.
+      {
+        path: "/git/:project",
+        lazy: () =>
+          import("@/components/git/GitGraphPage").then((m) => {
+            chunkLoaded(sessionStore());
+            return { Component: m.GitGraphPage };
+          }),
+      },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },

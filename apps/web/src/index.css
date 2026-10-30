@@ -32,6 +32,16 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+
+  /* Git graph lanes: eight hues far apart, dark enough to read on white. */
+  --graph-0: oklch(0.55 0.2 255);
+  --graph-1: oklch(0.58 0.17 150);
+  --graph-2: oklch(0.58 0.21 25);
+  --graph-3: oklch(0.55 0.2 305);
+  --graph-4: oklch(0.64 0.16 60);
+  --graph-5: oklch(0.6 0.12 200);
+  --graph-6: oklch(0.6 0.2 350);
+  --graph-7: oklch(0.6 0.15 115);
 }
 
 .dark {
@@ -53,6 +63,16 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
+
+  /* The same hues, lighter, for the dark background. */
+  --graph-0: oklch(0.72 0.15 255);
+  --graph-1: oklch(0.76 0.15 150);
+  --graph-2: oklch(0.72 0.17 25);
+  --graph-3: oklch(0.72 0.16 305);
+  --graph-4: oklch(0.8 0.14 60);
+  --graph-5: oklch(0.78 0.11 200);
+  --graph-6: oklch(0.74 0.16 350);
+  --graph-7: oklch(0.82 0.15 115);
 }
 
 @theme inline {
