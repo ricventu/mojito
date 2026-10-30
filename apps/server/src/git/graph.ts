@@ -1,4 +1,7 @@
-import type { GraphCommit, GraphRef } from "@mojito/shared";
+import type { GitGraphPage, GraphCommit, GraphHighlight, GraphRef } from "@mojito/shared";
+import { defaultBase } from "./defaultBranch";
+import type { GitRun } from "./git";
+import { findTicketBranch } from "./ticketBranch";
 
 // The pure half of the git graph: parsers for what git prints, over the strings the git calls
 // return. The calls themselves live below them, over an injected `GitRun` (the split sync.ts uses).
@@ -93,4 +96,58 @@ export function attachRefs(commits: Omit<GraphCommit, "refs">[], entries: RefEnt
 export function parseCounts(out: string): { behind: number; ahead: number } {
   const [behind = "0", ahead = "0"] = out.trim().split(/\s+/);
   return { behind: Number(behind), ahead: Number(ahead) };
+}
+
+/** What a failing read means here is "not there": no HEAD on an empty repo, no symbolic HEAD when detached. */
+const orNull = async (run: GitRun, args: string[], cwd: string): Promise<string | null> => {
+  try {
+    return (await run(args, cwd)).trim() || null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * One page of a project's graph, read-only. Only the ref listing may fail the call (outside a
+ * repo it throws `GitError`); a missing HEAD, worktree list or `origin/HEAD` just means less to
+ * show. `rev-list` is not guarded: `parseCounts` reads empty output as 0/0, which would pass a
+ * failure off as a branch that is level with its base.
+ */
+export async function readGraph(cwd: string, opts: { skip: number; ticket: string | null }, run: GitRun): Promise<GitGraphPage> {
+  const refsOut = await run(["for-each-ref", `--format=${REF_FORMAT}`, "refs/heads", "refs/remotes/origin", "refs/tags"], cwd);
+  const [head, symbolicHead, worktreesOut] = await Promise.all([
+    orNull(run, ["rev-parse", "--verify", "-q", "HEAD"], cwd),
+    orNull(run, ["symbolic-ref", "--quiet", "--short", "HEAD"], cwd),
+    orNull(run, ["worktree", "list", "--porcelain"], cwd),
+  ]);
+  let entries = parseRefs(refsOut);
+  if (worktreesOut) entries = markWorktrees(entries, parseWorktrees(worktreesOut));
+  if (entries.length === 0 && !head) return { head: null, highlight: null, commits: [], hasMore: false };
+
+  const logOut = await run(
+    ["log", "--topo-order", `--format=${LOG_FORMAT}`, `--skip=${opts.skip}`, "-n", String(PAGE_SIZE + 1), "--branches", "--remotes=origin", "--tags", ...(head ? ["HEAD"] : []), "--"],
+    cwd,
+  );
+  const all = parseLog(logOut);
+  const commits = attachRefs(all.slice(0, PAGE_SIZE), entries);
+
+  const highlight = opts.skip === 0 ? await readHighlight(cwd, entries, opts.ticket, head, symbolicHead, run) : null;
+  return { head, highlight, commits, hasMore: all.length > PAGE_SIZE };
+}
+
+async function readHighlight(
+  cwd: string,
+  entries: RefEntry[],
+  ticket: string | null,
+  head: string | null,
+  symbolicHead: string | null,
+  run: GitRun,
+): Promise<GraphHighlight | null> {
+  const branch = ticket ? findTicketBranch(entries, ticket) : symbolicHead && head ? { name: symbolicHead, hash: head } : null;
+  if (!branch) return null;
+  const originHead = await orNull(run, ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"], cwd);
+  const base = defaultBase(entries, originHead, branch.name);
+  if (!base) return { branch: branch.name, tip: branch.hash, base: "", baseTip: "", ahead: 0, behind: 0, merged: false };
+  const { ahead, behind } = parseCounts(await run(["rev-list", "--left-right", "--count", `${base.hash}...${branch.hash}`], cwd));
+  return { branch: branch.name, tip: branch.hash, base: base.name, baseTip: base.hash, ahead, behind, merged: ahead === 0 };
 }
