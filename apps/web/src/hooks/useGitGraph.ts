@@ -10,7 +10,8 @@ const base = (project: string) => `/api/projects/${encodeURIComponent(project)}/
 /**
  * A project's graph, one page of commits at a time; the next page skips what is loaded. A snapshot:
  * never refetched behind the reader's back. A reload or another ticket is another query, so a late
- * page of the old one cannot land in the new one.
+ * page of the old one cannot land in the new one. `gcTime: 0` drops it once nothing reads it, so
+ * each entry to the page is a fresh read rather than the pages cached on the last visit.
  */
 export function useGitGraph(project: string, ticket: string | null) {
   return useInfiniteQuery({
@@ -24,6 +25,7 @@ export function useGitGraph(project: string, ticket: string | null) {
     getNextPageParam: (last, pages) =>
       last.hasMore ? pages.reduce((n, p) => n + p.commits.length, 0) : undefined,
     staleTime: Infinity,
+    gcTime: 0,
     refetchOnWindowFocus: false,
   });
 }

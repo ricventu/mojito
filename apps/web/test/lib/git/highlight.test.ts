@@ -1,6 +1,6 @@
 import type { GraphHighlight } from "@mojito/shared";
 import { describe, expect, it } from "vitest";
-import { highlightChain, highlightSummary } from "@/lib/git/highlight";
+import { highlightChain, highlightedCommits, highlightSummary } from "@/lib/git/highlight";
 
 const c = (hash: string, ...parents: string[]) => ({ hash, parents });
 
@@ -40,9 +40,26 @@ const h = (over: Partial<GraphHighlight> = {}): GraphHighlight => ({
   ...over,
 });
 
+describe("highlightedCommits", () => {
+  // main: m2 -> m1 -> root; side: s1 -> m1
+  const commits = [c("m2", "m1"), c("s1", "m1"), c("m1", "root"), c("root")];
+
+  it("is the chain for a highlight with a base", () => {
+    expect([...highlightedCommits(commits, h({ tip: "s1", baseTip: "m2" }))]).toEqual(["s1"]);
+  });
+
+  it("is empty without a base, so nothing is dimmed", () => {
+    expect(highlightedCommits(commits, h({ branch: "main", tip: "m2", base: "", baseTip: "" })).size).toBe(0);
+  });
+
+  it("is empty without a highlight", () => {
+    expect(highlightedCommits(commits, null).size).toBe(0);
+  });
+});
+
 describe("highlightSummary", () => {
   it("says there is no branch for a ticket", () => {
-    expect(highlightSummary(null, "RIC-505")).toBe("No branch for RIC-505 yet");
+    expect(highlightSummary(null, "RIC-505")).toBe("No branch for RIC-505");
   });
 
   it("is null with no highlight and no ticket", () => {
@@ -63,5 +80,18 @@ describe("highlightSummary", () => {
 
   it("counts ahead and behind", () => {
     expect(highlightSummary(h(), null)).toBe("ric-505-git · 3 ahead · 12 behind origin/main");
+    expect(highlightSummary(h(), "RIC-505")).toBe("ric-505-git · 3 ahead · 12 behind origin/main");
+  });
+
+  it("never says merged for the checkout: a branch only behind its upstream", () => {
+    expect(highlightSummary(h({ branch: "main", ahead: 0, behind: 3, merged: true }), null)).toBe(
+      "main · 0 ahead · 3 behind origin/main",
+    );
+  });
+
+  it("says even with for the checkout at its upstream's tip", () => {
+    expect(highlightSummary(h({ branch: "main", tip: "b", ahead: 0, behind: 0, merged: true }), null)).toBe(
+      "main · even with origin/main",
+    );
   });
 });

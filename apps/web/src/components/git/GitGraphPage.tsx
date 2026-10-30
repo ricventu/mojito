@@ -8,7 +8,7 @@ import { useBackOr, useGitGraph } from "@/hooks/useGitGraph";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { ApiError } from "@/lib/api";
 import { boardHref } from "@/lib/boardReturn";
-import { highlightChain, highlightSummary } from "@/lib/git/highlight";
+import { highlightedCommits, highlightSummary } from "@/lib/git/highlight";
 import { layoutGraph, type GraphRow } from "@/lib/git/layout";
 import { pageCommits, refsOf } from "@/lib/git/pages";
 import { relativeTime } from "@/lib/git/time";
@@ -19,7 +19,7 @@ import { CommitSheet } from "./CommitSheet";
 import { GraphLanes } from "./GraphLanes";
 import { RefChip } from "./RefChip";
 
-/** The highlighted tip is scrolled into view on first load only when it is past this many rows. */
+/** A ticket's tip is scrolled into view on first load only when it is past this many rows. */
 const SCROLL_PAST = 10;
 
 /** `/git/:project`: a project's commits, branches and tags, read-only. State lives in the url (`lib/git/url.ts`). */
@@ -46,25 +46,23 @@ function GraphView({ project }: { project: string }) {
   const layout = useMemo(() => layoutGraph(commits, { maxLanes }), [commits, maxLanes]);
   const cols = Math.max(1, Math.min(layout.laneCount, maxLanes));
   const highlight = first?.highlight ?? null;
-  const chain = useMemo(
-    () => (highlight ? highlightChain(commits, highlight.tip, highlight.baseTip) : new Set<string>()),
-    [commits, highlight],
-  );
+  const chain = useMemo(() => highlightedCommits(commits, highlight), [commits, highlight]);
   const summary = first ? highlightSummary(highlight, ticket) : null;
   const openRefs = useMemo(() => (view.commit ? refsOf(commits, view.commit) : []), [commits, view.commit]);
 
-  // On first load, bring the highlighted tip into view when it is not among the first rows.
+  // On first load, bring a ticket's tip into view when it is not among the first rows. The plain
+  // project view opens at the top: the checkout's branch can sit far below the newest commits.
   const scrolledFor = useRef<string | null>(null);
   const queryId = `${project}\0${ticket ?? ""}`;
   useEffect(() => {
     if (!first || scrolledFor.current === queryId) return;
     scrolledFor.current = queryId;
     const tip = first.highlight?.tip;
-    if (!tip) return;
+    if (!ticket || !tip) return;
     if (commits.findIndex((c) => c.hash === tip) > SCROLL_PAST) {
       document.getElementById(`git-${tip}`)?.scrollIntoView({ block: "center" });
     }
-  }, [first, commits, queryId]);
+  }, [first, commits, queryId, ticket]);
 
   const reload = () => {
     scrolledFor.current = null;
