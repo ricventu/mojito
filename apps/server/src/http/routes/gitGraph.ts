@@ -78,6 +78,8 @@ export function gitGraphRoutes(deps: AppDeps): Hono {
       const path = c.req.query("path");
       if (!path) return c.json({ error: "path is required" }, 400);
       const from = c.req.query("from") || null;
+      // A NUL cannot be in a path, and node refuses it in an argument (a TypeError, not a git failure).
+      if (path.includes("\0") || from?.includes("\0")) return c.json({ error: "path contains a NUL byte" }, 400);
       const diff = await guarded(c, () => reader.diff(where.cwd, hash, path, from));
       if (diff instanceof Response) return diff;
       return diff ? c.json(diff) : c.json({ error: "commit not found" }, 404);

@@ -43,7 +43,13 @@ export const gitRunner =
           if (err) {
             // `code` is the exit status for a non-zero exit, a string such as "ENOENT" when git never ran.
             const exitCode = !err.killed && typeof err.code === "number" ? err.code : null;
-            reject(new GitError(args, [stdout, stderr || err.message].filter(Boolean).join("\n"), exitCode));
+            // Killed by the timeout (not the buffer cap, which sets a string code): node's own
+            // "Command failed: git log …" says nothing a reader can act on.
+            const timedOut = err.killed && typeof err.code !== "string";
+            const output = timedOut
+              ? `git did not answer within ${timeoutMs / 1000} s`
+              : [stdout, stderr || err.message].filter(Boolean).join("\n");
+            reject(new GitError(args, output, exitCode));
           }
           else resolve(stdout);
         },

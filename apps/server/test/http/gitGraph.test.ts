@@ -183,6 +183,14 @@ describe("GET /api/projects/:name/git/commits/:hash/diff", () => {
     expect(ctx.gitRead.diff).not.toHaveBeenCalled();
   });
 
+  it.each(["?path=a%00b", "?path=a.txt&from=b%00c"])("400s a NUL in path or from (%s) without calling git", async (q) => {
+    const ctx = withReader();
+    const res = await ctx.req(`${base}/commits/${HASH}/diff${q}`);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "path contains a NUL byte" });
+    expect(ctx.gitRead.diff).not.toHaveBeenCalled();
+  });
+
   it("400s a bad hash", async () => {
     const ctx = withReader();
     const res = await ctx.req(`${base}/commits/HEAD/diff?path=a.txt`);
