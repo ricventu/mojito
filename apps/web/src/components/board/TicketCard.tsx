@@ -9,6 +9,8 @@ interface Props {
   ticket: TicketSummary;
   session: SessionMeta | null;
   selected?: boolean;
+  /** Off in a kanban column, whose heading already says it. */
+  showStatus?: boolean;
   onOpen: (ticket: TicketSummary) => void;
 }
 
@@ -17,7 +19,7 @@ interface Props {
  * element's children are presentational to assistive tech, so a link inside it could not
  * be reached on its own.
  */
-export function TicketCard({ ticket, session, selected, onOpen }: Props) {
+export function TicketCard({ ticket, session, selected, showStatus = true, onOpen }: Props) {
   const open = () => onOpen(ticket);
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -53,15 +55,17 @@ export function TicketCard({ ticket, session, selected, onOpen }: Props) {
         className="flex flex-1 cursor-pointer flex-col gap-1.5 rounded-b-lg px-3 pt-1 pb-2.5 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
       >
         <p className="min-w-0 text-sm leading-snug font-medium break-words">{ticket.title}</p>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant="secondary">{ticket.statusName}</Badge>
-          {ticket.labels.map((label) => (
-            <Badge key={label} variant="outline" className="max-w-full truncate">
-              {label}
-            </Badge>
-          ))}
-          {session && <StateBadge state={session.state} />}
-        </div>
+        {(showStatus || ticket.labels.length > 0 || session) && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {showStatus && <Badge variant="secondary">{ticket.statusName}</Badge>}
+            {ticket.labels.map((label) => (
+              <Badge key={label} variant="outline" className="max-w-full truncate">
+                {label}
+              </Badge>
+            ))}
+            {session && <StateBadge state={session.state} />}
+          </div>
+        )}
         {waiting && session.alert && (
           <p className="text-xs text-amber-700 dark:text-amber-300">{session.alert}</p>
         )}

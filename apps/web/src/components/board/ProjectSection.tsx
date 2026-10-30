@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import type { SessionMeta, TicketSummary } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { sessionForTicket, type BoardSection } from "@/lib/board";
+import { kanbanColumns, sessionForTicket, type BoardSection } from "@/lib/board";
 import { docsHref } from "@/lib/docs/url";
 import { gitHref } from "@/lib/git/url";
 import { cn } from "@/lib/utils";
@@ -18,21 +18,30 @@ interface Props {
   onOpenTicket: (ticket: TicketSummary) => void;
   onNewTicket: (project?: string) => void;
   onNewSession: (project?: string) => void;
+  /** The board's status filter: the kanban shows only the columns it selects. */
+  statusFilter: readonly string[];
 }
 
-/** Cards and rows: one column on a phone, two or three as the board's column widens (a container query: a docked sidebar narrows it). */
-const LIST_CLASS = "grid gap-2 @2xl:grid-cols-2 @5xl:grid-cols-3";
+/**
+ * Backlog cards and loose rows: one column on a phone, three from the width the kanban starts at,
+ * level with its columns (a container query on the board's column, which a docked sidebar narrows).
+ */
+const LIST_CLASS = "grid gap-2 @2xl:grid-cols-3";
 
-/** One project: its active tickets, a closed Backlog group, then its loose sessions. */
-export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket, onNewTicket, onNewSession }: Props) {
+/**
+ * One project: its active tickets — a list on a phone, kanban columns from `@2xl` — a closed
+ * Backlog group, then its loose sessions.
+ */
+export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket, onNewTicket, onNewSession, statusFilter }: Props) {
   const { project } = section;
   const name = project ?? "General";
-  const card = (ticket: TicketSummary) => (
+  const card = (ticket: TicketSummary, showStatus = true) => (
     <TicketCard
       key={ticket.identifier}
       ticket={ticket}
       session={sessionForTicket(sessions, ticket.identifier)}
       selected={ticket.identifier === selectedTicket}
+      showStatus={showStatus}
       onOpen={onOpenTicket}
     />
   );
@@ -71,7 +80,30 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
         </Button>
       </header>
 
-      {section.active.length > 0 && <ul className={LIST_CLASS}>{section.active.map(card)}</ul>}
+      {section.active.length > 0 && (
+        <>
+          <ul className="flex flex-col gap-2 @2xl:hidden">{section.active.map((t) => card(t))}</ul>
+          {/* Both are rendered and CSS picks one: no width to measure, nothing jumps on the first paint. */}
+          <div className="hidden gap-2 @2xl:grid @2xl:auto-cols-fr @2xl:grid-flow-col">
+            {kanbanColumns(section.active, statusFilter).map((column) => (
+              <section
+                key={column.status}
+                aria-label={`${column.status} in ${name}`}
+                className="flex min-w-0 flex-col gap-2 rounded-lg bg-muted/40 p-2"
+              >
+                <h3 className="flex items-center gap-1.5 px-1 text-xs font-medium text-muted-foreground">
+                  {column.status}
+                  <span className="tabular-nums">{column.tickets.length}</span>
+                </h3>
+                <ul className="flex flex-col gap-2">
+                  {/* "Other" gathers several statuses: there the badge still says which. */}
+                  {column.tickets.map((t) => card(t, column.status === "Other"))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        </>
+      )}
 
       {section.backlog.length > 0 && (
         <Collapsible key={String(section.backlogOpen)} defaultOpen={section.backlogOpen} className="group/backlog">
@@ -80,7 +112,7 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
             Backlog ({section.backlog.length})
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <ul className={cn(LIST_CLASS, "pt-1")}>{section.backlog.map(card)}</ul>
+            <ul className={cn(LIST_CLASS, "pt-1")}>{section.backlog.map((t) => card(t))}</ul>
           </CollapsibleContent>
         </Collapsible>
       )}

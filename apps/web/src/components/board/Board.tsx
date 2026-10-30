@@ -117,6 +117,7 @@ export function Board() {
               onOpenTicket={setSelectedTicket}
               onNewTicket={onNewTicket}
               onNewSession={onNewSession}
+              statusFilter={filters.statuses}
             />
           ))
         )}

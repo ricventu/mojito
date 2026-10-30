@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BoardTickets, ProjectRow, SessionMeta, TicketSummary } from "@mojito/shared";
-import { filterBoard, groupBoard, linearBanner, needsInput, sessionForTicket } from "@/lib/board";
+import { filterBoard, groupBoard, kanbanColumns, linearBanner, needsInput, sessionForTicket } from "@/lib/board";
 import { NO_FILTERS, type BoardFilters } from "@/lib/filters";
 
 const project = (name: string): ProjectRow => ({ name, path: `/repos/${name}`, teamKey: "RIC" });
@@ -334,5 +334,44 @@ describe("filterBoard", () => {
       [],
     );
     expect(filterBoard(sections, filters({ statuses: ["Todo"] })).map((s) => s.project)).toEqual(["Alpha"]);
+  });
+});
+
+describe("kanbanColumns", () => {
+  const ids = (cols: ReturnType<typeof kanbanColumns>) => cols.map((c) => [c.status, c.tickets.map((t) => t.identifier)]);
+
+  it("lays the active tickets out Todo, In Progress, In Review, keeping their order", () => {
+    const active = [ticket("RIC-9", "In Review"), ticket("RIC-2", "In Progress"), ticket("RIC-3", "Todo"), ticket("RIC-10", "Todo")];
+    expect(ids(kanbanColumns(active, []))).toEqual([
+      ["Todo", ["RIC-3", "RIC-10"]],
+      ["In Progress", ["RIC-2"]],
+      ["In Review", ["RIC-9"]],
+    ]);
+  });
+
+  it("keeps an empty column, so every project's columns line up", () => {
+    expect(ids(kanbanColumns([ticket("RIC-1", "Todo")], []))).toEqual([
+      ["Todo", ["RIC-1"]],
+      ["In Progress", []],
+      ["In Review", []],
+    ]);
+  });
+
+  it("puts any other status in an Other column, only when there is one", () => {
+    const cols = kanbanColumns([ticket("RIC-1", "Todo"), ticket("RIC-4", "QA")], []);
+    expect(ids(cols)).toEqual([
+      ["Todo", ["RIC-1"]],
+      ["In Progress", []],
+      ["In Review", []],
+      ["Other", ["RIC-4"]],
+    ]);
+  });
+
+  it("shows only the columns a status filter selects", () => {
+    expect(ids(kanbanColumns([ticket("RIC-2", "In Review")], ["In Review", "Todo"]))).toEqual([
+      ["Todo", []],
+      ["In Review", ["RIC-2"]],
+    ]);
+    expect(kanbanColumns([], ["Backlog"])).toEqual([]);
   });
 });

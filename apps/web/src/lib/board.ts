@@ -111,6 +111,30 @@ export function filterBoard(sections: BoardSection[], f: BoardFilters): BoardSec
     .filter((s) => s.active.length + s.backlog.length + s.loose.length > 0);
 }
 
+/** The board's kanban columns, in workflow order left to right (the list reads the other way: STATUS_ORDER). */
+export const KANBAN_ORDER = ["Todo", "In Progress", "In Review"] as const;
+
+export interface KanbanColumn {
+  /** A status of `KANBAN_ORDER`, or "Other" for any status outside it. */
+  status: string;
+  tickets: TicketSummary[];
+}
+
+/**
+ * A section's active tickets as kanban columns, each keeping the section's order. Every column
+ * of `KANBAN_ORDER` is there even when empty — the columns line up across projects — unless a
+ * status filter leaves it out; an "Other" column (a custom Linear status) only when it has a ticket.
+ */
+export function kanbanColumns(active: TicketSummary[], statusFilter: readonly string[]): KanbanColumn[] {
+  const known: readonly string[] = KANBAN_ORDER;
+  const columns: KanbanColumn[] = KANBAN_ORDER.filter((s) => statusFilter.length === 0 || statusFilter.includes(s)).map(
+    (status) => ({ status, tickets: active.filter((t) => t.statusName === status) }),
+  );
+  const others = active.filter((t) => !known.includes(t.statusName));
+  if (others.length > 0) columns.push({ status: "Other", tickets: others });
+  return columns;
+}
+
 /** The ticket's live session if it has one, else the most recent one; `null` when it never had any. */
 export function sessionForTicket(sessions: SessionMeta[], identifier: string): SessionMeta | null {
   const mine = sessions
