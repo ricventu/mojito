@@ -1,6 +1,10 @@
 import { readFileSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve, sep } from "node:path";
-import { DOC_MAX_BYTES, isDocPath } from "@mojito/shared";
+import { DOC_MAX_BYTES, isDocPath, type DocFile } from "@mojito/shared";
+import type { GitRun } from "../git/git";
+import { allowedRoots, docRoot } from "./root";
+
+export type DocFileResult = { ok: true; file: DocFile } | { ok: false; reason: "invalid" | "not-found" | "too-large" };
 
 export type ReadDocResult = { ok: true; content: string } | { ok: false; reason: "not-found" | "too-large" };
 
@@ -52,4 +56,20 @@ export function readDoc(abs: string, maxBytes = DOC_MAX_BYTES): ReadDocResult {
   }
   if (size > maxBytes) return { ok: false, reason: "too-large" };
   return { ok: true, content: readFileSync(abs, "utf8") };
+}
+
+/**
+ * One document of a project, as the file route answers it: `path` relative to the root (the
+ * ticket's worktree when it has one, else the checkout) or absolute inside one of the repo's
+ * worktrees. The worktree list is read only for an absolute path.
+ */
+export async function readDocFile(checkout: string, path: string, ticket: string | null, home: string, run: GitRun): Promise<DocFileResult> {
+  if (!isDocPath(path)) return { ok: false, reason: "invalid" };
+  const { root } = await docRoot(checkout, ticket, run);
+  const absolute = isAbsolute(path) || path.startsWith("~/");
+  const allowed = absolute ? await allowedRoots(checkout, root, run) : [root];
+  const abs = resolveDocPath(path, root, allowed, home);
+  if (!abs) return { ok: false, reason: "invalid" };
+  const read = readDoc(abs);
+  return read.ok ? { ok: true, file: { path, content: read.content } } : read;
 }
