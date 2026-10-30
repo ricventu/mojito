@@ -37,15 +37,15 @@ export function parsePatch(out: string, limit = MAX_PATCH): CommitDiff {
 }
 
 /**
- * The full hash `hash` names, or null when no commit does. `--verify -q` fails silently for an
- * unknown hash, so a `fatal:` message means something else is wrong (not a repo) and propagates.
+ * The full hash `hash` names, or null when no commit does: `--verify -q` exits 1 for an unknown
+ * hash. Any other failure (128 outside a repo, a timeout) is not "not found" and propagates.
  */
 async function resolve(cwd: string, hash: string, run: GitRun): Promise<string | null> {
   if (!isValidHash(hash)) throw new Error("invalid hash");
   try {
     return (await run(["rev-parse", "--verify", "-q", "--end-of-options", `${hash}^{commit}`], cwd)).trim() || null;
   } catch (err) {
-    if (err instanceof GitError && !err.output.includes("fatal:")) return null;
+    if (err instanceof GitError && err.exitCode === 1) return null;
     throw err;
   }
 }

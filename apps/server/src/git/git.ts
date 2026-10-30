@@ -4,11 +4,15 @@ import { spawnEnv } from "../env/childEnv";
 /** Runs git in `cwd` and answers its stdout; a non-zero exit rejects with a `GitError`. */
 export type GitRun = (args: string[], cwd: string) => Promise<string>;
 
-/** A git command that failed: `output` is its stdout and stderr together, where git splits its messages. */
+/**
+ * A git command that failed: `output` is its stdout and stderr together, where git splits its
+ * messages; `exitCode` is the process's, `null` when it was killed (timeout) or never ran.
+ */
 export class GitError extends Error {
   constructor(
     readonly args: string[],
     readonly output: string,
+    readonly exitCode: number | null = null,
   ) {
     super(`git ${args[0]} failed: ${output.trim() || "no output"}`);
     this.name = "GitError";
@@ -36,7 +40,11 @@ export const gitRunner =
           env: { ...spawnEnv(), LC_ALL: "C", GIT_TERMINAL_PROMPT: "0" },
         },
         (err, stdout, stderr) => {
-          if (err) reject(new GitError(args, [stdout, stderr || err.message].filter(Boolean).join("\n")));
+          if (err) {
+            // `code` is the exit status for a non-zero exit, a string such as "ENOENT" when git never ran.
+            const exitCode = !err.killed && typeof err.code === "number" ? err.code : null;
+            reject(new GitError(args, [stdout, stderr || err.message].filter(Boolean).join("\n"), exitCode));
+          }
           else resolve(stdout);
         },
       );

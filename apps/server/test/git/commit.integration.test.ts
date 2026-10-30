@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { readGit } from "../../src/git/git";
+import { GitError, readGit } from "../../src/git/git";
 import { readCommit, readDiff } from "../../src/git/commit";
 
 // Real git, in a temp dir, with the user's own git config out of the way.
@@ -81,6 +81,16 @@ describe("readCommit", () => {
 
   it("answers null for a hash that is not in the repo", async () => {
     expect(await readCommit(repo, "deadbeef", readGit)).toBeNull();
+  });
+
+  it("rejects with a GitError outside a repo, and a real failure carries a numeric exit code", async () => {
+    const elsewhere = join(root, "not-a-repo");
+    mkdirSync(elsewhere);
+    const err = await readCommit(elsewhere, "deadbeef", readGit).catch((e) => e);
+    expect(err).toBeInstanceOf(GitError);
+    expect(err.exitCode).toBe(128);
+    const missing = await readGit(["rev-parse", "--verify", "-q", "deadbeef^{commit}"], repo).catch((e) => e);
+    expect(missing.exitCode).toBe(1);
   });
 });
 

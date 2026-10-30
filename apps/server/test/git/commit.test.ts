@@ -57,10 +57,14 @@ describe("hash safety", () => {
 });
 
 describe("readCommit", () => {
-  it("answers null when the hash does not resolve, and rethrows any other git failure", async () => {
-    const notFound = vi.fn().mockRejectedValue(new GitError(["rev-parse"], "Command failed: git rev-parse"));
+  it("answers null only when rev-parse exits 1, and rethrows any other git failure", async () => {
+    const args = ["rev-parse"];
+    const notFound = vi.fn().mockRejectedValue(new GitError(args, "", 1));
     await expect(readCommit("/x", "deadbeef", notFound)).resolves.toBeNull();
-    const broken = vi.fn().mockRejectedValue(new GitError(["rev-parse"], "fatal: not a git repository"));
-    await expect(readCommit("/x", "deadbeef", broken)).rejects.toBeInstanceOf(GitError);
+    const notARepo = vi.fn().mockRejectedValue(new GitError(args, "fatal: not a git repository", 128));
+    await expect(readCommit("/x", "deadbeef", notARepo)).rejects.toBeInstanceOf(GitError);
+    const timedOut = vi.fn().mockRejectedValue(new GitError(args, "", null));
+    await expect(readCommit("/x", "deadbeef", timedOut)).rejects.toBeInstanceOf(GitError);
+    await expect(readDiff("/x", "deadbeef", "a.txt", null, timedOut)).rejects.toBeInstanceOf(GitError);
   });
 });
