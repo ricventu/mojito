@@ -227,6 +227,11 @@ Linear key (`LINEAR_API_KEY`) are shared, everything else is v2's own (`MOJITO2_
   `allow-passthrough on` at every attach, and handled by a write-only OSC 52 handler. A
   Shift/Option+drag is xterm's, **copied on release**: claude's any-motion mouse tracking
   makes xterm clear it on the next mouse move, so Cmd+C/right-click never find it.
+  Links (`lib/terminal/links.ts`): http(s) URLs open in a new tab on click/tap, through our
+  own link provider — not `WebLinksAddon`, which joins rows only on xterm's soft-wrap flag,
+  and nothing from tmux ever carries it. Rows a program wrapped are joined on their bodies
+  when they end at the block's measured wrap width; a marker row (`● `) takes the indent of
+  the row below it.
   xterm's platform detection was verified correct under Vite, so v1's
   `restoreTerminalPlatform` is not ported; `platform.build.test.ts` bundles xterm with the
   app's Vite config and fails if anything starts shimming `process` (a dev warning too).

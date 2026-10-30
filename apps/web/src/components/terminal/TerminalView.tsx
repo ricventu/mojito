@@ -6,6 +6,7 @@ import { SESSION_GONE_CODE } from "@mojito/shared";
 import { browserClipboard, copyText, echoFilter, osc52Text } from "@/lib/terminal/copySelection";
 import { dragHasFiles, droppedImages, pastedImages } from "@/lib/images";
 import { terminalKeyHandler } from "@/lib/terminal/keyHandler";
+import { urlLinkProvider } from "@/lib/terminal/links";
 import { xtermThinksItIsNode } from "@/lib/terminal/platform";
 import { syncGeometry } from "@/lib/terminal/terminalFit";
 import { terminalOptions } from "@/lib/terminal/terminalOptions";
@@ -77,6 +78,11 @@ export function TerminalView({ sessionId, keyboardOpen, onExit, onReady, onImage
       }
       const fit = new FitAddon();
       term.loadAddon(fit);
+      // http(s) URLs open in a new tab on click or tap — joined across the rows claude
+      // wrapped them over, which WebLinksAddon cannot do against tmux (links.ts).
+      const links = term.registerLinkProvider(
+        urlLinkProvider(term, (url) => window.open(url, "_blank", "noopener,noreferrer")),
+      );
       term.open(el);
       fit.fit();
       termRef.current = term;
@@ -174,6 +180,7 @@ export function TerminalView({ sessionId, keyboardOpen, onExit, onReady, onImage
         onData.dispose();
         onSelection.dispose();
         onOsc52.dispose();
+        links.dispose();
         window.removeEventListener("mouseup", onMouseUp);
         wsRef.current?.close();
         wsRef.current = null;
