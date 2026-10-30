@@ -38,7 +38,11 @@ describe("findTicketBranch matching", () => {
   });
 
   it("does not read the ticket as a pattern", () => {
-    expect(found(["abc"], "a.c-1")).toBeNull();
+    expect(found(["abc-1"], "a.c-1")).toBeNull();
+    expect(found(["a.c-1"], "a.c-1")).toBe("a.c-1");
+    expect(found(["aab-1"], "a+b-1")).toBeNull();
+    expect(found(["a+b-1"], "a+b-1")).toBe("a+b-1");
+    expect(found(["fix/(a)-1"], "(a)-1")).toBe("fix/(a)-1");
   });
 });
 
