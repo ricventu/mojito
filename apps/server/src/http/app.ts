@@ -15,6 +15,7 @@ import type { closeSession } from "../tmux/tmux";
 import { tokenMatches } from "../token";
 import { errorMessage } from "./body";
 import { gitRoutes, type GitSync } from "./routes/git";
+import { docsRoutes, type DocsReader } from "./routes/docs";
 import { gitGraphRoutes, type GitReader } from "./routes/gitGraph";
 import { healthRoutes } from "./routes/health";
 import { hookRoutes } from "./routes/hook";
@@ -41,6 +42,8 @@ export interface AppDeps {
   git?: GitSync;
   /** A project's git graph, commit details and diffs (read-only). Default: real git (`defaultGitReader`). */
   gitRead?: GitReader;
+  /** A project's markdown list and documents (read-only). Default: real git and disk (`docsReader`). */
+  docsRead?: DocsReader;
   /** The built web client; with none, only `/api` is served. */
   staticDir?: string;
   /** Project path validation. Default `fs.existsSync`. */
@@ -72,6 +75,7 @@ export function createApp(deps: AppDeps): Hono {
   app.route("/api", projectRoutes(deps));
   app.route("/api", gitRoutes(deps));
   app.route("/api", gitGraphRoutes(deps));
+  app.route("/api", docsRoutes(deps));
   app.route("/api", settingsRoutes(deps));
   app.route("/api", ticketRoutes(deps));
   app.route("/api", sessionRoutes(deps));
