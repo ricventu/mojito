@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, GitGraph, Play, Power, SquareTerminal } from "lucide-react";
 import { Link, useNavigate } from "react-router";
@@ -20,8 +20,8 @@ import { sessionForTicket } from "@/lib/board";
 import { docsHref } from "@/lib/docs/url";
 import { gitHref } from "@/lib/git/url";
 import { launchErrorAction, launchOptions, type LaunchPicks } from "@/lib/launch";
-import { launchHosts, peerHref } from "@/lib/peers";
-import { getToken } from "@/lib/token";
+import { launchHosts, peerHref, peerSessionForTicket } from "@/lib/peers";
+import { getToken, subscribeToken } from "@/lib/token";
 import { qk } from "@/lib/queryKeys";
 import { safeHref } from "@/lib/url";
 import { LaunchOptions } from "./LaunchOptions";
@@ -284,6 +284,24 @@ function LiveSession({ ticket, session, onClose }: { ticket: TicketSummary; sess
   );
 }
 
+/** The ticket's session on another instance: its state and a way into that instance's client. */
+function PeerLiveSession({ peer, session }: { peer: PeerSnapshot; session: SessionMeta }) {
+  const token = useSyncExternalStore(subscribeToken, getToken);
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-muted-foreground">Session on {peer.name}</span>
+        <StateBadge state={session.state} />
+      </div>
+      <Button asChild>
+        <a href={peerHref(peer, sessionPath(session.id), token)} target="_blank" rel="noopener">
+          <SquareTerminal size={16} /> Open on {peer.name}
+        </a>
+      </Button>
+    </div>
+  );
+}
+
 interface Props {
   ticket: TicketSummary;
   onClose: () => void;
@@ -294,8 +312,11 @@ export function TicketSheet({ ticket, onClose }: Props) {
   const sessions = useSessions();
   const projects = useProjects();
   const settings = useSettings();
+  const peers = usePeers();
   const session = sessionForTicket(sessions.data ?? [], ticket.identifier);
   const live = session !== null && session.state !== "ended";
+  // Running on another instance: no Launch here, or a second agent would work the same ticket.
+  const onPeer = live ? null : peerSessionForTicket(peers.data?.peers ?? [], ticket.identifier);
   const teamKey = projects.data ? (projects.data.find((p) => p.name === ticket.project)?.teamKey ?? null) : undefined;
   // A move made here, shown at once and kept: Linear answers the refetch a beat later.
   const [movedTo, setMovedTo] = useState<string | null>(null);
@@ -336,6 +357,8 @@ export function TicketSheet({ ticket, onClose }: Props) {
           )}
           {live ? (
             <LiveSession ticket={ticket} session={session} onClose={onClose} />
+          ) : onPeer ? (
+            <PeerLiveSession peer={onPeer.peer} session={onPeer.session} />
           ) : settings.data ? (
             <LaunchForm ticket={ticket} status={status} settings={settings.data} onClose={onClose} />
           ) : (

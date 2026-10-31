@@ -186,8 +186,12 @@ app's state, left in place.
   awaited at boot) dials the peer's `/ws/events` with the shared backoff, pings it every 30 s
   (a sleeping Mac sends no close), reads `/api/sessions|projects|tickets` (10 s each) on every
   open, then patches the snapshot from `session.*`, `tickets.changed`, `projects.changed`
-  (emitted by `projectRoutes`); each change is `peers.updated` on the local bus. A close or a
-  failed read (a 401 logs "token rejected") empties the snapshot: offline shows no sessions.
+  (emitted by `projectRoutes`); each change is `peers.updated` on the local bus. A close
+  empties the snapshot: offline shows no sessions. A failed read closes the socket after
+  `retryDelay(failures in a row)` — the stream's backoff restarts on every open, so a peer that
+  opens but cannot be read would otherwise be re-dialled every second. A bad-token ws upgrade is
+  answered `401` (not just destroyed), so the dialling side logs "token rejected (401)"; a link
+  logs one line per offline stretch.
   No echo: a peer's `/api/sessions` is only its own. Paths never leave a peer (names only).
   `GET /api/peers` → `{self, peers}`; `POST /api/peers/:name/sessions` forwards a `LaunchBody`
   and answers the peer's status/body verbatim (offline/unreachable/non-json 502, no answer in
@@ -279,7 +283,10 @@ app's state, left in place.
   waiting; the board and its waiting pill stay local. The ticket sheet's "Run on"
   (`launchHosts`: this instance, then online peers mapping the ticket's project) shows only with
   more than one host; a peer launch opens its tab **inside the click** (`window.open("")`, then
-  pointed at the session — Safari blocks an open after an await) and closes it on failure.
+  pointed at the session — Safari blocks an open after an await) and closes it on failure. A
+  ticket already running on a peer (`peerSessionForTicket`) shows "Session on <peer>" and an
+  Open link instead of the Launch form: the board is local, and a Launch would start a second
+  agent on the same ticket.
 - **Desktop first, phone complete.** The board column is `max-w-6xl`, an `@container`: from
   `@2xl` (by its own width, which a docked sidebar narrows) each project's active tickets are
   kanban columns Todo → In Progress → In Review (`kanbanColumns`: all three even when empty, so

@@ -1,4 +1,4 @@
-import type { PeerSnapshot, PeersAnswer, TicketSummary } from "@mojito/shared";
+import type { PeerSnapshot, PeersAnswer, SessionMeta, TicketSummary } from "@mojito/shared";
 
 /**
  * A page of a peer's own client, logged in: its first-visit `?token=` handoff takes the token
@@ -27,6 +27,18 @@ export function launchHosts(ticket: Pick<TicketSummary, "project">, self: string
 /** Whether a session on another instance is asking for input and not hidden there. */
 export function waitingPeers(peers: PeerSnapshot[]): boolean {
   return peers.some((p) => p.sessions.some((s) => s.state === "needs-input" && !s.hidden));
+}
+
+/**
+ * A ticket already running on another instance (snapshots hold live sessions only). The ticket
+ * sheet shows it instead of a Launch that would start a second agent on the same ticket.
+ */
+export function peerSessionForTicket(peers: PeerSnapshot[], ticket: string): { peer: PeerSnapshot; session: SessionMeta } | null {
+  for (const peer of peers) {
+    const session = peer.sessions.find((s) => s.kind === "ticket" && s.ticket === ticket);
+    if (session) return { peer, session };
+  }
+  return null;
 }
 
 /** `peers.updated` applied to the cached answer: the peer replaced in place, by name. */
