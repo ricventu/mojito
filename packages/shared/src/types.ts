@@ -95,3 +95,27 @@ export type GitSyncResult =
   | { status: "up-to-date"; branch: string }
   | { status: "pushed"; branch: string; commits: number; pulled: number }
   | { status: "conflict"; session: SessionMeta; alreadyOpen: boolean };
+
+/**
+ * Another Mojito instance (`MOJITO_PEERS`) as this server sees it through its event socket.
+ * Offline, `sessions` is empty: last-known states of a sleeping machine would lie.
+ */
+export interface PeerSnapshot {
+  /** The first DNS label of its URL (the whole hostname for an IP or a dotless host). */
+  name: string;
+  /** As configured, no trailing slash: the origin its own client is served at. */
+  url: string;
+  online: boolean;
+  /** Its live sessions: never an `ended` one. */
+  sessions: SessionMeta[];
+  /** Its mapped project names; paths never leave the peer. */
+  projects: string[];
+  /** Ticket → title, only for the tickets of `sessions`. */
+  ticketTitles: Record<string, string>;
+}
+
+/** `GET /api/peers`: this instance's name (`MOJITO_NAME`) and its peers in configuration order. */
+export interface PeersAnswer {
+  self: string;
+  peers: PeerSnapshot[];
+}
