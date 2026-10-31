@@ -17,7 +17,8 @@ On the Linux box: `main` checked out in `~/code/mojito`, `mojito.service` on 870
 (127.0.0.1), state in `~/.local/state/mojito` (SQLite `mojito.db`), tmux ids `mj-…`, the
 phone at `https://ai-tonic.<tailnet>.ts.net/` (Tailscale Serve → 8700). The server reads
 `.env.local` at the repo root: `MOJITO_TOKEN`, `LINEAR_API_KEY`, `MOJITO_PORT`,
-`MOJITO_HOST`. `~/.mojito-state` is the old app's state, left in place.
+`MOJITO_HOST`, and for peers `MOJITO_NAME`, `MOJITO_PEERS`. `~/.mojito-state` is the old
+app's state, left in place.
 
 ## Layout
 
@@ -26,7 +27,9 @@ phone at `https://ai-tonic.<tailnet>.ts.net/` (Tailscale Serve → 8700). The se
   `PromptsBody`, `FavoritesBody`, `StatusBody`, `SessionPatchBody`), `MojitoEvent`, `MODELS`/`EFFORTS`, `DEFAULT_PROMPTS`,
   `SESSION_GONE_CODE` (4404), the git graph types (`GitGraphPage`, `GraphCommit`, `GraphRef`,
   `GraphHighlight`, `CommitDetails`, `CommitFile`, `CommitDiff`) and `isValidHash`/`isValidTicket`, the docs
-  types (`DocEntry`, `DocList`, `DocFile`, `DOC_MAX_BYTES`) and `isDocPath`. Consumed as source, no build; zod **4** everywhere (the Agent
+  types (`DocEntry`, `DocList`, `DocFile`, `DOC_MAX_BYTES`) and `isDocPath`, the peer types
+  (`PeerSnapshot`, `PeersAnswer`) and `openEventStream` (used by the web and by the server's peer
+  links; `schedule` is required — the package has no timer typings). Consumed as source, no build; zod **4** everywhere (the Agent
   SDK's peer).
 - `apps/server` — Node 22, Hono 4 on `@hono/node-server`, `ws` on the http `upgrade` event,
   `node-pty`, `better-sqlite3`. Built with tsup (`tsup.config.ts` bundles `@mojito/shared`
@@ -172,6 +175,25 @@ phone at `https://ai-tonic.<tailnet>.ts.net/` (Tailscale Serve → 8700). The se
   task's team/project, at most one issue per task; a task that created its issue is `done`
   even if the stream throws afterwards (retry must not duplicate). Images are validated
   (png/jpeg/gif/webp, ≤10, ≤10 MB) and uploaded to Linear **before** the task row exists.
+- **Peers** (`peers/`, `http/routes/peers.ts`; spec `2026-10-31-mojito-peers-design.md`): other
+  Mojito instances (the Mac, this box) whose live sessions every client shows. `MOJITO_PEERS` is
+  a comma-separated list of their URLs; a peer's name is the first DNS label of its host (the
+  whole hostname for an IP or a dotless host), a duplicate or a non-http(s) URL fails boot.
+  `MOJITO_NAME` names this one (default: the hostname up to its first dot) — set it to the tailnet
+  machine name so every client calls a machine the same. **All instances share one
+  `MOJITO_TOKEN`**: each would hold the other's anyway, and it is what lets a client open a peer
+  through the `?token=` handoff with the token it already has. `PeerLink` (one per peer, never
+  awaited at boot) dials the peer's `/ws/events` with the shared backoff, pings it every 30 s
+  (a sleeping Mac sends no close), reads `/api/sessions|projects|tickets` (10 s each) on every
+  open, then patches the snapshot from `session.*`, `tickets.changed`, `projects.changed`
+  (emitted by `projectRoutes`); each change is `peers.updated` on the local bus. A close or a
+  failed read (a 401 logs "token rejected") empties the snapshot: offline shows no sessions.
+  No echo: a peer's `/api/sessions` is only its own. Paths never leave a peer (names only).
+  `GET /api/peers` → `{self, peers}`; `POST /api/peers/:name/sessions` forwards a `LaunchBody`
+  and answers the peer's status/body verbatim (offline/unreachable/non-json 502, no answer in
+  30 s → 504 "may still be starting"). Nothing else is forwarded — no pty, git, docs, Hide.
+  Mac setup: `tailscale serve --bg 8700`, the same `MOJITO_TOKEN`, each instance listing the
+  other in `MOJITO_PEERS`.
 
 ## Web
 
@@ -247,6 +269,17 @@ phone at `https://ai-tonic.<tailnet>.ts.net/` (Tailscale Serve → 8700). The se
   pushes from the board, **replaces** from a terminal (Back stays "the board"; the shell reads
   `/session/:id`). A docked sidebar is not rendered while the iOS keyboard is up (the terminal
   tells the shell, `useKeyboardUp`, in a layout effect).
+- **Peers in the web** (`lib/peers.ts`, `hooks/usePeers.ts` under `qk.peers`, patched by
+  `peers.updated`): after the local groups the sidebar draws each peer (`PeerSection`: name, dot,
+  "offline", then its sessions grouped by its project names). A peer row is an `<a target=_blank>`
+  to `peerHref` — the peer's own client at `/session/<id>?token=` — with no Hide (that is the
+  peer's state); rows the peer hid go in the Hidden footer. With peers the header is
+  `InstanceSwitcher` (this instance's name, a menu opening the others; "Sessions" stays as the
+  `sr-only` title). `SidebarToggle` carries an amber dot when a peer has a visible session
+  waiting; the board and its waiting pill stay local. The ticket sheet's "Run on"
+  (`launchHosts`: this instance, then online peers mapping the ticket's project) shows only with
+  more than one host; a peer launch opens its tab **inside the click** (`window.open("")`, then
+  pointed at the session — Safari blocks an open after an await) and closes it on failure.
 - **Desktop first, phone complete.** The board column is `max-w-6xl`, an `@container`: from
   `@2xl` (by its own width, which a docked sidebar narrows) each project's active tickets are
   kanban columns Todo → In Progress → In Review (`kanbanColumns`: all three even when empty, so
