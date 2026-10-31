@@ -47,6 +47,9 @@ export function handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer
   try {
     const url = new URL(req.url ?? "", "http://localhost");
     if (!tokenMatches(url.searchParams.get("token"), deps.token)) {
+      // Said, not just dropped: another Mojito instance dialling with a different token logs
+      // "token rejected" instead of a bare hang-up. A browser sees no difference.
+      socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
       socket.destroy();
       return;
     }

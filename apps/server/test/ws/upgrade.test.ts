@@ -33,7 +33,7 @@ function setup() {
     title: null,
   });
   vi.mocked(attachPty).mockClear();
-  const socket = { destroy: vi.fn() };
+  const socket = { destroy: vi.fn(), write: vi.fn() };
   // The accepted socket: handleUpgrade hands it straight to the callback, as `ws` does once
   // the handshake is written.
   const ws = { on: vi.fn(), send: vi.fn(), close: vi.fn() };
@@ -104,6 +104,24 @@ describe("handleUpgrade", () => {
     upgrade(url);
     expect(socket.destroy).toHaveBeenCalled();
     expect(wss.handleUpgrade).not.toHaveBeenCalled();
+  });
+
+  // A peer instance dialling with another token must be able to say why it is offline; a bare
+  // destroy reaches it as "socket hang up". The browser sees no difference.
+  it.each([
+    ["a wrong token", "/ws/events?token=nope"],
+    ["no token", "/ws/events"],
+  ])("answers %s with a 401 before closing", (_label, url) => {
+    const { socket, upgrade } = setup();
+    upgrade(url);
+    expect(socket.write).toHaveBeenCalledWith(expect.stringMatching(/^HTTP\/1\.1 401 Unauthorized\r\n/));
+    expect(socket.destroy).toHaveBeenCalled();
+  });
+
+  it("answers a right token on an unknown path with no 401", () => {
+    const { socket, upgrade } = setup();
+    upgrade(`/ws/other?token=${TOKEN}`);
+    expect(socket.write).not.toHaveBeenCalled();
   });
 
   it("destroys the socket when the url cannot be decoded", () => {

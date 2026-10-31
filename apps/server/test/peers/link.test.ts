@@ -1,7 +1,12 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { WebSocketServer } from "ws";
 import type { BoardTickets, EventSocket, MojitoEvent, PeerSnapshot, ProjectRow, SessionMeta } from "@mojito/shared";
+import type { SessionsRepo } from "../../src/db/sessions";
 import { EventBus } from "../../src/events/bus";
 import { PeerLink } from "../../src/peers/link";
+import { handleUpgrade } from "../../src/ws/upgrade";
 
 const PEER = { name: "mac", url: "https://mac.t.ts.net" };
 
@@ -59,7 +64,9 @@ function fakePeer() {
 /** Sockets driven by hand; each dial makes a new one. */
 function fakeSockets() {
   const sockets: (EventSocket & { closed: boolean; url: string })[] = [];
-  const connect = vi.fn((url: string) => {
+  const reports: ((problem: string) => void)[] = [];
+  const connect = vi.fn((url: string, report: (problem: string) => void = () => {}) => {
+    reports.push(report);
     const s = {
       url,
       closed: false,
@@ -80,6 +87,8 @@ function fakeSockets() {
     open: () => last().onopen?.(),
     deliver: (e: MojitoEvent) => last().onmessage?.({ data: JSON.stringify(e) }),
     drop: () => last().onclose?.(),
+    /** What the real socket says about a dial that failed (`ws`'s error message). */
+    report: (problem: string) => reports[reports.length - 1](problem),
   };
 }
 
@@ -137,7 +146,7 @@ describe("PeerLink", () => {
   it("dials the peer's event socket with the token and reads nothing before it opens", () => {
     const s = setup({ token: "a+b=" });
     s.link.start();
-    expect(s.ws.connect).toHaveBeenCalledWith("wss://mac.t.ts.net/ws/events?token=a%2Bb%3D");
+    expect(s.ws.connect).toHaveBeenCalledWith("wss://mac.t.ts.net/ws/events?token=a%2Bb%3D", expect.any(Function));
     expect(s.peer.fetch).not.toHaveBeenCalled();
     expect(s.link.snapshot()).toEqual(offline);
     expect(s.link.peer).toEqual(PEER);
@@ -148,7 +157,7 @@ describe("PeerLink", () => {
     const ws = fakeSockets();
     const link = new PeerLink({ peer: { name: "127.0.0.1", url: "http://127.0.0.1:3200" }, token: "t", bus, connect: ws.connect, schedule: fakeClock().schedule });
     link.start();
-    expect(ws.connect).toHaveBeenCalledWith("ws://127.0.0.1:3200/ws/events?token=t");
+    expect(ws.connect).toHaveBeenCalledWith("ws://127.0.0.1:3200/ws/events?token=t", expect.any(Function));
   });
 
   it("on open reads sessions, projects and tickets into one online snapshot", async () => {
@@ -226,15 +235,33 @@ describe("PeerLink", () => {
     expect(s.updates).toHaveLength(1);
   });
 
-  it("a failing read closes the socket and stays offline", async () => {
+  it("a failing read closes the socket after a backoff and stays offline", async () => {
     const s = setup();
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     s.peer.answers["/api/projects"] = () => json({ error: "boom" }, 500);
     s.link.start();
     s.ws.open();
-    await vi.waitFor(() => expect(s.ws.sockets[0].closed).toBe(true));
+    await vi.waitFor(() => expect(s.clock.pending.map((p) => p.ms)).toEqual([1000]));
+    expect(s.ws.sockets[0].closed).toBe(false);
+    s.clock.runAll();
+    expect(s.ws.sockets[0].closed).toBe(true);
     expect(s.link.snapshot()).toEqual(offline);
     expect(String(error.mock.calls[0][0])).toMatch(/^mac: /);
+  });
+
+  it("reads that keep failing back off further each time, logging once", async () => {
+    const s = setup();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    s.peer.answers["/api/projects"] = () => json({ error: "boom" }, 500);
+    s.link.start();
+    s.ws.open();
+    await vi.waitFor(() => expect(s.clock.pending.map((p) => p.ms)).toEqual([1000]));
+    s.clock.runAll(); // the close
+    s.ws.drop();
+    s.clock.runAll(); // the stream's redial (its own backoff restarted on the open)
+    s.ws.open();
+    await vi.waitFor(() => expect(s.clock.pending.map((p) => p.ms)).toEqual([2000]));
+    expect(error).toHaveBeenCalledTimes(1);
   });
 
   it("a rejected token says so", async () => {
@@ -243,9 +270,27 @@ describe("PeerLink", () => {
     s.peer.answers["/api/sessions"] = () => json({ error: "unauthorized" }, 401);
     s.link.start();
     s.ws.open();
-    await vi.waitFor(() => expect(s.ws.sockets[0].closed).toBe(true));
-    expect(error).toHaveBeenCalledWith("mac: token rejected (401)");
+    await vi.waitFor(() => expect(error).toHaveBeenCalledWith("mac: token rejected (401)"));
     expect(s.link.snapshot().online).toBe(false);
+  });
+
+  it("a dial's problem is logged once per offline stretch", async () => {
+    const s = setup();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    s.link.start();
+    s.ws.report("Unexpected server response: 401");
+    s.ws.drop();
+    s.clock.runAll();
+    s.ws.report("Unexpected server response: 401");
+    s.ws.drop();
+    expect(error.mock.calls).toEqual([["mac: token rejected (401)"]]);
+    s.clock.runAll();
+    s.ws.open();
+    await vi.waitFor(() => expect(s.link.snapshot().online).toBe(true));
+    s.ws.drop();
+    s.clock.runAll();
+    s.ws.report("connect ECONNREFUSED 100.64.0.2:443");
+    expect(error.mock.calls).toEqual([["mac: token rejected (401)"], ["mac: connect ECONNREFUSED 100.64.0.2:443"]]);
   });
 
   it("a read that does not answer in time counts as a failure", async () => {
@@ -261,7 +306,9 @@ describe("PeerLink", () => {
     });
     s.link.start();
     s.ws.open();
-    await vi.waitFor(() => expect(s.ws.sockets[0].closed).toBe(true));
+    await vi.waitFor(() => expect(s.clock.pending.map((p) => p.ms)).toEqual([1000]));
+    s.clock.runAll();
+    expect(s.ws.sockets[0].closed).toBe(true);
     expect(s.link.snapshot().online).toBe(false);
   });
 
@@ -323,5 +370,29 @@ describe("PeerLink", () => {
     s.link.stop();
     s.clock.runAll();
     expect(s.ws.sockets).toHaveLength(1);
+  });
+});
+
+describe("PeerLink over a real socket", () => {
+  it("logs a peer that refuses its token as a rejected token", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const server = createServer();
+    const wss = new WebSocketServer({ noServer: true });
+    const bus = new EventBus();
+    server.on("upgrade", (req, socket, head) =>
+      handleUpgrade(req, socket, head, { token: "the-peer's", wss, sessions: {} as SessionsRepo, bus }),
+    );
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    const { port } = server.address() as AddressInfo;
+    const link = new PeerLink({ peer: { name: "127.0.0.1", url: `http://127.0.0.1:${port}` }, token: "ours", bus, schedule: () => () => {} });
+    try {
+      link.start();
+      await vi.waitFor(() => expect(error).toHaveBeenCalledWith("127.0.0.1: token rejected (401)"));
+      expect(link.snapshot().online).toBe(false);
+    } finally {
+      link.stop();
+      wss.close();
+      await new Promise((r) => server.close(r));
+    }
   });
 });
