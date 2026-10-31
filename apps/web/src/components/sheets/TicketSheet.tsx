@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, GitGraph, Play, Power, SquareTerminal } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
-import type { Effort, Model, SessionMeta, Settings, TicketSummary } from "@mojito/shared";
+import type { Effort, Model, PeerSnapshot, SessionMeta, Settings, TicketSummary } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
+import { usePeers } from "@/hooks/usePeers";
 import { useProjects } from "@/hooks/useProjects";
 import { useSessions } from "@/hooks/useSessions";
 import { useSettings } from "@/hooks/useSettings";
@@ -19,6 +20,8 @@ import { sessionForTicket } from "@/lib/board";
 import { docsHref } from "@/lib/docs/url";
 import { gitHref } from "@/lib/git/url";
 import { launchErrorAction, launchOptions, type LaunchPicks } from "@/lib/launch";
+import { launchHosts, peerHref } from "@/lib/peers";
+import { getToken } from "@/lib/token";
 import { qk } from "@/lib/queryKeys";
 import { safeHref } from "@/lib/url";
 import { LaunchOptions } from "./LaunchOptions";
@@ -26,6 +29,19 @@ import { SHEET_CONTENT_CLASS } from "./styles";
 
 const sessionPath = (id: string) => `/session/${encodeURIComponent(id)}`;
 const errorMessage = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
+
+/**
+ * A session on another instance, in its own client: the tab opened at the click when there is
+ * one; a blocked one leaves an "Open" action on a toast, which is a click of its own.
+ */
+function openOnPeer(peer: PeerSnapshot, id: string, tab: Window | null) {
+  const href = peerHref(peer, sessionPath(id), getToken());
+  if (tab) {
+    tab.location.href = href;
+    return;
+  }
+  toast(`${id} on ${peer.name}`, { action: { label: "Open", onClick: () => window.open(href, "_blank", "noopener") } });
+}
 
 /**
  * The ticket's status as a pill in the header; tapping it moves the ticket among its team's states
@@ -135,39 +151,77 @@ function LaunchForm({
 }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const peers = usePeers();
   const [picks, setPicks] = useState<LaunchPicks>({});
   const [worktree, setWorktree] = useState(false);
+  const [hostName, setHostName] = useState<string | null>(null);
   const { model, effort } = launchOptions(status, settings, picks);
+  const hosts = launchHosts(ticket, peers.data?.self ?? "", peers.data?.peers ?? []);
+  // A peer that went offline (or stopped mapping the project) since it was picked falls back here.
+  const host = hosts.find((h) => h.name === hostName) ?? hosts[0];
 
   const launch = useMutation({
-    mutationFn: () =>
-      apiJson<{ session: SessionMeta; warning?: string }>("/api/sessions", "POST", {
-        kind: "ticket",
-        ticket: ticket.identifier,
-        model,
-        effort,
-        worktree,
-      }),
-    onSuccess: ({ session, warning }) => {
-      void qc.invalidateQueries({ queryKey: qk.sessions });
-      void qc.invalidateQueries({ queryKey: qk.tickets });
+    mutationFn: ({ peer }: { peer: PeerSnapshot | null; tab: Window | null }) =>
+      apiJson<{ session: SessionMeta; warning?: string }>(
+        peer ? `/api/peers/${encodeURIComponent(peer.name)}/sessions` : "/api/sessions",
+        "POST",
+        { kind: "ticket", ticket: ticket.identifier, model, effort, worktree },
+      ),
+    onSuccess: ({ session, warning }, { peer, tab }) => {
       if (warning) toast.warning(warning);
       onClose();
+      if (peer) {
+        openOnPeer(peer, session.id, tab);
+        toast.success(`Started on ${peer.name}`);
+        return;
+      }
+      void qc.invalidateQueries({ queryKey: qk.sessions });
+      void qc.invalidateQueries({ queryKey: qk.tickets });
       navigate(sessionPath(session.id));
     },
-    onError: (e) => {
+    onError: (e, { peer, tab }) => {
       const action = e instanceof ApiError ? launchErrorAction(e) : { kind: "toast" as const, message: errorMessage(e, "Launch failed") };
       if (action.kind === "open") {
         onClose();
-        navigate(sessionPath(action.sessionId));
+        if (peer) openOnPeer(peer, action.sessionId, tab);
+        else navigate(sessionPath(action.sessionId));
       } else {
+        tab?.close();
         toast.error(action.message);
       }
     },
   });
 
+  const start = () => {
+    // Safari opens a tab only inside the click itself, never after an await: open it now, empty,
+    // and point it at the session once the peer answers.
+    let tab: Window | null = null;
+    if (host.peer) {
+      tab = window.open("", "_blank");
+      if (tab) tab.opener = null;
+    }
+    launch.mutate({ peer: host.peer, tab });
+  };
+
   return (
     <div className="flex flex-col gap-4">
+      {hosts.length > 1 && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="ticket-host">Run on</Label>
+          <Select value={host.name} onValueChange={setHostName}>
+            <SelectTrigger id="ticket-host" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {hosts.map((h) => (
+                <SelectItem key={h.name} value={h.name}>
+                  {h.peer ? h.name : `${h.name} (this one)`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <LaunchOptions
         idPrefix="ticket"
         model={model}
@@ -179,7 +233,7 @@ function LaunchForm({
         <Label htmlFor="ticket-worktree">Work in a worktree</Label>
         <Switch id="ticket-worktree" checked={worktree} onCheckedChange={setWorktree} />
       </div>
-      <Button disabled={launch.isPending} onClick={() => launch.mutate()}>
+      <Button disabled={launch.isPending} onClick={start}>
         <Play size={16} /> {launch.isPending ? "Launching…" : "Launch"}
       </Button>
     </div>
