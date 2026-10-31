@@ -14,6 +14,8 @@ import { registerEnvKeysAddedSince, snapshotEnvKeys } from "./env/childEnv";
 import { EventBus } from "./events/bus";
 import { createApp } from "./http/app";
 import { LinearClient } from "./linear/client";
+import { PeerLink } from "./peers/link";
+import { PeerRegistry } from "./peers/registry";
 import { defaultLaunchIo, type LaunchDeps } from "./sessions/launch";
 import { reconcileSessions } from "./sessions/reconcile";
 import { startTitleWatch } from "./sessions/titles";
@@ -80,6 +82,14 @@ async function main(): Promise<void> {
   // Session names: `/rename` fires no hook, the tmux pane title has it (titles.ts).
   const stopTitles = startTitleWatch({ sessions, bus, paneTitles: () => paneTitles(PREFIX) });
 
+  // The other instances: one event socket each, never awaited — a peer that is down only means
+  // its sidebar section says offline.
+  const peers = new PeerRegistry(
+    cfg.name,
+    cfg.peers.map((peer) => new PeerLink({ peer, token: cfg.token, bus })),
+  );
+  if (cfg.peers.length > 0) console.log(`peers: ${cfg.peers.map((p) => `${p.name} (${p.url})`).join(", ")}`);
+
   const webDist = join(cfg.repoRoot, "apps", "web", "dist");
   const staticDir = existsSync(webDist) ? webDist : undefined;
   const app = createApp({
@@ -95,6 +105,7 @@ async function main(): Promise<void> {
     launch,
     closeSession,
     taskQueue,
+    peers,
     staticDir,
   });
 
@@ -114,6 +125,7 @@ async function main(): Promise<void> {
   const stopHeartbeat = startHeartbeat(wss);
   server.on("close", stopHeartbeat);
   server.on("upgrade", (req, socket, head) => handleUpgrade(req, socket, head, { token: cfg.token, wss, sessions, bus }));
+  peers.start();
 
   // Stop serving and let go of the database; the tmux sessions are deliberately left alone —
   // they outlive the server, and the next boot reconciles with them. Dropping the sockets
@@ -123,6 +135,7 @@ async function main(): Promise<void> {
     if (stopping) return;
     stopping = true;
     console.log(`${signal}: shutting down`);
+    peers.stop();
     tickets.stop();
     stopTitles();
     for (const ws of wss.clients) ws.terminate();

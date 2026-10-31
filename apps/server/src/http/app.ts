@@ -8,6 +8,7 @@ import type { SettingsRepo } from "../db/settings";
 import type { TasksRepo } from "../db/tasks";
 import type { EventBus } from "../events/bus";
 import type { LinearClient } from "../linear/client";
+import type { PeerRegistry } from "../peers/registry";
 import type { LaunchDeps } from "../sessions/launch";
 import type { TaskQueue } from "../tasks/runner";
 import type { TicketCache } from "../tickets/cache";
@@ -19,6 +20,7 @@ import { docsRoutes, type DocsReader } from "./routes/docs";
 import { gitGraphRoutes, type GitReader } from "./routes/gitGraph";
 import { healthRoutes } from "./routes/health";
 import { hookRoutes } from "./routes/hook";
+import { peerRoutes } from "./routes/peers";
 import { projectRoutes } from "./routes/projects";
 import { sessionRoutes } from "./routes/sessions";
 import { settingsRoutes } from "./routes/settings";
@@ -44,6 +46,10 @@ export interface AppDeps {
   gitRead?: GitReader;
   /** A project's markdown list and documents (read-only). Default: real git and disk (`docsReader`). */
   docsRead?: DocsReader;
+  /** The other instances (`MOJITO_PEERS`); none when absent. */
+  peers?: PeerRegistry;
+  /** The fetch a launch on a peer goes through. Default: the global one. */
+  peerFetch?: typeof fetch;
   /** The built web client; with none, only `/api` is served. */
   staticDir?: string;
   /** Project path validation. Default `fs.existsSync`. */
@@ -80,6 +86,7 @@ export function createApp(deps: AppDeps): Hono {
   app.route("/api", ticketRoutes(deps));
   app.route("/api", sessionRoutes(deps));
   app.route("/api", taskRoutes(deps));
+  app.route("/api", peerRoutes(deps));
 
   // Neither falls through to the web client: an unknown API path is an error the caller must
   // see as one, and a plain GET on /ws/* is a WebSocket that failed to upgrade.
