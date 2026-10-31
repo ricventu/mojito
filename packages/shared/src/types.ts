@@ -60,6 +60,11 @@ export interface SessionMeta {
   lastEventAt: number;
   /** Sidebar-only: tucked into the sidebar's Hidden footer. Nothing behavioural reads it. */
   hidden: boolean;
+  /**
+   * The name claude gives the session — `/rename`'s, else its own automatic title — read from
+   * the tmux pane title (`sessions/titles.ts`); null until it has one. The last one is kept.
+   */
+  title: string | null;
 }
 
 export type TaskStatus = "queued" | "running" | "done" | "failed";

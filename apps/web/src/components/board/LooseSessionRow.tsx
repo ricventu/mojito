@@ -8,13 +8,8 @@ import { Button } from "@/components/ui/button";
 import { ApiError, apiFetch } from "@/lib/api";
 import { clock } from "@/lib/board";
 import { qk } from "@/lib/queryKeys";
+import { sessionName } from "@/lib/sidebar";
 import { cn } from "@/lib/utils";
-
-const KIND_LABEL: Record<SessionMeta["kind"], string> = {
-  ticket: "Ticket",
-  claude: "Claude",
-  shell: "Shell",
-};
 
 /**
  * A session with no ticket card to live under — a free session, or a ticket session whose
@@ -49,7 +44,7 @@ export function LooseSessionRow({ session }: { session: SessionMeta }) {
   });
   const waiting = session.state === "needs-input";
   const ended = session.state === "ended";
-  const label = session.kind === "ticket" && session.ticket ? session.ticket : KIND_LABEL[session.kind];
+  const label = session.kind === "ticket" && session.ticket ? session.ticket : sessionName(session);
 
   return (
     <li className={cn("flex items-stretch rounded-lg border bg-card", waiting && "border-amber-500/60")}>
@@ -60,9 +55,10 @@ export function LooseSessionRow({ session }: { session: SessionMeta }) {
       >
         <SquareTerminal size={16} className="shrink-0 text-muted-foreground" />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-sm font-medium">
-            <span className={cn(session.kind === "ticket" && "font-mono")}>{label}</span>
-            <span className="font-normal text-muted-foreground"> · {clock(session.createdAt)}</span>
+          {/* A long name gives way, the time stays. */}
+          <span className="flex min-w-0 text-sm font-medium">
+            <span className={cn("truncate", session.kind === "ticket" && "font-mono")}>{label}</span>
+            <span className="shrink-0 font-normal whitespace-pre text-muted-foreground"> · {clock(session.createdAt)}</span>
           </span>
           {waiting && session.alert && (
             <span className="text-xs text-amber-700 dark:text-amber-300">{session.alert}</span>

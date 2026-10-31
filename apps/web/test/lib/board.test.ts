@@ -32,6 +32,7 @@ function session(id: string, over: Partial<SessionMeta> = {}): SessionMeta {
     createdAt: 1,
     lastEventAt: 1,
     hidden: false,
+    title: null,
     ...over,
   };
 }

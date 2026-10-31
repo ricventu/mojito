@@ -16,10 +16,11 @@ import { createApp } from "./http/app";
 import { LinearClient } from "./linear/client";
 import { defaultLaunchIo, type LaunchDeps } from "./sessions/launch";
 import { reconcileSessions } from "./sessions/reconcile";
+import { startTitleWatch } from "./sessions/titles";
 import { linearImageFetcher } from "./tasks/images";
 import { TaskQueue } from "./tasks/runner";
 import { TicketCache } from "./tickets/cache";
-import { PREFIX, closeSession, listSessions } from "./tmux/tmux";
+import { PREFIX, closeSession, listSessions, paneTitles } from "./tmux/tmux";
 import { startHeartbeat } from "./ws/heartbeat";
 import { handleUpgrade } from "./ws/upgrade";
 
@@ -76,6 +77,8 @@ async function main(): Promise<void> {
     console.log(`reconciled sessions: ${ended.length} ended, ${adopted.length} adopted, ${revived.length} revived`);
   }
   tickets.start();
+  // Session names: `/rename` fires no hook, the tmux pane title has it (titles.ts).
+  const stopTitles = startTitleWatch({ sessions, bus, paneTitles: () => paneTitles(PREFIX) });
 
   const webDist = join(cfg.repoRoot, "apps", "web", "dist");
   const staticDir = existsSync(webDist) ? webDist : undefined;
@@ -121,6 +124,7 @@ async function main(): Promise<void> {
     stopping = true;
     console.log(`${signal}: shutting down`);
     tickets.stop();
+    stopTitles();
     for (const ws of wss.clients) ws.terminate();
     server.close(() => {
       db.close();

@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, FileText, GitGraph, Power } from "lucide-react";
 import { Link, Navigate, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
-import type { SessionKind, SessionMeta, TicketSummary } from "@mojito/shared";
+import type { SessionMeta, TicketSummary } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
 import { useKeyboardUp } from "@/components/AppShell";
 import { SidebarToggle } from "@/components/sidebar/SidebarToggle";
@@ -22,14 +22,13 @@ import { boardHref } from "@/lib/boardReturn";
 import { docsHref } from "@/lib/docs/url";
 import { gitHref } from "@/lib/git/url";
 import { qk } from "@/lib/queryKeys";
+import { sessionName } from "@/lib/sidebar";
 import { safeHref } from "@/lib/url";
 import { attachImages, uploadImages } from "@/lib/terminal/imageInput";
 import { cn } from "@/lib/utils";
 
-const KIND_LABEL: Record<SessionKind, string> = { ticket: "Ticket", claude: "Claude", shell: "Shell" };
-
 /**
- * Who the session is: the ticket (id, live status and title) or `<kind> · <project>`, in whatever
+ * Who the session is: the ticket (id, live status and title) or `<name> · <project>`, in whatever
  * width the header leaves: the title gives way first, then the status, the id last.
  */
 function Identity({ session, ticket }: { session: SessionMeta; ticket: TicketSummary | undefined }) {
@@ -63,7 +62,7 @@ function Identity({ session, ticket }: { session: SessionMeta; ticket: TicketSum
   }
   return (
     <div className="min-w-0 flex-1 truncate text-sm font-medium">
-      {KIND_LABEL[session.kind]}
+      {sessionName(session)}
       <span className="font-normal text-muted-foreground"> · {session.project ?? "General"}</span>
     </div>
   );

@@ -17,7 +17,7 @@ describe("migrate", () => {
     migrate(db);
     migrate(db);
     const rows = db.prepare("SELECT version FROM schema_migrations").all();
-    expect(rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
+    expect(rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }]);
   });
   it("drops the brainstorming column and its stored default (v2)", () => {
     const db = openDb(":memory:");
@@ -34,7 +34,7 @@ describe("migrate", () => {
     const columns = db.prepare("PRAGMA table_info(sessions)").all() as { name: string; notnull: number; dflt_value: string | null }[];
     expect(columns.find((c) => c.name === "hidden")).toMatchObject({ notnull: 1, dflt_value: "0" });
   });
-  it("migrates an existing version-2 database, its sessions reading back visible", () => {
+  it("migrates an existing version-2 database, its sessions reading back visible and unnamed", () => {
     // A database as the build before 003 left it: migrations 1 and 2 applied, one session.
     const db = new Database(":memory:");
     db.exec("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY)");
@@ -51,8 +51,9 @@ describe("migrate", () => {
       { version: 1 },
       { version: 2 },
       { version: 3 },
+      { version: 4 },
     ]);
-    expect(new SessionsRepo(db).get("mj-RIC-1")).toEqual(session({ state: "idle", lastEventAt: 2, hidden: false }));
+    expect(new SessionsRepo(db).get("mj-RIC-1")).toEqual(session({ state: "idle", lastEventAt: 2, hidden: false, title: null }));
   });
   it("enforces foreign keys pragma", () => {
     const db = openDb(":memory:");
@@ -208,6 +209,7 @@ const session = (over: Partial<SessionMeta> = {}): SessionMeta => ({
   createdAt: 1,
   lastEventAt: 1,
   hidden: false,
+  title: null,
   ...over,
 });
 
@@ -318,5 +320,16 @@ describe("TasksRepo", () => {
     expect(repo.get("r")?.status).toBe("failed");
     expect(repo.get("d")?.status).toBe("done");
     expect(repo.get("f")?.error).toBe("boom");
+  });
+});
+
+describe("SessionsRepo title", () => {
+  it("stores the name, patches it and keeps it on other patches", () => {
+    const repo = new SessionsRepo(openDb(":memory:"));
+    repo.insert(session({ title: "first" }));
+    expect(repo.get("mj-RIC-1")?.title).toBe("first");
+    repo.patch("mj-RIC-1", { title: "second" });
+    repo.patch("mj-RIC-1", { state: "idle" });
+    expect(repo.get("mj-RIC-1")?.title).toBe("second");
   });
 });

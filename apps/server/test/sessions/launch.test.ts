@@ -88,6 +88,7 @@ const row = (over: Partial<SessionMeta>): SessionMeta => ({
   createdAt: 1,
   lastEventAt: 1,
   hidden: false,
+  title: null,
   ...over,
 });
 
@@ -117,6 +118,7 @@ describe("launchTicket", () => {
       createdAt: 1000,
       lastEventAt: 1000,
       hidden: false,
+      title: null,
     };
     expect(res).toEqual({ ok: true, session: expected });
     expect(deps.newSession).toHaveBeenCalledTimes(1);
@@ -354,6 +356,7 @@ describe("launchFree", () => {
       createdAt: 1000,
       lastEventAt: 1000,
       hidden: false,
+      title: null,
     };
     expect(res).toEqual({ ok: true, session: expected });
     const settingsPath = "/state/hooks/mj-web-a1b2c3.json";
@@ -463,6 +466,7 @@ describe("launchGitResolve", () => {
       createdAt: 1000,
       lastEventAt: 1000,
       hidden: false,
+      title: null,
     };
     expect(res).toEqual({ ok: true, session: expected, alreadyOpen: false });
     expect(deps.newSession).toHaveBeenCalledWith(

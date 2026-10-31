@@ -14,6 +14,7 @@ interface Row {
   created_at: number;
   last_event_at: number;
   hidden: number;
+  title: string | null;
 }
 
 const toMeta = (r: Row): SessionMeta => ({
@@ -29,6 +30,7 @@ const toMeta = (r: Row): SessionMeta => ({
   createdAt: r.created_at,
   lastEventAt: r.last_event_at,
   hidden: r.hidden === 1,
+  title: r.title,
 });
 
 export class SessionsRepo {
@@ -48,19 +50,23 @@ export class SessionsRepo {
     this.db
       .prepare(
         `INSERT OR REPLACE INTO sessions
-           (id, kind, project, ticket, cwd, model, effort, state, alert, created_at, last_event_at, hidden)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, kind, project, ticket, cwd, model, effort, state, alert, created_at, last_event_at, hidden, title)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(m.id, m.kind, m.project, m.ticket, m.cwd, m.model, m.effort, m.state, m.alert, m.createdAt, m.lastEventAt, m.hidden ? 1 : 0);
+      .run(
+        m.id, m.kind, m.project, m.ticket, m.cwd, m.model, m.effort, m.state, m.alert,
+        m.createdAt, m.lastEventAt, m.hidden ? 1 : 0, m.title,
+      );
   }
 
-  patch(id: string, p: Partial<Pick<SessionMeta, "state" | "alert" | "lastEventAt" | "hidden">>): SessionMeta | null {
+  patch(id: string, p: Partial<Pick<SessionMeta, "state" | "alert" | "lastEventAt" | "hidden" | "title">>): SessionMeta | null {
     const sets: string[] = [];
     const values: unknown[] = [];
     if (p.state !== undefined) (sets.push("state = ?"), values.push(p.state));
     if (p.alert !== undefined) (sets.push("alert = ?"), values.push(p.alert));
     if (p.lastEventAt !== undefined) (sets.push("last_event_at = ?"), values.push(p.lastEventAt));
     if (p.hidden !== undefined) (sets.push("hidden = ?"), values.push(p.hidden ? 1 : 0));
+    if (p.title !== undefined) (sets.push("title = ?"), values.push(p.title));
     if (sets.length > 0) this.db.prepare(`UPDATE sessions SET ${sets.join(", ")} WHERE id = ?`).run(...values, id);
     return this.get(id);
   }

@@ -33,6 +33,15 @@ describe.skipIf(!tmux.tmuxAvailable())("tmux control (requires tmux)", () => {
     expect(await tmux.capturePane(name, 50)).toContain("hello-mojito");
   });
 
+  it("reads the pane title a program set, per session of the prefix", async () => {
+    fresh();
+    await tmux.newSession(name, tmpdir(), "printf '\\033]2;✳ pippo-test\\033\\\\'; sleep 30");
+    await new Promise((r) => setTimeout(r, 300));
+    const titles = await tmux.paneTitles("mj-test-");
+    expect(titles.get(name)).toBe("✳ pippo-test");
+    expect([...titles.keys()].every((n) => n.startsWith("mj-test-"))).toBe(true);
+  });
+
   it("refuses to create a second session under a name that is taken", async () => {
     fresh();
     await tmux.newSession(name, tmpdir(), "sleep 30");

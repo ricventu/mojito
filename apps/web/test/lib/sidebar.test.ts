@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectRow, SessionMeta, TicketSummary } from "@mojito/shared";
 import { groupBoard } from "@/lib/board";
-import { sessionLabel, sidebarGroups, splitHidden } from "@/lib/sidebar";
+import { sessionLabel, sessionName, sidebarGroups, splitHidden } from "@/lib/sidebar";
 
 const project = (name: string): ProjectRow => ({ name, path: `/repos/${name}`, teamKey: "RIC" });
 
@@ -19,6 +19,7 @@ function session(id: string, over: Partial<SessionMeta> = {}): SessionMeta {
     createdAt: 1,
     lastEventAt: 1,
     hidden: false,
+    title: null,
     ...over,
   };
 }
@@ -161,5 +162,31 @@ describe("sessionLabel", () => {
 
   it("a shell session is Shell", () => {
     expect(sessionLabel(session("mj-mojito-d4e5f6", { kind: "shell" }), tickets).primary).toBe("Shell");
+  });
+});
+
+describe("sessionName", () => {
+  it("is claude's name for the session once it has one", () => {
+    expect(sessionName(session("mj-mojito-a1b2c3", { title: "pippo-test" }))).toBe("pippo-test");
+    expect(sessionName(session("mj-mojito-a1b2c3", { kind: "shell", title: "build" }))).toBe("build");
+  });
+
+  it("is the kind before that", () => {
+    expect(sessionName(session("mj-mojito-a1b2c3"))).toBe("Claude");
+    expect(sessionName(session("mj-mojito-a1b2c3", { kind: "shell" }))).toBe("Shell");
+  });
+});
+
+describe("sessionLabel: a named session", () => {
+  it("shows its name over the id's hex suffix", () => {
+    expect(sessionLabel(session("mj-mojito-a1b2c3", { title: "pippo-test" }), [])).toEqual({
+      primary: "pippo-test",
+      secondary: "a1b2c3",
+    });
+  });
+
+  it("a ticket session keeps its ticket, whatever claude calls it", () => {
+    const s = session("mj-RIC-5", { kind: "ticket", ticket: "RIC-5", title: "Fix the login" });
+    expect(sessionLabel(s, [ticket("RIC-5")])).toEqual({ primary: "RIC-5", secondary: "title RIC-5" });
   });
 });

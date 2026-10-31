@@ -39,7 +39,7 @@ export function splitHidden(groups: SidebarGroup[]): { shown: SidebarGroup[]; hi
 
 /**
  * A row's two lines: the ticket id and its title from the tickets cache (empty when the
- * ticket is no longer listed), or Claude/Shell and the id's hex suffix.
+ * ticket is no longer listed), or the session's name (`sessionName`) and the id's hex suffix.
  */
 export function sessionLabel(
   s: SessionMeta,
@@ -48,8 +48,13 @@ export function sessionLabel(
   if (s.kind === "ticket" && s.ticket !== null) {
     return { primary: s.ticket, secondary: tickets.find((t) => t.identifier === s.ticket)?.title ?? "" };
   }
-  return {
-    primary: s.kind === "shell" ? "Shell" : "Claude",
-    secondary: s.id.slice(s.id.lastIndexOf("-") + 1),
-  };
+  return { primary: sessionName(s), secondary: s.id.slice(s.id.lastIndexOf("-") + 1) };
+}
+
+/**
+ * What a session with no ticket is called: claude's name for it (`/rename`, else its automatic
+ * title, read from tmux by the server), else its kind. A ticket session is called by its ticket.
+ */
+export function sessionName(s: SessionMeta): string {
+  return s.title ?? (s.kind === "shell" ? "Shell" : "Claude");
 }

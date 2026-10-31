@@ -84,6 +84,13 @@ phone at `https://ai-tonic.<tailnet>.ts.net/` (Tailscale Serve → 8700). The se
   ~60 s `idle_prompt` after every Stop would otherwise turn every finished session amber.
   `startupStall.ts` flips a session still `starting` after 20 s to needs-input (the
   workspace-trust prompt fires no hook).
+- **Session names** (`sessions/titles.ts`, migration 004 `sessions.title`): `/rename` fires no
+  hook, but claude sets the terminal title to `<glyph> <name>` — the `/rename` name, else its
+  automatic title (`Claude Code` until it has one; kept across `/clear`). Every 5 s one
+  `tmux list-panes -a` (`paneTitles`) is read; `sessionTitle` takes what follows a leading
+  non-letter glyph (a shell's hostname title never matches), and a change patches the row and
+  emits `session.updated`. No name keeps the last one. The web shows it for sessions without a
+  ticket (`sessionName`: board rows, sidebar, terminal header); a ticket session keeps its ticket.
 - **tmux** (`tmux/tmux.ts`): always **exact targets** — `=name` for sessions, `=name:` for
   panes. tmux matches `-t` by prefix, and `mj-RIC-49` is a prefix of `mj-RIC-49x`: a bare
   target once sent Kill's Ctrl-D to the wrong claude. `hasSession` answers false only when

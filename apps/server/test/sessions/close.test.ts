@@ -18,6 +18,7 @@ const meta = (state: SessionMeta["state"]): SessionMeta => ({
   createdAt: 1,
   lastEventAt: 1,
   hidden: false,
+  title: null,
 });
 
 function setup(row: SessionMeta | null, closed: boolean) {

@@ -145,6 +145,7 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
       createdAt: now,
       lastEventAt: now,
       hidden: false,
+      title: null,
     };
     record(deps, session);
     watchStartupStall(id, stallDeps(deps));
@@ -191,6 +192,7 @@ export async function launchFree(body: LaunchFreeBody, deps: LaunchDeps): Promis
     createdAt: now,
     lastEventAt: now,
     hidden: false,
+    title: null,
   };
 
   if (body.kind === "shell") {
@@ -272,6 +274,7 @@ export async function launchGitResolve(
       createdAt: now,
       lastEventAt: now,
       hidden: false,
+      title: null,
     };
     record(deps, session);
     watchStartupStall(id, stallDeps(deps));

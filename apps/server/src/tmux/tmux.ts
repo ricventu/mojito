@@ -213,6 +213,28 @@ export async function listSessions(prefix: string): Promise<string[]> {
   }
 }
 
+/**
+ * The pane title of each session whose name starts with `prefix` (its first pane): what the
+ * program in it last set with an OSC title — claude's is `✳ <session name>`. No tmux server
+ * is an empty map; any other failure rejects.
+ */
+export async function paneTitles(prefix: string): Promise<Map<string, string>> {
+  let stdout: string;
+  try {
+    ({ stdout } = await pexec("tmux", ["list-panes", "-a", "-F", "#{session_name}\t#{pane_title}"]));
+  } catch (err) {
+    if (isSessionGone(err)) return new Map();
+    throw err;
+  }
+  const titles = new Map<string, string>();
+  for (const line of stdout.split("\n")) {
+    const tab = line.indexOf("\t");
+    const name = line.slice(0, tab);
+    if (tab > 0 && name.startsWith(prefix) && !titles.has(name)) titles.set(name, line.slice(tab + 1));
+  }
+  return titles;
+}
+
 // `-e` keeps the SGR escape sequences, so the scrollback the browser terminal
 // replays on attach (ptyGateway) comes back in colour instead of flat text.
 export async function capturePane(name: string, lines: number): Promise<string> {
