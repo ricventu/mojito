@@ -26,7 +26,7 @@ interface Props {
  * Backlog cards and loose rows: one column on a phone, three from the width the kanban starts at,
  * level with its columns (a container query on the board's column, which a docked sidebar narrows).
  */
-const LIST_CLASS = "grid gap-2 @2xl:grid-cols-3";
+const LIST_CLASS = "grid grid-cols-1 gap-2 @2xl:grid-cols-3";
 
 /**
  * One project: its active tickets — a list on a phone, kanban columns from `@2xl` — a closed
