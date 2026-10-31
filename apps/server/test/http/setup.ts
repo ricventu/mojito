@@ -14,6 +14,8 @@ import { TicketCache } from "../../src/tickets/cache";
 export const TOKEN = "tok";
 
 export const cfg: ServerConfig = {
+  name: "box",
+  peers: [],
   port: 3100,
   host: "0.0.0.0",
   token: TOKEN,

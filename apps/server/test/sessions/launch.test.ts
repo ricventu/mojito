@@ -12,6 +12,8 @@ import { STALL_GRACE_MS } from "../../src/sessions/startupStall";
 import { launchFree, launchGitResolve, launchTicket, type LaunchDeps } from "../../src/sessions/launch";
 
 const cfg: ServerConfig = {
+  name: "box",
+  peers: [],
   port: 3100,
   host: "0.0.0.0",
   token: "tok",

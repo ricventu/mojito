@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { loadConfig, loadEnvFile, selfOrigin } from "../src/config";
+import { loadConfig, loadEnvFile, parsePeers, selfOrigin } from "../src/config";
 import { resetMojitoOnlyKeys, sanitizeEnv } from "../src/env/childEnv";
 
 const KEYS = { MOJITO_TOKEN: "tok", LINEAR_API_KEY: "lin_api_x", HOME: "/home/me" };
@@ -30,8 +30,10 @@ describe("loadConfig", () => {
   });
 
   it("applies the defaults", () => {
-    const cfg = loadConfig(KEYS);
+    const cfg = loadConfig(KEYS, "ai-tonic");
     expect(cfg).toEqual({
+      name: "ai-tonic",
+      peers: [],
       port: 8700,
       host: "127.0.0.1",
       token: "tok",
@@ -61,6 +63,54 @@ describe("loadConfig", () => {
     const cfg = loadConfig({ ...KEYS, MOJITO_PORT: "", MOJITO_HOST: "" });
     expect(cfg.port).toBe(8700);
     expect(cfg.host).toBe("127.0.0.1");
+  });
+
+  it("MOJITO_NAME, else the hostname up to its first dot", () => {
+    expect(loadConfig(KEYS, "ai-tonic.local").name).toBe("ai-tonic");
+    expect(loadConfig({ ...KEYS, MOJITO_NAME: "box" }, "ai-tonic.local").name).toBe("box");
+  });
+
+  it("reads the peers from MOJITO_PEERS", () => {
+    expect(loadConfig({ ...KEYS, MOJITO_PEERS: "https://mac.tail1.ts.net" }).peers).toEqual([
+      { name: "mac", url: "https://mac.tail1.ts.net" },
+    ]);
+  });
+});
+
+describe("parsePeers", () => {
+  it("is empty for unset or blank", () => {
+    expect(parsePeers(undefined)).toEqual([]);
+    expect(parsePeers(" , ")).toEqual([]);
+  });
+
+  it("names a peer by the first label of its host and drops a trailing slash", () => {
+    expect(parsePeers("https://mac.tail1.ts.net/, https://ai-tonic.tail1.ts.net")).toEqual([
+      { name: "mac", url: "https://mac.tail1.ts.net" },
+      { name: "ai-tonic", url: "https://ai-tonic.tail1.ts.net" },
+    ]);
+  });
+
+  it("keeps a path, without its trailing slash", () => {
+    expect(parsePeers("https://proxy.tail1.ts.net/mojito/")).toEqual([
+      { name: "proxy", url: "https://proxy.tail1.ts.net/mojito" },
+    ]);
+  });
+
+  it("names an IP or a dotless host by the whole hostname", () => {
+    expect(parsePeers("http://127.0.0.1:3200,http://localhost:3300,http://[::1]:3400").map((p) => p.name)).toEqual([
+      "127.0.0.1",
+      "localhost",
+      "[::1]",
+    ]);
+  });
+
+  it("refuses a duplicate name", () => {
+    expect(() => parsePeers("https://mac.a.ts.net,https://mac.b.ts.net")).toThrow(/duplicate peer name: mac/);
+  });
+
+  it("refuses what is not an http(s) URL", () => {
+    expect(() => parsePeers("ftp://mac.a.ts.net")).toThrow(/MOJITO_PEERS/);
+    expect(() => parsePeers("mac.a.ts.net")).toThrow(/MOJITO_PEERS/);
   });
 });
 

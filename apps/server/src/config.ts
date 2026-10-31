@@ -1,11 +1,23 @@
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { isIP } from "node:net";
+import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 import { registerEnvFileKeys } from "./env/childEnv";
 
+/** Another Mojito instance this one shows the sessions of (`MOJITO_PEERS`). */
+export interface PeerConfig {
+  /** The routing key in `/api/peers/:name` and the label every client shows. */
+  name: string;
+  /** Origin plus path, no trailing slash. */
+  url: string;
+}
+
 export interface ServerConfig {
+  /** This instance's name in the instance switcher (`MOJITO_NAME`). */
+  name: string;
+  peers: PeerConfig[];
   port: number;
   host: string;
   token: string;
@@ -28,13 +40,15 @@ export const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url)).re
  * the Linux box has a public address, and the phone reaches Mojito through Tailscale Serve,
  * never directly).
  */
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
+export function loadConfig(env: NodeJS.ProcessEnv = process.env, osHostname: string = hostname()): ServerConfig {
   const token = env.MOJITO_TOKEN;
   if (!token) throw new Error("MOJITO_TOKEN is required");
   const linearApiKey = env.LINEAR_API_KEY;
   if (!linearApiKey) throw new Error("LINEAR_API_KEY is required");
   const home = env.HOME ?? homedir();
   return {
+    name: env.MOJITO_NAME || osHostname.split(".")[0],
+    peers: parsePeers(env.MOJITO_PEERS),
     port: Number(env.MOJITO_PORT || 8700),
     host: env.MOJITO_HOST || "127.0.0.1",
     token,
@@ -44,6 +58,30 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     projectsJsonPath: env.MOJITO_PROJECTS ?? join(home, ".config", "mojito", "projects.json"),
     home,
   };
+}
+
+/**
+ * `MOJITO_PEERS`: comma-separated http(s) URLs of the other instances. A peer is named by the
+ * first DNS label of its host (`https://mac.<tailnet>.ts.net` → `mac`) — known at boot, with no
+ * request — or by the whole hostname when that is an IP or has no dot (the dev setup's
+ * `http://127.0.0.1:3200`). A bad URL or two peers with one name is a config error.
+ */
+export function parsePeers(raw: string | undefined): PeerConfig[] {
+  const peers: PeerConfig[] = [];
+  for (const item of (raw ?? "").split(",").map((s) => s.trim()).filter(Boolean)) {
+    let url: URL;
+    try {
+      url = new URL(item);
+    } catch {
+      throw new Error(`MOJITO_PEERS: not an http(s) URL: ${item}`);
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error(`MOJITO_PEERS: not an http(s) URL: ${item}`);
+    const host = url.hostname;
+    const name = isIP(host.replace(/^\[|\]$/g, "")) || !host.includes(".") ? host : host.split(".")[0];
+    if (peers.some((p) => p.name === name)) throw new Error(`MOJITO_PEERS: duplicate peer name: ${name}`);
+    peers.push({ name, url: (url.origin + url.pathname).replace(/\/+$/, "") });
+  }
+  return peers;
 }
 
 /**
