@@ -1,8 +1,9 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import type { MojitoEvent, SessionMeta, TaskRecord } from "@mojito/shared";
+import type { MojitoEvent, PeersAnswer, SessionMeta, TaskRecord } from "@mojito/shared";
 import { openEventStream, type EventSocket } from "@/lib/eventStream";
 import { removeById, upsertById } from "@/lib/eventCache";
+import { replacePeer } from "@/lib/peers";
 import { favoritesMutationKey, qk } from "@/lib/queryKeys";
 import { getToken, subscribeToken } from "@/lib/token";
 
@@ -31,6 +32,9 @@ function applyEvent(qc: QueryClient, e: MojitoEvent) {
       break;
     case "projects.changed":
       void qc.invalidateQueries({ queryKey: qk.projects });
+      break;
+    case "peers.updated":
+      qc.setQueryData<PeersAnswer>(qk.peers, (answer) => replacePeer(answer, e.peer));
       break;
   }
 }

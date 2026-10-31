@@ -4,6 +4,7 @@ export const qk = {
   tasks: ["tasks"],
   projects: ["projects"],
   settings: ["settings"],
+  peers: ["peers"],
 } as const;
 
 /** Every favourites write, queued in one mutation scope so the PUTs run one at a time. */
