@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { SessionMeta } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { usePeers } from "@/hooks/usePeers";
 import { useProjects } from "@/hooks/useProjects";
 import { useSessions } from "@/hooks/useSessions";
 import type { SidebarState } from "@/hooks/useSidebar";
@@ -13,6 +14,8 @@ import { apiJson } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { sessionLabel, sidebarGroups, splitHidden, type SidebarGroup } from "@/lib/sidebar";
 import { cn } from "@/lib/utils";
+import { InstanceSwitcher } from "./InstanceSwitcher";
+import { PeerSection, peerHalves } from "./PeerSection";
 import { SidebarRow } from "./SidebarRow";
 
 interface Props {
@@ -28,6 +31,7 @@ function Panel({ sidebar, currentId, replace, inSheet }: Props & { inSheet: bool
   const sessions = useSessions();
   const tickets = useTickets();
   const projects = useProjects();
+  const peers = usePeers();
   const qc = useQueryClient();
   const [showHidden, setShowHidden] = useState(false);
   const hiddenRef = useRef<HTMLDivElement>(null);
@@ -37,9 +41,13 @@ function Panel({ sidebar, currentId, replace, inSheet }: Props & { inSheet: bool
     [projects.data, sessions.data],
   );
   const ticketList = tickets.data?.tickets ?? [];
-  const hiddenSessions = hidden.flatMap((g) => g.sessions);
+  const peerList = peers.data?.peers ?? [];
+  // The Hidden footer counts every instance's hidden rows; each peer draws its own half.
+  const hiddenSessions = [...hidden, ...peerList.flatMap((p) => peerHalves(p).hidden)].flatMap((g) => g.sessions);
   const hiddenWaiting = hiddenSessions.some((s) => s.state === "needs-input");
   const expanded = showHidden && hiddenSessions.length > 0;
+
+  const switcher = peers.data && peers.data.peers.length > 0 ? peers.data : null;
 
   useEffect(() => {
     if (expanded) hiddenRef.current?.scrollIntoView({ block: "nearest" });
@@ -86,11 +94,17 @@ function Panel({ sidebar, currentId, replace, inSheet }: Props & { inSheet: bool
 
   return (
     <>
-      <div className="flex items-center gap-1 border-b py-2 pr-2 pl-4">
+      <div className={cn("flex items-center gap-1 border-b py-2 pr-2", switcher ? "pl-2" : "pl-4")}>
+        {/* With other instances the header names this one, as their menu; "Sessions" stays the accessible title. */}
         {inSheet ? (
-          <SheetTitle className="min-w-0 flex-1 truncate text-base">Sessions</SheetTitle>
+          <SheetTitle className={cn("min-w-0 flex-1 truncate text-base", switcher && "sr-only")}>Sessions</SheetTitle>
         ) : (
-          <h2 className="min-w-0 flex-1 truncate text-base font-semibold">Sessions</h2>
+          <h2 className={cn("min-w-0 flex-1 truncate text-base font-semibold", switcher && "sr-only")}>Sessions</h2>
+        )}
+        {switcher && (
+          <div className="flex min-w-0 flex-1">
+            <InstanceSwitcher answer={switcher} />
+          </div>
         )}
         {inSheet && <SheetDescription className="sr-only">The live sessions, grouped by project.</SheetDescription>}
         {sidebar.canPin && (
@@ -109,13 +123,19 @@ function Panel({ sidebar, currentId, replace, inSheet }: Props & { inSheet: bool
         </Button>
       </div>
       <nav aria-label="Live sessions" className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {shown.length === 0 && hiddenSessions.length === 0 && (
+        {shown.length === 0 && hidden.length === 0 && (
           <p className="px-2 py-3 text-sm text-muted-foreground">No live sessions</p>
         )}
         {groupList(shown)}
+        {peerList.map((p) => (
+          <PeerSection key={p.name} peer={p} hidden={false} />
+        ))}
         {expanded && (
           <div ref={hiddenRef} className="mt-2 border-t pt-1">
             {groupList(hidden)}
+            {peerList.map((p) => (
+              <PeerSection key={p.name} peer={p} hidden />
+            ))}
           </div>
         )}
       </nav>

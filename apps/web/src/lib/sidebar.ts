@@ -13,7 +13,7 @@ export interface SidebarGroup {
  * and leaves on a removal. Within a group the order is newest `createdAt`, ties by id: both
  * are immutable for a session's life, so a session asking for input never jumps.
  */
-export function sidebarGroups(projects: ProjectRow[], sessions: SessionMeta[]): SidebarGroup[] {
+export function sidebarGroups(projects: Pick<ProjectRow, "name">[], sessions: SessionMeta[]): SidebarGroup[] {
   const names = projects.map((p) => p.name).sort(byProjectName);
   const known = new Set(names);
   const live = sessions
@@ -43,7 +43,7 @@ export function splitHidden(groups: SidebarGroup[]): { shown: SidebarGroup[]; hi
  */
 export function sessionLabel(
   s: SessionMeta,
-  tickets: TicketSummary[],
+  tickets: Pick<TicketSummary, "identifier" | "title">[],
 ): { primary: string; secondary: string } {
   if (s.kind === "ticket" && s.ticket !== null) {
     return { primary: s.ticket, secondary: tickets.find((t) => t.identifier === s.ticket)?.title ?? "" };

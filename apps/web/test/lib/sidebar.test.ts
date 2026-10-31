@@ -190,3 +190,18 @@ describe("sessionLabel: a named session", () => {
     expect(sessionLabel(s, [ticket("RIC-5")])).toEqual({ primary: "RIC-5", secondary: "title RIC-5" });
   });
 });
+
+describe("a peer's sessions", () => {
+  it("group by the peer's project names alone", () => {
+    const groups = sidebarGroups([{ name: "Ios" }], [session("mj-RIC-7", { project: "Ios" }), session("mj-x", { project: null })]);
+    expect(groups.map((g) => [g.project, ids([g])])).toEqual([
+      ["Ios", ["mj-RIC-7"]],
+      [null, ["mj-x"]],
+    ]);
+  });
+
+  it("take their titles from the peer's ticket titles", () => {
+    const s = session("mj-RIC-7", { kind: "ticket", ticket: "RIC-7" });
+    expect(sessionLabel(s, [{ identifier: "RIC-7", title: "Ship it" }])).toEqual({ primary: "RIC-7", secondary: "Ship it" });
+  });
+});
