@@ -155,3 +155,27 @@ describe("DELETE /api/projects/:name", () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 });
+
+describe("projects.changed", () => {
+  const changed = (events: { type: string }[]) => events.filter((e) => e.type === "projects.changed").length;
+
+  it("is emitted after a create, an update, a rename and a delete", async () => {
+    const { req, events } = setup();
+    await req("/api/projects", { method: "POST", json: web });
+    expect(changed(events)).toBe(1);
+    await req("/api/projects/Web", { method: "PUT", json: { ...web, path: "/repo/web2" } });
+    expect(changed(events)).toBe(2);
+    await req("/api/projects/Web", { method: "PUT", json: { ...web, name: "Site" } });
+    expect(changed(events)).toBe(3);
+    await req("/api/projects/Site", { method: "DELETE" });
+    expect(changed(events)).toBe(4);
+  });
+
+  it("is not emitted when a change is refused", async () => {
+    const { req, events } = setup();
+    await req("/api/projects", { method: "POST", json: { ...web, path: "repo/web" } });
+    await req("/api/projects/Nope", { method: "DELETE" });
+    await req("/api/projects/Nope", { method: "PUT", json: web });
+    expect(changed(events)).toBe(0);
+  });
+});

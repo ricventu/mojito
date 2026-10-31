@@ -29,6 +29,9 @@ function applyEvent(qc: QueryClient, e: MojitoEvent) {
     case "tickets.changed":
       void qc.invalidateQueries({ queryKey: qk.tickets });
       break;
+    case "projects.changed":
+      void qc.invalidateQueries({ queryKey: qk.projects });
+      break;
   }
 }
 

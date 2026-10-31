@@ -20,7 +20,11 @@ export function projectRoutes(deps: AppDeps): Hono {
     if (!exists(path)) return `project path not found: ${path}`;
     return null;
   };
-  const changed = () => void deps.tickets.refresh();
+  // Every client (and every peer that lists this instance) re-reads the projects.
+  const changed = () => {
+    void deps.tickets.refresh();
+    deps.bus.emit({ type: "projects.changed" });
+  };
 
   return new Hono()
     .get("/projects", (c) => c.json(deps.projects.list()))
