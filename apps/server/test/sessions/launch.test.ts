@@ -89,7 +89,6 @@ const row = (over: Partial<SessionMeta>): SessionMeta => ({
   alert: null,
   createdAt: 1,
   lastEventAt: 1,
-  hidden: false,
   title: null,
   ...over,
 });
@@ -119,7 +118,6 @@ describe("launchTicket", () => {
       alert: null,
       createdAt: 1000,
       lastEventAt: 1000,
-      hidden: false,
       title: null,
     };
     expect(res).toEqual({ ok: true, session: expected });
@@ -322,14 +320,6 @@ describe("launchTicket", () => {
     expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "starting", model: "opus", effort: "high", createdAt: 1000 });
   });
 
-  it("a relaunch shows a hidden session again", async () => {
-    const { deps, sessions } = setup();
-    sessions.insert(row({ state: "ended", hidden: true }));
-    const res = await launchTicket(body(), deps);
-    expect(res.ok).toBe(true);
-    expect(sessions.get("mj-RIC-1")?.hidden).toBe(false);
-  });
-
   it("arms the startup stall watch", async () => {
     const { deps, sessions } = setup();
     await launchTicket(body(), deps);
@@ -357,7 +347,6 @@ describe("launchFree", () => {
       alert: null,
       createdAt: 1000,
       lastEventAt: 1000,
-      hidden: false,
       title: null,
     };
     expect(res).toEqual({ ok: true, session: expected });
@@ -467,7 +456,6 @@ describe("launchGitResolve", () => {
       alert: null,
       createdAt: 1000,
       lastEventAt: 1000,
-      hidden: false,
       title: null,
     };
     expect(res).toEqual({ ok: true, session: expected, alreadyOpen: false });
@@ -490,9 +478,9 @@ describe("launchGitResolve", () => {
 
   it("ends a row whose tmux is gone and opens the session afresh", async () => {
     const { deps, sessions } = setup({ hasSession: vi.fn(async () => false) });
-    sessions.insert(row({ id: "mj-web-git", kind: "claude", ticket: null, state: "idle", hidden: true }));
+    sessions.insert(row({ id: "mj-web-git", kind: "claude", ticket: null, state: "idle" }));
     const res = await launchGitResolve(req, deps);
-    expect(res).toMatchObject({ ok: true, alreadyOpen: false, session: { state: "starting", hidden: false } });
+    expect(res).toMatchObject({ ok: true, alreadyOpen: false, session: { state: "starting" } });
     expect(deps.newSession).toHaveBeenCalledTimes(1);
   });
 

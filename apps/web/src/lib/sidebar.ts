@@ -28,13 +28,9 @@ export function sidebarGroups(projects: Pick<ProjectRow, "name">[], sessions: Se
     .filter((g) => g.sessions.length > 0);
 }
 
-/** The groups without and with hidden sessions; both halves keep the grouping, empty groups dropped. */
-export function splitHidden(groups: SidebarGroup[]): { shown: SidebarGroup[]; hidden: SidebarGroup[] } {
-  const part = (hidden: boolean): SidebarGroup[] =>
-    groups
-      .map((g) => ({ project: g.project, sessions: g.sessions.filter((s) => s.hidden === hidden) }))
-      .filter((g) => g.sessions.length > 0);
-  return { shown: part(false), hidden: part(true) };
+/** How many sessions the groups hold: the count on a host's band. */
+export function sessionCount(groups: SidebarGroup[]): number {
+  return groups.reduce((n, g) => n + g.sessions.length, 0);
 }
 
 /**

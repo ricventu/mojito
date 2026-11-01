@@ -24,7 +24,7 @@ app's state, left in place.
 
 - `packages/shared` — types (`SessionMeta`, `TaskRecord`, `TicketSummary`, `BoardTickets`,
   `Settings`, `ProjectRow`, `Favorite`), zod request bodies (`LaunchBody`, `ProjectBody`, `SettingsBody`,
-  `PromptsBody`, `FavoritesBody`, `StatusBody`, `SessionPatchBody`), `MojitoEvent`, `MODELS`/`EFFORTS`, `DEFAULT_PROMPTS`,
+  `PromptsBody`, `FavoritesBody`, `StatusBody`), `MojitoEvent`, `MODELS`/`EFFORTS`, `DEFAULT_PROMPTS`,
   `SESSION_GONE_CODE` (4404), the git graph types (`GitGraphPage`, `GraphCommit`, `GraphRef`,
   `GraphHighlight`, `CommitDetails`, `CommitFile`, `CommitDiff`) and `isValidHash`/`isValidTicket`, the docs
   types (`DocEntry`, `DocList`, `DocFile`, `DOC_MAX_BYTES`) and `isDocPath`, the peer types
@@ -41,8 +41,8 @@ app's state, left in place.
 
 - **Persistence** (`src/db`): migrations are TS modules exporting SQL (`migrations/*.ts`,
   applied once each, in a transaction) — `.sql` imports break under vitest and `tsx watch`.
-  Tables: `projects`, `settings` (key/value JSON), `sessions` (`hidden` since migration 003),
-  `sdk_tasks`. Tickets are never
+  Tables: `projects`, `settings` (key/value JSON), `sessions` (`hidden`, added by 003, was
+  dropped by 005 with the sidebar's Hide), `sdk_tasks`. Tickets are never
   stored: `tickets/cache.ts` polls Linear every 45 s, scoped to the mapped project names,
   coalesces concurrent refreshes, keeps the last list (`stale`) when Linear fails.
   `projects.json` (`~/.config/mojito/projects.json`) is imported once per database, then
@@ -73,10 +73,6 @@ app's state, left in place.
 - **Favourites** (RIC-502) are the `favorites` settings key: `{name, search}[]`, validated by
   shape only (≤ 50, name trimmed 1-60 and unique case-insensitively, `search` ≤ 2000) — the
   server never interprets `search`, the client's `parseFilters` does.
-- **Hidden sessions**: `sessions.hidden` is sidebar-only state (the board, the waiting pill and
-  Kill ignore it), set by `PATCH /api/sessions/:id` (`SessionPatchBody`, strict: unknown id 404,
-  any other body 400; emits `session.updated`). A launch writes a fresh row, so a relaunched
-  session is visible again; adoption writes `false`, a revive keeps the row's value.
 - **Live state** comes only from Claude Code hooks (`hookSettings.ts` → curl to
   `<selfOrigin>/api/hook` — the configured host, loopback only for a wildcard bind — with
   `x-mojito-token` and claude's hook JSON as body; `hookMap.ts`, `hooks.ts`). `ended` is
@@ -195,7 +191,7 @@ app's state, left in place.
   No echo: a peer's `/api/sessions` is only its own. Paths never leave a peer (names only).
   `GET /api/peers` → `{self, peers}`; `POST /api/peers/:name/sessions` forwards a `LaunchBody`
   and answers the peer's status/body verbatim (offline/unreachable/non-json 502, no answer in
-  30 s → 504 "may still be starting"). Nothing else is forwarded — no pty, git, docs, Hide.
+  30 s → 504 "may still be starting"). Nothing else is forwarded — no pty, git, docs.
   Mac setup: `tailscale serve --bg 8700`, the same `MOJITO_TOKEN`, each instance listing the
   other in `MOJITO_PEERS`.
 
@@ -261,8 +257,8 @@ app's state, left in place.
   pages reach it through `useAppSidebar`/`SidebarToggle`, and each starts after it with
   `[var(--dock-width)]`, guarded by `safeArea.test.ts`). Every
   non-`ended` session, unfiltered by the board, grouped by project (General last), newest
-  `createdAt` first — only immutable keys, so rows never jump when a state changes. Hide is
-  per row (optimistic `setQueryData`, a failed `PATCH` re-reads), with a "Hidden (n)" footer.
+  `createdAt` first — only immutable keys, so rows never jump when a state changes. No Hide:
+  it was removed (a session leaves the sidebar when it ends).
   Unpinned it is a left `Sheet` overlay (never resizes the pty); pinned it is a docked `w-72`
   column, only at ≥ 1024px (`useMediaQuery`), pin in `localStorage` (`mojito-sidebar-pinned`,
   read in the `useReducer` initialiser so it docks on the first render, no pty resize twice).
@@ -274,12 +270,14 @@ app's state, left in place.
   `/session/:id`). A docked sidebar is not rendered while the iOS keyboard is up (the terminal
   tells the shell, `useKeyboardUp`, in a layout effect).
 - **Peers in the web** (`lib/peers.ts`, `hooks/usePeers.ts` under `qk.peers`, patched by
-  `peers.updated`): after the local groups the sidebar draws each peer (`PeerSection`: name, dot,
-  "offline", then its sessions grouped by its project names). A peer row is an `<a target=_blank>`
-  to `peerHref` — the peer's own client at `/session/<id>?token=` — with no Hide (that is the
-  peer's state); rows the peer hid go in the Hidden footer. With peers the header is
-  `InstanceSwitcher` (this instance's name, a menu opening the others; "Sessions" stays as the
-  `sr-only` title). `SidebarToggle` carries an amber dot when a peer has a visible session
+  `peers.updated`): with peers every instance gets a band (`HostSection`), this one first, each
+  peer after it (`PeerSection`) — the band is the top tier (uppercase name, session count,
+  `sticky` so a row's host is always on screen), project headings the middle one. Hosts carry no
+  status dot (a dot always means a session's state): an offline peer is its band alone, dimmed,
+  "· offline". Anything that leaves this host ends in ↗: a peer row is an `<a target=_blank>` to
+  `peerHref` — the peer's own client at `/session/<id>?token=` — and the peer's band has ↗ to
+  open its client (no instance menu). Without peers there are no bands, the list is this
+  instance's projects. `SidebarToggle` carries an amber dot when a peer has a session
   waiting; the board and its waiting pill stay local. The ticket sheet's "Run on"
   (`launchHosts`: this instance, then online peers mapping the ticket's project) shows only with
   more than one host; a peer launch opens its tab **inside the click** (`window.open("")`, then

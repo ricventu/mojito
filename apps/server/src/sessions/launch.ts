@@ -144,7 +144,6 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
       alert: null,
       createdAt: now,
       lastEventAt: now,
-      hidden: false,
       title: null,
     };
     record(deps, session);
@@ -191,7 +190,6 @@ export async function launchFree(body: LaunchFreeBody, deps: LaunchDeps): Promis
     alert: null,
     createdAt: now,
     lastEventAt: now,
-    hidden: false,
     title: null,
   };
 
@@ -273,7 +271,6 @@ export async function launchGitResolve(
       alert: null,
       createdAt: now,
       lastEventAt: now,
-      hidden: false,
       title: null,
     };
     record(deps, session);

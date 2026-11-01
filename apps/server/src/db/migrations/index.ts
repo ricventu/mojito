@@ -2,6 +2,7 @@ import init from "./001_init";
 import dropBrainstorming from "./002_drop_brainstorming";
 import sessionHidden from "./003_session_hidden";
 import sessionTitle from "./004_session_title";
+import dropSessionHidden from "./005_drop_session_hidden";
 
 export interface Migration {
   version: number;
@@ -14,4 +15,5 @@ export const migrations: Migration[] = [
   { version: 2, sql: dropBrainstorming },
   { version: 3, sql: sessionHidden },
   { version: 4, sql: sessionTitle },
+  { version: 5, sql: dropSessionHidden },
 ];

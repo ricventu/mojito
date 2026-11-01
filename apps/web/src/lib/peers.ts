@@ -24,9 +24,9 @@ export function launchHosts(ticket: Pick<TicketSummary, "project">, self: string
   return [{ name: self, peer: null }, ...others.map((p) => ({ name: p.name, peer: p }))];
 }
 
-/** Whether a session on another instance is asking for input and not hidden there. */
+/** Whether a session on another instance is asking for input. */
 export function waitingPeers(peers: PeerSnapshot[]): boolean {
-  return peers.some((p) => p.sessions.some((s) => s.state === "needs-input" && !s.hidden));
+  return peers.some((p) => p.sessions.some((s) => s.state === "needs-input"));
 }
 
 /**

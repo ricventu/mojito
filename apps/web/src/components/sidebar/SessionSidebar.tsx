@@ -1,8 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { EyeOff, Pin, PinOff, X } from "lucide-react";
-import { toast } from "sonner";
-import type { SessionMeta } from "@mojito/shared";
+import { useMemo, useSyncExternalStore } from "react";
+import { Pin, PinOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { usePeers } from "@/hooks/usePeers";
@@ -10,12 +7,10 @@ import { useProjects } from "@/hooks/useProjects";
 import { useSessions } from "@/hooks/useSessions";
 import type { SidebarState } from "@/hooks/useSidebar";
 import { useTickets } from "@/hooks/useTickets";
-import { apiJson } from "@/lib/api";
-import { qk } from "@/lib/queryKeys";
-import { sessionLabel, sidebarGroups, splitHidden, type SidebarGroup } from "@/lib/sidebar";
-import { cn } from "@/lib/utils";
-import { InstanceSwitcher } from "./InstanceSwitcher";
-import { PeerSection, peerHalves } from "./PeerSection";
+import { sessionCount, sessionLabel, sidebarGroups } from "@/lib/sidebar";
+import { getToken, subscribeToken } from "@/lib/token";
+import { GroupList, HostSection } from "./HostSection";
+import { PeerSection } from "./PeerSection";
 import { SidebarRow } from "./SidebarRow";
 
 interface Props {
@@ -26,87 +21,53 @@ interface Props {
   replace?: boolean;
 }
 
-/** The header, the grouped list and the hidden footer: the same in the docked column and the overlay. */
+/**
+ * The header and the grouped list: the same in the docked column and the overlay. With peers
+ * configured every instance gets a band (`HostSection`), this one first; without, the list is
+ * this instance's projects alone, as before peers existed.
+ */
 function Panel({ sidebar, currentId, replace, inSheet }: Props & { inSheet: boolean }) {
   const sessions = useSessions();
   const tickets = useTickets();
   const projects = useProjects();
   const peers = usePeers();
-  const qc = useQueryClient();
-  const [showHidden, setShowHidden] = useState(false);
-  const hiddenRef = useRef<HTMLDivElement>(null);
+  const token = useSyncExternalStore(subscribeToken, getToken);
 
-  const { shown, hidden } = useMemo(
-    () => splitHidden(sidebarGroups(projects.data ?? [], sessions.data ?? [])),
-    [projects.data, sessions.data],
-  );
+  const groups = useMemo(() => sidebarGroups(projects.data ?? [], sessions.data ?? []), [projects.data, sessions.data]);
   const ticketList = tickets.data?.tickets ?? [];
-  const peerList = peers.data?.peers ?? [];
-  // The Hidden footer counts every instance's hidden rows; each peer draws its own half.
-  const hiddenSessions = [...hidden, ...peerList.flatMap((p) => peerHalves(p).hidden)].flatMap((g) => g.sessions);
-  const hiddenWaiting = hiddenSessions.some((s) => s.state === "needs-input");
-  const expanded = showHidden && hiddenSessions.length > 0;
-
-  const switcher = peers.data && peers.data.peers.length > 0 ? peers.data : null;
-
-  useEffect(() => {
-    if (expanded) hiddenRef.current?.scrollIntoView({ block: "nearest" });
-  }, [expanded]);
+  const answer = peers.data && peers.data.peers.length > 0 ? peers.data : null;
 
   // The row's link navigates; a pick only closes the overlay.
   const pick = () => {
     if (!sidebar.docked) sidebar.close();
   };
 
-  // Optimistic: the row moves at once; the server's `session.updated` confirms it. A refetch
-  // already in flight is cancelled first, or its older list would put the row back. A failure
-  // re-reads the list rather than remembering what to roll back.
-  const setHidden = async (id: string, next: boolean) => {
-    await qc.cancelQueries({ queryKey: qk.sessions });
-    qc.setQueryData<SessionMeta[]>(qk.sessions, (list) => list?.map((s) => (s.id === id ? { ...s, hidden: next } : s)));
-    try {
-      await apiJson<SessionMeta>(`/api/sessions/${encodeURIComponent(id)}`, "PATCH", { hidden: next });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : next ? "Hiding failed" : "Showing failed");
-      void qc.invalidateQueries({ queryKey: qk.sessions });
-    }
-  };
-
-  const groupList = (groups: SidebarGroup[]) =>
-    groups.map((g) => (
-      <section key={g.project ?? "general"} className="flex flex-col gap-0.5">
-        <h3 className="truncate px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground">{g.project ?? "General"}</h3>
-        <ul className="flex flex-col gap-0.5">
-          {g.sessions.map((s) => (
-            <SidebarRow
-              key={s.id}
-              session={s}
-              label={sessionLabel(s, ticketList)}
-              current={s.id === currentId}
-              replace={replace ?? false}
-              onPick={pick}
-              onHide={(next) => void setHidden(s.id, next)}
-            />
-          ))}
-        </ul>
-      </section>
-    ));
+  const local = (
+    <GroupList
+      nested={answer !== null}
+      groups={groups}
+      row={(s) => (
+        <SidebarRow
+          key={s.id}
+          session={s}
+          label={sessionLabel(s, ticketList)}
+          current={s.id === currentId}
+          replace={replace ?? false}
+          onPick={pick}
+        />
+      )}
+    />
+  );
 
   return (
     <>
-      <div className={cn("flex items-center gap-1 border-b py-2 pr-2", switcher ? "pl-2" : "pl-4")}>
-        {/* With other instances the header names this one, as their menu; "Sessions" stays the accessible title. */}
+      <div className="flex items-center gap-1 border-b py-2 pr-2 pl-4">
         {inSheet ? (
-          <SheetTitle className={cn("min-w-0 flex-1 truncate text-base", switcher && "sr-only")}>Sessions</SheetTitle>
+          <SheetTitle className="min-w-0 flex-1 truncate text-base">Sessions</SheetTitle>
         ) : (
-          <h2 className={cn("min-w-0 flex-1 truncate text-base font-semibold", switcher && "sr-only")}>Sessions</h2>
+          <h2 className="min-w-0 flex-1 truncate text-base font-semibold">Sessions</h2>
         )}
-        {switcher && (
-          <div className="flex min-w-0 flex-1">
-            <InstanceSwitcher answer={switcher} />
-          </div>
-        )}
-        {inSheet && <SheetDescription className="sr-only">The live sessions, grouped by project.</SheetDescription>}
+        {inSheet && <SheetDescription className="sr-only">The live sessions, grouped by host and project.</SheetDescription>}
         {sidebar.canPin && (
           <Button
             variant="ghost"
@@ -123,38 +84,19 @@ function Panel({ sidebar, currentId, replace, inSheet }: Props & { inSheet: bool
         </Button>
       </div>
       <nav aria-label="Live sessions" className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {shown.length === 0 && hidden.length === 0 && (
-          <p className="px-2 py-3 text-sm text-muted-foreground">No live sessions</p>
-        )}
-        {groupList(shown)}
-        {peerList.map((p) => (
-          <PeerSection key={p.name} peer={p} hidden={false} />
-        ))}
-        {expanded && (
-          <div ref={hiddenRef} className="mt-2 border-t pt-1">
-            {groupList(hidden)}
-            {peerList.map((p) => (
-              <PeerSection key={p.name} peer={p} hidden />
+        {answer ? (
+          <>
+            <HostSection name={answer.self} count={sessionCount(groups)} online first>
+              {local}
+            </HostSection>
+            {answer.peers.map((p) => (
+              <PeerSection key={p.name} peer={p} token={token} />
             ))}
-          </div>
+          </>
+        ) : (
+          local
         )}
       </nav>
-      {hiddenSessions.length > 0 && (
-        <div className="border-t p-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-expanded={expanded}
-            className={cn(
-              "w-full justify-start",
-              hiddenWaiting ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground",
-            )}
-            onClick={() => setShowHidden(!showHidden)}
-          >
-            <EyeOff size={14} /> Hidden ({hiddenSessions.length})
-          </Button>
-        </div>
-      )}
     </>
   );
 }

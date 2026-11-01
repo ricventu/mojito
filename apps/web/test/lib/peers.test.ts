@@ -14,7 +14,6 @@ const session = (id: string, over: Partial<SessionMeta> = {}): SessionMeta => ({
   alert: null,
   createdAt: 1,
   lastEventAt: 1,
-  hidden: false,
   title: null,
   ...over,
 });
@@ -57,12 +56,11 @@ describe("launchHosts", () => {
 });
 
 describe("waitingPeers", () => {
-  it("is true when a peer has a visible session asking for input", () => {
+  it("is true when a peer has a session asking for input", () => {
     expect(waitingPeers([peer("mac", [], { sessions: [session("mj-a", { state: "needs-input" })] })])).toBe(true);
   });
 
-  it("ignores a hidden one, and a peer with none", () => {
-    expect(waitingPeers([peer("mac", [], { sessions: [session("mj-a", { state: "needs-input", hidden: true })] })])).toBe(false);
+  it("is false for a peer with none waiting, and for no peers", () => {
     expect(waitingPeers([peer("mac", [], { sessions: [session("mj-a")] })])).toBe(false);
     expect(waitingPeers([])).toBe(false);
   });

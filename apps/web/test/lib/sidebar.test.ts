@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectRow, SessionMeta, TicketSummary } from "@mojito/shared";
 import { groupBoard } from "@/lib/board";
-import { sessionLabel, sessionName, sidebarGroups, splitHidden } from "@/lib/sidebar";
+import { sessionCount, sessionLabel, sessionName, sidebarGroups } from "@/lib/sidebar";
 
 const project = (name: string): ProjectRow => ({ name, path: `/repos/${name}`, teamKey: "RIC" });
 
@@ -18,7 +18,6 @@ function session(id: string, over: Partial<SessionMeta> = {}): SessionMeta {
     alert: null,
     createdAt: 1,
     lastEventAt: 1,
-    hidden: false,
     title: null,
     ...over,
   };
@@ -113,26 +112,14 @@ describe("sidebarGroups", () => {
   });
 });
 
-describe("splitHidden", () => {
-  it("keeps the grouping and drops empty groups", () => {
+describe("sessionCount", () => {
+  it("counts every group's sessions", () => {
     const groups = sidebarGroups(
       [project("Alpha"), project("Beta")],
-      [
-        session("mj-1", { project: "Alpha" }),
-        session("mj-2", { project: "Alpha", hidden: true }),
-        session("mj-3", { project: "Beta", hidden: true }),
-        session("mj-4", { project: null }),
-      ],
+      [session("mj-1", { project: "Alpha" }), session("mj-2", { project: "Beta" }), session("mj-3", { project: null })],
     );
-    const { shown, hidden } = splitHidden(groups);
-    expect(shown.map((g) => [g.project, g.sessions.map((s) => s.id)])).toEqual([
-      ["Alpha", ["mj-1"]],
-      [null, ["mj-4"]],
-    ]);
-    expect(hidden.map((g) => [g.project, g.sessions.map((s) => s.id)])).toEqual([
-      ["Alpha", ["mj-2"]],
-      ["Beta", ["mj-3"]],
-    ]);
+    expect(sessionCount(groups)).toBe(3);
+    expect(sessionCount([])).toBe(0);
   });
 });
 

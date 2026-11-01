@@ -29,7 +29,6 @@ function setup() {
     alert: null,
     createdAt: 1,
     lastEventAt: 1,
-    hidden: false,
     title: null,
   });
   vi.mocked(attachPty).mockClear();

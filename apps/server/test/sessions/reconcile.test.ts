@@ -17,7 +17,6 @@ const meta = (id: string, state: SessionMeta["state"]): SessionMeta => ({
   alert: state === "needs-input" ? "x" : null,
   createdAt: 1,
   lastEventAt: 1,
-  hidden: false,
   title: null,
 });
 
@@ -70,7 +69,6 @@ describe("reconcileSessions", () => {
       alert: null,
       createdAt: 900,
       lastEventAt: 900,
-      hidden: false,
       title: null,
     });
     expect(events).toEqual([

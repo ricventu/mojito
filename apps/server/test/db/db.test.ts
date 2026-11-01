@@ -17,7 +17,7 @@ describe("migrate", () => {
     migrate(db);
     migrate(db);
     const rows = db.prepare("SELECT version FROM schema_migrations").all();
-    expect(rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }]);
+    expect(rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }]);
   });
   it("drops the brainstorming column and its stored default (v2)", () => {
     const db = openDb(":memory:");
@@ -29,12 +29,12 @@ describe("migrate", () => {
     expect(columns).not.toContain("brainstorming");
     expect(db.prepare("SELECT key FROM settings WHERE key = 'brainstormingDefault'").get()).toBeUndefined();
   });
-  it("adds hidden, defaulting to 0", () => {
+  it("drops hidden (v5), which 003 added", () => {
     const db = openDb(":memory:");
-    const columns = db.prepare("PRAGMA table_info(sessions)").all() as { name: string; notnull: number; dflt_value: string | null }[];
-    expect(columns.find((c) => c.name === "hidden")).toMatchObject({ notnull: 1, dflt_value: "0" });
+    const columns = (db.prepare("PRAGMA table_info(sessions)").all() as { name: string }[]).map((c) => c.name);
+    expect(columns).not.toContain("hidden");
   });
-  it("migrates an existing version-2 database, its sessions reading back visible and unnamed", () => {
+  it("migrates an existing version-2 database, its sessions reading back unnamed", () => {
     // A database as the build before 003 left it: migrations 1 and 2 applied, one session.
     const db = new Database(":memory:");
     db.exec("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY)");
@@ -52,8 +52,9 @@ describe("migrate", () => {
       { version: 2 },
       { version: 3 },
       { version: 4 },
+      { version: 5 },
     ]);
-    expect(new SessionsRepo(db).get("mj-RIC-1")).toEqual(session({ state: "idle", lastEventAt: 2, hidden: false, title: null }));
+    expect(new SessionsRepo(db).get("mj-RIC-1")).toEqual(session({ state: "idle", lastEventAt: 2, title: null }));
   });
   it("enforces foreign keys pragma", () => {
     const db = openDb(":memory:");
@@ -208,7 +209,6 @@ const session = (over: Partial<SessionMeta> = {}): SessionMeta => ({
   alert: null,
   createdAt: 1,
   lastEventAt: 1,
-  hidden: false,
   title: null,
   ...over,
 });

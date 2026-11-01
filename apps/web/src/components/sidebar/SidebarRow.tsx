@@ -1,7 +1,6 @@
-import { Eye, EyeOff } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { Link } from "react-router";
 import type { SessionMeta, SessionState } from "@mojito/shared";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const DOT: Record<SessionState, { label: string; className: string }> = {
@@ -20,22 +19,19 @@ interface Props {
   replace: boolean;
   /** A plain click on the row; a modified click opens a new tab and leaves the page alone. */
   onPick(): void;
-  /** Absent for another instance's session: hiding is that instance's own state. */
-  onHide?(hidden: boolean): void;
-  /** Another instance's session: its own client, in a new tab, instead of this app's terminal. */
-  href?: string;
+  /** A session on another instance: its own client, in a new tab, instead of this app's terminal. */
+  remote?: { host: string; href: string };
 }
 
 const ROW_LINK =
-  "flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-1.5 text-left outline-none hover:bg-accent/60 focus-visible:ring-[3px] focus-visible:ring-ring/50";
+  "flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left outline-none hover:bg-accent/60 focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 /**
  * One live session: its state dot and label are a link to its terminal (so Cmd/middle-click
- * and a long-press work as on any link); the eye beside it hides or shows it — with a mouse,
- * only on hover or focus, so a column of eyes does not out-shout the labels. A session on
- * another instance links to that instance's client instead, and has no eye.
+ * and a long-press work as on any link). A session on another instance links to that
+ * instance's client instead, and ends in ↗: tapping it leaves this host.
  */
-export function SidebarRow({ session, label, current, replace, onPick, onHide, href }: Props) {
+export function SidebarRow({ session, label, current, replace, onPick, remote }: Props) {
   const dot = DOT[session.state];
   const { primary, secondary } = label;
   const body = (
@@ -52,10 +48,12 @@ export function SidebarRow({ session, label, current, replace, onPick, onHide, h
   );
 
   return (
-    <li className={cn("group/row flex items-center gap-1 rounded-md pr-1", current && "bg-accent text-accent-foreground")}>
-      {href ? (
-        <a href={href} target="_blank" rel="noopener" className={ROW_LINK}>
+    <li className={cn("flex flex-col rounded-md", current && "bg-accent text-accent-foreground")}>
+      {remote ? (
+        <a href={remote.href} target="_blank" rel="noopener" className={ROW_LINK}>
           {body}
+          <ArrowUpRight aria-hidden size={14} className="shrink-0 text-muted-foreground" />
+          <span className="sr-only">(opens on {remote.host})</span>
         </a>
       ) : (
         <Link
@@ -70,15 +68,6 @@ export function SidebarRow({ session, label, current, replace, onPick, onHide, h
           {body}
         </Link>
       )}
-      {onHide && <Button
-        variant="ghost"
-        size="icon-sm"
-        className="shrink-0 text-muted-foreground pointer-fine:opacity-0 pointer-fine:group-hover/row:opacity-100 pointer-fine:focus-visible:opacity-100"
-        aria-label={session.hidden ? `Show ${primary}` : `Hide ${primary}`}
-        onClick={() => onHide(!session.hidden)}
-      >
-        {session.hidden ? <Eye size={16} /> : <EyeOff size={16} />}
-      </Button>}
     </li>
   );
 }

@@ -17,7 +17,6 @@ const meta = (state: SessionMeta["state"]): SessionMeta => ({
   alert: state === "needs-input" ? "claude is waiting for you" : null,
   createdAt: 1,
   lastEventAt: 1,
-  hidden: false,
   title: null,
 });
 
