@@ -1,4 +1,5 @@
 import type { PeerSnapshot, PeersAnswer, SessionMeta, TicketSummary } from "@mojito/shared";
+import { byProjectName } from "@/lib/board";
 
 /**
  * A page of a peer's own client, logged in: its first-visit `?token=` handoff takes the token
@@ -29,6 +30,27 @@ export function launchHosts(ticket: Pick<TicketSummary, "project">, self: string
   const project = ticket.project;
   const others = project === null ? [] : peers.filter((p) => p.online && p.projects.includes(project));
   return [{ name: self, peer: null }, ...others.map((p) => ({ name: p.name, peer: p }))];
+}
+
+/**
+ * The projects a free session can start in: this instance's and every online peer's, once
+ * each, in display order. A project only a peer maps is launchable there (`freeLaunchHosts`).
+ */
+export function freeLaunchProjects(selfProjects: string[], peers: PeerSnapshot[]): string[] {
+  const online = peers.filter((p) => p.online).flatMap((p) => p.projects);
+  return [...new Set([...selfProjects, ...online])].sort(byProjectName);
+}
+
+/**
+ * Where a free session can run: the hosts that map its project, this instance first when it
+ * does. General (`null`) needs no checkout — it starts in the home directory — so it runs on
+ * this instance and every online peer.
+ */
+export function freeLaunchHosts(project: string | null, self: string, selfProjects: string[], peers: PeerSnapshot[]): LaunchHost[] {
+  const maps = (projects: string[]) => project === null || projects.includes(project);
+  const here = maps(selfProjects) ? [{ name: self, peer: null }] : [];
+  const others = peers.filter((p) => p.online && maps(p.projects));
+  return [...here, ...others.map((p) => ({ name: p.name, peer: p }))];
 }
 
 /** Whether a session on another instance is asking for input. */

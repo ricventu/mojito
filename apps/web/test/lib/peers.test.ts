@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PeerSnapshot, PeersAnswer, SessionMeta } from "@mojito/shared";
-import { appTitle, launchHosts, peerHref, peerSessionForTicket, replacePeer, waitingPeers } from "@/lib/peers";
+import { appTitle, freeLaunchHosts, freeLaunchProjects, launchHosts, peerHref, peerSessionForTicket, replacePeer, waitingPeers } from "@/lib/peers";
 
 const session = (id: string, over: Partial<SessionMeta> = {}): SessionMeta => ({
   id,
@@ -52,6 +52,35 @@ describe("launchHosts", () => {
 
   it("a ticket with no project runs here only", () => {
     expect(launchHosts({ project: null }, "box", [peer("mac", ["Web"])]).map((h) => h.name)).toEqual(["box"]);
+  });
+});
+
+describe("freeLaunchProjects", () => {
+  it("is this instance's projects and every online peer's, once each, by name", () => {
+    const projects = freeLaunchProjects(["Web", "api"], [
+      peer("mac", ["Web", "Ios"]),
+      peer("air", ["Old"], { online: false }),
+      peer("mini", ["Ios", "Zed"]),
+    ]);
+    expect(projects).toEqual(["api", "Ios", "Web", "Zed"]);
+  });
+});
+
+describe("freeLaunchHosts", () => {
+  const peers = [peer("mac", ["Web"]), peer("air", ["Web"], { online: false }), peer("mini", ["Ios"])];
+
+  it("is this instance first when it maps the project, then the online peers that map it", () => {
+    expect(freeLaunchHosts("Web", "box", ["Web"], peers).map((h) => h.name)).toEqual(["box", "mac"]);
+  });
+
+  it("leaves this instance out when the project is only on a peer", () => {
+    const hosts = freeLaunchHosts("Ios", "box", ["Web"], peers);
+    expect(hosts.map((h) => h.name)).toEqual(["mini"]);
+    expect(hosts[0].peer?.name).toBe("mini");
+  });
+
+  it("General runs anywhere online", () => {
+    expect(freeLaunchHosts(null, "box", [], peers).map((h) => h.name)).toEqual(["box", "mac", "mini"]);
   });
 });
 

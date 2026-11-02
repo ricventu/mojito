@@ -313,7 +313,10 @@ app's state, left in place.
   waiting; the board and its waiting pill stay local. The ticket sheet's "Run on"
   (`launchHosts`: this instance, then online peers mapping the ticket's project) shows only with
   more than one host; a peer launch navigates in place to the session once the forward answers
-  (a 409 with `sessionId` too) — there is no tab, so no `window.open` dance. A
+  (a 409 with `sessionId` too) — there is no tab, so no `window.open` dance. The new-session sheet has
+  the same "Run on" (`freeLaunchHosts`): its Project list is this instance's projects and every
+  online peer's (`freeLaunchProjects`), the hosts are those mapping the picked one (General: all
+  online), and it shows with a choice or when the only host is a peer. A
   ticket already running on a peer (`peerSessionForTicket`) shows "Session on <peer>" and an
   in-app Open link instead of the Launch form: the board is local, and a Launch would start a
   second agent on the same ticket.
