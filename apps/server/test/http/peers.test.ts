@@ -85,6 +85,128 @@ describe("POST /api/peers/:name/sessions", () => {
   });
 });
 
+describe("ALL /api/peers/:name/*", () => {
+  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1, 2]);
+  const IMAGE = "/api/peers/mac/sessions/mj-a/image?path=a.png";
+
+  it("relays an image read with the token alone and passes the safe headers back", async () => {
+    const { req, fetch } = withPeers(
+      async () =>
+        new Response(PNG, {
+          headers: {
+            "content-type": "image/png",
+            "x-content-type-options": "nosniff",
+            "content-security-policy": "sandbox; default-src 'none'",
+            "cache-control": "no-store",
+            "set-cookie": "a=b",
+          },
+        }),
+    );
+    const res = await req(IMAGE, { headers: { cookie: "x" } });
+    expect(res.status).toBe(200);
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(PNG);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(res.headers.get("content-security-policy")).toBe("sandbox; default-src 'none'");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("set-cookie")).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://mac.t.ts.net/api/sessions/mj-a/image?path=a.png");
+    expect(Object.fromEntries(new Headers(init.headers))).toEqual({ "x-mojito-token": "tok" });
+  });
+
+  it("passes the peer's answer to a kill verbatim", async () => {
+    const { req, fetch } = withPeers(async () => Response.json({ error: "claude did not exit: open the terminal" }, { status: 409 }));
+    const res = await req("/api/peers/mac/sessions/mj-a", { method: "DELETE" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "claude did not exit: open the terminal" });
+    expect((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].method).toBe("DELETE");
+  });
+
+  it("streams an upload through with its content type and bytes", async () => {
+    let seen: { type: string | null; bytes: Uint8Array } | null = null;
+    const { app, fetch } = withPeers(async (_url, init) => {
+      const r = new Response(init?.body as ReadableStream, { headers: new Headers(init?.headers) });
+      seen = { type: r.headers.get("content-type"), bytes: new Uint8Array(await r.arrayBuffer()) };
+      return Response.json({ paths: ["/p/1.png"] });
+    });
+    const form = new FormData();
+    form.append("files", new File([PNG], "a.png", { type: "image/png" }));
+    const sent = new Response(form);
+    const type = sent.headers.get("content-type")!;
+    const bytes = new Uint8Array(await sent.arrayBuffer());
+    const res = await app.request("/api/peers/mac/sessions/mj-a/images", {
+      method: "POST",
+      headers: { "x-mojito-token": "tok", "content-type": type },
+      body: bytes,
+    });
+    expect(res.status).toBe(200);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(seen!.type).toBe(type);
+    expect(seen!.bytes).toEqual(bytes);
+  });
+
+  it("refuses a param that climbs out of its segment", async () => {
+    const { req, fetch } = withPeers();
+    const res = await req("/api/peers/mac/sessions/..%2F..%2Fsettings/image");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not found" });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("refuses what is off the allowlist", async () => {
+    const { req, fetch } = withPeers();
+    const res = await req("/api/peers/mac/settings", { method: "PUT", json: {} });
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not found" });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("an unknown peer is a 404", async () => {
+    const { req, fetch } = withPeers();
+    const res = await req("/api/peers/nope/sessions/mj-a/image?path=a.png");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "peer not found: nope" });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("an offline peer is a 502 and nothing is sent", async () => {
+    const { req, fetch } = withPeers();
+    const res = await req("/api/peers/air/sessions/mj-a/image?path=a.png");
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: "air is not reachable" });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("a failing fetch is a 502, a timeout a 504", async () => {
+    const down = withPeers(async () => {
+      throw new TypeError("fetch failed");
+    });
+    const a = await down.req(IMAGE);
+    expect(a.status).toBe(502);
+    expect(await a.json()).toEqual({ error: "mac is not reachable" });
+
+    const slow = withPeers(async () => {
+      throw new DOMException("timed out", "TimeoutError");
+    });
+    const b = await slow.req(IMAGE);
+    expect(b.status).toBe(504);
+    expect(await b.json()).toEqual({ error: "mac did not answer within 30 s" });
+  });
+
+  it("a peer's error that is not json is a 502", async () => {
+    const { req } = withPeers(async () => new Response("boom", { status: 500 }));
+    expect((await req(IMAGE)).status).toBe(502);
+  });
+
+  it("without the token nothing is relayed", async () => {
+    const { app, fetch } = withPeers();
+    expect((await app.request(IMAGE)).status).toBe(401);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
 describe("PeerRegistry", () => {
   it("starts and stops every link", () => {
     const links = [stubLink(snapshot("mac", true)), stubLink(snapshot("air", false))];
