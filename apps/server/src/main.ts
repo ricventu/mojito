@@ -124,7 +124,7 @@ async function main(): Promise<void> {
   // its pty (a `tmux attach`) would never be released: ping every client, reap the silent ones.
   const stopHeartbeat = startHeartbeat(wss);
   server.on("close", stopHeartbeat);
-  server.on("upgrade", (req, socket, head) => handleUpgrade(req, socket, head, { token: cfg.token, wss, sessions, bus }));
+  server.on("upgrade", (req, socket, head) => handleUpgrade(req, socket, head, { token: cfg.token, wss, sessions, bus, peers }));
   peers.start();
 
   // Stop serving and let go of the database; the tmux sessions are deliberately left alone —

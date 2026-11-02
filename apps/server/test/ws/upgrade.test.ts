@@ -40,7 +40,11 @@ function setup() {
   const bus = new EventBus();
   const events: MojitoEvent[] = [];
   bus.subscribe((e) => events.push(e));
-  const deps = { token: TOKEN, wss: wss as unknown as WebSocketServer, sessions, bus, now: () => 77 };
+  const peers = {
+    config: (name: string) => (name === "mac" ? { name: "mac", url: "http://mac:8700" } : undefined),
+    online: () => false,
+  };
+  const deps = { token: TOKEN, wss: wss as unknown as WebSocketServer, sessions, bus, peers, now: () => 77 };
   const upgrade = (url: string) =>
     handleUpgrade({ url, headers: {} } as IncomingMessage, socket as unknown as Duplex, Buffer.alloc(0), deps);
   return { socket, wss, ws, upgrade, sessions, events };
@@ -96,7 +100,13 @@ describe("handleUpgrade", () => {
     ["an id outside the mj- prefix", `/ws/pty/RIC-1?token=${TOKEN}`],
     ["an mj- id with no session row but a wrong token", "/ws/pty/mj-RIC-2?token=nope"],
     ["a nested pty path", `/ws/pty/mj-RIC-1/x?token=${TOKEN}`],
-    ["a path that is neither", `/ws/other?token=${TOKEN}`],
+    ["an unknown peer", `/ws/peers/nope/pty/mj-a?token=${TOKEN}`],
+    ["a peer id outside the mj- prefix", `/ws/peers/mac/pty/other?token=${TOKEN}`],
+    ["a nested peer pty path", `/ws/peers/mac/pty/mj-a/x?token=${TOKEN}`],
+    ["a peer path that is not pty", `/ws/peers/mac/events?token=${TOKEN}`],
+    ["a peer path with an undecodable id", `/ws/peers/mac/pty/%E0%A4%A?token=${TOKEN}`],
+    ["a peer pty path with a wrong token", "/ws/peers/mac/pty/mj-a?token=nope"],
+    ["a path that is neither",`/ws/other?token=${TOKEN}`],
     ["an /api path", `/api/health?token=${TOKEN}`],
   ])("destroys the socket for %s", (_label, url) => {
     const { socket, wss, upgrade } = setup();
