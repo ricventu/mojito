@@ -58,8 +58,9 @@ app's state, left in place.
   it; when ready for review, move it to "In Review" on Linear; use `superpowers:brainstorming`
   first only if the ticket leaves design decisions open. Brainstorming is not a launch option —
   the session decides it, like branches. Nothing else, except the ticket sheet's "Work in a
-  worktree" switch (off by default, `LaunchTicketBody.worktree`): on, `buildTicketPrompt` appends
-  the fixed `WORKTREE_INSTRUCTION` (not a setting) as the last line.
+  worktree" switch (on by default in the sheet, RIC-527; `LaunchTicketBody.worktree`, absent in
+  the body = off, so an API call or an older peer's forward keeps its meaning): on,
+  `buildTicketPrompt` appends the fixed `WORKTREE_INSTRUCTION` (not a setting) as the last line.
   Mojito writes In Progress; the session writes In Review; Done is the human's.
 - **Prompts are settings** (RIC-513): the ticket prompt (a template; `{ticket}` required,
   filled by `buildTicketPrompt`) and the create-ticket system prompt. Defaults live in

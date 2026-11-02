@@ -120,7 +120,7 @@ function StatusPill({
 }
 
 /**
- * Model, effort and worktree (off unless asked), then Launch. Disabled while the request is in flight: a double tap is one POST.
+ * Model, effort and worktree (on unless switched off), then Launch. Disabled while the request is in flight: a double tap is one POST.
  * Both start from the defaults of the status shown in the header, and keep following it — a status
  * moved in this sheet brings its own defaults — until the human picks one by hand.
  */
@@ -139,7 +139,7 @@ function LaunchForm({
   const qc = useQueryClient();
   const peers = usePeers();
   const [picks, setPicks] = useState<LaunchPicks>({});
-  const [worktree, setWorktree] = useState(false);
+  const [worktree, setWorktree] = useState(true);
   const [hostName, setHostName] = useState<string | null>(null);
   const { model, effort } = launchOptions(status, settings, picks);
   const hosts = launchHosts(ticket, peers.data?.self ?? "", peers.data?.peers ?? []);
