@@ -12,6 +12,8 @@ Decided with the owner on 2026-10-31:
 - **Out of scope:** everything else stays in each instance's own client — terminals, Hide,
   Kill, Pull/Push, git graph, docs, Settings, prompts, create-ticket, free sessions.
   Tapping a remote session opens that instance's client at it; nothing relays a pty.
+  *Superseded for sessions by `2026-11-02-peer-sessions-in-place-design.md`: a peer's session
+  opens in this client, through a relay.*
 - Both machines are on the tailnet and each serves its Mojito over `tailscale serve`, so each
   has an https URL the other and the phone reach.
 - Projects are mostly disjoint between machines: a project lives on one host. One that is

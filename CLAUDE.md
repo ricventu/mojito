@@ -110,7 +110,16 @@ app's state, left in place.
   (the client must not reconnect); a gone tmux marks the row ended. Protocol at the top of
   `ws/pty.ts`: binary = keys, text `{"resize":{cols,rows}}` sent on **every** (re)connect
   (the pty spawns at 80x24 and only the client corrects it), 200 lines of scrollback replayed
-  first. Ping/pong heartbeat reaps half-open phone sockets.
+  first. Ping/pong heartbeat reaps half-open phone sockets. `/ws/peers/<name>/pty/<id>` is the
+  same terminal on a peer, relayed (`ws/peerPty.ts`; `UpgradeDeps.peers`, absent → destroyed): an
+  unknown peer or a non-`mj-` id is destroyed, an offline peer is answered 1011 (the client's
+  backoff re-attaches), otherwise this instance dials the peer's `/ws/pty/<id>` with the shared
+  token **before** completing the browser's handshake (a dial failure → 1011); if the browser
+  leaves mid-dial the dial is aborted and the socket destroyed — a handshake completed on a dead
+  socket crashed the server once. Frames pipe both ways with their type kept. **Close-code rule**:
+  1000 and 3000-4999 are mirrored (`SESSION_GONE_CODE` 4404 must reach the browser intact or its
+  reconnect loop retries a gone session forever), anything else (1005/1006, 1001) becomes 1011;
+  the peer side is pinged every 30 s (a sleeping Mac sends no close).
 - **HTTP** (`http/`): all `/api/*` except `/health` need `x-mojito-token`; error bodies are
   always `{ error }`; `POST /api/sessions` → 201 `{session, warning?}` or `{error, sessionId?}`.
   Static web build served with SPA fallback (never for `/api` or `/ws`). Listen errors exit 1.
@@ -191,7 +200,19 @@ app's state, left in place.
   No echo: a peer's `/api/sessions` is only its own. Paths never leave a peer (names only).
   `GET /api/peers` → `{self, peers}`; `POST /api/peers/:name/sessions` forwards a `LaunchBody`
   and answers the peer's status/body verbatim (offline/unreachable/non-json 502, no answer in
-  30 s → 504 "may still be starting"). Nothing else is forwarded — no pty, git, docs.
+  30 s → 504 "may still be starting"). Besides that launch, a peer's session opens **in this
+  client** (spec `2026-11-02-peer-sessions-in-place-design.md`), so the browser only ever talks to
+  this instance: an **allowlisted** HTTP relay, `/api/peers/:name/<rest>` (`peers/relay.ts`,
+  `matchRelay` + `relayRequest`), and the pty relay above. The table is Kill (`DELETE
+  /sessions/:id`, never with `remove`), image upload and view, the git graph/commit/diff, the docs
+  list/file — nothing else (not settings, hooks, projects): off the table is 404, so a client bug
+  cannot write a peer's settings. Each segment is decoded, must be one plain name (no
+  `.`/`..`/`/`) and is re-encoded into the peer URL; the body is streamed (never parsed, the peer
+  validates it), the response comes back verbatim with only `content-type|length`, `nosniff`,
+  `CSP` and `cache-control` (the viewer's `CSP: sandbox` survives the hop); offline → 502 without
+  trying, no answer in 30 s → 504; only `x-mojito-token` goes to the peer. Ids are unique per
+  instance only (`mj-<slug>-git` exists on every instance with that project): the host is always
+  part of an address.
   Mac setup: `tailscale serve --bg 8700`, the same `MOJITO_TOKEN`, each instance listing the
   other in `MOJITO_PEERS`.
 
@@ -274,17 +295,39 @@ app's state, left in place.
   peer after it (`PeerSection`) — the band is the top tier (uppercase name, session count,
   `sticky` so a row's host is always on screen), project headings the middle one. Hosts carry no
   status dot (a dot always means a session's state): an offline peer is its band alone, dimmed,
-  "· offline". Anything that leaves this host ends in ↗: a peer row is an `<a target=_blank>` to
-  `peerHref` — the peer's own client at `/session/<id>?token=` — and the peer's band has ↗ to
-  open its client (no instance menu). Without peers there are no bands, the list is this
+  "· offline". A peer's row is an in-app `<Link>` to `/session/<id>?host=<peer>` like a local
+  one (`isCurrent` compares host **and** id); only what belongs to the machine leaves the client:
+  the band's ↗ opens the peer's own client (`peerHref`, `?token=` handoff) in the **same tab**
+  — a plain link, Back returns — to reach its board, Pull/Push, launches and Settings (in an
+  installed web app another origin is out of scope, so the platform may open the browser; not
+  ours to fix). No instance menu. Without peers there are no bands, the list is this
   instance's projects. `SidebarToggle` carries an amber dot when a peer has a session
   waiting; the board and its waiting pill stay local. The ticket sheet's "Run on"
   (`launchHosts`: this instance, then online peers mapping the ticket's project) shows only with
-  more than one host; a peer launch opens its tab **inside the click** (`window.open("")`, then
-  pointed at the session — Safari blocks an open after an await) and closes it on failure. A
+  more than one host; a peer launch navigates in place to the session once the forward answers
+  (a 409 with `sessionId` too) — there is no tab, so no `window.open` dance. A
   ticket already running on a peer (`peerSessionForTicket`) shows "Session on <peer>" and an
-  Open link instead of the Launch form: the board is local, and a Launch would start a second
-  agent on the same ticket.
+  in-app Open link instead of the Launch form: the board is local, and a Launch would start a
+  second agent on the same ticket.
+- **A peer's session in this client** (`lib/host.ts`, `hooks/useHost.ts`, `lib/peerSession.ts`):
+  `/session/:id`, `/git/:project` and `/docs/:project` take `?host=<peer>`, absent = this instance
+  (the git/docs codecs keep `host` as written and every in-page link carries it). **`host` is
+  never resolved to this instance unless it equals `self`** — `resolveHost` waits for
+  `/api/peers` (loading), then self / peer / unknown; otherwise a renamed peer's old url
+  `/session/mj-mojito-git?host=192.168.1.5` would open — and Kill — the local `mj-mojito-git`.
+  Unknown: the session page goes to the board, git/docs show "Unknown host". While loading,
+  `pageSession` never shows this instance's row for the id. **`hostApi(host, path)` is the one
+  way to address a host** (`ptyPath`, `sessionHref` likewise): a peer's call becomes
+  `/api/peers/<host>/…`; `apiFetch`/`apiBlob` are unchanged, and `gitKeys`/`docKeys` take the
+  host (a project name may exist on both machines). The peer's snapshot holds live sessions only,
+  so it never sends the reader away: **the pty is the authority** — the page keeps the last-known
+  row for host+id, the relay's 4404 shows "Session ended", and a 4404 on a cold load (nothing
+  seen: a stale link) goes to the board (`exitAction`); an offline peer keeps the page
+  ("<peer> · offline", the terminal reconnects). The terminal header names the host. Kill, image
+  upload/viewer, `.md` paths and the header's Git and Docs all go through `hostApi` and carry
+  `host`; no Pull/Push or other project action appears for a peer. The board stays local: its
+  toolbar `<h1>` and the tab title (`appTitle`, `<self> · Mojito`) name this instance (`self` of
+  `/api/peers`, "Mojito" until it answers), so after a band's ↗ it is plain whose board it is.
 - **Desktop first, phone complete.** The board column is `max-w-6xl`, an `@container`: from
   `@2xl` (by its own width, which a docked sidebar narrows) each project's active tickets are
   kanban columns Todo → In Progress → In Review (`kanbanColumns`: all three even when empty, so
