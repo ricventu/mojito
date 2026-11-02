@@ -1,5 +1,5 @@
 import { createContext, useContext, useLayoutEffect, useState } from "react";
-import { Outlet, useMatch } from "react-router";
+import { Outlet, useMatch, useSearchParams } from "react-router";
 import { SessionSidebar } from "@/components/sidebar/SessionSidebar";
 import { useSidebar, type SidebarState } from "@/hooks/useSidebar";
 
@@ -42,11 +42,13 @@ export function AppShell() {
   const sidebar = useSidebar();
   const [keyboardUp, setKeyboardUp] = useState(false);
   const terminal = useMatch("/session/:id");
+  const [params] = useSearchParams();
+  const current = terminal ? { host: params.get("host"), id: terminal.params.id ?? "" } : undefined;
 
   return (
     <ShellContext.Provider value={{ sidebar, setKeyboardUp }}>
       {!(keyboardUp && sidebar.docked) && (
-        <SessionSidebar sidebar={sidebar} currentId={terminal?.params.id} replace={terminal !== null} />
+        <SessionSidebar sidebar={sidebar} current={current} replace={terminal !== null} />
       )}
       <Outlet />
     </ShellContext.Provider>

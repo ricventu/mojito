@@ -9,7 +9,7 @@ interface HostProps {
   name: string;
   count: number;
   online: boolean;
-  /** Another instance: its own client, in a new tab. Absent for this one. */
+  /** Another instance: its own client, in this tab (leaving this host). Absent for this one. */
   href?: string;
   /** The first band touches the header's border, so it draws none above itself. */
   first?: boolean;
@@ -44,8 +44,6 @@ export function HostSection({ name, count, online, href, first = false, children
         {href && (
           <a
             href={href}
-            target="_blank"
-            rel="noopener"
             aria-label={`Open Mojito on ${name}`}
             className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }), "shrink-0 text-muted-foreground", !online && "ml-auto")}
           >

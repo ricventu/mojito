@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, GitGraph, Play, Power, SquareTerminal } from "lucide-react";
 import { Link, useNavigate } from "react-router";
@@ -19,29 +19,15 @@ import { ApiError, apiFetch, apiJson } from "@/lib/api";
 import { sessionForTicket } from "@/lib/board";
 import { docsHref } from "@/lib/docs/url";
 import { gitHref } from "@/lib/git/url";
+import { sessionHref } from "@/lib/host";
 import { launchErrorAction, launchOptions, type LaunchPicks } from "@/lib/launch";
-import { launchHosts, peerHref, peerSessionForTicket } from "@/lib/peers";
-import { getToken, subscribeToken } from "@/lib/token";
+import { launchHosts, peerSessionForTicket } from "@/lib/peers";
 import { qk } from "@/lib/queryKeys";
 import { safeHref } from "@/lib/url";
 import { LaunchOptions } from "./LaunchOptions";
 import { SHEET_CONTENT_CLASS } from "./styles";
 
-const sessionPath = (id: string) => `/session/${encodeURIComponent(id)}`;
 const errorMessage = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
-
-/**
- * A session on another instance, in its own client: the tab opened at the click when there is
- * one; a blocked one leaves an "Open" action on a toast, which is a click of its own.
- */
-function openOnPeer(peer: PeerSnapshot, id: string, tab: Window | null) {
-  const href = peerHref(peer, sessionPath(id), getToken());
-  if (tab) {
-    tab.location.href = href;
-    return;
-  }
-  toast(`${id} on ${peer.name}`, { action: { label: "Open", onClick: () => window.open(href, "_blank", "noopener") } });
-}
 
 /**
  * The ticket's status as a pill in the header; tapping it moves the ticket among its team's states
@@ -161,47 +147,33 @@ function LaunchForm({
   const host = hosts.find((h) => h.name === hostName) ?? hosts[0];
 
   const launch = useMutation({
-    mutationFn: ({ peer }: { peer: PeerSnapshot | null; tab: Window | null }) =>
+    mutationFn: ({ peer }: { peer: PeerSnapshot | null }) =>
       apiJson<{ session: SessionMeta; warning?: string }>(
         peer ? `/api/peers/${encodeURIComponent(peer.name)}/sessions` : "/api/sessions",
         "POST",
         { kind: "ticket", ticket: ticket.identifier, model, effort, worktree },
       ),
-    onSuccess: ({ session, warning }, { peer, tab }) => {
+    onSuccess: ({ session, warning }, { peer }) => {
       if (warning) toast.warning(warning);
       onClose();
       if (peer) {
-        openOnPeer(peer, session.id, tab);
         toast.success(`Started on ${peer.name}`);
-        return;
+      } else {
+        void qc.invalidateQueries({ queryKey: qk.sessions });
+        void qc.invalidateQueries({ queryKey: qk.tickets });
       }
-      void qc.invalidateQueries({ queryKey: qk.sessions });
-      void qc.invalidateQueries({ queryKey: qk.tickets });
-      navigate(sessionPath(session.id));
+      navigate(sessionHref(peer?.name ?? null, session.id));
     },
-    onError: (e, { peer, tab }) => {
+    onError: (e, { peer }) => {
       const action = e instanceof ApiError ? launchErrorAction(e) : { kind: "toast" as const, message: errorMessage(e, "Launch failed") };
       if (action.kind === "open") {
         onClose();
-        if (peer) openOnPeer(peer, action.sessionId, tab);
-        else navigate(sessionPath(action.sessionId));
+        navigate(sessionHref(peer?.name ?? null, action.sessionId));
       } else {
-        tab?.close();
         toast.error(action.message);
       }
     },
   });
-
-  const start = () => {
-    // Safari opens a tab only inside the click itself, never after an await: open it now, empty,
-    // and point it at the session once the peer answers.
-    let tab: Window | null = null;
-    if (host.peer) {
-      tab = window.open("", "_blank");
-      if (tab) tab.opener = null;
-    }
-    launch.mutate({ peer: host.peer, tab });
-  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -233,7 +205,7 @@ function LaunchForm({
         <Label htmlFor="ticket-worktree">Work in a worktree</Label>
         <Switch id="ticket-worktree" checked={worktree} onCheckedChange={setWorktree} />
       </div>
-      <Button disabled={launch.isPending} onClick={start}>
+      <Button disabled={launch.isPending} onClick={() => launch.mutate({ peer: host.peer })}>
         <Play size={16} /> {launch.isPending ? "Launching…" : "Launch"}
       </Button>
     </div>
@@ -265,7 +237,7 @@ function LiveSession({ ticket, session, onClose }: { ticket: TicketSummary; sess
           className="flex-1"
           onClick={() => {
             onClose();
-            navigate(sessionPath(session.id));
+            navigate(sessionHref(null, session.id));
           }}
         >
           <SquareTerminal size={16} /> Open terminal
@@ -284,9 +256,8 @@ function LiveSession({ ticket, session, onClose }: { ticket: TicketSummary; sess
   );
 }
 
-/** The ticket's session on another instance: its state and a way into that instance's client. */
-function PeerLiveSession({ peer, session }: { peer: PeerSnapshot; session: SessionMeta }) {
-  const token = useSyncExternalStore(subscribeToken, getToken);
+/** The ticket's session on another instance: its state and a way into its terminal, in this client. */
+function PeerLiveSession({ peer, session, onClose }: { peer: PeerSnapshot; session: SessionMeta; onClose: () => void }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2 text-sm">
@@ -294,9 +265,9 @@ function PeerLiveSession({ peer, session }: { peer: PeerSnapshot; session: Sessi
         <StateBadge state={session.state} />
       </div>
       <Button asChild>
-        <a href={peerHref(peer, sessionPath(session.id), token)} target="_blank" rel="noopener">
-          <SquareTerminal size={16} /> Open on {peer.name}
-        </a>
+        <Link to={sessionHref(peer.name, session.id)} onClick={onClose}>
+          <SquareTerminal size={16} /> Open
+        </Link>
       </Button>
     </div>
   );
@@ -358,7 +329,7 @@ export function TicketSheet({ ticket, onClose }: Props) {
           {live ? (
             <LiveSession ticket={ticket} session={session} onClose={onClose} />
           ) : onPeer ? (
-            <PeerLiveSession peer={onPeer.peer} session={onPeer.session} />
+            <PeerLiveSession peer={onPeer.peer} session={onPeer.session} onClose={onClose} />
           ) : settings.data ? (
             <LaunchForm ticket={ticket} status={status} settings={settings.data} onClose={onClose} />
           ) : (

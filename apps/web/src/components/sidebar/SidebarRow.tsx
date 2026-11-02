@@ -1,4 +1,3 @@
-import { ArrowUpRight } from "lucide-react";
 import { Link } from "react-router";
 import type { SessionMeta, SessionState } from "@mojito/shared";
 import { cn } from "@/lib/utils";
@@ -13,14 +12,14 @@ const DOT: Record<SessionState, { label: string; className: string }> = {
 
 interface Props {
   session: SessionMeta;
+  /** Where the row goes: this app's terminal for the session, on this instance or through a peer's relay. */
+  to: string;
   label: { primary: string; secondary: string };
   current: boolean;
   /** Replace the history entry instead of pushing one (picking from a terminal). */
   replace: boolean;
   /** A plain click on the row; a modified click opens a new tab and leaves the page alone. */
   onPick(): void;
-  /** A session on another instance: its own client, in a new tab, instead of this app's terminal. */
-  remote?: { host: string; href: string };
 }
 
 const ROW_LINK =
@@ -28,10 +27,10 @@ const ROW_LINK =
 
 /**
  * One live session: its state dot and label are a link to its terminal (so Cmd/middle-click
- * and a long-press work as on any link). A session on another instance links to that
- * instance's client instead, and ends in ↗: tapping it leaves this host.
+ * and a long-press work as on any link). A peer's session is the same row: its terminal opens
+ * in this client, through the relay.
  */
-export function SidebarRow({ session, label, current, replace, onPick, remote }: Props) {
+export function SidebarRow({ session, to, label, current, replace, onPick }: Props) {
   const dot = DOT[session.state];
   const { primary, secondary } = label;
   const body = (
@@ -49,25 +48,17 @@ export function SidebarRow({ session, label, current, replace, onPick, remote }:
 
   return (
     <li className={cn("flex flex-col rounded-md", current && "bg-accent text-accent-foreground")}>
-      {remote ? (
-        <a href={remote.href} target="_blank" rel="noopener" className={ROW_LINK}>
-          {body}
-          <ArrowUpRight aria-hidden size={14} className="shrink-0 text-muted-foreground" />
-          <span className="sr-only">(opens on {remote.host})</span>
-        </a>
-      ) : (
-        <Link
-          to={`/session/${encodeURIComponent(session.id)}`}
-          replace={replace}
-          onClick={(e) => {
-            if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) onPick();
-          }}
-          aria-current={current ? "page" : undefined}
-          className={ROW_LINK}
-        >
-          {body}
-        </Link>
-      )}
+      <Link
+        to={to}
+        replace={replace}
+        onClick={(e) => {
+          if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) onPick();
+        }}
+        aria-current={current ? "page" : undefined}
+        className={ROW_LINK}
+      >
+        {body}
+      </Link>
     </li>
   );
 }

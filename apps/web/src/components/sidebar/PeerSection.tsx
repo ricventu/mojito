@@ -1,15 +1,25 @@
 import type { PeerSnapshot } from "@mojito/shared";
+import { sessionHref } from "@/lib/host";
 import { peerHref } from "@/lib/peers";
-import { sessionCount, sessionLabel, sidebarGroups } from "@/lib/sidebar";
+import { isCurrent, sessionCount, sessionLabel, sidebarGroups, type CurrentSession } from "@/lib/sidebar";
 import { GroupList, HostSection } from "./HostSection";
 import { SidebarRow } from "./SidebarRow";
 
+interface Props {
+  peer: PeerSnapshot;
+  token: string;
+  current?: CurrentSession;
+  /** As for this instance's rows: replace the history entry when picked from a terminal. */
+  replace: boolean;
+  onPick(): void;
+}
+
 /**
  * Another instance in the sidebar: its band, then its sessions grouped by its projects. Each
- * row opens that instance's own client at the session, in a new tab; the band's ↗ opens its
- * client. An offline instance is its band alone.
+ * row opens the session in this client's terminal, as a local row does; the band's ↗ opens
+ * the instance's own client in this tab. An offline instance is its band alone.
  */
-export function PeerSection({ peer, token }: { peer: PeerSnapshot; token: string }) {
+export function PeerSection({ peer, token, current, replace, onPick }: Props) {
   const groups = sidebarGroups(peer.projects.map((name) => ({ name })), peer.sessions);
   const tickets = Object.entries(peer.ticketTitles).map(([identifier, title]) => ({ identifier, title }));
 
@@ -23,11 +33,11 @@ export function PeerSection({ peer, token }: { peer: PeerSnapshot; token: string
             <SidebarRow
               key={s.id}
               session={s}
+              to={sessionHref(peer.name, s.id)}
               label={sessionLabel(s, tickets)}
-              current={false}
-              replace={false}
-              onPick={() => {}}
-              remote={{ host: peer.name, href: peerHref(peer, `/session/${encodeURIComponent(s.id)}`, token) }}
+              current={isCurrent(current, peer.name, s.id)}
+              replace={replace}
+              onPick={onPick}
             />
           )}
         />

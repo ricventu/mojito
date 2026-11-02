@@ -7,7 +7,8 @@ import { useProjects } from "@/hooks/useProjects";
 import { useSessions } from "@/hooks/useSessions";
 import type { SidebarState } from "@/hooks/useSidebar";
 import { useTickets } from "@/hooks/useTickets";
-import { sessionCount, sessionLabel, sidebarGroups } from "@/lib/sidebar";
+import { isCurrent, sessionCount, sessionLabel, sidebarGroups, type CurrentSession } from "@/lib/sidebar";
+import { sessionHref } from "@/lib/host";
 import { getToken, subscribeToken } from "@/lib/token";
 import { GroupList, HostSection } from "./HostSection";
 import { PeerSection } from "./PeerSection";
@@ -15,8 +16,8 @@ import { SidebarRow } from "./SidebarRow";
 
 interface Props {
   sidebar: SidebarState;
-  /** The session whose terminal is on screen, highlighted. */
-  currentId?: string;
+  /** The session whose terminal is on screen (its host and id), highlighted. */
+  current?: CurrentSession;
   /** Replace the history entry when a row is picked: from a terminal, Back keeps meaning the board. */
   replace?: boolean;
 }
@@ -26,7 +27,7 @@ interface Props {
  * configured every instance gets a band (`HostSection`), this one first; without, the list is
  * this instance's projects alone, as before peers existed.
  */
-function Panel({ sidebar, currentId, replace, inSheet }: Props & { inSheet: boolean }) {
+function Panel({ sidebar, current, replace, inSheet }: Props & { inSheet: boolean }) {
   const sessions = useSessions();
   const tickets = useTickets();
   const projects = useProjects();
@@ -50,8 +51,9 @@ function Panel({ sidebar, currentId, replace, inSheet }: Props & { inSheet: bool
         <SidebarRow
           key={s.id}
           session={s}
+          to={sessionHref(null, s.id)}
           label={sessionLabel(s, ticketList)}
-          current={s.id === currentId}
+          current={isCurrent(current, null, s.id)}
           replace={replace ?? false}
           onPick={pick}
         />
@@ -90,7 +92,7 @@ function Panel({ sidebar, currentId, replace, inSheet }: Props & { inSheet: bool
               {local}
             </HostSection>
             {answer.peers.map((p) => (
-              <PeerSection key={p.name} peer={p} token={token} />
+              <PeerSection key={p.name} peer={p} token={token} current={current} replace={replace ?? false} onPick={pick} />
             ))}
           </>
         ) : (
@@ -106,7 +108,7 @@ function Panel({ sidebar, currentId, replace, inSheet }: Props & { inSheet: bool
  * is a fixed column on the left, which the pages start after; otherwise an overlay from the
  * left, so the pty is never resized for a peek. Both pay the insets of the edges they touch.
  */
-export function SessionSidebar({ sidebar, currentId, replace = false }: Props) {
+export function SessionSidebar({ sidebar, current, replace = false }: Props) {
   if (sidebar.docked) {
     return (
       // `data-sidebar-docked` sets `--dock-width` (index.css), which must stay equal to `w-72`.
@@ -114,7 +116,7 @@ export function SessionSidebar({ sidebar, currentId, replace = false }: Props) {
         data-sidebar-docked
         className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r bg-background pt-[var(--sat)] pb-[var(--sab)] pl-[var(--sal)]"
       >
-        <Panel sidebar={sidebar} currentId={currentId} replace={replace} inSheet={false} />
+        <Panel sidebar={sidebar} current={current} replace={replace} inSheet={false} />
       </aside>
     );
   }
@@ -125,7 +127,7 @@ export function SessionSidebar({ sidebar, currentId, replace = false }: Props) {
         showCloseButton={false}
         className="w-72 gap-0 pt-[var(--sat)] pb-[var(--sab)] pl-[var(--sal)]"
       >
-        <Panel sidebar={sidebar} currentId={currentId} replace={replace} inSheet />
+        <Panel sidebar={sidebar} current={current} replace={replace} inSheet />
       </SheetContent>
     </Sheet>
   );

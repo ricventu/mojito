@@ -3,6 +3,8 @@ import type { PeerSnapshot, PeersAnswer, SessionMeta, TicketSummary } from "@moj
 /**
  * A page of a peer's own client, logged in: its first-visit `?token=` handoff takes the token
  * this client already holds (every instance shares one), stores it and strips it from the url.
+ * Only the sidebar band's ↗ uses it, in the same tab: a peer's sessions, git and docs open in
+ * this client (`?host=`).
  */
 export function peerHref(peer: Pick<PeerSnapshot, "url">, path: string, token: string): string {
   return `${peer.url}${path}?token=${encodeURIComponent(token)}`;

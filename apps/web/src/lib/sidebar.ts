@@ -28,6 +28,17 @@ export function sidebarGroups(projects: Pick<ProjectRow, "name">[], sessions: Se
     .filter((g) => g.sessions.length > 0);
 }
 
+/** The session whose terminal is on screen: the same id on two instances is two sessions. */
+export interface CurrentSession {
+  /** The peer's name, `null` for this instance. */
+  host: string | null;
+  id: string;
+}
+
+export function isCurrent(current: CurrentSession | undefined, host: string | null, id: string): boolean {
+  return current !== undefined && current.host === host && current.id === id;
+}
+
 /** How many sessions the groups hold: the count on a host's band. */
 export function sessionCount(groups: SidebarGroup[]): number {
   return groups.reduce((n, g) => n + g.sessions.length, 0);

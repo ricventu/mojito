@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectRow, SessionMeta, TicketSummary } from "@mojito/shared";
 import { groupBoard } from "@/lib/board";
-import { sessionCount, sessionLabel, sessionName, sidebarGroups } from "@/lib/sidebar";
+import { isCurrent, sessionCount, sessionLabel, sessionName, sidebarGroups } from "@/lib/sidebar";
 
 const project = (name: string): ProjectRow => ({ name, path: `/repos/${name}`, teamKey: "RIC" });
 
@@ -190,5 +190,22 @@ describe("a peer's sessions", () => {
   it("take their titles from the peer's ticket titles", () => {
     const s = session("mj-RIC-7", { kind: "ticket", ticket: "RIC-7" });
     expect(sessionLabel(s, [{ identifier: "RIC-7", title: "Ship it" }])).toEqual({ primary: "RIC-7", secondary: "Ship it" });
+  });
+});
+
+describe("isCurrent", () => {
+  it("matches host and id together", () => {
+    expect(isCurrent({ host: null, id: "mj-a" }, null, "mj-a")).toBe(true);
+    expect(isCurrent({ host: "mac", id: "mj-a" }, "mac", "mj-a")).toBe(true);
+  });
+
+  it("is not fooled by the same id on another host", () => {
+    expect(isCurrent({ host: "mac", id: "mj-a" }, null, "mj-a")).toBe(false);
+    expect(isCurrent({ host: null, id: "mj-a" }, "mac", "mj-a")).toBe(false);
+  });
+
+  it("is false with no session on screen or another id", () => {
+    expect(isCurrent(undefined, null, "mj-a")).toBe(false);
+    expect(isCurrent({ host: null, id: "mj-b" }, null, "mj-a")).toBe(false);
   });
 });
