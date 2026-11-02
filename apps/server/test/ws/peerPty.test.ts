@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import type { AddressInfo } from "node:net";
+import net, { type AddressInfo } from "node:net";
 import type { Duplex } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
 // The pty gateway behind /ws/pty loads node-pty's native binding; nothing here spawns one.
@@ -61,7 +61,9 @@ async function instance({ peerUrl, online = true, dial }: Opts) {
   const server = createServer();
   const wss = new WebSocketServer({ noServer: true });
   const sessions = new SessionsRepo(openDb(":memory:"));
-  server.on("upgrade", (req, socket, head) =>
+  const sockets: Duplex[] = [];
+  server.on("upgrade", (req, socket, head) => {
+    sockets.push(socket);
     handleUpgrade(req, socket as Duplex, head, {
       token: TOKEN,
       wss,
@@ -69,8 +71,8 @@ async function instance({ peerUrl, online = true, dial }: Opts) {
       bus: new EventBus(),
       peers: { config: () => ({ name: "mac", url: peerUrl }), online: () => online },
       dial,
-    }),
-  );
+    });
+  });
   const port = await listening(server);
   closers.push(() => {
     for (const c of wss.clients) c.terminate();
@@ -79,6 +81,8 @@ async function instance({ peerUrl, online = true, dial }: Opts) {
     server.close();
   });
   return {
+    port,
+    sockets,
     connect: (id = "mj-a") => new WebSocket(`ws://127.0.0.1:${port}/ws/peers/mac/pty/${id}?token=${TOKEN}`),
   };
 }
@@ -195,7 +199,14 @@ describe("the peer pty relay", () => {
     expect(await closedWith(browser)).toBe(1011);
   });
 
-  it("closes an upstream that arrives after the browser gave up", async () => {
+  // The browser leaves while the peer is still being dialled: by closing its side, or by a reset
+  // (node's http server has no `error` listener on an upgraded socket, so an unwatched reset is an
+  // uncaught ECONNRESET). Either way the late upstream is closed and the socket is let go.
+  it.each([
+    ["half-closes", (c: net.Socket) => c.end()],
+    ["resets", (c: net.Socket) => c.resetAndDestroy()],
+    ["hangs up", (c: net.Socket) => c.destroy()],
+  ])("closes an upstream that arrives after the browser %s mid-dial", async (_label, leave) => {
     const peer = await fakePeer();
     let resolveDial!: (ws: WebSocket) => void;
     const dialed = new Promise<WebSocket>((resolve) => {
@@ -205,18 +216,22 @@ describe("the peer pty relay", () => {
     const started = new Promise<void>((resolve) => {
       dialStarted = resolve;
     });
-    const { connect } = await instance({
+    const inst = await instance({
       peerUrl: `http://127.0.0.1:${peer.port}`,
       dial: () => {
         dialStarted();
         return dialed;
       },
     });
-    const browser = connect();
-    browser.on("error", () => {});
+    const client = net.connect(inst.port, "127.0.0.1");
+    client.on("error", () => {});
+    client.write(
+      `GET /ws/peers/mac/pty/mj-a?token=${TOKEN} HTTP/1.1\r\nHost: x\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n` +
+        "Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n",
+    );
     await started;
-    browser.terminate();
-    // Let the server see the socket close before the dial resolves.
+    leave(client);
+    // Let the server see the hang-up before the dial resolves.
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     const upstream = new WebSocket(`ws://127.0.0.1:${peer.port}/ws/pty/mj-a?token=tok`);
@@ -224,10 +239,11 @@ describe("the peer pty relay", () => {
     const close = vi.spyOn(upstream, "close");
     resolveDial(upstream);
     await vi.waitFor(() => expect(close).toHaveBeenCalled());
+    await vi.waitFor(() => expect(inst.sockets[0].destroyed).toBe(true));
   });
 
   it("terminates a peer that never answers a ping, and tells the browser 1011", async () => {
-    const browserSide =new WebSocketServer({ port: 0, host: "127.0.0.1" });
+    const browserSide = new WebSocketServer({ port: 0, host: "127.0.0.1" });
     closers.push(() => {
       for (const c of browserSide.clients) c.terminate();
       browserSide.close();

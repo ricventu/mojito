@@ -62,24 +62,34 @@ function relayToPeer(
     return;
   }
   // The browser may give up while the dial is pending; its upstream must not be left open.
-  // `end` (a clean hang-up) and `close` (a reset) both count: a half-open socket only closes
-  // later. An upgraded socket is not read until `ws` takes it over, and a socket nobody reads
-  // never reports its peer's hang-up: resume it so a browser that leaves mid-dial is noticed.
-  // It sends nothing before the 101, so no byte is dropped.
+  // `end` (a clean hang-up) and `close` both count: the http server's sockets are half-open
+  // capable, so a hang-up emits only `end` and the socket lingers until we destroy it. An
+  // upgraded socket is not read until `ws` takes it over, and a socket nobody reads never
+  // reports its peer's hang-up: resume it so a browser that leaves mid-dial is noticed. It sends
+  // nothing before the 101, so no byte is dropped. `error` matters as much: node's http server
+  // removes its own listener before `upgrade` and `ws` adds its own only in `handleUpgrade`, so
+  // a reset during the dial would otherwise be an uncaught ECONNRESET that kills the process.
   let aborted = false;
   const abort = () => {
     aborted = true;
+    socket.destroy();
   };
-  socket.once("end", abort);
-  socket.once("close", abort);
+  const watch = ["end", "close", "error"] as const;
+  for (const event of watch) socket.once(event, abort);
+  // Handed to `ws` (which listens for itself) or given up on: stop watching.
+  const unwatch = () => {
+    for (const event of watch) socket.removeListener(event, abort);
+  };
   socket.resume();
   const dial = deps.dial ?? dialPeer;
   dial(peerPtyUrl(peer.url, id, deps.token)).then(
     (upstream) => {
       if (aborted) {
         upstream.close();
+        socket.destroy();
         return;
       }
+      unwatch();
       try {
         deps.wss.handleUpgrade(req, socket, head, (ws) => {
           markAlive(ws);
@@ -92,7 +102,11 @@ function relayToPeer(
       }
     },
     (err) => {
-      if (aborted) return;
+      if (aborted) {
+        socket.destroy();
+        return;
+      }
+      unwatch();
       console.error(`peer ${peer.name}: terminal not opened:`, err instanceof Error ? err.message : err);
       try {
         refuse();
