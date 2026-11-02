@@ -1,7 +1,9 @@
-import { createContext, useContext, useLayoutEffect, useState } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useState } from "react";
 import { Outlet, useMatch, useSearchParams } from "react-router";
 import { SessionSidebar } from "@/components/sidebar/SessionSidebar";
+import { usePeers } from "@/hooks/usePeers";
 import { useSidebar, type SidebarState } from "@/hooks/useSidebar";
+import { appTitle } from "@/lib/peers";
 
 interface Shell {
   sidebar: SidebarState;
@@ -41,6 +43,10 @@ export function useKeyboardUp(up: boolean): void {
 export function AppShell() {
   const sidebar = useSidebar();
   const [keyboardUp, setKeyboardUp] = useState(false);
+  const self = usePeers().data?.self;
+  useEffect(() => {
+    document.title = appTitle(self);
+  }, [self]);
   const terminal = useMatch("/session/:id");
   const [params] = useSearchParams();
   const current = terminal ? { host: params.get("host"), id: terminal.params.id ?? "" } : undefined;

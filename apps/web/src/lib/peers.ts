@@ -10,6 +10,11 @@ export function peerHref(peer: Pick<PeerSnapshot, "url">, path: string, token: s
   return `${peer.url}${path}?token=${encodeURIComponent(token)}`;
 }
 
+/** The tab title: this instance's name first, so a glance at the tab says whose board it is. */
+export function appTitle(self: string | undefined): string {
+  return self ? `${self} · Mojito` : "Mojito";
+}
+
 /** Where a ticket can run: `peer` null is this instance. */
 export interface LaunchHost {
   name: string;

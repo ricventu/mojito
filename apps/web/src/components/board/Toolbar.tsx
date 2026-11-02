@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import type { SessionMeta } from "@mojito/shared";
 import { SidebarToggle } from "@/components/sidebar/SidebarToggle";
 import { Button } from "@/components/ui/button";
+import { usePeers } from "@/hooks/usePeers";
 import { needsInput } from "@/lib/board";
 
 interface Props {
@@ -16,12 +17,13 @@ interface Props {
 /** Sticky top bar. It pays the top safe-area inset itself: the board is full-bleed. */
 export function Toolbar({ sessions, onNewTicket, onNewSession, children }: Props) {
   const waiting = needsInput(sessions);
+  const self = usePeers().data?.self || "Mojito";
 
   return (
     <div className="sticky top-0 z-10 border-b bg-background/95 pt-[var(--sat)] pr-[var(--sar)] pl-[var(--sal)] backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2">
         <SidebarToggle />
-        <h1 className="min-w-0 flex-1 truncate text-base font-semibold">Mojito</h1>
+        <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{self}</h1>
         {waiting.length > 0 && (
           <Button
             asChild

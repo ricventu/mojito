@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PeerSnapshot, PeersAnswer, SessionMeta } from "@mojito/shared";
-import { launchHosts, peerHref, peerSessionForTicket, replacePeer, waitingPeers } from "@/lib/peers";
+import { appTitle, launchHosts, peerHref, peerSessionForTicket, replacePeer, waitingPeers } from "@/lib/peers";
 
 const session = (id: string, over: Partial<SessionMeta> = {}): SessionMeta => ({
   id,
@@ -91,5 +91,16 @@ describe("replacePeer", () => {
   it("returns an unknown peer's answer, and no answer, unchanged", () => {
     expect(replacePeer(answer, peer("nope", []))).toBe(answer);
     expect(replacePeer(undefined, peer("mac", []))).toBeUndefined();
+  });
+});
+
+describe("appTitle", () => {
+  it("is Mojito until this instance's name is known", () => {
+    expect(appTitle(undefined)).toBe("Mojito");
+    expect(appTitle("")).toBe("Mojito");
+  });
+
+  it("names this instance first", () => {
+    expect(appTitle("ai-tonic")).toBe("ai-tonic · Mojito");
   });
 });
