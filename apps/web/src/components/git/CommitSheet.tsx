@@ -15,6 +15,8 @@ import { DiffView, LoadError, Spinner } from "./DiffView";
 import { RefChip } from "./RefChip";
 
 interface Props {
+  /** A peer's name; null is this instance. */
+  host: string | null;
   project: string;
   ticket: string | null;
   hash: string;
@@ -28,10 +30,10 @@ interface Props {
  * The open commit (`?commit=`): its details, or one file's diff (`&file=`) in their place. The url
  * is the state: closing it (✕, overlay, Escape) navigates to the graph, and the graph unmounts it.
  */
-export function CommitSheet({ project, ticket, hash, file, from, refs }: Props) {
+export function CommitSheet({ host, project, ticket, hash, file, from, refs }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
-  const commit = useCommit(project, hash);
+  const commit = useCommit(host, project, hash);
   const full = commit.data?.hash ?? (hash.length === 40 ? hash : null);
 
   // A second tap before the first navigation lands must not step back once more (out of the app).
@@ -41,7 +43,7 @@ export function CommitSheet({ project, ticket, hash, file, from, refs }: Props) 
     closedAt.current = location.key;
     const move = closeMove(file !== null, historyIndex(), location.state);
     if (move.kind === "back") void navigate(-move.steps);
-    else void navigate(gitHref(project, { ticket }), { replace: true });
+    else void navigate(gitHref(project, { host, ticket }), { replace: true });
   };
 
   const copy = async () => {
@@ -85,11 +87,11 @@ export function CommitSheet({ project, ticket, hash, file, from, refs }: Props) 
           </SheetDescription>
         </SheetHeader>
         {file ? (
-          <DiffView project={project} hash={hash} file={file} from={from} />
+          <DiffView host={host} project={project} hash={hash} file={file} from={from} />
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-3 pb-[max(1rem,var(--sab))]">
             {commit.data ? (
-              <Details project={project} ticket={ticket} hash={hash} details={commit.data} refs={refs} />
+              <Details host={host} project={project} ticket={ticket} hash={hash} details={commit.data} refs={refs} />
             ) : commit.isPending ? (
               <Spinner />
             ) : (
@@ -103,12 +105,14 @@ export function CommitSheet({ project, ticket, hash, file, from, refs }: Props) 
 }
 
 function Details({
+  host,
   project,
   ticket,
   hash,
   details: d,
   refs,
 }: {
+  host: string | null;
   project: string;
   ticket: string | null;
   hash: string;
@@ -148,7 +152,7 @@ function Details({
             <li key={`${f.from ?? ""}\0${f.path}`}>
               <FileRow
                 file={f}
-                href={gitHref(project, { ticket, commit: hash, file: f.path, from: f.from ?? null })}
+                href={gitHref(project, { host, ticket, commit: hash, file: f.path, from: f.from ?? null })}
                 state={diffEntryState(historyIndex())}
               />
             </li>

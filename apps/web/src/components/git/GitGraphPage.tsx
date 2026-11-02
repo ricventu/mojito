@@ -6,9 +6,11 @@ import type { GraphCommit } from "@mojito/shared";
 import { SidebarToggle } from "@/components/sidebar/SidebarToggle";
 import { Button } from "@/components/ui/button";
 import { useBackOr, useGitGraph } from "@/hooks/useGitGraph";
+import { useHost } from "@/hooks/useHost";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { ApiError } from "@/lib/api";
 import { boardHref } from "@/lib/boardReturn";
+import { hostOf } from "@/lib/host";
 import { highlightedCommits, highlightSummary } from "@/lib/git/highlight";
 import { layoutGraph, type GraphRow } from "@/lib/git/layout";
 import { pageCommits, refsOf } from "@/lib/git/pages";
@@ -27,16 +29,55 @@ const SCROLL_PAST = 10;
 export function GitGraphPage() {
   const { project } = useParams();
   if (!project) return <Navigate to="/" replace />;
-  return <GraphView project={project} />;
+  return <HostGate project={project} />;
 }
 
-function GraphView({ project }: { project: string }) {
+/**
+ * `?host=` names a peer only once `/api/peers` has answered: until then nothing is fetched (a
+ * guess would hit this instance's own API), and an unknown name is not found, never this instance.
+ */
+function HostGate({ project }: { project: string }) {
+  const host = useHost();
+  const back = useBackOr();
+  if (host.kind === "loading" || host.kind === "unknown") {
+    return (
+      <main className="ml-[var(--dock-width)] flex min-h-dvh flex-col pr-[var(--sar)] pb-[var(--sab)] pl-[var(--sal)]">
+        <div className="border-b pt-[var(--sat)]">
+          <header className="mx-auto flex w-full max-w-5xl items-center gap-2 px-3 py-2">
+            <SidebarToggle />
+            <h1 className="min-w-0 flex-1 truncate text-base font-semibold">
+              {project}
+              <span className="font-normal text-muted-foreground"> · git</span>
+            </h1>
+          </header>
+        </div>
+        <div className="mx-auto flex w-full max-w-5xl min-w-0 flex-1 flex-col">
+          <Centered>
+            {host.kind === "loading" ? (
+              <Loader2 size={20} className="animate-spin text-muted-foreground" aria-label="Loading" />
+            ) : (
+              <>
+                <p className="text-sm">Unknown host {host.name}</p>
+                <Button variant="secondary" size="sm" onClick={() => back(boardHref())}>
+                  <ArrowLeft size={16} /> Back
+                </Button>
+              </>
+            )}
+          </Centered>
+        </div>
+      </main>
+    );
+  }
+  return <GraphView host={hostOf(host)} project={project} />;
+}
+
+function GraphView({ host, project }: { host: string | null; project: string }) {
   const [params] = useSearchParams();
   const view = parseGitSearch(params);
   const { ticket } = view;
   const back = useBackOr();
   const qc = useQueryClient();
-  const graph = useGitGraph(project, ticket);
+  const graph = useGitGraph(host, project, ticket);
   const narrow = useMediaQuery("(max-width: 479px)");
   const rowHeight = narrow ? 44 : 32;
   const maxLanes = narrow ? 5 : 12;
@@ -54,7 +95,7 @@ function GraphView({ project }: { project: string }) {
   // On first load, bring a ticket's tip into view when it is not among the first rows. The plain
   // project view opens at the top: the checkout's branch can sit far below the newest commits.
   const scrolledFor = useRef<string | null>(null);
-  const queryId = `${project}\0${ticket ?? ""}`;
+  const queryId = `${host ?? ""}\0${project}\0${ticket ?? ""}`;
   useEffect(() => {
     if (!first || scrolledFor.current === queryId) return;
     scrolledFor.current = queryId;
@@ -68,7 +109,7 @@ function GraphView({ project }: { project: string }) {
   const reload = () => {
     scrolledFor.current = null;
     window.scrollTo({ top: 0 });
-    void qc.resetQueries({ queryKey: gitKeys.graph(null, project, ticket) });
+    void qc.resetQueries({ queryKey: gitKeys.graph(host, project, ticket) });
   };
 
   return (
@@ -137,7 +178,7 @@ function GraphView({ project }: { project: string }) {
                     cols={cols}
                     height={rowHeight}
                     narrow={narrow}
-                    href={gitHref(project, { ticket, commit: c.hash })}
+                    href={gitHref(project, { host, ticket, commit: c.hash })}
                     current={c.hash === view.commit}
                     inChain={chain.has(c.hash)}
                     dimmed={chain.size > 0 && !chain.has(c.hash)}
@@ -167,6 +208,7 @@ function GraphView({ project }: { project: string }) {
       </div>
       {view.commit && (
         <CommitSheet
+          host={host}
           project={project}
           ticket={ticket}
           hash={view.commit}

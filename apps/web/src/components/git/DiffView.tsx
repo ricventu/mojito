@@ -21,17 +21,19 @@ const TINT: Record<DiffLineKind, string> = {
  * to them; the patch scrolls both ways inside its own box, never widening the page.
  */
 export function DiffView({
+  host,
   project,
   hash,
   file,
   from,
 }: {
+  host: string | null;
   project: string;
   hash: string;
   file: string;
   from: string | null;
 }) {
-  const diff = useDiff(project, hash, file, from);
+  const diff = useDiff(host, project, hash, file, from);
   const back = useBackOr();
   const [params] = useSearchParams();
   const location = useLocation();
@@ -40,7 +42,7 @@ export function DiffView({
   const toDetails = () => {
     if (wentBackFrom.current === location.key) return;
     wentBackFrom.current = location.key;
-    back(gitHref(project, { ticket: parseGitSearch(params).ticket, commit: hash }));
+    back(gitHref(project, { host, ticket: parseGitSearch(params).ticket, commit: hash }));
   };
 
   return (

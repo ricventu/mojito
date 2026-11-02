@@ -6,6 +6,8 @@ import { docsHref } from "@/lib/docs/url";
 
 interface Props {
   content: string;
+  /** A peer's name; null is this instance. Its links stay on the same host. */
+  host: string | null;
   project: string;
   ticket: string | null;
   /** The document's own path: relative links resolve against its directory. */
@@ -17,7 +19,7 @@ interface Props {
  * `rehype-raw`), so nothing here needs sanitizing. Images show their alt text only: a relative one
  * would need a file route, a remote one a fetch nobody asked for.
  */
-export function MarkdownView({ content, project, ticket, path }: Props) {
+export function MarkdownView({ content, host, project, ticket, path }: Props) {
   const components: Components = {
     a: ({ href, title, children }) => {
       const link = classifyHref(href, path);
@@ -36,7 +38,7 @@ export function MarkdownView({ content, project, ticket, path }: Props) {
           );
         case "doc":
           return (
-            <Link to={docsHref(project, { ticket, path: link.path })} title={title}>
+            <Link to={docsHref(project, { host, ticket, path: link.path })} title={title}>
               {children}
             </Link>
           );

@@ -6,9 +6,11 @@ import type { DocEntry } from "@mojito/shared";
 import { SidebarToggle } from "@/components/sidebar/SidebarToggle";
 import { Button } from "@/components/ui/button";
 import { useDocFile, useDocList } from "@/hooks/useDocs";
+import { useHost } from "@/hooks/useHost";
 import { useBackOr } from "@/hooks/useGitGraph";
 import { ApiError } from "@/lib/api";
 import { boardHref } from "@/lib/boardReturn";
+import { hostOf } from "@/lib/host";
 import { docGroups, docLabel } from "@/lib/docs/list";
 import { docsHref, parseDocsSearch } from "@/lib/docs/url";
 import { relativeTime } from "@/lib/git/time";
@@ -20,21 +22,58 @@ import { MarkdownView } from "./MarkdownView";
 export function DocsPage() {
   const { project } = useParams();
   if (!project) return <Navigate to="/" replace />;
-  return <DocsView project={project} />;
+  return <HostGate project={project} />;
 }
 
-function DocsView({ project }: { project: string }) {
+/**
+ * `?host=` names a peer only once `/api/peers` has answered: until then nothing is fetched (a
+ * guess would hit this instance's own API), and an unknown name is not found, never this instance.
+ */
+function HostGate({ project }: { project: string }) {
+  const host = useHost();
+  const back = useBackOr();
+  if (host.kind === "loading" || host.kind === "unknown") {
+    return (
+      <main className="ml-[var(--dock-width)] flex min-h-dvh flex-col pr-[var(--sar)] pb-[var(--sab)] pl-[var(--sal)]">
+        <div className="border-b pt-[var(--sat)]">
+          <header className="mx-auto flex w-full max-w-3xl items-center gap-2 px-3 py-2">
+            <SidebarToggle />
+            <h1 className="min-w-0 flex-1 truncate text-base font-semibold">
+              {project}
+              <span className="font-normal text-muted-foreground"> · docs</span>
+            </h1>
+          </header>
+        </div>
+        <div className="mx-auto flex w-full max-w-3xl min-w-0 flex-1 flex-col">
+          {host.kind === "loading" ? (
+            <Spinner />
+          ) : (
+            <Centered>
+              <p className="text-sm">Unknown host {host.name}</p>
+              <Button variant="secondary" size="sm" onClick={() => back(boardHref())}>
+                <ArrowLeft size={16} /> Back
+              </Button>
+            </Centered>
+          )}
+        </div>
+      </main>
+    );
+  }
+  return <DocsView host={hostOf(host)} project={project} />;
+}
+
+function DocsView({ host, project }: { host: string | null; project: string }) {
   const [params] = useSearchParams();
   const { ticket, path } = parseDocsSearch(params);
   const back = useBackOr();
   const qc = useQueryClient();
   // The list is not read under an open document: the document view never shows it.
-  const list = useDocList(project, ticket, path === null);
-  const file = useDocFile(project, ticket, path);
+  const list = useDocList(host, project, ticket, path === null);
+  const file = useDocFile(host, project, ticket, path);
   const fetching = path ? file.isFetching : list.isFetching;
   const label = path ? docLabel(path) : null;
 
-  const reload = () => void qc.resetQueries({ queryKey: docKeys.project(null, project) });
+  const reload = () => void qc.resetQueries({ queryKey: docKeys.project(host, project) });
 
   return (
     // It starts after a docked session sidebar (AppShell), which pays the left inset there.
@@ -43,7 +82,7 @@ function DocsView({ project }: { project: string }) {
       <div className="sticky top-0 z-10 border-b bg-background pt-[var(--sat)]">
         <header className="mx-auto flex w-full max-w-3xl items-center gap-2 px-3 py-2">
           <SidebarToggle />
-          <Button variant="ghost" size="sm" className="shrink-0" onClick={() => back(path ? docsHref(project, { ticket }) : boardHref())}>
+          <Button variant="ghost" size="sm" className="shrink-0" onClick={() => back(path ? docsHref(project, { host, ticket }) : boardHref())}>
             <ArrowLeft size={16} /> <span className="max-[480px]:sr-only">Back</span>
           </Button>
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold">
@@ -69,7 +108,7 @@ function DocsView({ project }: { project: string }) {
             <Spinner />
           ) : file.data ? (
             <article className="px-4 py-4">
-              <MarkdownView content={file.data.content} project={project} ticket={ticket} path={path} />
+              <MarkdownView content={file.data.content} host={host} project={project} ticket={ticket} path={path} />
             </article>
           ) : (
             <Failure error={file.error} path={path} onReload={reload} onBack={() => back(boardHref())} />
@@ -83,19 +122,29 @@ function DocsView({ project }: { project: string }) {
             <p className="text-sm text-muted-foreground">No markdown documents.</p>
           </Centered>
         ) : (
-          <DocLists groups={docGroups(list.data, ticket)} ticket={ticket} project={project} />
+          <DocLists groups={docGroups(list.data, ticket)} ticket={ticket} host={host} project={project} />
         )}
       </div>
     </main>
   );
 }
 
-function DocLists({ groups, ticket, project }: { groups: ReturnType<typeof docGroups>; ticket: string | null; project: string }) {
+function DocLists({
+  groups,
+  ticket,
+  host,
+  project,
+}: {
+  groups: ReturnType<typeof docGroups>;
+  ticket: string | null;
+  host: string | null;
+  project: string;
+}) {
   const rows = (docs: DocEntry[]) => (
     <ul className="flex flex-col">
       {docs.map((d) => (
         <li key={d.path}>
-          <DocRow doc={d} href={docsHref(project, { ticket, path: d.path })} />
+          <DocRow doc={d} href={docsHref(project, { host, ticket, path: d.path })} />
         </li>
       ))}
     </ul>

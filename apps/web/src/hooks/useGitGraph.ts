@@ -3,9 +3,12 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import type { CommitDetails, CommitDiff, GitGraphPage } from "@mojito/shared";
 import { apiFetch } from "@/lib/api";
+import { hostApi } from "@/lib/host";
 import { gitKeys } from "@/lib/queryKeys";
 
-const base = (project: string) => `/api/projects/${encodeURIComponent(project)}/git`;
+/** `host` is a peer's name (null: this instance); a peer's calls go through the relay. */
+const base = (host: string | null, project: string) =>
+  hostApi(host, `/api/projects/${encodeURIComponent(project)}/git`);
 
 /**
  * A project's graph, one page of commits at a time; the next page skips what is loaded. A snapshot:
@@ -13,12 +16,12 @@ const base = (project: string) => `/api/projects/${encodeURIComponent(project)}/
  * page of the old one cannot land in the new one. `gcTime: 0` drops it once nothing reads it, so
  * each entry to the page is a fresh read rather than the pages cached on the last visit.
  */
-export function useGitGraph(project: string, ticket: string | null) {
+export function useGitGraph(host: string | null, project: string, ticket: string | null) {
   return useInfiniteQuery({
-    queryKey: gitKeys.graph(null, project, ticket),
+    queryKey: gitKeys.graph(host, project, ticket),
     queryFn: ({ pageParam }) =>
       apiFetch<GitGraphPage>(
-        `${base(project)}/graph?skip=${pageParam}${ticket ? `&ticket=${encodeURIComponent(ticket)}` : ""}`,
+        `${base(host, project)}/graph?skip=${pageParam}${ticket ? `&ticket=${encodeURIComponent(ticket)}` : ""}`,
       ),
     initialPageParam: 0,
     // Raw page lengths, not the deduplicated rows (`pageCommits`): that is what `--skip` counts.
@@ -31,23 +34,29 @@ export function useGitGraph(project: string, ticket: string | null) {
 }
 
 /** One commit's details; a commit never changes. */
-export function useCommit(project: string, hash: string | null) {
+export function useCommit(host: string | null, project: string, hash: string | null) {
   return useQuery({
-    queryKey: gitKeys.commit(null, project, hash ?? ""),
-    queryFn: () => apiFetch<CommitDetails>(`${base(project)}/commits/${encodeURIComponent(hash!)}`),
+    queryKey: gitKeys.commit(host, project, hash ?? ""),
+    queryFn: () => apiFetch<CommitDetails>(`${base(host, project)}/commits/${encodeURIComponent(hash!)}`),
     enabled: hash !== null,
     staleTime: Infinity,
   });
 }
 
 /** One file's diff in a commit; `from` keeps a rename a rename. */
-export function useDiff(project: string, hash: string | null, file: string | null, from: string | null) {
+export function useDiff(
+  host: string | null,
+  project: string,
+  hash: string | null,
+  file: string | null,
+  from: string | null,
+) {
   return useQuery({
-    queryKey: gitKeys.diff(null, project, hash ?? "", file ?? "", from),
+    queryKey: gitKeys.diff(host, project, hash ?? "", file ?? "", from),
     queryFn: () => {
       const params = new URLSearchParams({ path: file! });
       if (from) params.set("from", from);
-      return apiFetch<CommitDiff>(`${base(project)}/commits/${encodeURIComponent(hash!)}/diff?${params}`);
+      return apiFetch<CommitDiff>(`${base(host, project)}/commits/${encodeURIComponent(hash!)}/diff?${params}`);
     },
     enabled: hash !== null && file !== null,
     staleTime: Infinity,
