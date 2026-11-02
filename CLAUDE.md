@@ -317,13 +317,14 @@ app's state, left in place.
 - **Session sidebar** (`components/sidebar`, `lib/sidebar.ts`, `hooks/useSidebar.ts`): drawn
   once for every page by the layout route `AppShell` (a pinned one stays put from page to page;
   pages reach it through `useAppSidebar`/`SidebarToggle`, and each starts after it with
-  `[var(--dock-width)]`, guarded by `safeArea.test.ts`). Every session not removed, unfiltered
-  by the board, grouped by project (General last): the live ones, then the ended ones (dimmed;
-  their terminal page offers Resume), each newest `createdAt` first — rows move only when a
-  session ends (down) or is resumed (top). A band's count is live sessions only. No Hide: Remove
-  (board) is how an ended session leaves. Resume (`hooks/useResume.ts`, `canResume`: ended, not a
-  shell, a `claudeSessionId`) is on the ended terminal, the board's loose row and the ticket sheet
-  (beside a fresh Launch); this instance only.
+  `[var(--dock-width)]`, guarded by `safeArea.test.ts`). Every
+  non-`ended` session, unfiltered by the board, grouped by project (General last), newest
+  `createdAt` first — only immutable keys, so rows never jump when a state changes. No Hide:
+  it was removed (a session leaves the sidebar when it ends; ended ones stay on the board, at
+  the bottom of their project, until removed — never in the sidebar, by the human's choice).
+  Resume (`hooks/useResume.ts`, `canResume`: ended, not a shell, a `claudeSessionId`) is on the
+  ended terminal, the board's loose row and the ticket sheet (beside a fresh Launch); this
+  instance only.
   Unpinned it is a left `Sheet` overlay (never resizes the pty); pinned it is a docked `w-72`
   column, only at ≥ 1024px (`useMediaQuery`), pin in `localStorage` (`mojito-sidebar-pinned`,
   read in the `useReducer` initialiser so it docks on the first render, no pty resize twice).
