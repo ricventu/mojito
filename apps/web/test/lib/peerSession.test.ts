@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PeerSnapshot, SessionMeta } from "@mojito/shared";
-import { exitAction, peerSessionView } from "@/lib/peerSession";
+import { exitAction, pageSession, peerSessionView } from "@/lib/peerSession";
 
 const a: SessionMeta = {
   id: "mj-a",
@@ -40,6 +40,30 @@ describe("peerSessionView", () => {
 
   it("has no session when none was ever seen", () => {
     expect(peerSessionView(peer(true, []), "mj-a", null)).toEqual({ session: null, offline: false });
+  });
+});
+
+describe("pageSession", () => {
+  const local: SessionMeta = { ...a, cwd: "/local" };
+  const remote: SessionMeta = { ...a, cwd: "/remote" };
+
+  it("reads this instance's list only for self", () => {
+    expect(pageSession({ kind: "self" }, [local], "mj-a", null)).toBe(local);
+    expect(pageSession({ kind: "self" }, undefined, "mj-a", null)).toBeNull();
+  });
+
+  it("never takes a local row while the host is loading", () => {
+    expect(pageSession({ kind: "loading" }, [local], "mj-a", null)).toBeNull();
+  });
+
+  it("never takes a local row for an unknown host", () => {
+    expect(pageSession({ kind: "unknown", name: "x" }, [local], "mj-a", null)).toBeNull();
+  });
+
+  it("takes a peer's snapshot row, else the last known, never the local one", () => {
+    expect(pageSession({ kind: "peer", peer: peer(true, [remote]) }, [local], "mj-a", null)).toBe(remote);
+    expect(pageSession({ kind: "peer", peer: peer(true, []) }, [local], "mj-a", a)).toBe(a);
+    expect(pageSession({ kind: "peer", peer: peer(true, []) }, [local], "mj-a", null)).toBeNull();
   });
 });
 

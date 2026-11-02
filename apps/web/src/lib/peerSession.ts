@@ -3,6 +3,7 @@
 // emptied when the peer goes offline, so what the page shows must outlive the snapshot's row.
 
 import type { PeerSnapshot, SessionMeta } from "@mojito/shared";
+import type { HostResolution } from "@/lib/host";
 
 /**
  * The session to show: the snapshot's row, else the last one this page saw (an offline peer's
@@ -14,6 +15,27 @@ export function peerSessionView(
   lastKnown: SessionMeta | null,
 ): { session: SessionMeta | null; offline: boolean } {
   return { session: peer.sessions.find((s) => s.id === id) ?? lastKnown, offline: !peer.online };
+}
+
+/**
+ * The session the terminal page is about. This instance's list is read only for `self`: while a
+ * `?host=` is still resolving (or is unknown) the url's id may exist here too, and showing that
+ * row would let Kill and the Git/Docs links act on the wrong machine's session.
+ */
+export function pageSession(
+  host: HostResolution,
+  local: SessionMeta[] | undefined,
+  id: string,
+  lastKnown: SessionMeta | null,
+): SessionMeta | null {
+  switch (host.kind) {
+    case "self":
+      return local?.find((s) => s.id === id) ?? null;
+    case "peer":
+      return peerSessionView(host.peer, id, lastKnown).session;
+    default:
+      return null;
+  }
 }
 
 /**

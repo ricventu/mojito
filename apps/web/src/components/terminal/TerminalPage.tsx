@@ -23,7 +23,7 @@ import { boardHref } from "@/lib/boardReturn";
 import { docsHref } from "@/lib/docs/url";
 import { gitHref } from "@/lib/git/url";
 import { hostApi, hostOf } from "@/lib/host";
-import { exitAction, peerSessionView } from "@/lib/peerSession";
+import { exitAction, pageSession } from "@/lib/peerSession";
 import { qk } from "@/lib/queryKeys";
 import { sessionName } from "@/lib/sidebar";
 import { safeHref } from "@/lib/url";
@@ -128,9 +128,8 @@ export function TerminalPage() {
   };
 
   // This instance's list, or — for a peer — its snapshot's row (kept once seen).
-  const peerView = host.kind === "peer" ? peerSessionView(host.peer, id, lastKnown) : null;
-  const offline = peerView?.offline ?? false;
-  const session = peerView ? peerView.session : sessions.data?.find((s) => s.id === id);
+  const offline = host.kind === "peer" && !host.peer.online;
+  const session = pageSession(host, sessions.data, id, lastKnown) ?? undefined;
   // A markdown path claude printed opens in its project's docs; General sessions have none.
   const docsProject = session?.project ?? null;
   const openDoc = docsProject
