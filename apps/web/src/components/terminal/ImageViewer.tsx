@@ -4,9 +4,12 @@ import { CENTRED_ON_WIDE_CLASS } from "@/components/sheets/styles";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { apiBlob } from "@/lib/api";
+import { hostApi } from "@/lib/host";
 import { cn } from "@/lib/utils";
 
 interface Props {
+  /** The peer the session lives on; null is this instance. */
+  host: string | null;
   sessionId: string;
   /** The path as claude printed it: the server reads it from the session's directory. */
   path: string;
@@ -21,7 +24,7 @@ type Loaded = { url: string } | { error: string } | null;
  * with the token header and shown from an object URL, so the token never sits in a link. A tap
  * on the image flips between fitting the window and its actual size, scrolled.
  */
-export function ImageViewer({ sessionId, path, onClose }: Props) {
+export function ImageViewer({ host, sessionId, path, onClose }: Props) {
   const [loaded, setLoaded] = useState<Loaded>(null);
   const [actualSize, setActualSize] = useState(false);
   const name = path.split("/").pop() ?? path;
@@ -30,7 +33,7 @@ export function ImageViewer({ sessionId, path, onClose }: Props) {
   useEffect(() => {
     let live = true;
     let url: string | null = null;
-    apiBlob(`/api/sessions/${encodeURIComponent(sessionId)}/image?path=${encodeURIComponent(path)}`).then(
+    apiBlob(hostApi(host, `/api/sessions/${encodeURIComponent(sessionId)}/image?path=${encodeURIComponent(path)}`)).then(
       (blob) => {
         if (!live) return;
         url = URL.createObjectURL(blob);
@@ -42,7 +45,7 @@ export function ImageViewer({ sessionId, path, onClose }: Props) {
       live = false;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [sessionId, path]);
+  }, [host, sessionId, path]);
 
   const url = loaded && "url" in loaded ? loaded.url : null;
 

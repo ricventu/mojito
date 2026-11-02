@@ -5,6 +5,7 @@
  * each into an `[Image #N]` attachment.
  */
 import { apiFetch } from "@/lib/api";
+import { hostApi } from "@/lib/host";
 import { validateImages } from "@/lib/images";
 
 /** Uploads the images, then pastes their paths at claude's input line; nothing is pasted when either step refuses. */
@@ -25,13 +26,13 @@ export async function attachImages(
   return { ok: true };
 }
 
-/** `POST /api/sessions/:id/images`: the images' absolute paths on the server. */
-export async function uploadImages(sessionId: string, files: File[]): Promise<string[]> {
+/** `POST /api/sessions/:id/images`: the images' absolute paths on the server (a peer's, through the relay). */
+export async function uploadImages(host: string | null, sessionId: string, files: File[]): Promise<string[]> {
   const form = new FormData();
   for (const f of files) form.append("images", f);
-  const { paths } = await apiFetch<{ paths: string[] }>(`/api/sessions/${encodeURIComponent(sessionId)}/images`, {
-    method: "POST",
-    body: form,
-  });
+  const { paths } = await apiFetch<{ paths: string[] }>(
+    hostApi(host, `/api/sessions/${encodeURIComponent(sessionId)}/images`),
+    { method: "POST", body: form },
+  );
   return paths;
 }

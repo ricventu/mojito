@@ -11,17 +11,20 @@ import { xtermThinksItIsNode } from "@/lib/terminal/platform";
 import { syncGeometry } from "@/lib/terminal/terminalFit";
 import { terminalOptions } from "@/lib/terminal/terminalOptions";
 import { computeTouchScroll, wheelSequences } from "@/lib/terminal/touchScroll";
+import { ptyPath } from "@/lib/host";
 import { getToken } from "@/lib/token";
 
 const RECONNECT_MS = 1500;
 const encoder = new TextEncoder();
 
-function ptyUrl(sessionId: string): string {
+function ptyUrl(host: string | null, sessionId: string): string {
   const scheme = window.location.protocol === "https:" ? "wss" : "ws";
-  return `${scheme}://${window.location.host}/ws/pty/${encodeURIComponent(sessionId)}?token=${encodeURIComponent(getToken())}`;
+  return `${scheme}://${window.location.host}${ptyPath(host, sessionId)}?token=${encodeURIComponent(getToken())}`;
 }
 
 interface Props {
+  /** The peer the session lives on (reached through this server's relay); null is this instance. */
+  host: string | null;
   sessionId: string;
   /** Is the mobile keyboard up? (`useKeyboardOpen`) — the terminal keeps its rows while it is. */
   keyboardOpen: boolean;
@@ -38,14 +41,14 @@ interface Props {
 }
 
 /**
- * The browser terminal: xterm (DOM renderer) attached to `/ws/pty/<id>`. Keystrokes go
+ * The browser terminal: xterm (DOM renderer) attached to `/ws/pty/<id>` (a peer's through the relay, `/ws/peers/<name>/pty/<id>`). Keystrokes go
  * out as binary frames, the geometry as `{resize:{cols,rows}}` — on every (re)connect
  * unconditionally and on every change of the box, through `syncGeometry` (RIC-258). Any
  * close but `SESSION_GONE_CODE` reconnects every 1.5s while mounted. The terminal is
  * anchored to the bottom of its box, so rows the keyboard costs come off the top and
  * claude's input line stays on screen.
  */
-export function TerminalView({ sessionId, keyboardOpen, onExit, onReady, onImages, openDoc, openImage }: Props) {
+export function TerminalView({ host, sessionId, keyboardOpen, onExit, onReady, onImages, openDoc, openImage }: Props) {
   const holder = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -156,7 +159,7 @@ export function TerminalView({ sessionId, keyboardOpen, onExit, onReady, onImage
       let closed = false;
       let retry: ReturnType<typeof setTimeout> | undefined;
       const connect = () => {
-        const ws = new WebSocket(ptyUrl(sessionId));
+        const ws = new WebSocket(ptyUrl(host, sessionId));
         ws.binaryType = "arraybuffer";
         wsRef.current = ws;
         // Unconditional: the server attaches at 80x24 and this is the only thing that
@@ -211,7 +214,7 @@ export function TerminalView({ sessionId, keyboardOpen, onExit, onReady, onImage
       clearTimeout(startTimer);
       teardown?.();
     };
-  }, [sessionId]);
+  }, [host, sessionId]);
 
   // The header unmounts while the keyboard is up; publish the geometry either way.
   useEffect(() => {
