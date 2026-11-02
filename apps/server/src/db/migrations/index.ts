@@ -4,6 +4,7 @@ import sessionHidden from "./003_session_hidden";
 import sessionTitle from "./004_session_title";
 import dropSessionHidden from "./005_drop_session_hidden";
 import sessionEndReason from "./006_session_end_reason";
+import sessionClaudeId from "./007_session_claude_id";
 
 export interface Migration {
   version: number;
@@ -18,4 +19,5 @@ export const migrations: Migration[] = [
   { version: 4, sql: sessionTitle },
   { version: 5, sql: dropSessionHidden },
   { version: 6, sql: sessionEndReason },
+  { version: 7, sql: sessionClaudeId },
 ];

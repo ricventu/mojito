@@ -20,6 +20,7 @@ function session(id: string, over: Partial<SessionMeta> = {}): SessionMeta {
     lastEventAt: 1,
     title: null,
     endReason: null,
+    claudeSessionId: null,
     ...over,
   };
 }
@@ -40,12 +41,22 @@ function ticket(identifier: string): TicketSummary {
 const ids = (groups: { sessions: SessionMeta[] }[]) => groups.flatMap((g) => g.sessions.map((s) => s.id));
 
 describe("sidebarGroups", () => {
-  it("excludes ended sessions", () => {
+  it("keeps ended sessions until removed, after the live ones, each part newest first", () => {
     const groups = sidebarGroups(
       [project("Alpha")],
-      [session("mj-a-111111"), session("mj-a-222222", { state: "ended" })],
+      [
+        session("mj-a-old-ended", { state: "ended", createdAt: 1 }),
+        session("mj-a-live-old", { createdAt: 2 }),
+        session("mj-a-new-ended", { state: "ended", createdAt: 9 }),
+        session("mj-a-live-new", { state: "running", createdAt: 5 }),
+      ],
     );
-    expect(ids(groups)).toEqual(["mj-a-111111"]);
+    expect(ids(groups)).toEqual(["mj-a-live-new", "mj-a-live-old", "mj-a-new-ended", "mj-a-old-ended"]);
+  });
+
+  it("shows a project whose sessions have all ended", () => {
+    const groups = sidebarGroups([project("Alpha")], [session("mj-a-1", { state: "ended" })]);
+    expect(groups.map((g) => g.project)).toEqual(["Alpha"]);
   });
 
   it("groups configured projects alphabetically, General last", () => {
@@ -121,6 +132,11 @@ describe("sessionCount", () => {
     );
     expect(sessionCount(groups)).toBe(3);
     expect(sessionCount([])).toBe(0);
+  });
+
+  it("counts only the live ones: an ended session is history", () => {
+    const groups = sidebarGroups([project("Alpha")], [session("mj-1"), session("mj-2", { state: "ended" })]);
+    expect(sessionCount(groups)).toBe(1);
   });
 });
 

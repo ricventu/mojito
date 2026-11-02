@@ -87,7 +87,10 @@ describe("isHookEvent", () => {
 
 describe("hookPayload", () => {
   it("reads the fields Mojito uses off claude's hook input", () => {
-    expect(hookPayload({ hook_event_name: "SessionEnd", session_id: "x", reason: "clear" })).toEqual({ reason: "clear" });
+    expect(hookPayload({ hook_event_name: "SessionEnd", session_id: "x", reason: "clear" })).toEqual({
+      reason: "clear",
+      sessionId: "x",
+    });
     expect(hookPayload({ hook_event_name: "Notification", message: "m", notification_type: "idle_prompt" })).toEqual({
       notification_type: "idle_prompt",
     });

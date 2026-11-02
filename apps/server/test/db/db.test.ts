@@ -17,7 +17,7 @@ describe("migrate", () => {
     migrate(db);
     migrate(db);
     const rows = db.prepare("SELECT version FROM schema_migrations").all();
-    expect(rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }]);
+    expect(rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }]);
   });
   it("drops the brainstorming column and its stored default (v2)", () => {
     const db = openDb(":memory:");
@@ -54,6 +54,7 @@ describe("migrate", () => {
       { version: 4 },
       { version: 5 },
       { version: 6 },
+      { version: 7 },
     ]);
     expect(new SessionsRepo(db).get("mj-RIC-1")).toEqual(session({ state: "idle", lastEventAt: 2, title: null }));
   });
@@ -212,6 +213,7 @@ const session = (over: Partial<SessionMeta> = {}): SessionMeta => ({
   lastEventAt: 1,
   title: null,
   endReason: null,
+  claudeSessionId: null,
   ...over,
 });
 

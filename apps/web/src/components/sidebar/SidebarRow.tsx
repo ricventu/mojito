@@ -26,9 +26,9 @@ const ROW_LINK =
   "flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left outline-none hover:bg-accent/60 focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 /**
- * One live session: its state dot and label are a link to its terminal (so Cmd/middle-click
- * and a long-press work as on any link). A peer's session is the same row: its terminal opens
- * in this client, through the relay.
+ * One session: its state dot and label are a link to its terminal (so Cmd/middle-click and a
+ * long-press work as on any link). An ended one is dimmed; its terminal page offers Resume. A
+ * peer's session is the same row: its terminal opens in this client, through the relay.
  */
 export function SidebarRow({ session, to, label, current, replace, onPick }: Props) {
   const dot = DOT[session.state];
@@ -55,7 +55,7 @@ export function SidebarRow({ session, to, label, current, replace, onPick }: Pro
           if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) onPick();
         }}
         aria-current={current ? "page" : undefined}
-        className={ROW_LINK}
+        className={cn(ROW_LINK, session.state === "ended" && !current && "opacity-60")}
       >
         {body}
       </Link>

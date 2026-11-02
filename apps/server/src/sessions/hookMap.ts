@@ -50,7 +50,13 @@ export interface HookPayload {
    * counted: a dev server left running in the background is not the session working.
    */
   backgroundAgents?: number;
+  /** Every event: claude's id for the conversation (`session_id`), when it is a plain id. */
+  sessionId?: string;
 }
+
+// What a conversation id may look like before it is kept and handed back to `claude --resume`
+// (claude's are UUIDs): nothing a shell or an option parser could read as something else.
+const CLAUDE_SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
 // The `background_tasks` types that are an agent working on the session's behalf; their report
 // comes back as a new turn (UserPromptSubmit), and a Stop follows it.
@@ -76,6 +82,7 @@ export function hookPayload(body: unknown): HookPayload {
   if (typeof b.source === "string") out.source = b.source;
   const agents = countBackgroundAgents(b.background_tasks);
   if (agents !== undefined) out.backgroundAgents = agents;
+  if (typeof b.session_id === "string" && CLAUDE_SESSION_ID.test(b.session_id)) out.sessionId = b.session_id;
   return out;
 }
 
@@ -105,8 +112,8 @@ export function isNoiseHook(event: HookEventName, payload: HookPayload): boolean
  * that has ended never comes back through one (a relaunch is a new row), so a late SessionStart
  * or an idle Notification must not resurrect it — only the boot-time reconcile does, for a row
  * whose tmux is demonstrably alive. Only needs-input carries an alert; every other state clears it.
- * The SessionStart of a `/clear` leaves claude at an empty prompt, waiting: idle, not running —
- * no Stop follows it to say so. A Stop while a background agent is still at work is not idle
+ * The SessionStart of a `/clear` or a `--resume` leaves claude at its prompt, waiting: idle, not
+ * running — no Stop follows it to say so. A Stop while a background agent is still at work is not idle
  * either: the turn is over, the work is not, and its report will start the next turn. Shown idle,
  * such a session looks finished — one was closed mid-verification that way.
  */
@@ -114,7 +121,7 @@ export function mapHook(event: HookEventName, current: SessionState, payload: Ho
   if (current === "ended") return { state: "ended", alert: null };
   switch (event) {
     case "SessionStart":
-      return { state: payload.source === "clear" ? "idle" : "running", alert: null };
+      return { state: payload.source === "clear" || payload.source === "resume" ? "idle" : "running", alert: null };
     case "UserPromptSubmit":
     case "PostToolUse":
       return { state: "running", alert: null };

@@ -7,7 +7,7 @@ import { parseBody } from "../body";
 import { expandHome } from "../../homePath";
 import { killSession } from "../../sessions/close";
 import { imagesDir, storeImages } from "../../sessions/images";
-import { launchFree, launchTicket } from "../../sessions/launch";
+import { launchFree, launchTicket, resumeSession } from "../../sessions/launch";
 import { readImageFile, resolveImagePath } from "../../sessions/viewImage";
 import { validateImages, type ImageType } from "../../tasks/images";
 
@@ -104,6 +104,15 @@ export function sessionRoutes(deps: AppDeps): Hono {
       }
       const { session, warning } = result;
       return c.json(warning === undefined ? { session } : { session, warning }, 201);
+    })
+    // An ended claude session started again on its own conversation (launch.ts#resumeSession).
+    .post("/sessions/:id/resume", async (c) => {
+      const result = await resumeSession(c.req.param("id"), deps.launch);
+      if (!result.ok) {
+        const { status, error, sessionId } = result;
+        return c.json(sessionId === undefined ? { error } : { error, sessionId }, status);
+      }
+      return c.json({ session: result.session }, 201);
     })
     .delete("/sessions/:id", async (c) => {
       const id = c.req.param("id");

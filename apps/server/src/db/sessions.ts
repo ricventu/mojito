@@ -15,6 +15,7 @@ interface Row {
   last_event_at: number;
   title: string | null;
   end_reason: SessionMeta["endReason"];
+  claude_session_id: string | null;
 }
 
 const toMeta = (r: Row): SessionMeta => ({
@@ -31,6 +32,7 @@ const toMeta = (r: Row): SessionMeta => ({
   lastEventAt: r.last_event_at,
   title: r.title,
   endReason: r.end_reason ?? null,
+  claudeSessionId: r.claude_session_id ?? null,
 });
 
 export class SessionsRepo {
@@ -50,12 +52,12 @@ export class SessionsRepo {
     this.db
       .prepare(
         `INSERT OR REPLACE INTO sessions
-           (id, kind, project, ticket, cwd, model, effort, state, alert, created_at, last_event_at, title, end_reason)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, kind, project, ticket, cwd, model, effort, state, alert, created_at, last_event_at, title, end_reason, claude_session_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         m.id, m.kind, m.project, m.ticket, m.cwd, m.model, m.effort, m.state, m.alert,
-        m.createdAt, m.lastEventAt, m.title, m.endReason ?? null,
+        m.createdAt, m.lastEventAt, m.title, m.endReason ?? null, m.claudeSessionId ?? null,
       );
   }
 
@@ -65,7 +67,7 @@ export class SessionsRepo {
    */
   patch(
     id: string,
-    p: Partial<Pick<SessionMeta, "state" | "alert" | "lastEventAt" | "title" | "endReason">>,
+    p: Partial<Pick<SessionMeta, "state" | "alert" | "lastEventAt" | "title" | "endReason" | "claudeSessionId">>,
   ): SessionMeta | null {
     const sets: string[] = [];
     const values: unknown[] = [];
@@ -75,6 +77,7 @@ export class SessionsRepo {
     if (p.title !== undefined) (sets.push("title = ?"), values.push(p.title));
     const endReason = p.state !== undefined && p.state !== "ended" ? null : p.endReason;
     if (endReason !== undefined) (sets.push("end_reason = ?"), values.push(endReason));
+    if (p.claudeSessionId !== undefined) (sets.push("claude_session_id = ?"), values.push(p.claudeSessionId));
     if (sets.length > 0) this.db.prepare(`UPDATE sessions SET ${sets.join(", ")} WHERE id = ?`).run(...values, id);
     return this.get(id);
   }

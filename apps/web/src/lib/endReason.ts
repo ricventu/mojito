@@ -1,4 +1,4 @@
-import type { EndReason } from "@mojito/shared";
+import type { EndReason, SessionMeta } from "@mojito/shared";
 
 export interface EndLook {
   /** The badge's word. */
@@ -37,4 +37,12 @@ const UNKNOWN: EndLook = { label: "Ended", description: "Session ended.", abnorm
  */
 export function endLook(reason: EndReason | null | undefined): EndLook {
   return (reason && LOOKS[reason]) || UNKNOWN;
+}
+
+/**
+ * Whether Resume can start an ended session again: claude's, not a shell's, and with the
+ * conversation id the hooks recorded (a session that ended before Mojito kept it has none).
+ */
+export function canResume(s: Pick<SessionMeta, "state" | "kind" | "claudeSessionId">): boolean {
+  return s.state === "ended" && s.kind !== "shell" && s.claudeSessionId !== null && s.claudeSessionId !== undefined;
 }

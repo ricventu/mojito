@@ -19,6 +19,7 @@ const meta = (over: Partial<SessionMeta> = {}): SessionMeta => ({
   lastEventAt: 1,
   title: null,
   endReason: null,
+  claudeSessionId: null,
   ...over,
 });
 

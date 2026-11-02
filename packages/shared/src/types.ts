@@ -68,6 +68,11 @@ export interface SessionMeta {
    * ended before the reason was recorded. A peer that predates it sends no field at all.
    */
   endReason: EndReason | null;
+  /**
+   * claude's own id for the conversation (every hook's `session_id`; a `/clear` starts a new one),
+   * what Resume hands `claude --resume`. Null until the first hook, and for a shell.
+   */
+  claudeSessionId: string | null;
 }
 
 /**

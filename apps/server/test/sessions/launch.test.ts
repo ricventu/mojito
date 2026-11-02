@@ -9,7 +9,7 @@ import { DuplicateSessionError, q } from "../../src/tmux/tmux";
 import { buildHookSettings } from "../../src/sessions/hookSettings";
 import { buildGitResolvePrompt, buildTicketPrompt } from "../../src/sessions/prompt";
 import { STALL_GRACE_MS } from "../../src/sessions/startupStall";
-import { launchFree, launchGitResolve, launchTicket, type LaunchDeps } from "../../src/sessions/launch";
+import { launchFree, launchGitResolve, launchTicket, resumeSession, type LaunchDeps } from "../../src/sessions/launch";
 
 const cfg: ServerConfig = {
   name: "box",
@@ -91,6 +91,7 @@ const row = (over: Partial<SessionMeta>): SessionMeta => ({
   lastEventAt: 1,
   title: null,
   endReason: null,
+  claudeSessionId: null,
   ...over,
 });
 
@@ -121,6 +122,7 @@ describe("launchTicket", () => {
       lastEventAt: 1000,
       title: null,
       endReason: null,
+      claudeSessionId: null,
     };
     expect(res).toEqual({ ok: true, session: expected });
     expect(deps.newSession).toHaveBeenCalledTimes(1);
@@ -351,6 +353,7 @@ describe("launchFree", () => {
       lastEventAt: 1000,
       title: null,
       endReason: null,
+      claudeSessionId: null,
     };
     expect(res).toEqual({ ok: true, session: expected });
     const settingsPath = "/state/hooks/mj-web-a1b2c3.json";
@@ -461,6 +464,7 @@ describe("launchGitResolve", () => {
       lastEventAt: 1000,
       title: null,
       endReason: null,
+      claudeSessionId: null,
     };
     expect(res).toEqual({ ok: true, session: expected, alreadyOpen: false });
     expect(deps.newSession).toHaveBeenCalledWith(
@@ -491,5 +495,75 @@ describe("launchGitResolve", () => {
   it("refuses an unmapped project", async () => {
     const { deps } = setup();
     expect(await launchGitResolve({ ...req, project: "Nope" }, deps)).toEqual({ ok: false, status: 400, error: "project not mapped: Nope" });
+  });
+});
+
+describe("resumeSession", () => {
+  const SID = "5739e507-0697-4ba0-b5c7-60239b8c95a3";
+  const ended = (over: Partial<SessionMeta> = {}) =>
+    row({ state: "ended", endReason: "oom", claudeSessionId: SID, title: "webapp26", ...over });
+
+  it("starts claude on its own conversation under the same id, from the session's directory", async () => {
+    const { deps, sessions, events, linear, files } = setup();
+    sessions.insert(ended());
+    const res = await resumeSession("mj-RIC-1", deps);
+    expect(res.ok).toBe(true);
+    const settingsPath = "/state/hooks/mj-RIC-1.json";
+    expect(deps.newSession).toHaveBeenCalledWith(
+      "mj-RIC-1",
+      "/repo/web",
+      `claude --model ${q("sonnet")} --effort ${q("low")} --settings ${q(settingsPath)} --resume ${q(SID)}`,
+    );
+    expect(files.get(settingsPath)).toBe(JSON.stringify(buildHookSettings("mj-RIC-1", "http://127.0.0.1:3100", "tok")));
+    const after = sessions.get("mj-RIC-1");
+    expect(after).toEqual(
+      ended({ state: "starting", endReason: null, alert: null, createdAt: 1000, lastEventAt: 1000 }),
+    );
+    expect(events).toEqual([{ type: "session.updated", session: after }]);
+    // The ticket stays where the human left it.
+    expect(linear.setStatus).not.toHaveBeenCalled();
+    expect(linear.assignToMe).not.toHaveBeenCalled();
+  });
+
+  it("leaves model and effort to claude for an adopted row that knows neither", async () => {
+    const { deps, sessions } = setup();
+    sessions.insert(ended({ model: null, effort: null }));
+    await resumeSession("mj-RIC-1", deps);
+    expect(deps.newSession).toHaveBeenCalledWith(
+      "mj-RIC-1",
+      "/repo/web",
+      `claude --settings ${q("/state/hooks/mj-RIC-1.json")} --resume ${q(SID)}`,
+    );
+  });
+
+  it("refuses what has nothing to resume, and a live session", async () => {
+    const { deps, sessions } = setup();
+    expect(await resumeSession("mj-RIC-1", deps)).toMatchObject({ ok: false, status: 404 });
+    sessions.insert(ended({ id: "mj-shell-a1b2c3", kind: "shell", ticket: null }));
+    expect(await resumeSession("mj-shell-a1b2c3", deps)).toMatchObject({ ok: false, status: 400 });
+    sessions.insert(ended({ claudeSessionId: null }));
+    expect(await resumeSession("mj-RIC-1", deps)).toMatchObject({ ok: false, status: 409 });
+    sessions.insert(ended({ state: "idle", endReason: null }));
+    expect(await resumeSession("mj-RIC-1", deps)).toMatchObject({ ok: false, status: 409, sessionId: "mj-RIC-1" });
+    sessions.insert(ended({ cwd: "" }));
+    expect(await resumeSession("mj-RIC-1", deps)).toMatchObject({ ok: false, status: 400 });
+    expect(deps.newSession).not.toHaveBeenCalled();
+  });
+
+  it("resumes a row that outlived its tmux, ending it first", async () => {
+    const { deps, sessions, events } = setup({ hasSession: vi.fn(async () => false) });
+    sessions.insert(ended({ state: "running", endReason: null }));
+    const res = await resumeSession("mj-RIC-1", deps);
+    expect(res.ok).toBe(true);
+    expect(events[0]).toMatchObject({ session: { state: "ended", endReason: "gone" } });
+    expect(sessions.get("mj-RIC-1")?.state).toBe("starting");
+  });
+
+  it("answers a double tap with one resume and one 409", async () => {
+    const { deps, sessions } = setup();
+    sessions.insert(ended());
+    const [a, b] = await Promise.all([resumeSession("mj-RIC-1", deps), resumeSession("mj-RIC-1", deps)]);
+    expect([a.ok, b.ok].sort()).toEqual([false, true]);
+    expect(deps.newSession).toHaveBeenCalledTimes(1);
   });
 });

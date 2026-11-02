@@ -76,6 +76,18 @@ function claudeCommand(model: Model, effort: Effort, settingsPath: string, promp
   return prompt === undefined ? base : `${base} ${q(prompt)}`;
 }
 
+/**
+ * claude picking up a conversation by its id. Run from the project checkout: claude looks for the
+ * id there and in the repo's worktrees first, and goes back into the worktree the session had
+ * moved to (its transcript went with it), or stays here when that worktree is gone. An adopted
+ * row knows no model or effort: claude's defaults then.
+ */
+function resumeCommand(row: Pick<SessionMeta, "model" | "effort">, settingsPath: string, claudeSessionId: string): string {
+  const model = row.model ? ` --model ${q(row.model)}` : "";
+  const effort = row.effort ? ` --effort ${q(row.effort)}` : "";
+  return `claude${model}${effort} --settings ${q(settingsPath)} --resume ${q(claudeSessionId)}`;
+}
+
 // A shell session is the user's login shell, in place of the tmux pane's own.
 const SHELL_COMMAND = 'exec "${SHELL:-/bin/bash}" -l';
 
@@ -146,6 +158,7 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
       lastEventAt: now,
       title: null,
       endReason: null,
+      claudeSessionId: null,
     };
     record(deps, session);
     watchStartupStall(id, stallDeps(deps));
@@ -193,6 +206,7 @@ export async function launchFree(body: LaunchFreeBody, deps: LaunchDeps): Promis
     lastEventAt: now,
     title: null,
     endReason: null,
+    claudeSessionId: null,
   };
 
   if (body.kind === "shell") {
@@ -275,10 +289,59 @@ export async function launchGitResolve(
       lastEventAt: now,
       title: null,
       endReason: null,
+      claudeSessionId: null,
     };
     record(deps, session);
     watchStartupStall(id, stallDeps(deps));
     return { ok: true, session, alreadyOpen: false };
+  } finally {
+    launching.delete(id);
+  }
+}
+
+/**
+ * Resume: an ended claude session started again on its own conversation (`claude --resume`),
+ * under the same id, so it comes back where it was on the board and in the sidebar. Linear is
+ * not touched: the ticket is where the human left it. A shell has no conversation to resume,
+ * nor does a session no hook ever reached (no `claudeSessionId`); a live one is a 409 carrying
+ * its id, like a second Launch.
+ */
+export async function resumeSession(id: string, deps: LaunchDeps): Promise<LaunchResult> {
+  const row = deps.sessions.get(id);
+  if (!row) return { ok: false, status: 404, error: `session not found: ${id}` };
+  if (row.kind === "shell") return { ok: false, status: 400, error: "a shell has no conversation to resume" };
+  if (!row.claudeSessionId) return { ok: false, status: 409, error: "no claude conversation was recorded for this session" };
+  const cwd = expandHome(row.cwd, deps.cfg.home);
+  if (!usableDir(deps, cwd)) return { ok: false, status: 400, error: `session directory not found: ${cwd || "(none)"}` };
+
+  if (launching.has(id)) return conflict(id);
+  launching.add(id);
+  try {
+    if (row.state !== "ended") {
+      if (await deps.hasSession(id)) return conflict(id);
+      const ended = deps.sessions.patch(id, { state: "ended", endReason: "gone" });
+      if (ended) deps.bus.emit({ type: "session.updated", session: ended });
+    }
+
+    const settingsPath = hookSettingsPath(deps.cfg, id);
+    deps.writeFile(settingsPath, JSON.stringify(buildHookSettings(id, selfOrigin(deps.cfg), deps.cfg.token)));
+    const refused = await spawn(deps, id, cwd, resumeCommand(row, settingsPath, row.claudeSessionId));
+    if (refused) return refused;
+
+    // A new start: `createdAt` too, so it sorts as the newest and no pane poll that read the
+    // ended row can take it for the same session.
+    const now = deps.now();
+    const session: SessionMeta = {
+      ...row,
+      state: "starting",
+      alert: null,
+      createdAt: now,
+      lastEventAt: now,
+      endReason: null,
+    };
+    record(deps, session);
+    watchStartupStall(id, stallDeps(deps));
+    return { ok: true, session };
   } finally {
     launching.delete(id);
   }

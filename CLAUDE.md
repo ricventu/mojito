@@ -42,7 +42,7 @@ app's state, left in place.
 - **Persistence** (`src/db`): migrations are TS modules exporting SQL (`migrations/*.ts`,
   applied once each, in a transaction) — `.sql` imports break under vitest and `tsx watch`.
   Tables: `projects`, `settings` (key/value JSON), `sessions` (`hidden`, added by 003, was
-  dropped by 005 with the sidebar's Hide; `end_reason`, 006), `sdk_tasks`. Tickets are never
+  dropped by 005 with the sidebar's Hide; `end_reason`, 006; `claude_session_id`, 007), `sdk_tasks`. Tickets are never
   stored: `tickets/cache.ts` polls Linear every 45 s, scoped to the mapped project names,
   coalesces concurrent refreshes, keeps the last list (`stale`) when Linear fails.
   `projects.json` (`~/.config/mojito/projects.json`) is imported once per database, then
@@ -78,7 +78,9 @@ app's state, left in place.
   `<selfOrigin>/api/hook` — the configured host, loopback only for a wildcard bind — with
   `x-mojito-token` and claude's hook JSON as body; `hookMap.ts`, `hooks.ts`). `ended` is
   sticky for hooks. Read from the body: SessionEnd `reason: "clear"` is ignored (a `/clear`
-  must not end a live session) and the SessionStart `source: "clear"` after it maps to idle;
+  must not end a live session) and the SessionStart `source: "clear"` after it maps to idle, as
+  does `source: "resume"` (a resumed claude waits at its prompt); every hook's `session_id` (a
+  plain id only — it reaches a shell command) is kept as `claudeSessionId`, a change emitted;
   Notification maps to
   needs-input only for blocking types (`permission_prompt`, `elicitation_dialog`, …) — the
   ~60 s `idle_prompt` after every Stop would otherwise turn every finished session amber. A Stop
@@ -103,6 +105,15 @@ app's state, left in place.
   install-service` installs `deploy/tmux-spawn-oom.conf` (`OOMPolicy=continue`) as a drop-in for
   every pane scope. The web shows it on the badge (`lib/endReason.ts`: red for `oom`/`gone`/`other`)
   and on the ended terminal.
+- **Resume** (`POST /api/sessions/:id/resume`, `launch.ts#resumeSession`): an ended claude
+  session started again as `claude --resume <claudeSessionId>` (model/effort as recorded, fresh
+  hook settings) under the **same id**, from the row's cwd — claude finds the id there and in the
+  repo's worktrees and goes back into the worktree the session had moved to (`EnterWorktree`
+  relocates the transcript, so `--resume` from the root lists nothing without Ctrl+W). New
+  `createdAt` (it sorts newest, and no pane poll that read the ended row takes it for the same
+  session), `endReason` cleared, Linear untouched. 404 unknown, 400 a shell or a missing cwd (an
+  adopted row has none), 409 no conversation id or live (with `sessionId`); the launch lock
+  answers a double tap. Not relayed to peers: their snapshot holds live sessions only.
 - **Session names** (`sessions/titles.ts`, migration 004 `sessions.title`): `/rename` fires no
   hook, but claude sets the terminal title to `<glyph> <name>` — the `/rename` name, else its
   automatic title (`Claude Code` until it has one; kept across `/clear`). Every 5 s one
@@ -306,10 +317,13 @@ app's state, left in place.
 - **Session sidebar** (`components/sidebar`, `lib/sidebar.ts`, `hooks/useSidebar.ts`): drawn
   once for every page by the layout route `AppShell` (a pinned one stays put from page to page;
   pages reach it through `useAppSidebar`/`SidebarToggle`, and each starts after it with
-  `[var(--dock-width)]`, guarded by `safeArea.test.ts`). Every
-  non-`ended` session, unfiltered by the board, grouped by project (General last), newest
-  `createdAt` first — only immutable keys, so rows never jump when a state changes. No Hide:
-  it was removed (a session leaves the sidebar when it ends).
+  `[var(--dock-width)]`, guarded by `safeArea.test.ts`). Every session not removed, unfiltered
+  by the board, grouped by project (General last): the live ones, then the ended ones (dimmed;
+  their terminal page offers Resume), each newest `createdAt` first — rows move only when a
+  session ends (down) or is resumed (top). A band's count is live sessions only. No Hide: Remove
+  (board) is how an ended session leaves. Resume (`hooks/useResume.ts`, `canResume`: ended, not a
+  shell, a `claudeSessionId`) is on the ended terminal, the board's loose row and the ticket sheet
+  (beside a fresh Launch); this instance only.
   Unpinned it is a left `Sheet` overlay (never resizes the pty); pinned it is a docked `w-72`
   column, only at ≥ 1024px (`useMediaQuery`), pin in `localStorage` (`mojito-sidebar-pinned`,
   read in the `useReducer` initialiser so it docks on the first render, no pty resize twice).

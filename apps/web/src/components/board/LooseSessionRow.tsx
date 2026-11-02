@@ -1,19 +1,22 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Power, SquareTerminal, Trash2 } from "lucide-react";
+import { Power, RotateCcw, SquareTerminal, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import type { SessionMeta } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
 import { Button } from "@/components/ui/button";
+import { useResume } from "@/hooks/useResume";
 import { ApiError, apiFetch } from "@/lib/api";
 import { clock } from "@/lib/board";
+import { canResume } from "@/lib/endReason";
 import { qk } from "@/lib/queryKeys";
 import { sessionName } from "@/lib/sidebar";
 import { cn } from "@/lib/utils";
 
 /**
  * A session with no ticket card to live under — a free session, or a ticket session whose
- * ticket has left the board — tapping it opens its terminal. An ended one offers Remove.
+ * ticket has left the board — tapping it opens its terminal. An ended one offers Resume (claude
+ * started again on its conversation, then its terminal) and Remove.
  * A live ticket session offers Kill as well: with its card gone, this row is the only place
  * on the board that still reaches it.
  */
@@ -42,6 +45,7 @@ export function LooseSessionRow({ session }: { session: SessionMeta }) {
             : "Kill failed",
       ),
   });
+  const resume = useResume(session.id, () => navigate(`/session/${encodeURIComponent(session.id)}`));
   const waiting = session.state === "needs-input";
   const ended = session.state === "ended";
   const label = session.kind === "ticket" && session.ticket ? session.ticket : sessionName(session);
@@ -67,15 +71,28 @@ export function LooseSessionRow({ session }: { session: SessionMeta }) {
         <StateBadge state={session.state} endReason={session.endReason} />
       </button>
       {ended ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-auto self-center text-muted-foreground"
-          disabled={remove.isPending}
-          onClick={() => remove.mutate()}
-        >
-          <Trash2 size={14} /> Remove
-        </Button>
+        <>
+          {canResume(session) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-auto self-center text-muted-foreground"
+              disabled={resume.isPending}
+              onClick={() => resume.mutate()}
+            >
+              <RotateCcw size={14} /> Resume
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto self-center text-muted-foreground"
+            disabled={remove.isPending}
+            onClick={() => remove.mutate()}
+          >
+            <Trash2 size={14} /> Remove
+          </Button>
+        </>
       ) : (
         session.kind === "ticket" && (
           <Button

@@ -20,6 +20,7 @@ const meta = (over: Partial<SessionMeta> = {}): SessionMeta => ({
   lastEventAt: 1,
   title: null,
   endReason: null,
+  claudeSessionId: null,
   ...over,
 });
 
@@ -110,6 +111,27 @@ describe("handleHook", () => {
     // Its report starts the next turn; the Stop after it, with nothing left, is idle.
     handleHook("mj-RIC-1", "UserPromptSubmit", deps, { hook_event_name: "UserPromptSubmit" });
     handleHook("mj-RIC-1", "Stop", deps, { hook_event_name: "Stop", background_tasks: [] });
+    expect(sessions.get("mj-RIC-1")?.state).toBe("idle");
+  });
+
+  it("keeps claude's conversation id, and tells the clients when it changes", () => {
+    const { sessions, events, deps } = setup(meta({ state: "running" }));
+    handleHook("mj-RIC-1", "PostToolUse", deps, { session_id: "aaaa-1" });
+    expect(sessions.get("mj-RIC-1")?.claudeSessionId).toBe("aaaa-1");
+    expect(events).toHaveLength(1);
+    handleHook("mj-RIC-1", "PostToolUse", deps, { session_id: "aaaa-1" });
+    expect(events).toHaveLength(1);
+    // A /clear's SessionStart carries the new conversation.
+    handleHook("mj-RIC-1", "SessionStart", deps, { source: "clear", session_id: "bbbb-2" });
+    expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "idle", claudeSessionId: "bbbb-2" });
+    // Anything that is no plain id is not kept: it is handed to a shell command later.
+    handleHook("mj-RIC-1", "PostToolUse", deps, { session_id: "-x; rm -rf ~" });
+    expect(sessions.get("mj-RIC-1")?.claudeSessionId).toBe("bbbb-2");
+  });
+
+  it("a resumed claude waits at its prompt: idle", () => {
+    const { sessions, deps } = setup(meta({ state: "starting" }));
+    handleHook("mj-RIC-1", "SessionStart", deps, { source: "resume", session_id: "aaaa-1" });
     expect(sessions.get("mj-RIC-1")?.state).toBe("idle");
   });
 

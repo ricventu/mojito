@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { endLook } from "../../src/lib/endReason";
+import { canResume, endLook } from "../../src/lib/endReason";
 
 describe("endLook", () => {
   it("reads a Kill or an /exit as a plain end", () => {
@@ -17,5 +17,22 @@ describe("endLook", () => {
     for (const r of [null, undefined, "bogus" as never]) {
       expect(endLook(r)).toEqual({ label: "Ended", description: "Session ended.", abnormal: false });
     }
+  });
+});
+
+describe("canResume", () => {
+  const s = { state: "ended" as const, kind: "claude" as const, claudeSessionId: "aaaa-1" };
+
+  it("is an ended claude session with its conversation on record", () => {
+    expect(canResume(s)).toBe(true);
+    expect(canResume({ ...s, kind: "ticket" })).toBe(true);
+  });
+
+  it("is never a live session, a shell, or one with no conversation id", () => {
+    expect(canResume({ ...s, state: "idle" })).toBe(false);
+    expect(canResume({ ...s, kind: "shell" })).toBe(false);
+    expect(canResume({ ...s, claudeSessionId: null })).toBe(false);
+    // A peer that predates the field sends none at all.
+    expect(canResume({ ...s, claudeSessionId: undefined as unknown as null })).toBe(false);
   });
 });

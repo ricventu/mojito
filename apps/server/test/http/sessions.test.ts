@@ -75,6 +75,26 @@ describe("POST /api/sessions", () => {
   });
 });
 
+describe("POST /api/sessions/:id/resume", () => {
+  it("resumes an ended session and answers 201 with its row", async () => {
+    const { req, sessions, launch } = setup();
+    sessions.insert(meta({ state: "ended", endReason: "other", claudeSessionId: "aaaa-1" }));
+    const res = await req("/api/sessions/mj-RIC-1/resume", { method: "POST" });
+    expect(res.status).toBe(201);
+    expect(((await res.json()) as { session: { state: string } }).session.state).toBe("starting");
+    expect(launch.newSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("answers the refusal's status with { error }", async () => {
+    const { req, sessions } = setup();
+    expect((await req("/api/sessions/mj-RIC-1/resume", { method: "POST" })).status).toBe(404);
+    sessions.insert(meta({ state: "ended" }));
+    const res = await req("/api/sessions/mj-RIC-1/resume", { method: "POST" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "no claude conversation was recorded for this session" });
+  });
+});
+
 describe("DELETE /api/sessions/:id", () => {
   it("kills a live session", async () => {
     const { req, sessions, closeSession } = setup();

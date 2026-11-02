@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, GitGraph, Play, Power, SquareTerminal } from "lucide-react";
+import { FileText, GitGraph, Play, Power, RotateCcw, SquareTerminal } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 import type { Effort, Model, PeerSnapshot, SessionMeta, Settings, TicketSummary } from "@mojito/shared";
@@ -13,11 +13,13 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Switch } from "@/components/ui/switch";
 import { usePeers } from "@/hooks/usePeers";
 import { useProjects } from "@/hooks/useProjects";
+import { useResume } from "@/hooks/useResume";
 import { useSessions } from "@/hooks/useSessions";
 import { useSettings } from "@/hooks/useSettings";
 import { ApiError, apiFetch, apiJson } from "@/lib/api";
 import { sessionForTicket } from "@/lib/board";
 import { docsHref } from "@/lib/docs/url";
+import { canResume } from "@/lib/endReason";
 import { gitHref } from "@/lib/git/url";
 import { sessionHref } from "@/lib/host";
 import { launchErrorAction, launchOptions, type LaunchPicks } from "@/lib/launch";
@@ -256,6 +258,29 @@ function LiveSession({ ticket, session, onClose }: { ticket: TicketSummary; sess
   );
 }
 
+/**
+ * The ticket's last session, ended but still on record: Resume starts claude again on that
+ * conversation (the ticket's status is left alone), as the alternative to a fresh Launch below.
+ */
+function EndedSession({ session, onClose }: { session: SessionMeta; onClose: () => void }) {
+  const navigate = useNavigate();
+  const resume = useResume(session.id, () => {
+    onClose();
+    navigate(sessionHref(null, session.id));
+  });
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-muted-foreground">Last session</span>
+        <StateBadge state={session.state} endReason={session.endReason} />
+      </div>
+      <Button variant="outline" disabled={resume.isPending} onClick={() => resume.mutate()}>
+        <RotateCcw size={16} /> {resume.isPending ? "Resuming…" : "Resume the last session"}
+      </Button>
+    </div>
+  );
+}
+
 /** The ticket's session on another instance: its state and a way into its terminal, in this client. */
 function PeerLiveSession({ peer, session, onClose }: { peer: PeerSnapshot; session: SessionMeta; onClose: () => void }) {
   return (
@@ -331,7 +356,10 @@ export function TicketSheet({ ticket, onClose }: Props) {
           ) : onPeer ? (
             <PeerLiveSession peer={onPeer.peer} session={onPeer.session} onClose={onClose} />
           ) : settings.data ? (
-            <LaunchForm ticket={ticket} status={status} settings={settings.data} onClose={onClose} />
+            <>
+              {session && canResume(session) && <EndedSession session={session} onClose={onClose} />}
+              <LaunchForm ticket={ticket} status={status} settings={settings.data} onClose={onClose} />
+            </>
           ) : (
             <p className="text-sm text-muted-foreground">
               {settings.error ? errorMessage(settings.error, "Settings unavailable") : "Loading…"}

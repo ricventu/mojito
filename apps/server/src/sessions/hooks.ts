@@ -48,12 +48,15 @@ export function handleHook(id: string, event: string, deps: HookDeps, body?: unk
     const before = deps.sessions.get(id);
     if (!before || before.state === "ended") return;
     const next = mapHook(event, before.state, payload);
-    const changed = next.state !== before.state || next.alert !== before.alert;
+    // A new conversation id (the first hook, a `/clear`) is news too: it is what Resume needs.
+    const newId = payload.sessionId !== undefined && payload.sessionId !== before.claudeSessionId;
+    const changed = next.state !== before.state || next.alert !== before.alert || newId;
     const session = deps.sessions.patch(id, {
       state: next.state,
       alert: next.alert,
       lastEventAt: deps.now(),
       ...(next.endReason ? { endReason: next.endReason } : {}),
+      ...(newId ? { claudeSessionId: payload.sessionId } : {}),
     });
     if (changed && session) deps.bus.emit({ type: "session.updated", session });
     // The session moves its own ticket in Linear; a finished turn is when that may have happened.

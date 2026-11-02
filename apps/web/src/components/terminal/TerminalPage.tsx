@@ -1,12 +1,11 @@
 import { useState } from "react";
 import type { Terminal } from "@xterm/xterm";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, FileText, GitGraph, Power } from "lucide-react";
+import { ArrowLeft, FileText, GitGraph, Power, RotateCcw } from "lucide-react";
 import { Link, Navigate, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import type { SessionMeta } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
-import { endLook } from "@/lib/endReason";
 import { useKeyboardUp } from "@/components/AppShell";
 import { SidebarToggle } from "@/components/sidebar/SidebarToggle";
 import { AccessoryBar } from "@/components/terminal/AccessoryBar";
@@ -17,11 +16,13 @@ import { TerminalView } from "@/components/terminal/TerminalView";
 import { Button } from "@/components/ui/button";
 import { useHost } from "@/hooks/useHost";
 import { useKeyboardOpen } from "@/hooks/useKeyboardOpen";
+import { useResume } from "@/hooks/useResume";
 import { useSessions } from "@/hooks/useSessions";
 import { useTickets } from "@/hooks/useTickets";
 import { ApiError, apiFetch } from "@/lib/api";
 import { boardHref } from "@/lib/boardReturn";
 import { docsHref } from "@/lib/docs/url";
+import { canResume, endLook } from "@/lib/endReason";
 import { gitHref } from "@/lib/git/url";
 import { hostApi, hostOf } from "@/lib/host";
 import { exitAction, pageSession } from "@/lib/peerSession";
@@ -131,6 +132,10 @@ export function TerminalPage() {
   // This instance's list, or — for a peer — its snapshot's row (kept once seen).
   const offline = host.kind === "peer" && !host.peer.online;
   const session = pageSession(host, sessions.data, id, lastKnown) ?? undefined;
+  // Resume (this instance only: a peer's ended sessions are not in its snapshot). Clearing
+  // `gone` mounts a fresh terminal, which attaches to the session claude is starting again in.
+  const resume = useResume(id, () => setGoneScope(null));
+  const resumable = hostName === null && session !== undefined && canResume(session);
   // A markdown path claude printed opens in its project's docs; General sessions have none.
   const docsProject = session?.project ?? null;
   const openDoc = docsProject
@@ -254,11 +259,18 @@ export function TerminalPage() {
           <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-[#08090a] p-6 text-center text-neutral-300">
             <p className="text-sm">Session ended</p>
             {session?.endReason && <p className="max-w-sm text-xs text-neutral-400">{endLook(session.endReason).description}</p>}
-            <Button asChild variant="secondary" size="sm">
-              <Link to={boardHref()}>
-                <ArrowLeft size={16} /> Back to the board
-              </Link>
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              {resumable && (
+                <Button size="sm" disabled={resume.isPending} onClick={() => resume.mutate()}>
+                  <RotateCcw size={16} /> {resume.isPending ? "Resuming…" : "Resume"}
+                </Button>
+              )}
+              <Button asChild variant="secondary" size="sm">
+                <Link to={boardHref()}>
+                  <ArrowLeft size={16} /> Back to the board
+                </Link>
+              </Button>
+            </div>
           </div>
         ) : (
           <>

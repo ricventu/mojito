@@ -69,7 +69,7 @@ function Panel({ sidebar, current, replace, inSheet }: Props & { inSheet: boolea
         ) : (
           <h2 className="min-w-0 flex-1 truncate text-base font-semibold">Sessions</h2>
         )}
-        {inSheet && <SheetDescription className="sr-only">The live sessions, grouped by host and project.</SheetDescription>}
+        {inSheet && <SheetDescription className="sr-only">The sessions, grouped by host and project.</SheetDescription>}
         {sidebar.canPin && (
           <Button
             variant="ghost"
@@ -104,9 +104,9 @@ function Panel({ sidebar, current, replace, inSheet }: Props & { inSheet: boolea
 }
 
 /**
- * The live sessions, wherever the user is (AppShell draws it once for every page). Docked, it
- * is a fixed column on the left, which the pages start after; otherwise an overlay from the
- * left, so the pty is never resized for a peek. Both pay the insets of the edges they touch.
+ * The sessions not removed yet, wherever the user is (AppShell draws it once for every page).
+ * Docked, it is a fixed column on the left, which the pages start after; otherwise an overlay
+ * from the left, so the pty is never resized for a peek. Both pay the insets of the edges they touch.
  */
 export function SessionSidebar({ sidebar, current, replace = false }: Props) {
   if (sidebar.docked) {

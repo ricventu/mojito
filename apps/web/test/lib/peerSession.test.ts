@@ -16,6 +16,7 @@ const a: SessionMeta = {
   lastEventAt: 1,
   title: null,
   endReason: null,
+  claudeSessionId: null,
 };
 const peer = (online: boolean, sessions: SessionMeta[]): PeerSnapshot => ({
   name: "mac",
