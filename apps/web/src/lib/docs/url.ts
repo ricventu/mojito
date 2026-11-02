@@ -5,15 +5,19 @@
 import { isDocPath, isValidTicket } from "@mojito/shared";
 
 export interface DocsView {
+  /** A peer's name (`?host=`), as written; null is this instance. Resolved by `useHost`. */
+  host: string | null;
   ticket: string | null;
   path: string | null;
 }
 
 /** Only what makes sense survives: a bad ticket or a path that is no document is dropped. */
 export function parseDocsSearch(params: URLSearchParams): DocsView {
+  const host = params.get("host");
   const ticket = params.get("ticket");
   const path = params.get("path");
   return {
+    host: host || null,
     ticket: ticket !== null && isValidTicket(ticket) ? ticket : null,
     path: path !== null && isDocPath(path) ? path : null,
   };
@@ -22,6 +26,7 @@ export function parseDocsSearch(params: URLSearchParams): DocsView {
 /** A leading `./` is dropped: `./docs/a.md` and `docs/a.md` are one document, so one url. */
 export function docsHref(project: string, view: Partial<DocsView> = {}): string {
   const params = new URLSearchParams();
+  if (view.host) params.set("host", view.host);
   if (view.ticket) params.set("ticket", view.ticket);
   if (view.path) params.set("path", view.path.replace(/^(\.\/)+/, ""));
   const qs = params.toString();

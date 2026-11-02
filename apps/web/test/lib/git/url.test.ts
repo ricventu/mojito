@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { gitHref, parseGitSearch } from "@/lib/git/url";
 
 const parse = (qs: string) => parseGitSearch(new URLSearchParams(qs));
-const NONE = { ticket: null, commit: null, file: null, from: null };
+const NONE = { host: null, ticket: null, commit: null, file: null, from: null };
 
 describe("gitHref", () => {
   it("builds the project path with no view", () => {
@@ -19,6 +19,10 @@ describe("gitHref", () => {
     expect(gitHref("p", { ticket: null, commit: "abc1234", file: undefined })).toBe("/git/p?commit=abc1234");
   });
 
+  it("writes host first", () => {
+    expect(gitHref("p", { host: "mac", ticket: "RIC-5" })).toBe("/git/p?host=mac&ticket=RIC-5");
+  });
+
   it("writes from after file", () => {
     expect(gitHref("p", { commit: "abc1234", from: "old.ts", file: "new.ts" })).toBe(
       "/git/p?commit=abc1234&file=new.ts&from=old.ts",
@@ -28,7 +32,7 @@ describe("gitHref", () => {
 
 describe("parseGitSearch", () => {
   it("round-trips a full view", () => {
-    const view = { ticket: "RIC-5", commit: "abc1234", file: "a b/é.txt", from: "old name.txt" };
+    const view = { host: "mac", ticket: "RIC-5", commit: "abc1234", file: "a b/é.txt", from: "old name.txt" };
     const href = gitHref("my proj", view);
     expect(parseGitSearch(new URL(href, "http://x").searchParams)).toEqual(view);
   });
@@ -53,6 +57,11 @@ describe("parseGitSearch", () => {
 
   it("drops an empty file", () => {
     expect(parse("commit=abc1234&file=")).toEqual({ ...NONE, commit: "abc1234" });
+  });
+
+  it("keeps a host as written", () => {
+    expect(parse("host=mac&commit=abc1234")).toEqual({ ...NONE, host: "mac", commit: "abc1234" });
+    expect(parse("host=")).toEqual(NONE);
   });
 
   it("keeps a ticket only in its shape", () => {

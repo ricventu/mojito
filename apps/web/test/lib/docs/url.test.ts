@@ -14,23 +14,33 @@ describe("docsHref", () => {
     );
   });
 
+  it("writes host first", () => {
+    expect(docsHref("p", { host: "mac", path: "./a.md" })).toBe("/docs/p?host=mac&path=a.md");
+  });
+
   it("omits null and undefined", () => {
-    expect(docsHref("p", { ticket: null, path: undefined })).toBe("/docs/p");
+    expect(docsHref("p", { host: null, ticket: null, path: undefined })).toBe("/docs/p");
   });
 });
 
 describe("parseDocsSearch", () => {
-  it("round-trips a ticket and a path", () => {
-    const href = docsHref("p", { ticket: "RIC-5", path: "with space/perché.md" });
-    expect(parse(href.split("?")[1]!)).toEqual({ ticket: "RIC-5", path: "with space/perché.md" });
+  it("round-trips a host, a ticket and a path", () => {
+    const view = { host: "mac", ticket: "RIC-5", path: "with space/perché.md" };
+    const href = docsHref("p", view);
+    expect(parse(href.split("?")[1]!)).toEqual(view);
   });
 
   it("drops a bad ticket and a path that is no document", () => {
-    expect(parse("ticket=../x&path=x.txt")).toEqual({ ticket: null, path: null });
-    expect(parse("path=../a.md")).toEqual({ ticket: null, path: null });
+    expect(parse("ticket=../x&path=x.txt")).toEqual({ host: null, ticket: null, path: null });
+    expect(parse("path=../a.md")).toEqual({ host: null, ticket: null, path: null });
+  });
+
+  it("keeps a host as written", () => {
+    expect(parse("host=mac")).toEqual({ host: "mac", ticket: null, path: null });
   });
 
   it("reads nothing as nothing", () => {
-    expect(parse("")).toEqual({ ticket: null, path: null });
+    expect(parse("")).toEqual({ host: null, ticket: null, path: null });
+    expect(parse("host=")).toEqual({ host: null, ticket: null, path: null });
   });
 });

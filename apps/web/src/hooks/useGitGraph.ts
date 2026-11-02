@@ -15,7 +15,7 @@ const base = (project: string) => `/api/projects/${encodeURIComponent(project)}/
  */
 export function useGitGraph(project: string, ticket: string | null) {
   return useInfiniteQuery({
-    queryKey: gitKeys.graph(project, ticket),
+    queryKey: gitKeys.graph(null, project, ticket),
     queryFn: ({ pageParam }) =>
       apiFetch<GitGraphPage>(
         `${base(project)}/graph?skip=${pageParam}${ticket ? `&ticket=${encodeURIComponent(ticket)}` : ""}`,
@@ -33,7 +33,7 @@ export function useGitGraph(project: string, ticket: string | null) {
 /** One commit's details; a commit never changes. */
 export function useCommit(project: string, hash: string | null) {
   return useQuery({
-    queryKey: gitKeys.commit(project, hash ?? ""),
+    queryKey: gitKeys.commit(null, project, hash ?? ""),
     queryFn: () => apiFetch<CommitDetails>(`${base(project)}/commits/${encodeURIComponent(hash!)}`),
     enabled: hash !== null,
     staleTime: Infinity,
@@ -43,7 +43,7 @@ export function useCommit(project: string, hash: string | null) {
 /** One file's diff in a commit; `from` keeps a rename a rename. */
 export function useDiff(project: string, hash: string | null, file: string | null, from: string | null) {
   return useQuery({
-    queryKey: gitKeys.diff(project, hash ?? "", file ?? "", from),
+    queryKey: gitKeys.diff(null, project, hash ?? "", file ?? "", from),
     queryFn: () => {
       const params = new URLSearchParams({ path: file! });
       if (from) params.set("from", from);

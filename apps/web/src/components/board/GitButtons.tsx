@@ -26,7 +26,7 @@ export function GitButtons({ project }: { project: string }) {
     onSuccess: (result, op) => {
       // Every outcome moved (or may have moved) the repo, a conflict included: the graph is a
       // snapshot, so this is what keeps an open one honest.
-      void qc.invalidateQueries({ queryKey: gitKeys.graphs(project) });
+      void qc.invalidateQueries({ queryKey: gitKeys.graphs(null, project) });
       const action = gitSyncAction(op, result);
       if (action.kind === "toast") {
         toast.success(action.message);

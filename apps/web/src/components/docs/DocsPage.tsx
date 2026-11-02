@@ -34,7 +34,7 @@ function DocsView({ project }: { project: string }) {
   const fetching = path ? file.isFetching : list.isFetching;
   const label = path ? docLabel(path) : null;
 
-  const reload = () => void qc.resetQueries({ queryKey: docKeys.project(project) });
+  const reload = () => void qc.resetQueries({ queryKey: docKeys.project(null, project) });
 
   return (
     // It starts after a docked session sidebar (AppShell), which pays the left inset there.

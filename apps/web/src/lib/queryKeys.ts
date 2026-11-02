@@ -16,11 +16,13 @@ export const favoritesMutationKey = ["favorites"] as const;
  * being one fetch behind. Reload and a successful Pull/Push refresh it explicitly.
  */
 export const gitKeys = {
-  graphs: (project: string) => ["git", project, "graph"] as const,
-  graph: (project: string, ticket: string | null) => ["git", project, "graph", ticket] as const,
-  commit: (project: string, hash: string) => ["git", project, "commit", hash] as const,
-  diff: (project: string, hash: string, file: string, from: string | null) =>
-    ["git", project, "diff", hash, file, from] as const,
+  graphs: (host: string | null, project: string) => ["git", host ?? "", project, "graph"] as const,
+  graph: (host: string | null, project: string, ticket: string | null) =>
+    ["git", host ?? "", project, "graph", ticket] as const,
+  commit: (host: string | null, project: string, hash: string) =>
+    ["git", host ?? "", project, "commit", hash] as const,
+  diff: (host: string | null, project: string, hash: string, file: string, from: string | null) =>
+    ["git", host ?? "", project, "diff", hash, file, from] as const,
 };
 
 /**
@@ -28,7 +30,9 @@ export const gitKeys = {
  * re-read a document under the reader. Reload refreshes them explicitly.
  */
 export const docKeys = {
-  project: (project: string) => ["docs", project] as const,
-  list: (project: string, ticket: string | null) => ["docs", project, "list", ticket] as const,
-  file: (project: string, ticket: string | null, path: string) => ["docs", project, "file", ticket, path] as const,
+  project: (host: string | null, project: string) => ["docs", host ?? "", project] as const,
+  list: (host: string | null, project: string, ticket: string | null) =>
+    ["docs", host ?? "", project, "list", ticket] as const,
+  file: (host: string | null, project: string, ticket: string | null, path: string) =>
+    ["docs", host ?? "", project, "file", ticket, path] as const,
 };

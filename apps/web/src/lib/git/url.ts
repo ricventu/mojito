@@ -5,6 +5,8 @@
 import { isValidHash, isValidTicket } from "@mojito/shared";
 
 export interface GitView {
+  /** A peer's name (`?host=`), as written; null is this instance. Resolved by `useHost`. */
+  host: string | null;
   ticket: string | null;
   commit: string | null;
   file: string | null;
@@ -13,6 +15,7 @@ export interface GitView {
 
 /** Only what makes sense survives: a file needs a commit, a `from` needs a file. */
 export function parseGitSearch(params: URLSearchParams): GitView {
+  const host = params.get("host");
   const ticket = params.get("ticket");
   const commit = params.get("commit");
   const file = params.get("file");
@@ -20,6 +23,7 @@ export function parseGitSearch(params: URLSearchParams): GitView {
   const validCommit = commit !== null && isValidHash(commit) ? commit : null;
   const validFile = validCommit && file ? file : null;
   return {
+    host: host || null,
     ticket: ticket !== null && isValidTicket(ticket) ? ticket : null,
     commit: validCommit,
     file: validFile,
@@ -29,7 +33,7 @@ export function parseGitSearch(params: URLSearchParams): GitView {
 
 export function gitHref(project: string, view: Partial<GitView> = {}): string {
   const params = new URLSearchParams();
-  for (const key of ["ticket", "commit", "file", "from"] as const) {
+  for (const key of ["host", "ticket", "commit", "file", "from"] as const) {
     const value = view[key];
     if (value) params.set(key, value);
   }

@@ -68,7 +68,7 @@ function GraphView({ project }: { project: string }) {
   const reload = () => {
     scrolledFor.current = null;
     window.scrollTo({ top: 0 });
-    void qc.resetQueries({ queryKey: gitKeys.graph(project, ticket) });
+    void qc.resetQueries({ queryKey: gitKeys.graph(null, project, ticket) });
   };
 
   return (
