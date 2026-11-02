@@ -96,65 +96,36 @@ describe("POST /api/sessions/:id/resume", () => {
 });
 
 describe("DELETE /api/sessions/:id", () => {
-  it("kills a live session", async () => {
-    const { req, sessions, closeSession } = setup();
+  it("never kills: a live session is left as it is (claude is quit in its terminal)", async () => {
+    const { req, sessions, events } = setup();
     sessions.insert(meta());
-    const res = await req("/api/sessions/mj-RIC-1", { method: "DELETE" });
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true });
-    expect(closeSession).toHaveBeenCalledWith("mj-RIC-1");
-    expect(sessions.get("mj-RIC-1")?.state).toBe("ended");
-  });
-
-  it("answers 404 for an unknown session", async () => {
-    const { req, closeSession } = setup();
-    const res = await req("/api/sessions/mj-RIC-1", { method: "DELETE" });
-    expect(res.status).toBe(404);
-    expect(closeSession).not.toHaveBeenCalled();
-  });
-
-  it("answers 409 when claude will not leave, and keeps the session", async () => {
-    const { req, sessions, closeSession } = setup();
-    sessions.insert(meta());
-    closeSession.mockResolvedValue({ closed: false });
     const res = await req("/api/sessions/mj-RIC-1", { method: "DELETE" });
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "claude did not exit: open the terminal" });
     expect(sessions.get("mj-RIC-1")?.state).toBe("running");
+    expect(events).toEqual([]);
   });
 
-  it("answers 500 when closing throws", async () => {
-    const { req, sessions, closeSession } = setup();
-    sessions.insert(meta());
-    closeSession.mockRejectedValue(new Error("tmux gone mad"));
-    const res = await req("/api/sessions/mj-RIC-1", { method: "DELETE" });
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: "tmux gone mad" });
-  });
-
-  describe("?remove=1", () => {
+  describe("forgetting an ended session", () => {
     it("refuses to remove a session that has not ended", async () => {
-      const { req, sessions, events, removeFile, closeSession } = setup();
+      const { req, sessions, events, removeFile } = setup();
       sessions.insert(meta({ state: "running" }));
-      const res = await req("/api/sessions/mj-RIC-1?remove=1", { method: "DELETE" });
+      const res = await req("/api/sessions/mj-RIC-1", { method: "DELETE" });
       expect(res.status).toBe(409);
       expect(((await res.json()) as { error: string }).error).toEqual(expect.any(String));
       expect(sessions.get("mj-RIC-1")).not.toBeNull();
       expect(events).toEqual([]);
       expect(removeFile).not.toHaveBeenCalled();
-      expect(closeSession).not.toHaveBeenCalled();
     });
 
     it("removes an ended session, its hook file, its images, and says so", async () => {
-      const { req, sessions, events, removeFile, closeSession } = setup();
+      const { req, sessions, events, removeFile } = setup();
       sessions.insert(meta({ state: "ended" }));
-      const res = await req("/api/sessions/mj-RIC-1?remove=1", { method: "DELETE" });
+      const res = await req("/api/sessions/mj-RIC-1", { method: "DELETE" });
       expect(res.status).toBe(200);
       expect(sessions.get("mj-RIC-1")).toBeNull();
       expect(events).toEqual([{ type: "session.removed", id: "mj-RIC-1" }]);
       expect(removeFile).toHaveBeenCalledWith("/state/hooks/mj-RIC-1.json");
       expect(removeFile).toHaveBeenCalledWith("/state/images/mj-RIC-1");
-      expect(closeSession).not.toHaveBeenCalled();
     });
 
     it("still removes the row and the images when the hook file cannot be deleted", async () => {
@@ -163,7 +134,7 @@ describe("DELETE /api/sessions/:id", () => {
       removeFile.mockImplementation((path) => {
         if (path.endsWith(".json")) throw new Error("ENOENT");
       });
-      const res = await req("/api/sessions/mj-RIC-1?remove=1", { method: "DELETE" });
+      const res = await req("/api/sessions/mj-RIC-1", { method: "DELETE" });
       expect(res.status).toBe(200);
       expect(sessions.get("mj-RIC-1")).toBeNull();
       expect(removeFile).toHaveBeenCalledWith("/state/images/mj-RIC-1");
@@ -171,7 +142,7 @@ describe("DELETE /api/sessions/:id", () => {
 
     it("answers 404 for an unknown session", async () => {
       const { req, events } = setup();
-      const res = await req("/api/sessions/mj-RIC-1?remove=1", { method: "DELETE" });
+      const res = await req("/api/sessions/mj-RIC-1", { method: "DELETE" });
       expect(res.status).toBe(404);
       expect(events).toEqual([]);
     });

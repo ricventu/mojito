@@ -91,7 +91,7 @@ app's state, left in place.
   `startupStall.ts` flips a session still `starting` after 20 s to needs-input (the
   workspace-trust prompt fires no hook).
 - **Why a session ended** (`sessions/ends.ts`, `oom.ts`, migration 006 `sessions.end_reason`,
-  `EndReason` in shared): `killed` (Kill, over the SessionEnd its Ctrl-D fires), `exited`
+  `EndReason` in shared): `exited`
   (SessionEnd `prompt_input_exit`/`logout`), `other` (any other SessionEnd: a signal), `gone` (tmux
   vanished with no SessionEnd), `oom`. Each end logs `session <id> ended: <reason>` — what to grep
   in the service log. The 5 s pane poll (`paneWatch.ts`) also ends a live row tmux no longer lists
@@ -123,10 +123,11 @@ app's state, left in place.
   ticket (`sessionName`: board rows, sidebar, terminal header); a ticket session keeps its ticket.
 - **tmux** (`tmux/tmux.ts`): always **exact targets** — `=name` for sessions, `=name:` for
   panes. tmux matches `-t` by prefix, and `mj-RIC-49` is a prefix of `mj-RIC-49x`: a bare
-  target once sent Kill's Ctrl-D to the wrong claude. `hasSession` answers false only when
+  target once sent Ctrl-D to the wrong claude. `hasSession` answers false only when
   tmux says the session/server is not there; any other failure rejects (unreachable is not
-  dead — the pty gateway then closes 1011, retryable). `closeSession` never forces (Ctrl-C,
-  then Ctrl-D re-sent each poll; claude that will not leave → 409). New sessions start in a
+  dead — the pty gateway then closes 1011, retryable). **No Kill**: Mojito never closes a
+  session (it was removed on purpose, with `closeSession`); claude is quit in its terminal, and
+  `DELETE /api/sessions/:id` only forgets an **ended** row (409 for a live one). New sessions start in a
   systemd scope of their own (`outsideService`) so they survive `mojito` restarts.
 - **Reconcile at boot** (`reconcile.ts`): rows with no tmux → ended; `mj-*` tmux with no row
   → adopted; ended rows whose tmux is alive → revived to idle.
@@ -162,7 +163,7 @@ app's state, left in place.
   and pastes the returned absolute paths, which claude turns into `[Image #N]`. Stored in
   `<stateDir>/images/<id>/` (0700/0600), never the repo — claude attaches a pasted image path
   outside its cwd without a permission prompt and downscales big ones itself (both verified
-  on 2.1.312), hence the shared 10 MB cap. Deleted with the row (`?remove=1`).
+  on 2.1.312), hence the shared 10 MB cap. Deleted with the row (`DELETE /api/sessions/:id`, an ended one only).
   The other way, `GET /api/sessions/:id/image?path` (`sessions/viewImage.ts`) serves an image path
   claude printed, for the terminal's viewer: relative to the session's cwd, `~/` from HOME, an
   absolute one **anywhere** — the token already opens a shell in every session, and a fence would
@@ -241,9 +242,9 @@ app's state, left in place.
   30 s → 504 "may still be starting"). Besides that launch, a peer's session opens **in this
   client** (spec `2026-11-02-peer-sessions-in-place-design.md`), so the browser only ever talks to
   this instance: an **allowlisted** HTTP relay, `/api/peers/:name/<rest>` (`peers/relay.ts`,
-  `matchRelay` + `relayRequest`), and the pty relay above. The table is Kill (`DELETE
-  /sessions/:id`, never with `remove`), image upload and view, the git graph/commit/diff, the docs
-  list/file — nothing else (not settings, hooks, projects): off the table is 404, so a client bug
+  `matchRelay` + `relayRequest`), and the pty relay above. The table is image upload
+  and view, the git graph/commit/diff, the docs list/file — nothing else (not settings, hooks, projects; no DELETE either: there is no Kill, and a peer's
+  rows are forgotten on the peer): off the table is 404, so a client bug
   cannot write a peer's settings. Each segment is decoded and must be one plain name (no
   `.`/`..`/`/`); the literal segments are matched verbatim and only the `:param` slots are
   re-encoded into the peer URL; the body is streamed (never parsed, the peer
@@ -362,7 +363,7 @@ app's state, left in place.
   (the git/docs codecs keep `host` as written and every in-page link carries it). **`host` is
   never resolved to this instance unless it equals `self`** — `resolveHost` waits for
   `/api/peers` (loading), then self / peer / unknown; otherwise a renamed peer's old url
-  `/session/mj-mojito-git?host=192.168.1.5` would open — and Kill — the local `mj-mojito-git`.
+  `/session/mj-mojito-git?host=192.168.1.5` would open the local `mj-mojito-git`.
   Unknown: the session page goes to the board, git/docs show "Unknown host". While loading,
   `pageSession` never shows this instance's row for the id. **`hostApi(host, path)` is the one
   way to address a host** (`ptyPath`, `sessionHref` likewise): a peer's call becomes
@@ -371,8 +372,7 @@ app's state, left in place.
   so it never sends the reader away: **the pty is the authority** — the page keeps the last-known
   row for host+id, the relay's 4404 shows "Session ended", and a 4404 on a cold load (nothing
   seen: a stale link) goes to the board (`exitAction`); an offline peer keeps the page
-  ("<peer> · offline", the terminal reconnects). The terminal header names the host and has no
-  Kill (removed on purpose: Kill lives on the board and the ticket sheet). Image upload/viewer,
+  ("<peer> · offline", the terminal reconnects). The terminal header names the host. Image upload/viewer,
   `.md` paths and the header's Git and Docs all go through `hostApi` and carry `host`; no Pull/Push or other project action appears for a peer. The board stays local: its
   toolbar `<h1>` and the tab title (`appTitle`, `<self> · Mojito`) name this instance (`self` of
   `/api/peers`, "Mojito" until it answers), so after a band's ↗ it is plain whose board it is.

@@ -5,13 +5,10 @@ import { Hono } from "hono";
 import type { AppDeps } from "../app";
 import { parseBody } from "../body";
 import { expandHome } from "../../homePath";
-import { killSession } from "../../sessions/close";
 import { imagesDir, storeImages } from "../../sessions/images";
 import { launchFree, launchTicket, resumeSession } from "../../sessions/launch";
 import { readImageFile, resolveImagePath } from "../../sessions/viewImage";
 import { validateImages, type ImageType } from "../../tasks/images";
-
-const NOT_CLOSED = "claude did not exit: open the terminal";
 
 const IMAGE_ERRORS = {
   "not-found": [404, "image not found"],
@@ -114,20 +111,10 @@ export function sessionRoutes(deps: AppDeps): Hono {
       }
       return c.json({ session: result.session }, 201);
     })
-    .delete("/sessions/:id", async (c) => {
-      const id = c.req.param("id");
-      if (c.req.query("remove") === "1") {
-        const r = remove(id);
-        return r.status === 200 ? c.json({ ok: true }) : c.json({ error: r.error }, r.status);
-      }
-      const { status } = await killSession(id, {
-        sessions: deps.sessions,
-        bus: deps.bus,
-        closeSession: deps.closeSession,
-        now: deps.now,
-      });
-      if (status === 404) return c.json({ error: `session not found: ${id}` }, 404);
-      if (status === 409) return c.json({ error: NOT_CLOSED }, 409);
-      return c.json({ ok: true });
+    // There is no Kill: a session ends when claude is quit in its terminal. DELETE only forgets
+    // an ended one (`remove`).
+    .delete("/sessions/:id", (c) => {
+      const r = remove(c.req.param("id"));
+      return r.status === 200 ? c.json({ ok: true }) : c.json({ error: r.error }, r.status);
     });
 }

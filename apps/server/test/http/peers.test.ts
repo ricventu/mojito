@@ -116,12 +116,11 @@ describe("ALL /api/peers/:name/*", () => {
     expect(Object.fromEntries(new Headers(init.headers))).toEqual({ "x-mojito-token": "tok" });
   });
 
-  it("passes the peer's answer to a kill verbatim", async () => {
-    const { req, fetch } = withPeers(async () => Response.json({ error: "claude did not exit: open the terminal" }, { status: 409 }));
+  it("relays no DELETE: there is no Kill, and a peer's rows are forgotten on the peer", async () => {
+    const { req, fetch } = withPeers(async () => Response.json({ ok: true }));
     const res = await req("/api/peers/mac/sessions/mj-a", { method: "DELETE" });
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "claude did not exit: open the terminal" });
-    expect((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].method).toBe("DELETE");
+    expect(res.status).toBe(404);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("streams an upload through with its content type and bytes", async () => {

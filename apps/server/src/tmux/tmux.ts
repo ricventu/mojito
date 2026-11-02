@@ -22,8 +22,8 @@ export class DuplicateSessionError extends Error {
 }
 
 // tmux resolves a bare `-t name` by exact match first, then as a *prefix*, then as a glob —
-// so once `mj-RIC-49` is gone, `-t mj-RIC-49` quietly lands on a live `mj-RIC-49x`: Kill
-// would send Ctrl-D to the wrong claude, a reconnecting terminal would attach to the wrong
+// so once `mj-RIC-49` is gone, `-t mj-RIC-49` quietly lands on a live `mj-RIC-49x`: keys
+// would reach the wrong claude, a reconnecting terminal would attach to the wrong
 // session, and a stale row would look alive. `=` asks for the exact name only. A session
 // target (has-session, attach-session) is `=name`; a pane target (send-keys, capture-pane,
 // set-option) needs the trailing colon to say "that session's active pane" — given a bare
@@ -149,59 +149,6 @@ export async function newSession(
 
 export async function sendKeys(name: string, keys: string): Promise<void> {
   await pexec("tmux", ["send-keys", "-t", paneTarget(name), keys]);
-}
-
-export interface CloseDeps {
-  hasSession: (name: string) => Promise<boolean>;
-  sendKeys: (name: string, keys: string) => Promise<void>;
-  sleep: (ms: number) => Promise<void>;
-  now: () => number;
-}
-
-/**
- * Ask the claude process in a tmux session to exit, and report whether it did.
- *
- * Sends Ctrl+C (to interrupt any in-flight task) and then Ctrl+D, claude's
- * clean-exit signal — and keeps re-sending Ctrl+D while it waits, because claude
- * answers the first one with "Press Ctrl-D again to exit" and stays up until the
- * second arrives. Sending EOF once and then only watching is what left claude
- * running until the wait was up.
- *
- * There is no force path. When claude exits, its tmux session ends on its own and
- * this returns `{ closed: true }`; a session claude will not leave is reported as
- * `{ closed: false }` and left exactly as it was — tmux, registration and card —
- * for the human to deal with. Killing the session out from under a live claude
- * loses whatever it had not written out yet, which is the one thing a "dismiss"
- * must never do.
- */
-export async function closeSession(
-  name: string,
-  deps: Partial<CloseDeps> = {},
-  timeoutMs = 10000,
-  pollMs = 250,
-): Promise<{ closed: boolean }> {
-  const d: CloseDeps = {
-    hasSession,
-    sendKeys,
-    sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
-    now: () => Date.now(),
-    ...deps,
-  };
-  if (!(await d.hasSession(name))) return { closed: true };
-  // Best-effort signals: the pane can disappear between keystrokes (C-c alone may
-  // end the process), which makes a follow-up send-keys throw "can't find pane".
-  // Swallow that — the poll below is the source of truth for whether it closed.
-  await d.sendKeys(name, "C-c").catch(() => {});
-  await d.sendKeys(name, "C-d").catch(() => {});
-  const start = d.now();
-  while (await d.hasSession(name)) {
-    if (d.now() - start >= timeoutMs) return { closed: false };
-    await d.sleep(pollMs);
-    // The confirmation press. Harmless where one Ctrl-D was already enough: the
-    // session is gone by now and send-keys just fails into the catch.
-    await d.sendKeys(name, "C-d").catch(() => {});
-  }
-  return { closed: true };
 }
 
 export async function listSessions(prefix: string): Promise<string[]> {

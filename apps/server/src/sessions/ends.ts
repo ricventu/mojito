@@ -9,7 +9,7 @@ export const OOM_CHECK_DELAY_MS = 2000;
 /** How far before the end an OOM kill still counts as what ended the session. */
 export const OOM_WINDOW_MS = 60_000;
 
-// Only an end nobody asked for can be an OOM kill. A Kill or an `/exit` stays what it was, even
+// Only an end nobody asked for can be an OOM kill. An `/exit` stays what it was, even
 // when a test process in the same pane was OOM-killed a minute before.
 const INVOLUNTARY: ReadonlySet<EndReason> = new Set(["other", "gone"]);
 
@@ -94,7 +94,7 @@ export class EndWatch {
     try {
       if (!(await this.deps.oomKilledSince(scope, sinceMs))) return;
       const row = this.deps.sessions.get(id);
-      // Still the end it was checked for: not relaunched, not re-ended as a Kill meanwhile.
+      // Still the end it was checked for: not relaunched (or resumed) meanwhile.
       if (!row || row.state !== "ended" || !row.endReason || !INVOLUNTARY.has(row.endReason)) return;
       const session = this.deps.sessions.patch(id, { endReason: "oom" });
       if (session) this.deps.bus.emit({ type: "session.updated", session });

@@ -8,7 +8,7 @@ import { parseBody } from "../body";
 
 /**
  * The other instances (`MOJITO_PEERS`): their snapshots, a launch on one of them, and the
- * allowlisted calls of an open session (`peers/relay.ts`: kill, images, git graph, docs). Nothing
+ * allowlisted calls of an open session (`peers/relay.ts`: images, git graph, docs). Nothing
  * else is forwarded — a peer's settings, hooks and projects are its own client's.
  */
 export function peerRoutes(deps: AppDeps): Hono {
@@ -32,7 +32,7 @@ export function peerRoutes(deps: AppDeps): Hono {
       // The raw path: `c.req.path` is decoded, which would turn `%2F` into a separator.
       const url = new URL(c.req.url);
       const segments = url.pathname.split("/").slice(4);
-      const peerPath = matchRelay(c.req.method, segments, url.searchParams);
+      const peerPath = matchRelay(c.req.method, segments);
       if (!peerPath) return c.json({ error: "not found" }, 404);
       if (!deps.peers?.online(name)) return c.json({ error: `${name} is not reachable` }, 502);
       const hasBody = c.req.method !== "GET" && c.req.method !== "HEAD";

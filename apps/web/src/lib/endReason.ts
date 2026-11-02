@@ -10,7 +10,6 @@ export interface EndLook {
 }
 
 const LOOKS: Record<EndReason, EndLook> = {
-  killed: { label: "Ended", description: "Closed with Kill.", abnormal: false },
   exited: { label: "Ended", description: "Claude exited (/exit or Ctrl-D).", abnormal: false },
   other: {
     label: "Stopped",

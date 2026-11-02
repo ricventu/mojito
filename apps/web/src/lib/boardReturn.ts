@@ -6,7 +6,7 @@ function defaultStore(): Storage | null {
 }
 
 /**
- * Remember the board's search so the terminal's Board link (and Kill) can return to it.
+ * Remember the board's search so the terminal's Board link can return to it.
  * Best effort: a store that throws (Safari private mode) or no store means nothing is kept.
  */
 export function rememberBoardSearch(search: string, store: Storage | null = defaultStore()): void {

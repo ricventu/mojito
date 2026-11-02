@@ -20,7 +20,7 @@ export function peerSessionView(
 /**
  * The session the terminal page is about. This instance's list is read only for `self`: while a
  * `?host=` is still resolving (or is unknown) the url's id may exist here too, and showing that
- * row would let Kill and the Git/Docs links act on the wrong machine's session.
+ * row would let the Git/Docs links and image uploads act on the wrong machine's session.
  */
 export function pageSession(
   host: HostResolution,

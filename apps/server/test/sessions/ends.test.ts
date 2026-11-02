@@ -95,15 +95,14 @@ describe("EndWatch OOM", () => {
     expect(lines).toEqual(["session mj-RIC-1 ended: other", "session mj-RIC-1 ended: oom"]);
   });
 
-  it("never second-guesses a Kill or an /exit, nor a pane it never saw", async () => {
-    const { sessions, bus, oomKilledSince, watch, flush } = setup([meta(), meta({ id: "mj-RIC-2" })], true);
-    watch.observe(panes({ "mj-RIC-1": 7, "mj-RIC-2": 8 }), sessions.list());
-    bus.emit({ type: "session.updated", session: sessions.patch("mj-RIC-1", { state: "ended", endReason: "killed" })! });
-    bus.emit({ type: "session.updated", session: sessions.patch("mj-RIC-2", { state: "ended", endReason: "exited" })! });
+  it("never second-guesses an /exit, nor a pane it never saw", async () => {
+    const { sessions, bus, oomKilledSince, watch, flush } = setup([meta()], true);
+    watch.observe(panes({ "mj-RIC-1": 7 }), sessions.list());
+    bus.emit({ type: "session.updated", session: sessions.patch("mj-RIC-1", { state: "ended", endReason: "exited" })! });
     bus.emit({ type: "session.updated", session: meta({ id: "mj-unseen", state: "ended", endReason: "gone" }) });
     await flush();
     expect(oomKilledSince).not.toHaveBeenCalled();
-    expect(sessions.get("mj-RIC-1")?.endReason).toBe("killed");
+    expect(sessions.get("mj-RIC-1")?.endReason).toBe("exited");
   });
 
   it("keeps the reason when the journal has no OOM kill, or the row was relaunched meanwhile", async () => {

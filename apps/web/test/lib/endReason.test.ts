@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import { canResume, endLook } from "../../src/lib/endReason";
 
 describe("endLook", () => {
-  it("reads a Kill or an /exit as a plain end", () => {
-    expect(endLook("killed")).toMatchObject({ label: "Ended", abnormal: false });
+  it("reads an /exit as a plain end", () => {
     expect(endLook("exited")).toMatchObject({ label: "Ended", abnormal: false });
   });
 

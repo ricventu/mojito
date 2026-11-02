@@ -76,12 +76,13 @@ export interface SessionMeta {
 }
 
 /**
- * How a session ended. `killed`: Mojito's Kill. `exited`: claude quit at the human's word (`/exit`,
- * Ctrl-D, logout). `other`: claude ended for a reason of its own, typically a signal. `oom`: the
- * kernel's out-of-memory killer hit the session's pane (Linux, read from its systemd scope).
+ * How a session ended (there is no Kill: claude is quit in its terminal). `exited`: claude quit
+ * at the human's word (`/exit`, Ctrl-D, logout). `other`: claude ended for a reason of its own,
+ * typically a signal. `oom`: the kernel's out-of-memory killer hit the session's pane (Linux,
+ * read from its systemd scope).
  * `gone`: the tmux session vanished without claude saying so (a crash, a kill from outside, a reboot).
  */
-export type EndReason = "killed" | "exited" | "other" | "oom" | "gone";
+export type EndReason = "exited" | "other" | "oom" | "gone";
 
 export type TaskStatus = "queued" | "running" | "done" | "failed";
 

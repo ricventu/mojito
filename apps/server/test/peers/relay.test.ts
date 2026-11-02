@@ -1,45 +1,43 @@
 import { describe, expect, it, vi } from "vitest";
 import { matchRelay, relayRequest, RELAY_TIMEOUT_MS } from "../../src/peers/relay";
 
-const q = (s = "") => new URLSearchParams(s);
-
 describe("matchRelay", () => {
   it("maps every allowlisted shape to its peer path", () => {
-    expect(matchRelay("GET", ["sessions", "mj-a", "image"], q("path=x.png"))).toBe("/api/sessions/mj-a/image");
-    expect(matchRelay("DELETE", ["sessions", "mj-a"], q())).toBe("/api/sessions/mj-a");
-    expect(matchRelay("POST", ["sessions", "mj-a", "images"], q())).toBe("/api/sessions/mj-a/images");
-    expect(matchRelay("GET", ["projects", "Web", "git", "graph"], q("skip=200"))).toBe("/api/projects/Web/git/graph");
-    expect(matchRelay("GET", ["projects", "Web", "git", "commits", "abc123"], q())).toBe("/api/projects/Web/git/commits/abc123");
-    expect(matchRelay("GET", ["projects", "Web", "git", "commits", "abc123", "diff"], q("path=a.ts"))).toBe(
+    expect(matchRelay("GET", ["sessions", "mj-a", "image"])).toBe("/api/sessions/mj-a/image");
+    expect(matchRelay("POST", ["sessions", "mj-a", "images"])).toBe("/api/sessions/mj-a/images");
+    expect(matchRelay("GET", ["projects", "Web", "git", "graph"])).toBe("/api/projects/Web/git/graph");
+    expect(matchRelay("GET", ["projects", "Web", "git", "commits", "abc123"])).toBe("/api/projects/Web/git/commits/abc123");
+    expect(matchRelay("GET", ["projects", "Web", "git", "commits", "abc123", "diff"])).toBe(
       "/api/projects/Web/git/commits/abc123/diff",
     );
-    expect(matchRelay("GET", ["projects", "Web", "docs"], q())).toBe("/api/projects/Web/docs");
-    expect(matchRelay("GET", ["projects", "Web", "docs", "file"], q("path=a.md"))).toBe("/api/projects/Web/docs/file");
+    expect(matchRelay("GET", ["projects", "Web", "docs"])).toBe("/api/projects/Web/docs");
+    expect(matchRelay("GET", ["projects", "Web", "docs", "file"])).toBe("/api/projects/Web/docs/file");
   });
 
   it("decodes a param and encodes it again", () => {
-    expect(matchRelay("GET", ["projects", "my%20proj", "docs"], q())).toBe("/api/projects/my%20proj/docs");
-    expect(matchRelay("GET", ["projects", "caf%C3%A9", "docs"], q())).toBe("/api/projects/caf%C3%A9/docs");
+    expect(matchRelay("GET", ["projects", "my%20proj", "docs"])).toBe("/api/projects/my%20proj/docs");
+    expect(matchRelay("GET", ["projects", "caf%C3%A9", "docs"])).toBe("/api/projects/caf%C3%A9/docs");
   });
 
   it("refuses a param that could reach another route", () => {
-    expect(matchRelay("GET", ["sessions", "..%2F..%2Fsettings", "image"], q())).toBeNull();
-    expect(matchRelay("GET", ["sessions", "a%2Fb", "image"], q())).toBeNull();
-    expect(matchRelay("GET", ["sessions", "..", "image"], q())).toBeNull();
-    expect(matchRelay("GET", ["sessions", ".", "image"], q())).toBeNull();
-    expect(matchRelay("GET", ["sessions", "", "image"], q())).toBeNull();
-    expect(matchRelay("GET", ["sessions", "%E0%A4%A", "image"], q())).toBeNull();
+    expect(matchRelay("GET", ["sessions", "..%2F..%2Fsettings", "image"])).toBeNull();
+    expect(matchRelay("GET", ["sessions", "a%2Fb", "image"])).toBeNull();
+    expect(matchRelay("GET", ["sessions", "..", "image"])).toBeNull();
+    expect(matchRelay("GET", ["sessions", ".", "image"])).toBeNull();
+    expect(matchRelay("GET", ["sessions", "", "image"])).toBeNull();
+    expect(matchRelay("GET", ["sessions", "%E0%A4%A", "image"])).toBeNull();
   });
 
   it("refuses anything off the allowlist", () => {
-    expect(matchRelay("DELETE", ["sessions", "mj-a"], q("remove=1"))).toBeNull();
-    expect(matchRelay("PUT", ["settings"], q())).toBeNull();
-    expect(matchRelay("POST", ["hook"], q())).toBeNull();
-    expect(matchRelay("GET", ["sessions", "mj-a"], q())).toBeNull();
-    expect(matchRelay("POST", ["sessions", "mj-a", "image"], q())).toBeNull();
-    expect(matchRelay("GET", ["projects", "Web", "git", "graph", "extra"], q())).toBeNull();
-    expect(matchRelay("POST", ["projects", "Web", "docs"], q())).toBeNull();
-    expect(matchRelay("GET", [], q())).toBeNull();
+    // No Kill and no remove: a peer's sessions are quit in their terminal, and forgotten on the peer.
+    expect(matchRelay("DELETE", ["sessions", "mj-a"])).toBeNull();
+    expect(matchRelay("PUT", ["settings"])).toBeNull();
+    expect(matchRelay("POST", ["hook"])).toBeNull();
+    expect(matchRelay("GET", ["sessions", "mj-a"])).toBeNull();
+    expect(matchRelay("POST", ["sessions", "mj-a", "image"])).toBeNull();
+    expect(matchRelay("GET", ["projects", "Web", "git", "graph", "extra"])).toBeNull();
+    expect(matchRelay("POST", ["projects", "Web", "docs"])).toBeNull();
+    expect(matchRelay("GET", [])).toBeNull();
   });
 });
 

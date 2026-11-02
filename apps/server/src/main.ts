@@ -24,7 +24,7 @@ import { startPaneWatch } from "./sessions/paneWatch";
 import { linearImageFetcher } from "./tasks/images";
 import { TaskQueue } from "./tasks/runner";
 import { TicketCache } from "./tickets/cache";
-import { PREFIX, closeSession, listSessions, livePanes } from "./tmux/tmux";
+import { PREFIX, listSessions, livePanes } from "./tmux/tmux";
 import { startHeartbeat } from "./ws/heartbeat";
 import { handleUpgrade } from "./ws/upgrade";
 
@@ -109,7 +109,6 @@ async function main(): Promise<void> {
     linear,
     tickets,
     launch,
-    closeSession,
     taskQueue,
     peers,
     staticDir,

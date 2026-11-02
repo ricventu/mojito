@@ -12,7 +12,6 @@ import type { PeerRegistry } from "../peers/registry";
 import type { LaunchDeps } from "../sessions/launch";
 import type { TaskQueue } from "../tasks/runner";
 import type { TicketCache } from "../tickets/cache";
-import type { closeSession } from "../tmux/tmux";
 import { tokenMatches } from "../token";
 import { errorMessage } from "./body";
 import { gitRoutes, type GitSync } from "./routes/git";
@@ -38,7 +37,6 @@ export interface AppDeps {
   linear: Pick<LinearClient, "listTeamStates" | "setStatus" | "uploadImage">;
   tickets: TicketCache;
   launch: LaunchDeps;
-  closeSession: typeof closeSession;
   taskQueue: Pick<TaskQueue, "enqueue" | "retry">;
   /** A project's Pull and Push. Default: real git (`defaultGitSync`). */
   git?: GitSync;

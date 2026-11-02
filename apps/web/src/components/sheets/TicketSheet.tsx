@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, GitGraph, Play, Power, RotateCcw, SquareTerminal } from "lucide-react";
+import { FileText, GitGraph, Play, RotateCcw, SquareTerminal } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 import type { Effort, Model, PeerSnapshot, SessionMeta, Settings, TicketSummary } from "@mojito/shared";
@@ -214,46 +214,23 @@ function LaunchForm({
   );
 }
 
-/** A live session: open its terminal, or kill it (after a confirm). */
-function LiveSession({ ticket, session, onClose }: { ticket: TicketSummary; session: SessionMeta; onClose: () => void }) {
+/** A live session: open its terminal (there is no Kill: claude is quit there). */
+function LiveSession({ session, onClose }: { session: SessionMeta; onClose: () => void }) {
   const navigate = useNavigate();
-  const qc = useQueryClient();
-  const kill = useMutation({
-    mutationFn: () => apiFetch<unknown>(`/api/sessions/${encodeURIComponent(session.id)}`, { method: "DELETE" }),
-    onSuccess: () => {
-      toast.success("Session ended");
-      void qc.invalidateQueries({ queryKey: qk.sessions });
-    },
-    // A 409 means claude would not leave: the session is untouched, its terminal is the way in.
-    onError: (e) => toast.error(errorMessage(e, "Kill failed")),
-  });
-
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2 text-sm">
         <span className="text-muted-foreground">Session</span>
         <StateBadge state={session.state} endReason={session.endReason} />
       </div>
-      <div className="flex gap-2">
-        <Button
-          className="flex-1"
-          onClick={() => {
-            onClose();
-            navigate(sessionHref(null, session.id));
-          }}
-        >
-          <SquareTerminal size={16} /> Open terminal
-        </Button>
-        <Button
-          variant="outline"
-          disabled={kill.isPending}
-          onClick={() => {
-            if (window.confirm(`Kill the ${ticket.identifier} session?`)) kill.mutate();
-          }}
-        >
-          <Power size={16} /> Kill
-        </Button>
-      </div>
+      <Button
+        onClick={() => {
+          onClose();
+          navigate(sessionHref(null, session.id));
+        }}
+      >
+        <SquareTerminal size={16} /> Open terminal
+      </Button>
     </div>
   );
 }
@@ -352,7 +329,7 @@ export function TicketSheet({ ticket, onClose }: Props) {
             </div>
           )}
           {live ? (
-            <LiveSession ticket={ticket} session={session} onClose={onClose} />
+            <LiveSession session={session} onClose={onClose} />
           ) : onPeer ? (
             <PeerLiveSession peer={onPeer.peer} session={onPeer.session} onClose={onClose} />
           ) : settings.data ? (

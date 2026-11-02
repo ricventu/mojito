@@ -78,7 +78,6 @@ export function setup(over: Partial<AppDeps> = {}) {
     randomHex: () => "a1b2c3",
     prompts: () => settings.get().prompts,
   };
-  const closeSession = vi.fn(async (_name: string) => ({ closed: true }));
   const exists = vi.fn((_path: string) => true);
   const removeFile = vi.fn((_path: string) => {});
   const taskQueue = { enqueue: vi.fn((_id: string) => {}), retry: vi.fn((_id: string) => false) };
@@ -93,7 +92,6 @@ export function setup(over: Partial<AppDeps> = {}) {
     linear,
     tickets,
     launch,
-    closeSession,
     taskQueue,
     exists,
     removeFile,
@@ -114,5 +112,5 @@ export function setup(over: Partial<AppDeps> = {}) {
       ...(init.json !== undefined ? { body: JSON.stringify(init.json) } : {}),
     });
 
-  return { app, req, deps, db, projects, settings, sessions, tasks, bus, events, linear, tickets, refresh, launch, closeSession, taskQueue, exists, removeFile };
+  return { app, req, deps, db, projects, settings, sessions, tasks, bus, events, linear, tickets, refresh, launch, taskQueue, exists, removeFile };
 }
