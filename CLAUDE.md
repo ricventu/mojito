@@ -305,7 +305,7 @@ app's state, left in place.
   filter drops loose sessions and statuses outside `FILTER_STATUSES`; Backlog opens
   (`backlogOpen`) when selected or `q` is set, so a search never hides a match in a closed
   group. `lib/boardReturn.ts` keeps the last board search in `sessionStorage` (per tab) for the
-  terminal's Board link and Kill's navigation, best effort.
+  terminal's Board link, best effort.
 - **Favourites** (`lib/favorites.ts`, `hooks/useFavorites.ts`): chips under the search row
   (tap the active one = clear), saved from the filter sheet (a same-name save replaces in
   place), managed in the Settings `FavoritesCard`. The PUT replaces the whole list, so nothing
@@ -371,9 +371,9 @@ app's state, left in place.
   so it never sends the reader away: **the pty is the authority** — the page keeps the last-known
   row for host+id, the relay's 4404 shows "Session ended", and a 4404 on a cold load (nothing
   seen: a stale link) goes to the board (`exitAction`); an offline peer keeps the page
-  ("<peer> · offline", the terminal reconnects). The terminal header names the host. Kill, image
-  upload/viewer, `.md` paths and the header's Git and Docs all go through `hostApi` and carry
-  `host`; no Pull/Push or other project action appears for a peer. The board stays local: its
+  ("<peer> · offline", the terminal reconnects). The terminal header names the host and has no
+  Kill (removed on purpose: Kill lives on the board and the ticket sheet). Image upload/viewer,
+  `.md` paths and the header's Git and Docs all go through `hostApi` and carry `host`; no Pull/Push or other project action appears for a peer. The board stays local: its
   toolbar `<h1>` and the tab title (`appTitle`, `<self> · Mojito`) name this instance (`self` of
   `/api/peers`, "Mojito" until it answers), so after a band's ↗ it is plain whose board it is.
 - **Desktop first, phone complete.** The board column is `max-w-6xl`, an `@container`: from

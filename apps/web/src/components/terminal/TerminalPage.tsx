@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { Terminal } from "@xterm/xterm";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, FileText, GitGraph, Power, RotateCcw } from "lucide-react";
+import { ArrowLeft, FileText, GitGraph, RotateCcw } from "lucide-react";
 import { Link, Navigate, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import type { SessionMeta } from "@mojito/shared";
@@ -19,14 +18,12 @@ import { useKeyboardOpen } from "@/hooks/useKeyboardOpen";
 import { useResume } from "@/hooks/useResume";
 import { useSessions } from "@/hooks/useSessions";
 import { useTickets } from "@/hooks/useTickets";
-import { ApiError, apiFetch } from "@/lib/api";
 import { boardHref } from "@/lib/boardReturn";
 import { docsHref } from "@/lib/docs/url";
 import { canResume, endLook } from "@/lib/endReason";
 import { gitHref } from "@/lib/git/url";
-import { hostApi, hostOf } from "@/lib/host";
+import { hostOf } from "@/lib/host";
 import { exitAction, pageSession } from "@/lib/peerSession";
-import { qk } from "@/lib/queryKeys";
 import { sessionName } from "@/lib/sidebar";
 import { safeHref } from "@/lib/url";
 import { attachImages, uploadImages } from "@/lib/terminal/imageInput";
@@ -92,7 +89,6 @@ export function TerminalPage() {
   const band = useKeyboardOpen();
   useKeyboardUp(band.open);
   const navigate = useNavigate();
-  const qc = useQueryClient();
   const host = useHost();
   // The peer's name; null for this instance and for a host not resolved yet (nothing uses it then).
   const hostName = hostOf(host);
@@ -151,23 +147,6 @@ export function TerminalPage() {
       : session?.ticket
         ? tickets.data?.tickets.find((t) => t.identifier === session.ticket)
         : undefined;
-
-  const kill = useMutation({
-    mutationFn: () => apiFetch<unknown>(hostApi(hostName, `/api/sessions/${encodeURIComponent(id)}`), { method: "DELETE" }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: hostName === null ? qk.sessions : qk.peers });
-      navigate(boardHref());
-    },
-    // A 409 means claude would not leave: the session is untouched and this terminal is the way to it.
-    onError: (e) =>
-      toast.error(
-        e instanceof ApiError && e.status === 409
-          ? "claude did not exit: open the terminal"
-          : e instanceof Error
-            ? e.message
-            : "Kill failed",
-      ),
-  });
 
   // A host nobody knows is not found, never this instance's session under that id.
   if (host.kind === "unknown") return <Navigate to={boardHref()} replace />;
@@ -242,17 +221,6 @@ export function TerminalPage() {
                 </Link>
               </Button>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              disabled={!session || kill.isPending}
-              onClick={() => {
-                if (window.confirm(hostName === null ? "Kill this session?" : `Kill this session on ${hostName}?`)) kill.mutate();
-              }}
-            >
-              <Power size={16} /> <span className="max-[480px]:sr-only">Kill</span>
-            </Button>
           </header>
         )}
         {gone ? (
