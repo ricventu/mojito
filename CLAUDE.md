@@ -112,11 +112,14 @@ app's state, left in place.
   (the pty spawns at 80x24 and only the client corrects it), 200 lines of scrollback replayed
   first. Ping/pong heartbeat reaps half-open phone sockets. `/ws/peers/<name>/pty/<id>` is the
   same terminal on a peer, relayed (`ws/peerPty.ts`; `UpgradeDeps.peers`, absent → destroyed): an
-  unknown peer or a non-`mj-` id is destroyed, an offline peer is answered 1011 (the client's
+  unknown peer is destroyed, a known peer with an id that is no `mj-` id (empty, nested,
+  undecodable too) is answered 4404 — the client's `exitAction` then goes to the board instead of
+  redialling forever — an offline peer is answered 1011 (the client's
   backoff re-attaches), otherwise this instance dials the peer's `/ws/pty/<id>` with the shared
   token **before** completing the browser's handshake (a dial failure → 1011); if the browser
   leaves mid-dial the dial is aborted and the socket destroyed — a handshake completed on a dead
-  socket crashed the server once. Frames pipe both ways with their type kept. **Close-code rule**:
+  socket crashed the server once; a late upstream is closed under a no-op `error` listener, and so
+  is one whose browser handshake `ws` rejects (it answers 400 without calling back). Frames pipe both ways with their type kept. **Close-code rule**:
   1000 and 3000-4999 are mirrored (`SESSION_GONE_CODE` 4404 must reach the browser intact or its
   reconnect loop retries a gone session forever), anything else (1005/1006, 1001) becomes 1011;
   the peer side is pinged every 30 s (a sleeping Mac sends no close).
@@ -197,7 +200,9 @@ app's state, left in place.
   opens but cannot be read would otherwise be re-dialled every second. A bad-token ws upgrade is
   answered `401` (not just destroyed), so the dialling side logs "token rejected (401)"; a link
   logs one line per offline stretch.
-  No echo: a peer's `/api/sessions` is only its own. Paths never leave a peer (names only).
+  No echo: a peer's `/api/sessions` is only its own. Paths never leave a peer in the snapshot
+  (names only); the in-place relay below does carry them — image upload answers the peer's
+  absolute paths to the browser, and the viewer, docs and git calls send paths back.
   `GET /api/peers` → `{self, peers}`; `POST /api/peers/:name/sessions` forwards a `LaunchBody`
   and answers the peer's status/body verbatim (offline/unreachable/non-json 502, no answer in
   30 s → 504 "may still be starting"). Besides that launch, a peer's session opens **in this
@@ -206,11 +211,14 @@ app's state, left in place.
   `matchRelay` + `relayRequest`), and the pty relay above. The table is Kill (`DELETE
   /sessions/:id`, never with `remove`), image upload and view, the git graph/commit/diff, the docs
   list/file — nothing else (not settings, hooks, projects): off the table is 404, so a client bug
-  cannot write a peer's settings. Each segment is decoded, must be one plain name (no
-  `.`/`..`/`/`) and is re-encoded into the peer URL; the body is streamed (never parsed, the peer
+  cannot write a peer's settings. Each segment is decoded and must be one plain name (no
+  `.`/`..`/`/`); the literal segments are matched verbatim and only the `:param` slots are
+  re-encoded into the peer URL; the body is streamed (never parsed, the peer
   validates it), the response comes back verbatim with only `content-type|length`, `nosniff`,
   `CSP` and `cache-control` (the viewer's `CSP: sandbox` survives the hop); offline → 502 without
-  trying, no answer in 30 s → 504; only `x-mojito-token` goes to the peer. Ids are unique per
+  trying, no answer in 30 s → 504 (the limit is the peer's headers: it is cleared once they
+  arrive, so a slow upload or download is never cut); only `x-mojito-token` and the request's
+  `content-type` go to the peer. Ids are unique per
   instance only (`mj-<slug>-git` exists on every instance with that project): the host is always
   part of an address.
   Mac setup: `tailscale serve --bg 8700`, the same `MOJITO_TOKEN`, each instance listing the

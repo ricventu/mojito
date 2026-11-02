@@ -118,7 +118,7 @@ the header filter, unit-tested without a server.
 
 `ws/upgrade.ts` gains a third path. After the token check:
 
-- Unknown peer, or an id not starting with `mj-` → destroyed (as an unknown path is today).
+- Unknown peer → destroyed (as an unknown path is today). A known peer with an id not starting with `mj-` (or empty, nested, undecodable) → handshake completed and closed 4404, so the client goes to the board instead of redialling forever (final review).
 - Peer offline → handshake completed, closed **1011** (retryable: the client's backoff keeps
   trying and attaches when the peer is back).
 - Otherwise this instance dials `<peer.url>/ws/pty/<id>?token=<shared>` (http→ws,
