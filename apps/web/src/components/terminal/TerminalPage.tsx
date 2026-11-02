@@ -242,7 +242,7 @@ export function TerminalPage() {
               className="shrink-0"
               disabled={!session || kill.isPending}
               onClick={() => {
-                if (window.confirm("Kill this session?")) kill.mutate();
+                if (window.confirm(hostName === null ? "Kill this session?" : `Kill this session on ${hostName}?`)) kill.mutate();
               }}
             >
               <Power size={16} /> <span className="max-[480px]:sr-only">Kill</span>

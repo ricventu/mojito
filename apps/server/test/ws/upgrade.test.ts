@@ -101,10 +101,8 @@ describe("handleUpgrade", () => {
     ["an mj- id with no session row but a wrong token", "/ws/pty/mj-RIC-2?token=nope"],
     ["a nested pty path", `/ws/pty/mj-RIC-1/x?token=${TOKEN}`],
     ["an unknown peer", `/ws/peers/nope/pty/mj-a?token=${TOKEN}`],
-    ["a peer id outside the mj- prefix", `/ws/peers/mac/pty/other?token=${TOKEN}`],
-    ["a nested peer pty path", `/ws/peers/mac/pty/mj-a/x?token=${TOKEN}`],
     ["a peer path that is not pty", `/ws/peers/mac/events?token=${TOKEN}`],
-    ["a peer path with an undecodable id", `/ws/peers/mac/pty/%E0%A4%A?token=${TOKEN}`],
+    ["an unknown peer with a bad id", `/ws/peers/nope/pty/other?token=${TOKEN}`],
     ["a peer pty path with a wrong token", "/ws/peers/mac/pty/mj-a?token=nope"],
     ["a path that is neither",`/ws/other?token=${TOKEN}`],
     ["an /api path", `/api/health?token=${TOKEN}`],
@@ -117,6 +115,21 @@ describe("handleUpgrade", () => {
 
   // A peer instance dialling with another token must be able to say why it is offline; a bare
   // destroy reaches it as "socket hang up". The browser sees no difference.
+  // The web's exitAction sends a 4404 to the board; a destroyed handshake would be redialled every
+  // 1.5 s forever. Only for a configured peer: an unknown one stays destroyed (above).
+  it.each([
+    ["an id outside the mj- prefix", `/ws/peers/mac/pty/other?token=${TOKEN}`],
+    ["a nested id", `/ws/peers/mac/pty/mj-a/x?token=${TOKEN}`],
+    ["an undecodable id", `/ws/peers/mac/pty/%E0%A4%A?token=${TOKEN}`],
+    ["an empty id", `/ws/peers/mac/pty/?token=${TOKEN}`],
+  ])("closes a known peer's %s with SESSION_GONE_CODE", (_label, url) => {
+    const { socket, wss, ws, upgrade } = setup();
+    upgrade(url);
+    expect(wss.handleUpgrade).toHaveBeenCalled();
+    expect(socket.destroy).not.toHaveBeenCalled();
+    expect(ws.close).toHaveBeenCalledWith(SESSION_GONE_CODE, expect.any(String));
+  });
+
   it.each([
     ["a wrong token", "/ws/events?token=nope"],
     ["no token", "/ws/events"],

@@ -125,6 +125,7 @@ function GraphView({ host, project }: { host: string | null; project: string }) 
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold">
             {project}
             <span className="font-normal text-muted-foreground"> · git</span>
+            {host !== null && <span className="font-normal text-muted-foreground"> on {host}</span>}
           </h1>
           {layout.hiddenLanes > 0 && (
             <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">+{layout.hiddenLanes} lanes</span>

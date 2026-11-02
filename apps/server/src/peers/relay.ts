@@ -63,7 +63,7 @@ export type RelayRequest = {
  * Replays a request on a peer with the shared token and nothing else of the browser's (no cookie,
  * no origin). Status and body come back untouched — the body is a stream, never read here, so image
  * bytes are not re-encoded — with only `PASSED_HEADERS`. Unreachable: 502; no answer within the
- * limit: 504. A peer error whose body is not json (a proxy's page) is a 502 too, so the client
+ * limit for its headers: 504 (the body, once the answer is in, may take as long as it takes). A peer error whose body is not json (a proxy's page) is a 502 too, so the client
  * always reads `{ error }` from a failure.
  */
 export async function relayRequest(
@@ -74,19 +74,28 @@ export async function relayRequest(
 ): Promise<Response> {
   const headers: Record<string, string> = { "x-mojito-token": token };
   if (req.contentType) headers["content-type"] = req.contentType;
+  // The limit is the peer's *answer* (its headers), not the transfer: the timer is cleared once
+  // fetch resolves, so a slow upload or download is never cut mid-stream.
+  const abort = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    abort.abort();
+  }, opts.timeoutMs ?? RELAY_TIMEOUT_MS);
   let res: Response;
   try {
     res = await (opts.fetch ?? fetch)(`${peer.url}${req.peerPath}${req.search}`, {
       method: req.method,
       headers,
-      signal: AbortSignal.timeout(opts.timeoutMs ?? RELAY_TIMEOUT_MS),
+      signal: abort.signal,
       ...(req.body ? { body: req.body, duplex: "half" } : {}),
     } as RequestInit);
-  } catch (err) {
-    if (err instanceof DOMException && err.name === "TimeoutError") {
-      return Response.json({ error: `${peer.name} did not answer within ${RELAY_TIMEOUT_MS / 1000} s` }, { status: 504 });
-    }
-    return unreachable(peer);
+  } catch {
+    return timedOut
+      ? Response.json({ error: `${peer.name} did not answer within ${RELAY_TIMEOUT_MS / 1000} s` }, { status: 504 })
+      : unreachable(peer);
+  } finally {
+    clearTimeout(timer);
   }
   if (!res.ok && !(res.headers.get("content-type") ?? "").includes("json")) {
     await res.body?.cancel().catch(() => {});

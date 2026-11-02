@@ -28,18 +28,31 @@ export interface UpgradeDeps {
 const PTY_PATH = "/ws/pty/";
 const PEER_PATH = "/ws/peers/";
 
-// `[name, id]` of a `/ws/peers/<name>/pty/<id>` path, both decoded; null for any other shape
-// (a nested path, an empty segment, a decode failure).
-function peerPtyTarget(pathname: string): [string, string] | null {
+// The peer name of a `/ws/peers/<name>/pty/…` path, decoded, and its session id: null when the id
+// segment is empty, nested or will not decode (a bad id under a peer). Null for any other shape.
+function peerPtyTarget(pathname: string): { name: string; id: string | null } | null {
   const parts = pathname.slice(PEER_PATH.length).split("/");
-  if (parts.length !== 3 || parts[1] !== "pty") return null;
+  if (parts.length < 3 || parts[1] !== "pty") return null;
+  let name: string;
   try {
-    const name = decodeURIComponent(parts[0]);
-    const id = decodeURIComponent(parts[2]);
-    return name && id ? [name, id] : null;
+    name = decodeURIComponent(parts[0]);
   } catch {
     return null;
   }
+  if (!name) return null;
+  if (parts.length !== 3) return { name, id: null };
+  try {
+    return { name, id: decodeURIComponent(parts[2]) || null };
+  } catch {
+    return { name, id: null };
+  }
+}
+
+// Gives up an upstream that was never handed to a browser. `ws` emits `error` on a protocol
+// failure while closing, and an `error` nobody listens to is an uncaught exception.
+function dropUpstream(upstream: WebSocket): void {
+  upstream.on("error", () => {});
+  upstream.close();
 }
 
 /**
@@ -85,19 +98,25 @@ function relayToPeer(
   dial(peerPtyUrl(peer.url, id, deps.token)).then(
     (upstream) => {
       if (aborted) {
-        upstream.close();
+        dropUpstream(upstream);
         socket.destroy();
         return;
       }
       unwatch();
+      let relayed = false;
       try {
         deps.wss.handleUpgrade(req, socket, head, (ws) => {
+          relayed = true;
           markAlive(ws);
           relayPeerPty(ws, upstream);
         });
+        // `ws` answers a handshake it rejects (a bad key or version: 400) and destroys the socket
+        // without calling back; with no `verifyClient` an accepted one runs the callback
+        // synchronously. So no callback by now means the dialled upstream has no one to serve.
+        if (!relayed) dropUpstream(upstream);
       } catch (err) {
         console.error("upgrade handler error:", err);
-        upstream.close();
+        dropUpstream(upstream);
         socket.destroy();
       }
     },
@@ -135,7 +154,8 @@ function ptySessionId(pathname: string): string {
  * configured peer, relayed (`peerPty.ts`) with the shared token — anything else, and any
  * failure at all, destroys the socket rather than answering it.
  *
- * An `mj-` id with no session row is the one refusal answered rather than destroyed: the
+ * Two refusals are answered rather than destroyed: an `mj-` id with no session row, and an id
+ * that is no `mj-` id (or is empty, nested, undecodable) under a *configured* peer. The
  * handshake completes and the socket closes at once with `SESSION_GONE_CODE`. A destroyed
  * handshake reaches the browser as a bare 1006, which its reconnect loop retries every 1.5s
  * forever; 4404 is how it learns the session is gone and stops.
@@ -178,9 +198,15 @@ export function handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer
     }
     if (url.pathname.startsWith(PEER_PATH)) {
       const target = peerPtyTarget(url.pathname);
-      const peer = target && deps.peers?.config(target[0]);
-      if (target && peer && target[1].startsWith(PREFIX)) {
-        relayToPeer(req, socket, head, deps, peer, target[1]);
+      const peer = target && deps.peers?.config(target.name);
+      if (target && peer) {
+        if (target.id?.startsWith(PREFIX)) {
+          relayToPeer(req, socket, head, deps, peer, target.id);
+        } else {
+          // A known peer with an id that can never be a session: answered like a gone one, so the
+          // browser stops instead of redialling every 1.5 s (an unknown peer stays destroyed).
+          deps.wss.handleUpgrade(req, socket, head, (ws) => ws.close(SESSION_GONE_CODE, "session gone"));
+        }
         return;
       }
     }

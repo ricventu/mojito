@@ -240,6 +240,35 @@ describe("the peer pty relay", () => {
     resolveDial(upstream);
     await vi.waitFor(() => expect(close).toHaveBeenCalled());
     await vi.waitFor(() => expect(inst.sockets[0].destroyed).toBe(true));
+    // A protocol error while closing must not be an uncaught exception.
+    expect(upstream.listenerCount("error")).toBeGreaterThan(0);
+  });
+
+  // `ws` answers a browser handshake it rejects (400) and destroys the socket without calling
+  // back; the upstream dialled for it must not be left open on the peer.
+  it("closes the dialled upstream when ws rejects the browser's handshake", async () => {
+    const peer = await fakePeer();
+    const inst = await instance({ peerUrl: `http://127.0.0.1:${peer.port}` });
+    const client = net.connect(inst.port, "127.0.0.1");
+    client.on("error", () => {});
+    client.write(
+      `GET /ws/peers/mac/pty/mj-a?token=${TOKEN} HTTP/1.1\r\nHost: x\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n` +
+        "Sec-WebSocket-Version: 99\r\nSec-WebSocket-Key: not-a-key\r\n\r\n",
+    );
+    const upstream = await peer.nextConn();
+    const closed = new Promise<void>((resolve) => upstream.once("close", () => resolve()));
+    await closed;
+    expect(upstream.readyState).toBe(WebSocket.CLOSED);
+    client.destroy();
+  });
+
+  it("closes a known peer's bad id with 4404, without dialling", async () => {
+    const peer = await fakePeer();
+    const { connect } = await instance({ peerUrl: `http://127.0.0.1:${peer.port}` });
+    const browser = connect("other");
+    await opened(browser);
+    expect(await closedWith(browser)).toBe(SESSION_GONE_CODE);
+    expect(peer.urls).toEqual([]);
   });
 
   it("terminates a peer that never answers a ping, and tells the browser 1011", async () => {

@@ -92,6 +92,7 @@ function DocsView({ host, project }: { host: string | null; project: string }) {
               <>
                 {project}
                 <span className="font-normal text-muted-foreground"> · docs</span>
+                {host !== null && <span className="font-normal text-muted-foreground"> on {host}</span>}
               </>
             )}
           </h1>

@@ -119,12 +119,39 @@ describe("relayRequest", () => {
     expect(await res.json()).toEqual({ error: "mac is not reachable" });
   });
 
-  it("a timeout is a 504", async () => {
-    const res = await relayRequest(PEER, "tok", REQ, {
-      fetch: answering(() => Promise.reject(new DOMException("timed out", "TimeoutError"))),
-    });
+  it("a peer that never answers is a 504", async () => {
+    const neverAnswers = vi.fn(
+      (_input: string | URL | Request, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason ?? new DOMException("aborted", "AbortError")));
+        }),
+    ) as unknown as typeof fetch;
+    const res = await relayRequest(PEER, "tok", REQ, { fetch: neverAnswers, timeoutMs: 20 });
     expect(res.status).toBe(504);
     expect(await res.json()).toEqual({ error: "mac did not answer within 30 s" });
     expect(RELAY_TIMEOUT_MS).toBe(30_000);
+  });
+
+  // The limit is the peer's answer (its headers), not the transfer: a big image still arriving
+  // after it must come through whole.
+  it("does not cut a body that is still streaming after the limit", async () => {
+    let signal: AbortSignal | undefined;
+    const slowBody = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      signal = init?.signal ?? undefined;
+      const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          controller.enqueue(new TextEncoder().encode("first,"));
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          if (signal?.aborted) return controller.error(signal.reason);
+          controller.enqueue(new TextEncoder().encode("second"));
+          controller.close();
+        },
+      });
+      return new Response(stream, { headers: { "content-type": "text/plain" } });
+    }) as unknown as typeof fetch;
+    const res = await relayRequest(PEER, "tok", REQ, { fetch: slowBody, timeoutMs: 30 });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("first,second");
+    expect(signal?.aborted).toBe(false);
   });
 });

@@ -187,12 +187,23 @@ describe("ALL /api/peers/:name/*", () => {
     expect(a.status).toBe(502);
     expect(await a.json()).toEqual({ error: "mac is not reachable" });
 
-    const slow = withPeers(async () => {
-      throw new DOMException("timed out", "TimeoutError");
-    });
-    const b = await slow.req(IMAGE);
-    expect(b.status).toBe(504);
-    expect(await b.json()).toEqual({ error: "mac did not answer within 30 s" });
+    // A peer that never answers: the relay's own timer aborts the request after 30 s.
+    vi.useFakeTimers();
+    try {
+      const slow = withPeers(
+        (_input, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+          }),
+      );
+      const pending = slow.req(IMAGE);
+      await vi.advanceTimersByTimeAsync(30_000);
+      const b = await pending;
+      expect(b.status).toBe(504);
+      expect(await b.json()).toEqual({ error: "mac did not answer within 30 s" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("a peer's error that is not json is a 502", async () => {
