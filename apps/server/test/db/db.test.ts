@@ -261,7 +261,7 @@ describe("SessionsRepo", () => {
 const task = (over: Partial<TaskRecord> = {}): TaskRecord => ({
   id: "t1",
   type: "create-ticket",
-  input: { project: "Web", note: "note", imageUrls: ["u1"] },
+  input: { project: "Web", note: "note", imageUrls: ["u1"], initialStatus: "Backlog" },
   status: "queued",
   log: [],
   error: null,
@@ -299,8 +299,15 @@ describe("TasksRepo", () => {
     const repo = new TasksRepo(db);
     repo.insert(task());
     db.prepare("UPDATE sdk_tasks SET input = '{', log = 'nope', result = '[' WHERE id = 't1'").run();
-    expect(repo.get("t1")).toMatchObject({ input: { project: "", note: "", imageUrls: [] }, log: [], result: null });
+    expect(repo.get("t1")).toMatchObject({ input: { project: "", note: "", imageUrls: [], initialStatus: "Todo" }, log: [], result: null });
     expect(repo.list()).toHaveLength(1);
+  });
+  it("reads a task stored without a starting status with the default one", () => {
+    const db = openDb(":memory:");
+    const repo = new TasksRepo(db);
+    repo.insert(task());
+    db.prepare(`UPDATE sdk_tasks SET input = '{"project":"Web","note":"n","imageUrls":[]}' WHERE id = 't1'`).run();
+    expect(repo.get("t1")?.input).toEqual({ project: "Web", note: "n", imageUrls: [], initialStatus: "Todo" });
   });
   it("appendLog appends lines in order", () => {
     const repo = new TasksRepo(openDb(":memory:"));

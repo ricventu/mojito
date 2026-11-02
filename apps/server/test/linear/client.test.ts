@@ -301,7 +301,8 @@ describe("LinearClient.listTeamStates / listLabels", () => {
 });
 
 describe("LinearClient.createIssue", () => {
-  const team = { teams: { nodes: [{ id: "T1", projects: { nodes: [{ id: "P1" }] } }] } };
+  const states = { nodes: [{ id: "S-todo", name: "Todo" }, { id: "S-backlog", name: "Backlog" }] };
+  const team = { teams: { nodes: [{ id: "T1", projects: { nodes: [{ id: "P1" }] }, states }] } };
   const created = { issueCreate: { success: true, issue: { identifier: "RIC-300", url: "https://linear.app/x/RIC-300" } } };
   const input = { teamKey: "RIC", project: "Web", title: "T", description: "D" };
 
@@ -323,8 +324,30 @@ describe("LinearClient.createIssue", () => {
     expect(sent).not.toHaveProperty("labelIds");
   });
 
+  it("files the issue in the named workflow state", async () => {
+    const { fetchImpl, calls } = seq([team, created]);
+    await new LinearClient("k", fetchImpl).createIssue({ ...input, status: "Backlog" });
+    const sent = (calls[1].body.variables as { input: Record<string, unknown> }).input;
+    expect(sent.stateId).toBe("S-backlog");
+  });
+
+  it("leaves the state to the team's default without a status", async () => {
+    const { fetchImpl, calls } = seq([team, created]);
+    await new LinearClient("k", fetchImpl).createIssue(input);
+    const sent = (calls[1].body.variables as { input: Record<string, unknown> }).input;
+    expect(sent).not.toHaveProperty("stateId");
+  });
+
+  it("throws before creating anything when the team has no such state", async () => {
+    const { fetchImpl, calls } = seq([team, created]);
+    await expect(new LinearClient("k", fetchImpl).createIssue({ ...input, status: "Icebox" })).rejects.toThrow(
+      'workflow state "Icebox" not found in team RIC',
+    );
+    expect(calls).toHaveLength(1);
+  });
+
   it("throws when the project is not in the team", async () => {
-    const { fetchImpl } = seq([{ teams: { nodes: [{ id: "T1", projects: { nodes: [] } }] } }]);
+    const { fetchImpl } = seq([{ teams: { nodes: [{ id: "T1", projects: { nodes: [] }, states }] } }]);
     await expect(new LinearClient("k", fetchImpl).createIssue(input)).rejects.toThrow(
       'project "Web" not found in team RIC',
     );

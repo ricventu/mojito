@@ -4,9 +4,10 @@ import { TOKEN, setup } from "./setup";
 
 const png = (name = "a.png", bytes = 4) => new File([new Uint8Array(bytes)], name, { type: "image/png" });
 
-function form(fields: { project?: string; note?: string; images?: File[] }) {
+function form(fields: { project?: string; note?: string; initialStatus?: string; images?: File[] }) {
   const fd = new FormData();
   if (fields.project !== undefined) fd.append("project", fields.project);
+  if (fields.initialStatus !== undefined) fd.append("initialStatus", fields.initialStatus);
   if (fields.note !== undefined) fd.append("note", fields.note);
   for (const f of fields.images ?? []) fd.append("images[]", f);
   return fd;
@@ -22,7 +23,7 @@ function withProject() {
 const task = (over: Partial<TaskRecord> = {}): TaskRecord => ({
   id: "t1",
   type: "create-ticket",
-  input: { project: "Web", note: "n", imageUrls: [] },
+  input: { project: "Web", note: "n", imageUrls: [], initialStatus: "Todo" },
   status: "failed",
   log: [],
   error: "x",
@@ -43,7 +44,12 @@ describe("POST /api/tasks", () => {
     expect(body).toMatchObject({
       type: "create-ticket",
       status: "queued",
-      input: { project: "Web", note: "the save button is broken", imageUrls: ["https://uploads.linear.app/1", "https://uploads.linear.app/2"] },
+      input: {
+        project: "Web",
+        note: "the save button is broken",
+        imageUrls: ["https://uploads.linear.app/1", "https://uploads.linear.app/2"],
+        initialStatus: "Todo",
+      },
       log: [],
       error: null,
       result: null,
@@ -61,6 +67,16 @@ describe("POST /api/tasks", () => {
     expect(res.status).toBe(201);
     expect(((await res.json()) as TaskRecord).input.imageUrls).toEqual([]);
     expect(linear.uploadImage).not.toHaveBeenCalled();
+  });
+
+  it("takes the starting status, Todo when none is sent, and refuses any other", async () => {
+    const { post, tasks } = withProject();
+    const backlog = await post(form({ project: "Web", note: "n", initialStatus: "Backlog" }));
+    expect(((await backlog.json()) as TaskRecord).input.initialStatus).toBe("Backlog");
+    const bad = await post(form({ project: "Web", note: "n", initialStatus: "In Progress" }));
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toEqual({ error: "invalid initial status: In Progress" });
+    expect(tasks.list()).toHaveLength(1);
   });
 
   it("answers 502 and stores nothing when an upload fails", async () => {

@@ -117,12 +117,12 @@ export class TaskQueue {
 
   /** Runs the agent; answers the `result` text, which matters only when nothing was created. */
   private async execute(task: TaskRecord, onCreated: (r: Created) => void): Promise<string> {
-    const { project: name, note, imageUrls } = task.input;
+    const { project: name, note, imageUrls, initialStatus } = task.input;
     const project = this.deps.projects.get(name);
     if (!project) throw new Error(`unknown project: ${name}`);
     const images = await Promise.all(imageUrls.map((u) => this.deps.fetchImage(u)));
     const message = buildCreateTicketMessage({ teamKey: project.teamKey, project: name, note, imageUrls }, images);
-    const mcp = createLinearMcp(this.deps.linear, { teamKey: project.teamKey, project: name }, onCreated);
+    const mcp = createLinearMcp(this.deps.linear, { teamKey: project.teamKey, project: name, initialStatus }, onCreated);
 
     let resultText = "";
     const stream = this.deps.query({

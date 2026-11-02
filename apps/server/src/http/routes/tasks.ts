@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { TaskRecord } from "@mojito/shared";
+import { DEFAULT_INITIAL_STATUS, isInitialStatus, type TaskRecord } from "@mojito/shared";
 import { Hono } from "hono";
 import { validateImages } from "../../tasks/images";
 import type { AppDeps } from "../app";
@@ -21,8 +21,10 @@ export function taskRoutes(deps: AppDeps): Hono {
       const name = asString(body.project);
       const note = asString(body.note).trim();
       const entries = [...asList(body["images[]"]), ...asList(body.images)];
+      const initialStatus = body.initialStatus ?? DEFAULT_INITIAL_STATUS;
       if (!deps.projects.get(name)) return c.json({ error: `unknown project: ${name}` }, 400);
       if (!note) return c.json({ error: "the note is empty" }, 400);
+      if (!isInitialStatus(initialStatus)) return c.json({ error: `invalid initial status: ${asString(initialStatus)}` }, 400);
       if (entries.some((e) => !(e instanceof File))) return c.json({ error: "invalid image" }, 400);
       const files = entries as File[];
       const valid = validateImages(files);
@@ -45,7 +47,7 @@ export function taskRoutes(deps: AppDeps): Hono {
       const task: TaskRecord = {
         id: randomUUID(),
         type: "create-ticket",
-        input: { project: name, note, imageUrls },
+        input: { project: name, note, imageUrls, initialStatus },
         status: "queued",
         log: [],
         error: null,

@@ -8,14 +8,14 @@ function fakeLinear() {
       { id: "l1", name: "Bug" },
       { id: "l2", name: "Feature" },
     ]),
-    createIssue: vi.fn(async (_input: { teamKey: string; project: string; title: string; description: string; labelId?: string }) => ({
+    createIssue: vi.fn(async (_input: { teamKey: string; project: string; title: string; description: string; labelId?: string; status?: string }) => ({
       identifier: "RIC-9",
       url: "https://linear.app/x/issue/RIC-9",
     })),
   };
 }
 
-const BOUND = { teamKey: "RIC", project: "Web" };
+const BOUND = { teamKey: "RIC", project: "Web", initialStatus: "Todo" as const };
 
 describe("createLinearMcp", () => {
   it("is the mojito-linear in-process server", () => {
@@ -29,7 +29,7 @@ describe("createLinearMcp", () => {
     const onCreated = vi.fn();
     const mcp = createLinearMcp(linear, BOUND, onCreated);
     const res = await callTool(mcp, "create_issue", { team: "RIC", project: "Web", title: "T", description: "D", labelId: "l1" });
-    expect(linear.createIssue).toHaveBeenCalledWith({ teamKey: "RIC", project: "Web", title: "T", description: "D", labelId: "l1" });
+    expect(linear.createIssue).toHaveBeenCalledWith({ teamKey: "RIC", project: "Web", title: "T", description: "D", labelId: "l1", status: "Todo" });
     expect(onCreated).toHaveBeenCalledWith({ identifier: "RIC-9", url: "https://linear.app/x/issue/RIC-9" });
     const text = res.content.map((c) => c.text).join("");
     expect(text).toContain("RIC-9");
@@ -40,7 +40,14 @@ describe("createLinearMcp", () => {
   it("create_issue without a label sends no labelId", async () => {
     const linear = fakeLinear();
     await callTool(createLinearMcp(linear, BOUND, () => {}), "create_issue", { team: "RIC", project: "Web", title: "T", description: "D" });
-    expect(linear.createIssue).toHaveBeenCalledWith({ teamKey: "RIC", project: "Web", title: "T", description: "D" });
+    expect(linear.createIssue).toHaveBeenCalledWith({ teamKey: "RIC", project: "Web", title: "T", description: "D", status: "Todo" });
+  });
+
+  it("files the ticket in the bound status, which the model cannot change", async () => {
+    const linear = fakeLinear();
+    const mcp = createLinearMcp(linear, { ...BOUND, initialStatus: "Backlog" }, () => {});
+    await callTool(mcp, "create_issue", { team: "RIC", project: "Web", title: "T", description: "D", status: "In Progress" });
+    expect(linear.createIssue).toHaveBeenCalledWith(expect.objectContaining({ status: "Backlog" }));
   });
 
   it("refuses a second create_issue: one task, one ticket", async () => {

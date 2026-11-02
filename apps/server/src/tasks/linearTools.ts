@@ -1,4 +1,5 @@
 import { createSdkMcpServer, tool, type McpSdkServerConfigWithInstance } from "@anthropic-ai/claude-agent-sdk";
+import type { InitialStatus } from "@mojito/shared";
 import { z } from "zod";
 import type { LinearClient } from "../linear/client";
 import { errorMessage } from "../http/body";
@@ -15,11 +16,12 @@ const text = (t: string, isError = false) => ({ content: [{ type: "text" as cons
  *
  * The tools keep the spec's `team`/`project` parameters, but the server is bound to the task's
  * own: the note (or a screenshot in it) is model input, and must not be able to steer the ticket
- * into another team or project. A mismatch is a tool error and never reaches Linear.
+ * into another team or project. A mismatch is a tool error and never reaches Linear. The starting
+ * status is bound the same way and is not a parameter at all: the sheet chose it.
  */
 export function createLinearMcp(
   linear: Pick<LinearClient, "listLabels" | "createIssue">,
-  bound: { teamKey: string; project: string },
+  bound: { teamKey: string; project: string; initialStatus: InitialStatus },
   onCreated: (r: { identifier: string; url: string }) => void,
 ): McpSdkServerConfigWithInstance {
   let created: { identifier: string; url: string } | null = null;
@@ -50,7 +52,14 @@ export function createLinearMcp(
           if (created) return text(`ticket already created: ${created.identifier} ${created.url}`, true);
           if (team !== bound.teamKey || project !== bound.project) return wrongTarget;
           try {
-            const r = await linear.createIssue({ teamKey: team, project, title, description, ...(labelId ? { labelId } : {}) });
+            const r = await linear.createIssue({
+              teamKey: team,
+              project,
+              title,
+              description,
+              ...(labelId ? { labelId } : {}),
+              status: bound.initialStatus,
+            });
             created = r;
             onCreated(r);
             return text(`Created ${r.identifier}: ${r.url}`);

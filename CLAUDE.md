@@ -180,7 +180,9 @@ app's state, left in place.
   uncommitted spec is readable; over 512 KB → 413.
 - **Create-ticket task** (`tasks/`): Agent SDK `query()` with `settingSources: []`,
   `tools: []`, an in-process MCP (`mojito-linear`: `list_labels`, `create_issue`) bound to the
-  task's team/project, at most one issue per task; a task that created its issue is `done`
+  task's team/project, at most one issue per task; the starting status (`INITIAL_STATUSES`: Todo,
+  the default, or Backlog — the sheet's toggle, `input.initialStatus`, a task stored before it reads
+  Todo) is bound the same way and is no tool parameter; a task that created its issue is `done`
   even if the stream throws afterwards (retry must not duplicate). Images are validated
   (png/jpeg/gif/webp, ≤10, ≤10 MB) and uploaded to Linear **before** the task row exists.
 - **Peers** (`peers/`, `http/routes/peers.ts`; spec `2026-10-31-mojito-peers-design.md`): other

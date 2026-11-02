@@ -67,10 +67,19 @@ export interface SessionMeta {
 
 export type TaskStatus = "queued" | "running" | "done" | "failed";
 
+/**
+ * Where a new ticket starts on Linear, by workflow state name: the New-ticket sheet's choice,
+ * Todo first because it is the default. Mojito picks it, never the agent.
+ */
+export const INITIAL_STATUSES = ["Todo", "Backlog"] as const;
+export type InitialStatus = (typeof INITIAL_STATUSES)[number];
+export const DEFAULT_INITIAL_STATUS: InitialStatus = "Todo";
+export const isInitialStatus = (v: unknown): v is InitialStatus => (INITIAL_STATUSES as readonly unknown[]).includes(v);
+
 export interface TaskRecord {
   id: string;
   type: "create-ticket";
-  input: { project: string; note: string; imageUrls: string[] };
+  input: { project: string; note: string; imageUrls: string[]; initialStatus: InitialStatus };
   status: TaskStatus;
   log: string[];
   error: string | null;

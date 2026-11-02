@@ -194,17 +194,28 @@ export class LinearClient {
     return data.issueLabels.nodes.filter((l) => !l.retiredAt).map((l) => ({ id: l.id, name: l.name }));
   }
 
+  /**
+   * `status` is the workflow state's name; without one Linear files the issue in the team's
+   * default state. A name the team lacks fails before anything is created.
+   */
   async createIssue(input: {
     teamKey: string;
     project: string;
     title: string;
     description: string;
     labelId?: string;
+    status?: string;
   }): Promise<{ identifier: string; url: string }> {
-    const data = await this.query<{ teams: { nodes: { id: string; projects: { nodes: { id: string }[] } }[] } }>({
+    const data = await this.query<{
+      teams: { nodes: { id: string; projects: { nodes: { id: string }[] }; states: { nodes: { id: string; name: string }[] } }[] };
+    }>({
       query: `query ($key: String!, $name: String!) {
         teams(filter: { key: { eq: $key } }) {
-          nodes { id projects(filter: { name: { eq: $name } }, first: 1) { nodes { id } } }
+          nodes {
+            id
+            projects(filter: { name: { eq: $name } }, first: 1) { nodes { id } }
+            states { nodes { id name } }
+          }
         }
       }`,
       variables: { key: input.teamKey, name: input.project },
@@ -213,6 +224,8 @@ export class LinearClient {
     if (!team) throw new Error(`team not found: ${input.teamKey}`);
     const project = team.projects.nodes[0];
     if (!project) throw new Error(`project "${input.project}" not found in team ${input.teamKey}`);
+    const state = input.status === undefined ? undefined : team.states.nodes.find((s) => s.name === input.status);
+    if (input.status !== undefined && !state) throw new Error(`workflow state "${input.status}" not found in team ${input.teamKey}`);
     const created = await this.query<{
       issueCreate: { success: boolean; issue?: { identifier: string; url: string } };
     }>({
@@ -226,6 +239,7 @@ export class LinearClient {
           title: input.title,
           description: input.description,
           ...(input.labelId ? { labelIds: [input.labelId] } : {}),
+          ...(state ? { stateId: state.id } : {}),
         },
       },
     });

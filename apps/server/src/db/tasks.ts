@@ -1,4 +1,4 @@
-import type { TaskRecord } from "@mojito/shared";
+import { DEFAULT_INITIAL_STATUS, isInitialStatus, type TaskRecord } from "@mojito/shared";
 import type { Db } from "./db";
 
 interface Row {
@@ -25,10 +25,21 @@ function parseJson<T>(text: string | null, fallback: T): T {
   }
 }
 
+/** A task stored before the starting status was a choice reads with the default one. */
+const toInput = (text: string): TaskRecord["input"] => {
+  const input = parseJson<Partial<TaskRecord["input"]>>(text, {});
+  return {
+    project: input.project ?? "",
+    note: input.note ?? "",
+    imageUrls: input.imageUrls ?? [],
+    initialStatus: isInitialStatus(input.initialStatus) ? input.initialStatus : DEFAULT_INITIAL_STATUS,
+  };
+};
+
 const toTask = (r: Row): TaskRecord => ({
   id: r.id,
   type: r.type,
-  input: parseJson(r.input, { project: "", note: "", imageUrls: [] }),
+  input: toInput(r.input),
   status: r.status,
   log: parseJson(r.log, []),
   error: r.error,

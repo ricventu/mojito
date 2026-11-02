@@ -51,7 +51,7 @@ function setup(over: { query?: (p: Params) => AsyncGenerator<unknown>; concurren
     tasks.insert({
       id,
       type: "create-ticket",
-      input: { project: "Web", note: "note", imageUrls: [], ...input },
+      input: { project: "Web", note: "note", imageUrls: [], initialStatus: "Todo", ...input },
       status: "queued",
       log: [],
       error: null,
@@ -94,6 +94,14 @@ describe("TaskQueue", () => {
     expect(statuses("t1")).toEqual(["running", "done"]);
     expect(linear.createIssue).toHaveBeenCalledTimes(1);
     expect(tickets.refresh).toHaveBeenCalled();
+  });
+
+  it("files the ticket in the status the task was created with", async () => {
+    const { tasks, queue, add, linear } = setup();
+    add("t1", { initialStatus: "Backlog" });
+    queue.enqueue("t1");
+    await settled(tasks, "t1");
+    expect(linear.createIssue).toHaveBeenCalledWith(expect.objectContaining({ status: "Backlog" }));
   });
 
   it("passes the isolated options and a scrubbed environment to query", async () => {

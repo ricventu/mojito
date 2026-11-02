@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEve
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ImagePlus, X } from "lucide-react";
 import { toast } from "sonner";
-import type { TaskRecord } from "@mojito/shared";
+import { DEFAULT_INITIAL_STATUS, INITIAL_STATUSES, type InitialStatus, type TaskRecord } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,6 +27,7 @@ export function NewTicketSheet({ project: preselected, onClose }: Props) {
   const qc = useQueryClient();
   const [project, setProject] = useState(preselected ?? "");
   const [note, setNote] = useState("");
+  const [initialStatus, setInitialStatus] = useState<InitialStatus>(DEFAULT_INITIAL_STATUS);
   const [files, setFiles] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
   // dragenter/dragleave fire again for every child the pointer crosses (the label, the textarea):
@@ -54,6 +55,7 @@ export function NewTicketSheet({ project: preselected, onClose }: Props) {
       const form = new FormData();
       form.append("project", project);
       form.append("note", note.trim());
+      form.append("initialStatus", initialStatus);
       for (const f of files) form.append("images", f);
       return apiFetch<TaskRecord>("/api/tasks", { method: "POST", body: form });
     },
@@ -103,20 +105,26 @@ export function NewTicketSheet({ project: preselected, onClose }: Props) {
           <SheetDescription>Write a note: Claude drafts the title and description.</SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-4 px-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="new-ticket-project">Project</Label>
-            <Select value={project} onValueChange={setProject}>
-              <SelectTrigger id="new-ticket-project" className="w-full">
-                <SelectValue placeholder="Choose a project" />
-              </SelectTrigger>
-              <SelectContent>
-                {(projects.data ?? []).map((p) => (
-                  <SelectItem key={p.name} value={p.name}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex gap-3">
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <Label htmlFor="new-ticket-project">Project</Label>
+              <Select value={project} onValueChange={setProject}>
+                <SelectTrigger id="new-ticket-project" className="w-full">
+                  <SelectValue placeholder="Choose a project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(projects.data ?? []).map((p) => (
+                    <SelectItem key={p.name} value={p.name}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex shrink-0 flex-col gap-1.5">
+              <Label id="new-ticket-status">Status</Label>
+              <StatusToggle value={initialStatus} onChange={setInitialStatus} />
+            </div>
           </div>
 
           <div
@@ -179,5 +187,27 @@ export function NewTicketSheet({ project: preselected, onClose }: Props) {
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** Where the ticket lands on Linear: two choices, so one tap each rather than a dropdown. */
+function StatusToggle({ value, onChange }: { value: InitialStatus; onChange: (status: InitialStatus) => void }) {
+  return (
+    <div role="group" aria-labelledby="new-ticket-status" className="flex h-9 rounded-md border border-input p-0.5 shadow-xs">
+      {INITIAL_STATUSES.map((s) => (
+        <button
+          key={s}
+          type="button"
+          aria-pressed={value === s}
+          onClick={() => onChange(s)}
+          className={cn(
+            "rounded-[5px] px-3 text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50",
+            value === s ? "bg-secondary font-medium text-secondary-foreground" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {s}
+        </button>
+      ))}
+    </div>
   );
 }
