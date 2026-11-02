@@ -26,8 +26,13 @@ help:
 ## checkout is refused rather than installed as a unit that crash-loops on a missing
 ## dist/main.js. Every command's exit status is checked by hand: make 3.81 ignores
 ## .SHELLFLAGS, so there is no `-e` to lean on (see the header note).
+## On Linux it also installs deploy/tmux-spawn-oom.conf as a drop-in for every tmux pane scope
+## (tmux 3.4+ starts each pane in a `tmux-spawn-<uuid>.scope`): without it, a kernel OOM kill of
+## one process in a pane — a test runner, say — makes systemd stop the whole scope, claude
+## included. It applies to panes started after it is installed.
 SERVICE ?= mojito.service
 UNIT_DIR ?= $(HOME)/.config/systemd/user
+PANE_DROPIN_DIR ?= $(UNIT_DIR)/tmux-spawn-.scope.d
 UNAME := $(shell uname -s)
 install-service:
 	@if [ "$(UNAME)" = Darwin ]; then \
@@ -40,6 +45,8 @@ install-service:
 	fi; \
 	if ! mkdir -p "$(UNIT_DIR)"; then exit 1; fi; \
 	if ! cp deploy/mojito.service "$(UNIT_DIR)/$(SERVICE)"; then exit 1; fi; \
+	if ! mkdir -p "$(PANE_DROPIN_DIR)"; then exit 1; fi; \
+	if ! cp deploy/tmux-spawn-oom.conf "$(PANE_DROPIN_DIR)/50-mojito-oom.conf"; then exit 1; fi; \
 	if ! systemctl --user daemon-reload; then exit 1; fi; \
 	if ! systemctl --user enable "$(SERVICE)"; then exit 1; fi; \
 	if ! systemctl --user restart "$(SERVICE)"; then exit 1; fi; \

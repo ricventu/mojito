@@ -30,6 +30,7 @@ function setup() {
     createdAt: 1,
     lastEventAt: 1,
     title: null,
+    endReason: null,
   });
   vi.mocked(attachPty).mockClear();
   const socket = { destroy: vi.fn(), write: vi.fn() };

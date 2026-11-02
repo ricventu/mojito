@@ -1,5 +1,6 @@
-import type { SessionState } from "@mojito/shared";
+import type { EndReason, SessionState } from "@mojito/shared";
 import { Badge } from "@/components/ui/badge";
+import { endLook } from "@/lib/endReason";
 import { cn } from "@/lib/utils";
 
 const LOOK: Record<SessionState, { label: string; className: string }> = {
@@ -13,8 +14,31 @@ const LOOK: Record<SessionState, { label: string; className: string }> = {
   ended: { label: "Ended", className: "text-muted-foreground line-through" },
 };
 
-/** A session's live state as a small coloured pill. */
-export function StateBadge({ state, className }: { state: SessionState; className?: string }) {
+/**
+ * A session's live state as a small coloured pill. An ended one says how it ended when that was
+ * not the human's doing (out of memory, lost), in red; the full reason is its tooltip.
+ */
+export function StateBadge({
+  state,
+  endReason,
+  className,
+}: {
+  state: SessionState;
+  endReason?: EndReason | null;
+  className?: string;
+}) {
+  if (state === "ended") {
+    const end = endLook(endReason);
+    return (
+      <Badge
+        variant="outline"
+        title={end.description}
+        className={cn(end.abnormal ? "border-red-500/50 text-red-600 dark:text-red-400" : LOOK.ended.className, className)}
+      >
+        {end.label}
+      </Badge>
+    );
+  }
   const look = LOOK[state];
   return (
     <Badge variant="outline" className={cn(look.className, className)}>

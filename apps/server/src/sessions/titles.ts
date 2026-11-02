@@ -1,8 +1,6 @@
 import type { SessionsRepo } from "../db/sessions";
 import type { EventBus } from "../events/bus";
 
-/** How often the pane titles are read: one tmux call for every session. */
-export const TITLE_POLL_MS = 5000;
 const MAX_TITLE = 120;
 
 // claude sets the terminal title to its status glyph (✳ idle, a braille spinner at work), a
@@ -39,19 +37,4 @@ export async function refreshTitles(deps: TitleDeps): Promise<void> {
     const session = deps.sessions.patch(row.id, { title });
     if (session) deps.bus.emit({ type: "session.updated", session });
   }
-}
-
-/** Reads the titles every `TITLE_POLL_MS`, one round at a time; a failed round is logged and skipped. Returns the stop. */
-export function startTitleWatch(deps: TitleDeps, intervalMs = TITLE_POLL_MS): () => void {
-  let running = false;
-  const timer = setInterval(() => {
-    if (running) return;
-    running = true;
-    refreshTitles(deps)
-      .catch((err) => console.error("reading session titles failed", err))
-      .finally(() => {
-        running = false;
-      });
-  }, intervalMs);
-  return () => clearInterval(timer);
 }

@@ -6,6 +6,7 @@ import { Link, Navigate, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import type { SessionMeta } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
+import { endLook } from "@/lib/endReason";
 import { useKeyboardUp } from "@/components/AppShell";
 import { SidebarToggle } from "@/components/sidebar/SidebarToggle";
 import { AccessoryBar } from "@/components/terminal/AccessoryBar";
@@ -213,7 +214,7 @@ export function TerminalPage() {
                 {session.alert}
               </span>
             )}
-            {session && <StateBadge state={session.state} className="shrink-0" />}
+            {session && <StateBadge state={session.state} endReason={session.endReason} className="shrink-0" />}
             {session?.project && (
               <Button asChild variant="ghost" size="icon-sm" className="shrink-0">
                 <Link
@@ -252,6 +253,7 @@ export function TerminalPage() {
         {gone ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-[#08090a] p-6 text-center text-neutral-300">
             <p className="text-sm">Session ended</p>
+            {session?.endReason && <p className="max-w-sm text-xs text-neutral-400">{endLook(session.endReason).description}</p>}
             <Button asChild variant="secondary" size="sm">
               <Link to={boardHref()}>
                 <ArrowLeft size={16} /> Back to the board

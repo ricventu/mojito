@@ -18,11 +18,13 @@ import { PeerLink } from "./peers/link";
 import { PeerRegistry } from "./peers/registry";
 import { defaultLaunchIo, type LaunchDeps } from "./sessions/launch";
 import { reconcileSessions } from "./sessions/reconcile";
-import { startTitleWatch } from "./sessions/titles";
+import { EndWatch } from "./sessions/ends";
+import { oomKilledSince, paneScope } from "./sessions/oom";
+import { startPaneWatch } from "./sessions/paneWatch";
 import { linearImageFetcher } from "./tasks/images";
 import { TaskQueue } from "./tasks/runner";
 import { TicketCache } from "./tickets/cache";
-import { PREFIX, closeSession, listSessions, paneTitles } from "./tmux/tmux";
+import { PREFIX, closeSession, listSessions, livePanes } from "./tmux/tmux";
 import { startHeartbeat } from "./ws/heartbeat";
 import { handleUpgrade } from "./ws/upgrade";
 
@@ -69,6 +71,9 @@ async function main(): Promise<void> {
     prompts,
   });
 
+  // Why each session ends, logged one line each (ends.ts). Subscribed before the reconcile, so
+  // the rows it ends are logged too.
+  const ends = new EndWatch({ sessions, bus, now: Date.now, paneScope, oomKilledSince });
   const { ended, adopted, revived } = await reconcileSessions({
     sessions,
     listTmux: () => listSessions(PREFIX),
@@ -79,8 +84,9 @@ async function main(): Promise<void> {
     console.log(`reconciled sessions: ${ended.length} ended, ${adopted.length} adopted, ${revived.length} revived`);
   }
   tickets.start();
-  // Session names: `/rename` fires no hook, the tmux pane title has it (titles.ts).
-  const stopTitles = startTitleWatch({ sessions, bus, paneTitles: () => paneTitles(PREFIX) });
+  // Every 5 s from tmux: session names (`/rename` fires no hook, the pane title has it), and
+  // the sessions whose tmux is gone with no SessionEnd (paneWatch.ts).
+  const stopPanes = startPaneWatch({ sessions, bus, ends, livePanes: () => livePanes(PREFIX) });
 
   // The other instances: one event socket each, never awaited — a peer that is down only means
   // its sidebar section says offline.
@@ -137,7 +143,8 @@ async function main(): Promise<void> {
     console.log(`${signal}: shutting down`);
     peers.stop();
     tickets.stop();
-    stopTitles();
+    stopPanes();
+    ends.stop();
     for (const ws of wss.clients) ws.terminate();
     server.close(() => {
       db.close();

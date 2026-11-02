@@ -121,7 +121,7 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
     if (live) {
       if (await deps.hasSession(live.id)) return conflict(live.id);
       // The row outlived its tmux (a crash Mojito missed): end it and launch afresh.
-      const ended = deps.sessions.patch(live.id, { state: "ended" });
+      const ended = deps.sessions.patch(live.id, { state: "ended", endReason: "gone" });
       if (ended) deps.bus.emit({ type: "session.updated", session: ended });
     }
 
@@ -145,6 +145,7 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
       createdAt: now,
       lastEventAt: now,
       title: null,
+      endReason: null,
     };
     record(deps, session);
     watchStartupStall(id, stallDeps(deps));
@@ -191,6 +192,7 @@ export async function launchFree(body: LaunchFreeBody, deps: LaunchDeps): Promis
     createdAt: now,
     lastEventAt: now,
     title: null,
+    endReason: null,
   };
 
   if (body.kind === "shell") {
@@ -247,7 +249,7 @@ export async function launchGitResolve(
     const existing = deps.sessions.get(id);
     if (existing && existing.state !== "ended") {
       if (await deps.hasSession(id)) return { ok: true, session: existing, alreadyOpen: true };
-      const ended = deps.sessions.patch(id, { state: "ended" });
+      const ended = deps.sessions.patch(id, { state: "ended", endReason: "gone" });
       if (ended) deps.bus.emit({ type: "session.updated", session: ended });
     }
 
@@ -272,6 +274,7 @@ export async function launchGitResolve(
       createdAt: now,
       lastEventAt: now,
       title: null,
+      endReason: null,
     };
     record(deps, session);
     watchStartupStall(id, stallDeps(deps));

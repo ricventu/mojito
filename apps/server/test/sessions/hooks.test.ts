@@ -19,6 +19,7 @@ const meta = (over: Partial<SessionMeta> = {}): SessionMeta => ({
   createdAt: 1,
   lastEventAt: 1,
   title: null,
+  endReason: null,
   ...over,
 });
 
@@ -89,6 +90,27 @@ describe("handleHook", () => {
     handleHook("mj-RIC-1", "SessionStart", deps, { source: "startup" });
     expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "ended", lastEventAt: 7 });
     expect(events).toEqual([]);
+  });
+
+  it("records why a SessionEnd ended the session", () => {
+    const { sessions, deps } = setup(meta());
+    handleHook("mj-RIC-1", "SessionEnd", deps, { hook_event_name: "SessionEnd", reason: "prompt_input_exit" });
+    expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "ended", endReason: "exited" });
+    const other = setup(meta());
+    handleHook("mj-RIC-1", "SessionEnd", other.deps, { hook_event_name: "SessionEnd", reason: "other" });
+    expect(other.sessions.get("mj-RIC-1")).toMatchObject({ state: "ended", endReason: "other" });
+  });
+
+  it("keeps a session running when its turn stops with a background agent at work", () => {
+    const { sessions, events, deps } = setup(meta());
+    const agent = { id: "a1", type: "subagent", status: "running", agent_type: "general-purpose" };
+    handleHook("mj-RIC-1", "Stop", deps, { hook_event_name: "Stop", background_tasks: [agent] });
+    expect(sessions.get("mj-RIC-1")?.state).toBe("running");
+    expect(events).toEqual([]);
+    // Its report starts the next turn; the Stop after it, with nothing left, is idle.
+    handleHook("mj-RIC-1", "UserPromptSubmit", deps, { hook_event_name: "UserPromptSubmit" });
+    handleHook("mj-RIC-1", "Stop", deps, { hook_event_name: "Stop", background_tasks: [] });
+    expect(sessions.get("mj-RIC-1")?.state).toBe("idle");
   });
 
   // `/clear` is SessionEnd (reason "clear") then SessionStart, in the same live claude.

@@ -49,7 +49,12 @@ export function handleHook(id: string, event: string, deps: HookDeps, body?: unk
     if (!before || before.state === "ended") return;
     const next = mapHook(event, before.state, payload);
     const changed = next.state !== before.state || next.alert !== before.alert;
-    const session = deps.sessions.patch(id, { state: next.state, alert: next.alert, lastEventAt: deps.now() });
+    const session = deps.sessions.patch(id, {
+      state: next.state,
+      alert: next.alert,
+      lastEventAt: deps.now(),
+      ...(next.endReason ? { endReason: next.endReason } : {}),
+    });
     if (changed && session) deps.bus.emit({ type: "session.updated", session });
     // The session moves its own ticket in Linear; a finished turn is when that may have happened.
     if (event === "Stop" && before.kind === "ticket") void deps.tickets.refresh();

@@ -18,6 +18,7 @@ const meta = (state: SessionMeta["state"]): SessionMeta => ({
   createdAt: 1,
   lastEventAt: 1,
   title: null,
+  endReason: null,
 });
 
 function setup(state: SessionMeta["state"], alive: boolean) {

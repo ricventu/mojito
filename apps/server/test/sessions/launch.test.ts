@@ -90,6 +90,7 @@ const row = (over: Partial<SessionMeta>): SessionMeta => ({
   createdAt: 1,
   lastEventAt: 1,
   title: null,
+  endReason: null,
   ...over,
 });
 
@@ -119,6 +120,7 @@ describe("launchTicket", () => {
       createdAt: 1000,
       lastEventAt: 1000,
       title: null,
+      endReason: null,
     };
     expect(res).toEqual({ ok: true, session: expected });
     expect(deps.newSession).toHaveBeenCalledTimes(1);
@@ -266,7 +268,7 @@ describe("launchTicket", () => {
     sessions.insert(row({ state: "idle" }));
     const res = await launchTicket(body(), deps);
     expect(res.ok).toBe(true);
-    expect(events[0]).toEqual({ type: "session.updated", session: row({ state: "ended" }) });
+    expect(events[0]).toEqual({ type: "session.updated", session: row({ state: "ended", endReason: "gone" }) });
     expect(deps.newSession).toHaveBeenCalledTimes(1);
     expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "starting", model: "opus", createdAt: 1000 });
   });
@@ -348,6 +350,7 @@ describe("launchFree", () => {
       createdAt: 1000,
       lastEventAt: 1000,
       title: null,
+      endReason: null,
     };
     expect(res).toEqual({ ok: true, session: expected });
     const settingsPath = "/state/hooks/mj-web-a1b2c3.json";
@@ -457,6 +460,7 @@ describe("launchGitResolve", () => {
       createdAt: 1000,
       lastEventAt: 1000,
       title: null,
+      endReason: null,
     };
     expect(res).toEqual({ ok: true, session: expected, alreadyOpen: false });
     expect(deps.newSession).toHaveBeenCalledWith(

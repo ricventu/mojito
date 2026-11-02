@@ -213,26 +213,34 @@ export async function listSessions(prefix: string): Promise<string[]> {
   }
 }
 
+export interface LivePane {
+  /** What the program in it last set with an OSC title — claude's is `✳ <session name>`. */
+  title: string;
+  /** The pane's process, for its systemd scope (`sessions/oom.ts`); null when tmux gave none. */
+  pid: number | null;
+}
+
 /**
- * The pane title of each session whose name starts with `prefix` (its first pane): what the
- * program in it last set with an OSC title — claude's is `✳ <session name>`. No tmux server
- * is an empty map; any other failure rejects.
+ * The first pane of each session whose name starts with `prefix`, in one tmux call: the live
+ * sessions, as far as tmux knows. No tmux server is an empty map (nothing is alive); any other
+ * failure rejects — "could not ask" is not "gone".
  */
-export async function paneTitles(prefix: string): Promise<Map<string, string>> {
+export async function livePanes(prefix: string): Promise<Map<string, LivePane>> {
   let stdout: string;
   try {
-    ({ stdout } = await pexec("tmux", ["list-panes", "-a", "-F", "#{session_name}\t#{pane_title}"]));
+    ({ stdout } = await pexec("tmux", ["list-panes", "-a", "-F", "#{session_name}\t#{pane_pid}\t#{pane_title}"]));
   } catch (err) {
     if (isSessionGone(err)) return new Map();
     throw err;
   }
-  const titles = new Map<string, string>();
+  const panes = new Map<string, LivePane>();
   for (const line of stdout.split("\n")) {
-    const tab = line.indexOf("\t");
-    const name = line.slice(0, tab);
-    if (tab > 0 && name.startsWith(prefix) && !titles.has(name)) titles.set(name, line.slice(tab + 1));
+    const [name = "", pid = "", ...title] = line.split("\t");
+    if (!name.startsWith(prefix) || panes.has(name) || title.length === 0) continue;
+    const n = Number(pid);
+    panes.set(name, { title: title.join("\t"), pid: Number.isInteger(n) && n > 0 ? n : null });
   }
-  return titles;
+  return panes;
 }
 
 // `-e` keeps the SGR escape sequences, so the scrollback the browser terminal

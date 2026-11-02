@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HOOK_EVENTS, hookPayload, isHookEvent, isNoiseHook, mapHook } from "../../src/sessions/hookMap";
+import { HOOK_EVENTS, endReasonFromHook, hookPayload, isHookEvent, isNoiseHook, mapHook } from "../../src/sessions/hookMap";
 
 describe("mapHook", () => {
   it.each([
@@ -10,9 +10,22 @@ describe("mapHook", () => {
     ["Notification", "needs-input", "claude is waiting for you"],
     ["PreToolUse", "needs-input", "claude is asking you a question"],
     ["Stop", "idle", null],
-    ["SessionEnd", "ended", null],
   ] as const)("%s from running -> %s", (event, state, alert) => {
     expect(mapHook(event, "running")).toEqual({ state, alert });
+  });
+
+  it("SessionEnd ends the session, saying whose doing it was", () => {
+    expect(mapHook("SessionEnd", "running")).toEqual({ state: "ended", alert: null, endReason: "other" });
+    expect(mapHook("SessionEnd", "idle", { reason: "prompt_input_exit" })).toEqual({
+      state: "ended",
+      alert: null,
+      endReason: "exited",
+    });
+  });
+
+  it("a Stop with a background agent still at work keeps the session running", () => {
+    expect(mapHook("Stop", "running", { backgroundAgents: 1 })).toEqual({ state: "running", alert: null });
+    expect(mapHook("Stop", "running", { backgroundAgents: 0 })).toEqual({ state: "idle", alert: null });
   });
 
   it("a session that has ended stays ended whatever arrives", () => {
@@ -30,6 +43,37 @@ describe("mapHook", () => {
   it("the SessionStart of a /clear leaves the session idle, waiting at an empty prompt", () => {
     expect(mapHook("SessionStart", "running", { source: "clear" })).toEqual({ state: "idle", alert: null });
     expect(mapHook("SessionStart", "idle", { source: "startup" })).toEqual({ state: "running", alert: null });
+  });
+});
+
+describe("endReasonFromHook", () => {
+  it("is the human's doing only for an exit at the prompt or a logout", () => {
+    expect(endReasonFromHook("prompt_input_exit")).toBe("exited");
+    expect(endReasonFromHook("logout")).toBe("exited");
+    expect(endReasonFromHook("other")).toBe("other");
+    expect(endReasonFromHook(undefined)).toBe("other");
+  });
+});
+
+describe("hookPayload background_tasks", () => {
+  it("counts the agents still at work, never the shells", () => {
+    const body = {
+      hook_event_name: "Stop",
+      background_tasks: [
+        { id: "a", type: "subagent", status: "running", agent_type: "general-purpose" },
+        { id: "b", type: "shell", status: "running", command: "php artisan serve" },
+        { id: "c", type: "workflow", status: "running" },
+        { id: "d", type: "subagent", status: "completed" },
+        "junk",
+      ],
+    };
+    expect(hookPayload(body)).toEqual({ backgroundAgents: 2 });
+  });
+
+  it("says nothing when claude sends no list, and zero for an empty one", () => {
+    expect(hookPayload({ hook_event_name: "Stop" })).toEqual({});
+    expect(hookPayload({ background_tasks: [] })).toEqual({ backgroundAgents: 0 });
+    expect(hookPayload({ background_tasks: "nope" })).toEqual({});
   });
 });
 

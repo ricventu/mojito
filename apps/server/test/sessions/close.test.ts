@@ -18,6 +18,7 @@ const meta = (state: SessionMeta["state"]): SessionMeta => ({
   createdAt: 1,
   lastEventAt: 1,
   title: null,
+  endReason: null,
 });
 
 function setup(row: SessionMeta | null, closed: boolean) {
@@ -58,7 +59,17 @@ describe("killSession", () => {
     const { kill, sessions, events } = setup(meta("needs-input"), true);
     expect(await kill()).toEqual({ status: 200 });
     const row = sessions.get("mj-RIC-1");
-    expect(row).toMatchObject({ state: "ended", alert: null, lastEventAt: 800 });
+    expect(row).toMatchObject({ state: "ended", alert: null, lastEventAt: 800, endReason: "killed" });
     expect(events).toEqual([{ type: "session.updated", session: row }]);
+  });
+
+  it("says killed even where claude's own SessionEnd already ended the row", async () => {
+    const { kill, sessions, closeSession } = setup(meta("idle"), true);
+    closeSession.mockImplementationOnce(async () => {
+      sessions.patch("mj-RIC-1", { state: "ended", endReason: "exited" });
+      return { closed: true };
+    });
+    expect(await kill()).toEqual({ status: 200 });
+    expect(sessions.get("mj-RIC-1")?.endReason).toBe("killed");
   });
 });

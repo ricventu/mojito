@@ -4,13 +4,14 @@ import { PREFIX } from "../tmux/tmux";
 import { kindFromId, ticketFromId } from "./hooks";
 
 /**
- * Mark a session whose tmux is gone as `ended` (alert cleared) and tell every board. A row that
- * is missing or already ended is left alone; answers whether anything changed.
+ * Mark a session whose tmux is gone as `ended` (alert cleared, `endReason` `gone`: no SessionEnd
+ * said otherwise) and tell every board. A row that is missing or already ended is left alone;
+ * answers whether anything changed.
  */
 export function markEnded(id: string, deps: { sessions: SessionsRepo; bus: EventBus; now(): number }): boolean {
   const row = deps.sessions.get(id);
   if (!row || row.state === "ended") return false;
-  const session = deps.sessions.patch(id, { state: "ended", alert: null, lastEventAt: deps.now() });
+  const session = deps.sessions.patch(id, { state: "ended", alert: null, lastEventAt: deps.now(), endReason: "gone" });
   if (session) deps.bus.emit({ type: "session.updated", session });
   return true;
 }
@@ -65,6 +66,7 @@ export async function reconcileSessions(
       createdAt: now,
       lastEventAt: now,
       title: null,
+      endReason: null,
     };
     deps.sessions.insert(session);
     deps.bus.emit({ type: "session.updated", session });

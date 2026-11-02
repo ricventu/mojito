@@ -63,7 +63,7 @@ export function TicketCard({ ticket, session, selected, showStatus = true, onOpe
                 {label}
               </Badge>
             ))}
-            {session && <StateBadge state={session.state} />}
+            {session && <StateBadge state={session.state} endReason={session.endReason} />}
           </div>
         )}
         {waiting && session.alert && (

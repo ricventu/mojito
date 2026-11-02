@@ -19,7 +19,13 @@ export async function killSession(id: string, deps: KillDeps): Promise<{ status:
   if (row.state === "ended") return { status: 200 };
   const { closed } = await deps.closeSession(id);
   if (!closed) return { status: 409 };
-  const session = deps.sessions.patch(id, { state: "ended", alert: null, lastEventAt: (deps.now ?? Date.now)() });
+  // Over whatever the SessionEnd of claude's own exit already wrote: the human pressed Kill.
+  const session = deps.sessions.patch(id, {
+    state: "ended",
+    alert: null,
+    lastEventAt: (deps.now ?? Date.now)(),
+    endReason: "killed",
+  });
   if (session) deps.bus.emit({ type: "session.updated", session });
   return { status: 200 };
 }

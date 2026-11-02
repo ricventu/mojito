@@ -42,7 +42,7 @@ app's state, left in place.
 - **Persistence** (`src/db`): migrations are TS modules exporting SQL (`migrations/*.ts`,
   applied once each, in a transaction) — `.sql` imports break under vitest and `tsx watch`.
   Tables: `projects`, `settings` (key/value JSON), `sessions` (`hidden`, added by 003, was
-  dropped by 005 with the sidebar's Hide), `sdk_tasks`. Tickets are never
+  dropped by 005 with the sidebar's Hide; `end_reason`, 006), `sdk_tasks`. Tickets are never
   stored: `tickets/cache.ts` polls Linear every 45 s, scoped to the mapped project names,
   coalesces concurrent refreshes, keeps the last list (`stale`) when Linear fails.
   `projects.json` (`~/.config/mojito/projects.json`) is imported once per database, then
@@ -81,13 +81,32 @@ app's state, left in place.
   must not end a live session) and the SessionStart `source: "clear"` after it maps to idle;
   Notification maps to
   needs-input only for blocking types (`permission_prompt`, `elicitation_dialog`, …) — the
-  ~60 s `idle_prompt` after every Stop would otherwise turn every finished session amber.
+  ~60 s `idle_prompt` after every Stop would otherwise turn every finished session amber. A Stop
+  whose `background_tasks` still lists an agent (`subagent`/`workflow`/`teammate`, never a `shell`:
+  a dev server is not work) keeps the session `running` — its report starts the next turn
+  (UserPromptSubmit) and the Stop after that goes idle; shown idle, a session mid-verification was
+  closed as finished (verified on 2.1.316).
   `startupStall.ts` flips a session still `starting` after 20 s to needs-input (the
   workspace-trust prompt fires no hook).
+- **Why a session ended** (`sessions/ends.ts`, `oom.ts`, migration 006 `sessions.end_reason`,
+  `EndReason` in shared): `killed` (Kill, over the SessionEnd its Ctrl-D fires), `exited`
+  (SessionEnd `prompt_input_exit`/`logout`), `other` (any other SessionEnd: a signal), `gone` (tmux
+  vanished with no SessionEnd), `oom`. Each end logs `session <id> ended: <reason>` — what to grep
+  in the service log. The 5 s pane poll (`paneWatch.ts`) also ends a live row tmux no longer lists
+  (`gone`; only rows read *before* asking tmux, so a launch racing the poll is never reaped) — a
+  claude killed outright used to show `running` until someone opened it. OOM: on Linux tmux 3.4+
+  starts each pane in its own `tmux-spawn-<uuid>.scope`; `EndWatch` remembers each pane's scope
+  from `/proc/<pid>/cgroup` while it lives (a failed scope is garbage-collected), and an `other`/
+  `gone` end whose scope's user journal says "The kernel OOM killer killed some processes in this
+  unit" within 60 s becomes `oom`. systemd's default then stops the whole scope — claude gets a
+  SIGTERM, exits cleanly, and it looked like a normal close (ai-tonic, 2026-11-02) — so `make
+  install-service` installs `deploy/tmux-spawn-oom.conf` (`OOMPolicy=continue`) as a drop-in for
+  every pane scope. The web shows it on the badge (`lib/endReason.ts`: red for `oom`/`gone`/`other`)
+  and on the ended terminal.
 - **Session names** (`sessions/titles.ts`, migration 004 `sessions.title`): `/rename` fires no
   hook, but claude sets the terminal title to `<glyph> <name>` — the `/rename` name, else its
   automatic title (`Claude Code` until it has one; kept across `/clear`). Every 5 s one
-  `tmux list-panes -a` (`paneTitles`) is read; `sessionTitle` takes what follows a leading
+  `tmux list-panes -a` (`livePanes`, `paneWatch.ts`) is read; `sessionTitle` takes what follows a leading
   non-letter glyph (a shell's hostname title never matches), and a change patches the row and
   emits `session.updated`. No name keeps the last one. The web shows it for sessions without a
   ticket (`sessionName`: board rows, sidebar, terminal header); a ticket session keeps its ticket.

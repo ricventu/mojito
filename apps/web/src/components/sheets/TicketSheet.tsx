@@ -230,7 +230,7 @@ function LiveSession({ ticket, session, onClose }: { ticket: TicketSummary; sess
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2 text-sm">
         <span className="text-muted-foreground">Session</span>
-        <StateBadge state={session.state} />
+        <StateBadge state={session.state} endReason={session.endReason} />
       </div>
       <div className="flex gap-2">
         <Button
@@ -262,7 +262,7 @@ function PeerLiveSession({ peer, session, onClose }: { peer: PeerSnapshot; sessi
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2 text-sm">
         <span className="text-muted-foreground">Session on {peer.name}</span>
-        <StateBadge state={session.state} />
+        <StateBadge state={session.state} endReason={session.endReason} />
       </div>
       <Button asChild>
         <Link to={sessionHref(peer.name, session.id)} onClick={onClose}>

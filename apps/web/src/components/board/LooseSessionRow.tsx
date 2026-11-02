@@ -64,7 +64,7 @@ export function LooseSessionRow({ session }: { session: SessionMeta }) {
             <span className="text-xs text-amber-700 dark:text-amber-300">{session.alert}</span>
           )}
         </span>
-        <StateBadge state={session.state} />
+        <StateBadge state={session.state} endReason={session.endReason} />
       </button>
       {ended ? (
         <Button

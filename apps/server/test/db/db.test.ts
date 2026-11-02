@@ -17,7 +17,7 @@ describe("migrate", () => {
     migrate(db);
     migrate(db);
     const rows = db.prepare("SELECT version FROM schema_migrations").all();
-    expect(rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }]);
+    expect(rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }]);
   });
   it("drops the brainstorming column and its stored default (v2)", () => {
     const db = openDb(":memory:");
@@ -53,6 +53,7 @@ describe("migrate", () => {
       { version: 3 },
       { version: 4 },
       { version: 5 },
+      { version: 6 },
     ]);
     expect(new SessionsRepo(db).get("mj-RIC-1")).toEqual(session({ state: "idle", lastEventAt: 2, title: null }));
   });
@@ -210,10 +211,20 @@ const session = (over: Partial<SessionMeta> = {}): SessionMeta => ({
   createdAt: 1,
   lastEventAt: 1,
   title: null,
+  endReason: null,
   ...over,
 });
 
 describe("SessionsRepo", () => {
+  it("keeps an end reason with an ended row only, and clears it when the row lives again", () => {
+    const repo = new SessionsRepo(openDb(":memory:"));
+    repo.insert(session());
+    expect(repo.patch("mj-RIC-1", { state: "ended", endReason: "other" })?.endReason).toBe("other");
+    expect(repo.patch("mj-RIC-1", { endReason: "oom" })?.endReason).toBe("oom");
+    expect(repo.patch("mj-RIC-1", { title: "x" })?.endReason).toBe("oom");
+    expect(repo.patch("mj-RIC-1", { state: "idle", endReason: "gone" })?.endReason).toBeNull();
+  });
+
   it("round-trips, including nulls", () => {
     const repo = new SessionsRepo(openDb(":memory:"));
     repo.insert(session());
