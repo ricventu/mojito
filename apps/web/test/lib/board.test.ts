@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { BoardTickets, ProjectRow, SessionMeta, TicketSummary } from "@mojito/shared";
-import { filterBoard, groupBoard, kanbanColumns, linearBanner, needsInput, sessionForTicket } from "@/lib/board";
+import {
+  filterBoard,
+  groupBoard,
+  kanbanColumns,
+  linearBanner,
+  needsInput,
+  sessionForTicket,
+  splitLoose,
+  startedLabel,
+} from "@/lib/board";
 import { NO_FILTERS, type BoardFilters } from "@/lib/filters";
 
 const project = (name: string): ProjectRow => ({ name, path: `/repos/${name}`, teamKey: "RIC" });
@@ -375,5 +384,37 @@ describe("kanbanColumns", () => {
       ["In Review", ["RIC-2"]],
     ]);
     expect(kanbanColumns([], ["Backlog"])).toEqual([]);
+  });
+});
+
+describe("splitLoose", () => {
+  it("puts live sessions above ended ones, each keeping its order", () => {
+    const loose = [
+      session("a", { state: "ended" }),
+      session("b", { state: "idle" }),
+      session("c", { state: "ended" }),
+      session("d", { state: "needs-input" }),
+    ];
+    const { live, ended } = splitLoose(loose);
+    expect(live.map((s) => s.id)).toEqual(["b", "d"]);
+    expect(ended.map((s) => s.id)).toEqual(["a", "c"]);
+  });
+});
+
+describe("startedLabel", () => {
+  const now = new Date(2026, 10, 4, 15, 0).getTime(); // Wed 4 Nov 2026
+  const at = (day: number, h: number, m: number) => new Date(2026, 10, day, h, m).getTime();
+
+  it("is the time alone today", () => {
+    expect(startedLabel(at(4, 9, 5), now)).toBe("09:05");
+  });
+  it("says Yesterday for the day before, even a few minutes before midnight", () => {
+    expect(startedLabel(at(3, 23, 58), now)).toBe("Yesterday 23:58");
+  });
+  it("names the weekday within the last week", () => {
+    expect(startedLabel(at(1, 21, 32), now)).toBe("Sun 21:32");
+  });
+  it("gives the date beyond a week", () => {
+    expect(startedLabel(new Date(2026, 9, 20, 8, 0).getTime(), now)).toBe("20 Oct 08:00");
   });
 });

@@ -8,7 +8,7 @@ import { docsHref } from "@/lib/docs/url";
 import { gitHref } from "@/lib/git/url";
 import { cn } from "@/lib/utils";
 import { GitButtons } from "./GitButtons";
-import { LooseSessionRow } from "./LooseSessionRow";
+import { LooseSessions } from "./LooseSessions";
 import { TicketCard } from "./TicketCard";
 
 interface Props {
@@ -23,14 +23,14 @@ interface Props {
 }
 
 /**
- * Backlog cards and loose rows: one column on a phone, three from the width the kanban starts at,
- * level with its columns (a container query on the board's column, which a docked sidebar narrows).
+ * Backlog cards: one column on a phone, three from the width the kanban starts at, level with its
+ * columns (a container query on the board's column, which a docked sidebar narrows).
  */
 const LIST_CLASS = "grid grid-cols-1 gap-2 @2xl:grid-cols-3";
 
 /**
  * One project: its active tickets — a list on a phone, kanban columns from `@2xl` — a closed
- * Backlog group, then its loose sessions.
+ * Backlog group, then its loose sessions (a plain list).
  */
 export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket, onNewTicket, onNewSession, statusFilter }: Props) {
   const { project } = section;
@@ -117,13 +117,7 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
         </Collapsible>
       )}
 
-      {section.loose.length > 0 && (
-        <ul className={LIST_CLASS}>
-          {section.loose.map((s) => (
-            <LooseSessionRow key={s.id} session={s} />
-          ))}
-        </ul>
-      )}
+      {section.loose.length > 0 && <LooseSessions project={name} loose={section.loose} />}
     </section>
   );
 }

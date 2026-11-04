@@ -154,6 +154,38 @@ export function clock(ms: number): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+/**
+ * A section's loose sessions split for the list: the live ones on top, the ended ones in a group
+ * of their own below (with "Remove all"), each keeping `groupBoard`'s newest-first order.
+ */
+export function splitLoose(loose: SessionMeta[]): { live: SessionMeta[]; ended: SessionMeta[] } {
+  return {
+    live: loose.filter((s) => s.state !== "ended"),
+    ended: loose.filter((s) => s.state === "ended"),
+  };
+}
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * When a session started, read from `now`: the time alone today, "Yesterday 21:32", the weekday
+ * within the last week, else the date — a bare time on a list spanning days reads as today.
+ */
+export function startedLabel(ms: number, now: number = Date.now()): string {
+  const d = new Date(ms);
+  const midnight = (t: number) => {
+    const x = new Date(t);
+    x.setHours(0, 0, 0, 0);
+    return x.getTime();
+  };
+  const days = Math.round((midnight(now) - midnight(ms)) / 86_400_000);
+  if (days <= 0) return clock(ms);
+  if (days === 1) return `Yesterday ${clock(ms)}`;
+  if (days < 7) return `${WEEKDAYS[d.getDay()]} ${clock(ms)}`;
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${clock(ms)}`;
+}
+
 /** The banner text for a failed Linear poll, or `null` when the list is fresh. */
 export function linearBanner(t: BoardTickets): string | null {
   if (!t.stale && !t.error) return null;

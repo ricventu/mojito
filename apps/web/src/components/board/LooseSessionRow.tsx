@@ -7,7 +7,7 @@ import { StateBadge } from "@/components/StateBadge";
 import { Button } from "@/components/ui/button";
 import { useResume } from "@/hooks/useResume";
 import { apiFetch } from "@/lib/api";
-import { clock } from "@/lib/board";
+import { startedLabel } from "@/lib/board";
 import { canResume } from "@/lib/endReason";
 import { qk } from "@/lib/queryKeys";
 import { sessionName } from "@/lib/sidebar";
@@ -45,7 +45,7 @@ export function LooseSessionRow({ session }: { session: SessionMeta }) {
           {/* A long name gives way, the time stays. */}
           <span className="flex min-w-0 text-sm font-medium">
             <span className={cn("truncate", session.kind === "ticket" && "font-mono")}>{label}</span>
-            <span className="shrink-0 font-normal whitespace-pre text-muted-foreground"> · {clock(session.createdAt)}</span>
+            <span className="shrink-0 font-normal whitespace-pre text-muted-foreground"> · {startedLabel(session.createdAt)}</span>
           </span>
           {waiting && session.alert && (
             <span className="text-xs text-amber-700 dark:text-amber-300">{session.alert}</span>
@@ -61,9 +61,11 @@ export function LooseSessionRow({ session }: { session: SessionMeta }) {
               size="sm"
               className="h-auto self-center text-muted-foreground"
               disabled={resume.isPending}
+              aria-label="Resume"
               onClick={() => resume.mutate()}
             >
-              <RotateCcw size={14} /> Resume
+              <RotateCcw size={14} />
+              <span className="hidden sm:inline">Resume</span>
             </Button>
           )}
           <Button
@@ -71,9 +73,11 @@ export function LooseSessionRow({ session }: { session: SessionMeta }) {
             size="sm"
             className="h-auto self-center text-muted-foreground"
             disabled={remove.isPending}
+            aria-label="Remove"
             onClick={() => remove.mutate()}
           >
-            <Trash2 size={14} /> Remove
+            <Trash2 size={14} />
+            <span className="hidden sm:inline">Remove</span>
           </Button>
         </>
       ) : null}

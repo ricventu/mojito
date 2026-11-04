@@ -380,8 +380,10 @@ app's state, left in place.
   `@2xl` (by its own width, which a docked sidebar narrows) each project's active tickets are
   kanban columns Todo → In Progress → In Review (`kanbanColumns`: all three even when empty, so
   they line up across projects; "Other" only for a custom status; a status filter keeps only its
-  columns), with Backlog collapsed and the loose sessions in three columns below; under it, the
-  phone's list. Both are rendered and CSS picks one (nothing to measure, no jump). The board's modals (ticket,
+  columns), with Backlog collapsed; under it, the phone's list. Both are rendered and CSS picks one
+  (nothing to measure, no jump). Loose sessions are one plain list at every width
+  (`LooseSessions`, `splitLoose`): live first, then an "Ended N" group whose "Remove all" (two
+  taps) forgets them all; each row's time carries its day (`startedLabel`). The board's modals (ticket,
   new ticket, new session) and the commit sheet are a bottom sheet below `sm` and a centred dialog
   from `sm` (`sheets/styles.ts`, pure CSS: a resize never remounts an open modal), centred on the
   column beside a docked sidebar: the `aside` carries `data-sidebar-docked`, which sets
