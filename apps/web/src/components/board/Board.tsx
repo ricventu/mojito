@@ -14,7 +14,7 @@ import { ProjectSection } from "./ProjectSection";
 import { TaskStrip } from "./TaskStrip";
 import { Toolbar } from "./Toolbar";
 import { NewSessionSheet } from "@/components/sheets/NewSessionSheet";
-import { NewTicketSheet } from "@/components/sheets/NewTicketSheet";
+import { useNewTicket } from "@/components/AppShell";
 import { TicketSheet } from "@/components/sheets/TicketSheet";
 
 function Banner({ text }: { text: string }) {
@@ -58,9 +58,8 @@ export function Board() {
     : null;
 
   // `{ project }` is the section the sheet was opened from; `{}` is the toolbar's, with none preselected.
-  const [newTicket, setNewTicket] = useState<{ project?: string } | null>(null);
   const [newSession, setNewSession] = useState<{ project?: string } | null>(null);
-  const onNewTicket = (project?: string) => setNewTicket({ project });
+  const onNewTicket = useNewTicket();
   const onNewSession = (project?: string) => setNewSession({ project });
 
   return (
@@ -113,7 +112,6 @@ export function Board() {
         )}
       </main>
       {openTicket && <TicketSheet ticket={openTicket} onClose={() => setSelectedTicket(null)} />}
-      {newTicket && <NewTicketSheet project={newTicket.project} onClose={() => setNewTicket(null)} />}
       {newSession && <NewSessionSheet project={newSession.project} onClose={() => setNewSession(null)} />}
     </div>
   );

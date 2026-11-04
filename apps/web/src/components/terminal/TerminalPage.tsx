@@ -1,11 +1,11 @@
 import { useState } from "react";
 import type { Terminal } from "@xterm/xterm";
-import { ArrowLeft, FileText, GitGraph, RotateCcw } from "lucide-react";
+import { ArrowLeft, FileText, GitGraph, Plus, RotateCcw } from "lucide-react";
 import { Link, Navigate, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import type { SessionMeta } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
-import { useKeyboardUp } from "@/components/AppShell";
+import { useKeyboardUp, useNewTicket } from "@/components/AppShell";
 import { SidebarToggle } from "@/components/sidebar/SidebarToggle";
 import { AccessoryBar } from "@/components/terminal/AccessoryBar";
 import { Composer } from "@/components/terminal/Composer";
@@ -90,6 +90,7 @@ export function TerminalPage() {
   useKeyboardUp(band.open);
   const navigate = useNavigate();
   const host = useHost();
+  const newTicket = useNewTicket();
   // The peer's name; null for this instance and for a host not resolved yet (nothing uses it then).
   const hostName = hostOf(host);
   // Keyed by host and id: the route reuses this component when one terminal links to another,
@@ -221,6 +222,17 @@ export function TerminalPage() {
                 </Link>
               </Button>
             )}
+            {/* A ticket is created on this instance; the sheet keeps the project only if it maps it. */}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="shrink-0"
+              aria-label="New ticket"
+              title="New ticket"
+              onClick={() => newTicket(session?.project)}
+            >
+              <Plus size={16} />
+            </Button>
           </header>
         )}
         {gone ? (

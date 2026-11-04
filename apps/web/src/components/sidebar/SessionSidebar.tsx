@@ -1,5 +1,6 @@
 import { useMemo, useSyncExternalStore } from "react";
-import { Pin, PinOff, X } from "lucide-react";
+import { Pin, PinOff, Plus, X } from "lucide-react";
+import { useNewTicket } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { usePeers } from "@/hooks/usePeers";
@@ -33,6 +34,10 @@ function Panel({ sidebar, current, replace, inSheet }: Props & { inSheet: boolea
   const projects = useProjects();
   const peers = usePeers();
   const token = useSyncExternalStore(subscribeToken, getToken);
+  const newTicket = useNewTicket();
+  // Opened over a terminal of this instance, the sheet starts on that session's project.
+  const currentProject =
+    current?.host === null ? (sessions.data?.find((s) => s.id === current.id)?.project ?? undefined) : undefined;
 
   const groups = useMemo(() => sidebarGroups(projects.data ?? [], sessions.data ?? []), [projects.data, sessions.data]);
   const ticketList = tickets.data?.tickets ?? [];
@@ -70,6 +75,19 @@ function Panel({ sidebar, current, replace, inSheet }: Props & { inSheet: boolea
           <h2 className="min-w-0 flex-1 truncate text-base font-semibold">Sessions</h2>
         )}
         {inSheet && <SheetDescription className="sr-only">The live sessions, grouped by host and project.</SheetDescription>}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="New ticket"
+          title="New ticket"
+          onClick={() => {
+            // The overlay steps aside for the sheet; a docked column stays (closing it drops the pin).
+            if (!sidebar.docked) sidebar.close();
+            newTicket(currentProject);
+          }}
+        >
+          <Plus size={16} />
+        </Button>
         {sidebar.canPin && (
           <Button
             variant="ghost"

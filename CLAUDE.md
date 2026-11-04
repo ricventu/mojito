@@ -318,7 +318,10 @@ app's state, left in place.
 - **Session sidebar** (`components/sidebar`, `lib/sidebar.ts`, `hooks/useSidebar.ts`): drawn
   once for every page by the layout route `AppShell` (a pinned one stays put from page to page;
   pages reach it through `useAppSidebar`/`SidebarToggle`, and each starts after it with
-  `[var(--dock-width)]`, guarded by `safeArea.test.ts`). Every
+  `[var(--dock-width)]`, guarded by `safeArea.test.ts`). `AppShell` also holds the New ticket
+  sheet (`useNewTicket`): the board, the sidebar header's + and the terminal header's + open the
+  same one, preselecting the on-screen session's project when this instance maps it (the task
+  runs here, a peer's session too). Every
   non-`ended` session, unfiltered by the board, grouped by project (General last), newest
   `createdAt` first — only immutable keys, so rows never jump when a state changes. No Hide:
   it was removed (a session leaves the sidebar when it ends; ended ones stay on the board, at
