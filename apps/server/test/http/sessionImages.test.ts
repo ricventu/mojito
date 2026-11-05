@@ -47,22 +47,43 @@ describe("POST /api/sessions/:id/images", () => {
     const { post, stateDir } = withSession();
     const res = await post(form([image("a.png", "image/png"), image("a.heic", "image/heic")]));
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "unsupported type: image/heic" });
+    expect(await res.json()).toEqual({ error: "unsupported file: a.heic (images and PDF only)" });
     expect(() => readdirSync(join(stateDir, "images"))).toThrow();
   });
 
-  it("refuses a request with no images", async () => {
+  it("keeps a PDF's name, made safe to paste, under the extension it was allowed by", async () => {
+    const { post, stateDir } = withSession();
+    const res = await post(form([image("Fattura più bella (2026).PDF", "", [37, 80, 68, 70])]));
+    expect(res.status).toBe(201);
+    const { paths } = (await res.json()) as { paths: string[] };
+    expect(paths[0]).toMatch(new RegExp(`^${join(stateDir, "images", "mj-RIC-1")}/Fattura-piu-bella-2026-[0-9a-f]{12}\\.pdf$`));
+    expect([...readFileSync(paths[0])]).toEqual([37, 80, 68, 70]);
+    expect(statSync(paths[0]).mode & 0o777).toBe(0o600);
+  });
+
+  it("refuses a document that is no PDF, and a file too large, naming it", async () => {
+    const { post } = withSession();
+    const refused = await post(form([image("a.pdf", "application/pdf"), image("sheet.xlsx", "")]));
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toEqual({ error: "unsupported file: sheet.xlsx (images and PDF only)" });
+    const big = new File([new Uint8Array(10 * 1024 * 1024 + 1)], "big.pdf", { type: "application/pdf" });
+    const tooLarge = await post(form([big]));
+    expect(tooLarge.status).toBe(400);
+    expect(await tooLarge.json()).toEqual({ error: "file too large: big.pdf" });
+  });
+
+  it("refuses a request with no files", async () => {
     const { post } = withSession();
     const res = await post(form([]));
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "no images" });
+    expect(await res.json()).toEqual({ error: "no files" });
   });
 
   it("refuses a field that is not a file", async () => {
     const { post } = withSession();
     const res = await post(form(["not a file"]));
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "invalid image" });
+    expect(await res.json()).toEqual({ error: "invalid file" });
   });
 
   it("answers 404 for an unknown session", async () => {

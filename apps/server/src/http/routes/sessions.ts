@@ -5,10 +5,9 @@ import { Hono } from "hono";
 import type { AppDeps } from "../app";
 import { parseBody } from "../body";
 import { expandHome } from "../../homePath";
-import { imagesDir, storeImages } from "../../sessions/images";
+import { imagesDir, storeAttachments, validateAttachments } from "../../sessions/images";
 import { launchFree, launchTicket, resumeSession } from "../../sessions/launch";
 import { readImageFile, resolveImagePath } from "../../sessions/viewImage";
-import { validateImages, type ImageType } from "../../tasks/images";
 
 const IMAGE_ERRORS = {
   "not-found": [404, "image not found"],
@@ -22,7 +21,7 @@ export function sessionRoutes(deps: AppDeps): Hono {
   const removeFile = deps.removeFile ?? ((path: string) => rmSync(path, { recursive: true, force: true }));
 
   // Forgetting an ended session: its row, the hook settings it was launched with (which carry
-  // the token), and the images pasted into it. Only an ended one — a live session's row is how
+  // the token), and the files attached to it. Only an ended one — a live session's row is how
   // the board reaches it.
   const remove = (id: string): { status: 200 } | { status: 404 | 409; error: string } => {
     const row = deps.sessions.get(id);
@@ -34,7 +33,7 @@ export function sessionRoutes(deps: AppDeps): Hono {
     if (basename(id) === id) {
       for (const [what, path] of [
         ["hook settings", join(deps.cfg.stateDir, "hooks", `${id}.json`)],
-        ["images", imagesDir(deps.cfg.stateDir, id)],
+        ["attachments", imagesDir(deps.cfg.stateDir, id)],
       ]) {
         try {
           removeFile(path);
@@ -48,8 +47,9 @@ export function sessionRoutes(deps: AppDeps): Hono {
 
   return new Hono()
     .get("/sessions", (c) => c.json(deps.sessions.list()))
-    // Images for claude: claude's own image paste reads this machine's clipboard, never the
-    // browser's, so the client uploads them here and pastes the returned paths into the terminal.
+    // Images and PDFs for claude: claude's own image paste reads this machine's clipboard, never
+    // the browser's, so the client uploads them here and pastes the returned paths into the
+    // terminal. The route keeps its name: renaming it would refuse images to an older peer.
     .post("/sessions/:id/images", async (c) => {
       const id = c.req.param("id");
       const row = deps.sessions.get(id);
@@ -57,15 +57,15 @@ export function sessionRoutes(deps: AppDeps): Hono {
       if (row.state === "ended") return c.json({ error: `session ended: ${id}` }, 409);
       const body = await c.req.parseBody({ all: true });
       const entries = [...asList(body["images[]"]), ...asList(body.images)];
-      if (entries.some((e) => !(e instanceof File))) return c.json({ error: "invalid image" }, 400);
+      if (entries.some((e) => !(e instanceof File))) return c.json({ error: "invalid file" }, 400);
       const files = entries as File[];
-      if (files.length === 0) return c.json({ error: "no images" }, 400);
-      const valid = validateImages(files);
+      if (files.length === 0) return c.json({ error: "no files" }, 400);
+      const valid = validateAttachments(files);
       if (!valid.ok) return c.json({ error: valid.error }, 400);
-      const images = await Promise.all(
-        files.map(async (f) => ({ type: f.type as ImageType, bytes: new Uint8Array(await f.arrayBuffer()) })),
+      const attachments = await Promise.all(
+        files.map(async (f) => ({ name: f.name, type: f.type, bytes: new Uint8Array(await f.arrayBuffer()) })),
       );
-      return c.json({ paths: storeImages(imagesDir(deps.cfg.stateDir, id), images) }, 201);
+      return c.json({ paths: storeAttachments(imagesDir(deps.cfg.stateDir, id), attachments) }, 201);
     })
     // An image path claude printed, for the terminal's viewer (resolveImagePath: where it may
     // be, readImageFile: what may be served). Sandboxed and never sniffed, so the answer can

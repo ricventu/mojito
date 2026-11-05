@@ -19,7 +19,15 @@ function command(sessionId: string, origin: string, event: string, token: string
   return `curl -sS -m 2 -X POST "${url}" -H "Content-Type: application/json" -H 'x-mojito-token: ${tok}' --data-binary @- >/dev/null 2>&1 || true`;
 }
 
-export function buildHookSettings(sessionId: string, origin: string, token: string): { hooks: Record<string, unknown[]> } {
+// `attachmentsDir` (absolute; `//` is how a permission rule spells it): a PDF pasted into the
+// session lives outside the project, so reading it would prompt on the phone. This folder only;
+// Office files, should they come, need a shell, and no rule here would make that safe.
+export function buildHookSettings(
+  sessionId: string,
+  origin: string,
+  token: string,
+  attachmentsDir: string,
+): { hooks: Record<string, unknown[]>; permissions: { allow: string[] } } {
   const hooks: Record<string, unknown[]> = {};
   for (const event of EVENTS) {
     hooks[event] = [{ hooks: [{ type: "command", command: command(sessionId, origin, event, token) }] }];
@@ -27,5 +35,5 @@ export function buildHookSettings(sessionId: string, origin: string, token: stri
   for (const { event, matcher } of MATCHED_EVENTS) {
     hooks[event] = [{ matcher, hooks: [{ type: "command", command: command(sessionId, origin, event, token) }] }];
   }
-  return { hooks };
+  return { hooks, permissions: { allow: [`Read(/${attachmentsDir}/**)`] } };
 }

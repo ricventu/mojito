@@ -12,6 +12,7 @@ import type { LinearClient } from "../linear/client";
 import type { TicketCache } from "../tickets/cache";
 import { DuplicateSessionError, PREFIX, hasSession, newSession, q } from "../tmux/tmux";
 import { buildHookSettings } from "./hookSettings";
+import { imagesDir } from "./images";
 import { buildGitResolvePrompt, buildTicketPrompt } from "./prompt";
 import { watchStartupStall } from "./startupStall";
 
@@ -70,6 +71,10 @@ const conflict = (id: string): LaunchResult => ({
 const usableDir = (deps: LaunchDeps, path: string) => isAbsolute(path) && deps.exists(path);
 
 const hookSettingsPath = (cfg: ServerConfig, id: string) => join(cfg.stateDir, "hooks", `${id}.json`);
+
+/** The `--settings` file of a session, written at every launch and resume. */
+const sessionSettings = (deps: LaunchDeps, id: string): string =>
+  JSON.stringify(buildHookSettings(id, selfOrigin(deps.cfg), deps.cfg.token, imagesDir(deps.cfg.stateDir, id)));
 
 function claudeCommand(model: Model, effort: Effort, settingsPath: string, prompt?: string): string {
   const base = `claude --model ${q(model)} --effort ${q(effort)} --settings ${q(settingsPath)}`;
@@ -138,7 +143,7 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
     }
 
     const settingsPath = hookSettingsPath(deps.cfg, id);
-    deps.writeFile(settingsPath, JSON.stringify(buildHookSettings(id, selfOrigin(deps.cfg), deps.cfg.token)));
+    deps.writeFile(settingsPath, sessionSettings(deps, id));
     const command = claudeCommand(body.model, body.effort, settingsPath, buildTicketPrompt(body.ticket, deps.prompts().ticket, body.worktree));
     const refused = await spawn(deps, id, cwd, command);
     if (refused) return refused;
@@ -222,7 +227,7 @@ export async function launchFree(body: LaunchFreeBody, deps: LaunchDeps): Promis
     return { ok: false, status: 400, error: "model and effort are required for a claude session" };
   }
   const settingsPath = hookSettingsPath(deps.cfg, id);
-  deps.writeFile(settingsPath, JSON.stringify(buildHookSettings(id, selfOrigin(deps.cfg), deps.cfg.token)));
+  deps.writeFile(settingsPath, sessionSettings(deps, id));
   const refused = await spawn(deps, id, cwd, claudeCommand(body.model, body.effort, settingsPath));
   if (refused) return refused;
   const session: SessionMeta = {
@@ -270,7 +275,7 @@ export async function launchGitResolve(
     const model: Model = "opus";
     const effort: Effort = "xhigh";
     const settingsPath = hookSettingsPath(deps.cfg, id);
-    deps.writeFile(settingsPath, JSON.stringify(buildHookSettings(id, selfOrigin(deps.cfg), deps.cfg.token)));
+    deps.writeFile(settingsPath, sessionSettings(deps, id));
     const refused = await spawn(deps, id, cwd, claudeCommand(model, effort, settingsPath, buildGitResolvePrompt(req.op, req.conflict)));
     if (refused) return { ok: false, status: 409, error: `session already exists: ${id}` };
 
@@ -324,7 +329,7 @@ export async function resumeSession(id: string, deps: LaunchDeps): Promise<Launc
     }
 
     const settingsPath = hookSettingsPath(deps.cfg, id);
-    deps.writeFile(settingsPath, JSON.stringify(buildHookSettings(id, selfOrigin(deps.cfg), deps.cfg.token)));
+    deps.writeFile(settingsPath, sessionSettings(deps, id));
     const refused = await spawn(deps, id, cwd, resumeCommand(row, settingsPath, row.claudeSessionId));
     if (refused) return refused;
 

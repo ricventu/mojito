@@ -26,7 +26,7 @@ import { hostOf } from "@/lib/host";
 import { exitAction, pageSession } from "@/lib/peerSession";
 import { sessionName } from "@/lib/sidebar";
 import { safeHref } from "@/lib/url";
-import { attachImages, uploadImages } from "@/lib/terminal/imageInput";
+import { attachFiles, uploadAttachments } from "@/lib/terminal/attachments";
 import { cn } from "@/lib/utils";
 
 /**
@@ -115,12 +115,12 @@ export function TerminalPage() {
   const [imageState, setImage] = useState<{ scope: string; path: string } | null>(null);
   const image = imageState?.scope === scope ? imageState.path : null;
 
-  // Images pasted or dropped on the terminal, or picked from the accessory bar: uploaded,
-  // then their paths pasted into claude (imageInput.ts). Its `[Image #N]` is the success.
+  // Files pasted or dropped on the terminal, or picked from the accessory bar: uploaded, then
+  // their paths pasted into claude (attachments.ts). The path at its prompt is the success.
   const attach = (files: File[]) => {
     if (!term || files.length === 0) return;
-    const toastId = toast.loading(files.length === 1 ? "Uploading image…" : `Uploading ${files.length} images…`);
-    void attachImages(files, { upload: (fs) => uploadImages(hostName, id, fs), paste: (text) => term.paste(text) }).then((r) => {
+    const toastId = toast.loading(files.length === 1 ? "Uploading file…" : `Uploading ${files.length} files…`);
+    void attachFiles(files, { upload: (fs) => uploadAttachments(hostName, id, fs), paste: (text) => term.paste(text) }).then((r) => {
       if (r.ok) toast.dismiss(toastId);
       else toast.error(r.error, { id: toastId });
     });
@@ -265,7 +265,7 @@ export function TerminalPage() {
                   else navigate(boardHref(), { replace: true });
                 }}
                 onReady={setTerm}
-                onImages={attach}
+                onFiles={attach}
                 openDoc={openDoc}
                 openImage={(path) => setImage({ scope, path })}
               />

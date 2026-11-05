@@ -30,11 +30,6 @@ export function pastedImages(data: { files: Files; getData(type: string): string
   return data.getData("text/plain") ? [] : images(data.files);
 }
 
-/** The images a drop brings. */
-export function droppedImages(data: { files: Files }): File[] {
-  return images(data.files);
-}
-
 /**
  * Whether a drag carries files, from its `types` — readable during dragenter/dragover, when the
  * files themselves are not yet. A drag of selected text is the textarea's own, left alone.

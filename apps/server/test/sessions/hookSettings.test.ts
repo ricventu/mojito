@@ -4,7 +4,12 @@ import { buildHookSettings } from "../../src/sessions/hookSettings";
 type Entry = { matcher?: string; hooks: { type: string; command: string }[] };
 
 describe("buildHookSettings", () => {
-  const { hooks } = buildHookSettings("mj-RIC-1", "http://127.0.0.1:3100", "tok");
+  const { hooks } = buildHookSettings("mj-RIC-1", "http://127.0.0.1:3100", "tok", "/state/images/x");
+
+  it("lets the session read its own attachments, and nothing else, without a prompt", () => {
+    const { permissions } = buildHookSettings("mj-RIC-1", "http://127.0.0.1:3100", "tok", "/state/images/mj-RIC-1");
+    expect(permissions).toEqual({ allow: ["Read(//state/images/mj-RIC-1/**)"] });
+  });
 
   it("registers every event mapHook reads", () => {
     expect(Object.keys(hooks).sort()).toEqual(
@@ -31,12 +36,12 @@ describe("buildHookSettings", () => {
   });
 
   it("posts to whatever origin it is given", () => {
-    const cmd = (buildHookSettings("mj-RIC-1", "http://100.64.0.7:3100", "tok").hooks.Stop as Entry[])[0].hooks[0].command;
+    const cmd = (buildHookSettings("mj-RIC-1", "http://100.64.0.7:3100", "tok", "/state/images/x").hooks.Stop as Entry[])[0].hooks[0].command;
     expect(cmd).toContain('"http://100.64.0.7:3100/api/hook?session=mj-RIC-1&event=Stop"');
   });
 
   it("escapes an apostrophe in the token and encodes the session id", () => {
-    const h = buildHookSettings("mj-a b", "http://127.0.0.1:3100", "it's").hooks;
+    const h = buildHookSettings("mj-a b", "http://127.0.0.1:3100", "it's", "/state/images/x").hooks;
     const cmd = (h.SessionStart as Entry[])[0].hooks[0].command;
     expect(cmd).toContain("-H 'x-mojito-token: it'\\''s'");
     expect(cmd).toContain("session=mj-a%20b&event=SessionStart");

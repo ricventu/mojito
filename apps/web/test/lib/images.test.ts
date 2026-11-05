@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_IMAGE_BYTES, dragHasFiles, droppedImages, pastedImages, validateImages } from "@/lib/images";
+import { MAX_IMAGE_BYTES, dragHasFiles, pastedImages, validateImages } from "@/lib/images";
 
 const img = (over: Partial<{ name: string; type: string; size: number }> = {}) => ({
   name: "a.png",
@@ -65,14 +65,6 @@ describe("pastedImages", () => {
 
   it("ignores files that are not images", () => {
     expect(pastedImages(clipboard([file("notes.pdf", "application/pdf")]))).toEqual([]);
-  });
-});
-
-describe("droppedImages", () => {
-  it("takes the images of a drop, in order", () => {
-    const a = file("a.png", "image/png");
-    const b = file("b.jpg", "image/jpeg");
-    expect(droppedImages({ files: [a, file("x.txt", "text/plain"), b] })).toEqual([a, b]);
   });
 });
 

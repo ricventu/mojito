@@ -131,7 +131,7 @@ describe("launchTicket", () => {
       "/repo/web",
       `claude --model 'opus' --effort 'high' --settings '${settingsPath}' ${q(buildTicketPrompt("RIC-1"))}`,
     );
-    expect(JSON.parse(files.get(settingsPath)!)).toEqual(buildHookSettings("mj-RIC-1", "http://127.0.0.1:3100", "tok"));
+    expect(JSON.parse(files.get(settingsPath)!)).toEqual(buildHookSettings("mj-RIC-1", "http://127.0.0.1:3100", "tok", "/state/images/mj-RIC-1"));
     expect(sessions.get("mj-RIC-1")).toEqual(expected);
     expect(events).toEqual([{ type: "session.updated", session: expected }]);
     expect(linear.setStatus).toHaveBeenCalledWith("RIC-1", "In Progress");
@@ -362,7 +362,7 @@ describe("launchFree", () => {
       "/repo/web",
       `claude --model 'opus' --effort 'high' --settings '${settingsPath}'`,
     );
-    expect(JSON.parse(files.get(settingsPath)!)).toEqual(buildHookSettings("mj-web-a1b2c3", "http://127.0.0.1:3100", "tok"));
+    expect(JSON.parse(files.get(settingsPath)!)).toEqual(buildHookSettings("mj-web-a1b2c3", "http://127.0.0.1:3100", "tok", "/state/images/mj-web-a1b2c3"));
     expect(sessions.get("mj-web-a1b2c3")).toEqual(expected);
     expect(events).toEqual([{ type: "session.updated", session: expected }]);
     expect(linear.setStatus).not.toHaveBeenCalled();
@@ -514,7 +514,7 @@ describe("resumeSession", () => {
       "/repo/web",
       `claude --model ${q("sonnet")} --effort ${q("low")} --settings ${q(settingsPath)} --resume ${q(SID)}`,
     );
-    expect(files.get(settingsPath)).toBe(JSON.stringify(buildHookSettings("mj-RIC-1", "http://127.0.0.1:3100", "tok")));
+    expect(files.get(settingsPath)).toBe(JSON.stringify(buildHookSettings("mj-RIC-1", "http://127.0.0.1:3100", "tok", "/state/images/mj-RIC-1")));
     const after = sessions.get("mj-RIC-1");
     expect(after).toEqual(
       ended({ state: "starting", endReason: null, alert: null, createdAt: 1000, lastEventAt: 1000 }),

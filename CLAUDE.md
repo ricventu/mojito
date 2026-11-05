@@ -158,12 +158,23 @@ app's state, left in place.
 - **HTTP** (`http/`): all `/api/*` except `/health` need `x-mojito-token`; error bodies are
   always `{ error }`; `POST /api/sessions` → 201 `{session, warning?}` or `{error, sessionId?}`.
   Static web build served with SPA fallback (never for `/api` or `/ws`). Listen errors exit 1.
-- **Images for a session** (`POST /api/sessions/:id/images`, `sessions/images.ts`): claude's
-  own image paste reads the server's clipboard, never the browser's, so the client uploads
-  and pastes the returned absolute paths, which claude turns into `[Image #N]`. Stored in
-  `<stateDir>/images/<id>/` (0700/0600), never the repo — claude attaches a pasted image path
-  outside its cwd without a permission prompt and downscales big ones itself (both verified
-  on 2.1.312), hence the shared 10 MB cap. Deleted with the row (`DELETE /api/sessions/:id`, an ended one only).
+- **Files for a session** (`POST /api/sessions/:id/images`, `sessions/images.ts`; RIC-541): images
+  and PDFs. claude's own image paste reads the server's clipboard, never the browser's, so the
+  client uploads and pastes the returned absolute paths; claude turns an image into `[Image #N]`
+  and reads a PDF. `validateAttachments` is the session's own check (≤ 10 files, ≤ 10 MB each;
+  images by type, a PDF by type or extension, since `File.type` may be empty); `validateImages`
+  stays for what reaches Linear, so the New-ticket sheet takes images only. Stored in
+  `<stateDir>/images/<id>/` (0700/0600), never the repo; a PDF as `<safe name>-<hex>.pdf` (pasted
+  paths are space-separated, and the name helps claude), an image under a random name; the
+  extension never comes from the client's name. Route and folder keep their names so an older
+  peer still takes images; its 400 on a PDF reaches the user. claude attaches a pasted image path
+  outside its cwd without a permission prompt and downscales big ones itself (both verified on
+  2.1.312), hence the shared 10 MB cap. A PDF's path is text it must Read, which outside the
+  project prompts: `buildHookSettings` allows `Read` of that session's folder only, so it applies
+  from the next launch or resume (verified on 2.1.318, Mac and box, no `pdftotext` needed). Office
+  files were left out on purpose: Read refuses them and claude needs the shell, which prompts
+  (`.xlsx`/`.docx`/`.xls`/`.doc` all read fine once approved, on both machines). Deleted with the row
+  (`DELETE /api/sessions/:id`, an ended one only).
   The other way, `GET /api/sessions/:id/image?path` (`sessions/viewImage.ts`) serves an image path
   claude printed, for the terminal's viewer: relative to the session's cwd, `~/` from HOME, an
   absolute one **anywhere** — the token already opens a shell in every session, and a fence would
@@ -396,8 +407,8 @@ app's state, left in place.
 - Terminal (`components/terminal`, `lib/terminal`): `syncGeometry` always publishes the size,
   re-fit refused while the iOS keyboard is up; accessory bar (coarse pointers only), composer
   (`term.paste`, no CR — do not turn it into a paste box), buffer copy in a `<pre>`.
-  Images (`lib/terminal/imageInput.ts`): a paste with images and no text (capture phase on
-  the holder, ahead of xterm), a drop, or the accessory bar's picker (exact types, so iOS
+  Files (`lib/terminal/attachments.ts`): a paste with files and no text (capture phase on
+  the holder, ahead of xterm), a drop, or the accessory bar's picker (exact image types, so iOS
   hands HEIC over as JPEG) — uploaded, then the paths pasted into claude.
   Desktop mouse copy (`copySelection.ts`): a plain drag is **claude's own** selection, which
   it copies with an OSC 52 — reaching the browser only because the pty gateway sets
