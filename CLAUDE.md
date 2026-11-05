@@ -278,7 +278,9 @@ app's state, left in place.
   `visibilitychange`; events patch the query cache.
 - Board (`lib/board.ts` → `components/board`): one section per project, In Review → In
   Progress → Todo, Backlog collapsed; free sessions and sessions whose ticket is no longer on
-  the board stay visible as loose rows (a live tmux never disappears from the UI).
+  the board stay visible as loose rows (a live tmux never disappears from the UI). A "Created"
+  task card (`TaskStrip`) opens its ticket's sheet like a ticket card, its id the link to Linear;
+  until the ticket is on the board (`taskTicket`: the poll after creation; closed since) only the link.
 - Project header: Pull / Push icons (`GitButtons`, `lib/gitSync.ts`) — a toast, or on a conflict
   the git session's terminal (pushed, from the board).
 - **Git graph page** (RIC-505, `/git/:project`, `components/git`, `lib/git`, `hooks/useGitGraph.ts`):

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { BoardTickets, ProjectRow, SessionMeta, TicketSummary } from "@mojito/shared";
+import type { BoardTickets, ProjectRow, SessionMeta, TaskRecord, TicketSummary } from "@mojito/shared";
 import {
   canMarkDone,
   filterBoard,
@@ -10,6 +10,7 @@ import {
   sessionForTicket,
   splitLoose,
   startedLabel,
+  taskTicket,
 } from "@/lib/board";
 import { NO_FILTERS, type BoardFilters } from "@/lib/filters";
 
@@ -426,5 +427,23 @@ describe("canMarkDone", () => {
     for (const status of ["Backlog", "Todo", "In Progress", "Done", "Canceled", ""]) {
       expect(canMarkDone(status)).toBe(false);
     }
+  });
+});
+
+describe("taskTicket", () => {
+  const task = (result: TaskRecord["result"]): Pick<TaskRecord, "result"> => ({ result });
+  const created = { identifier: "RIC-2", url: "https://linear.app/x/issue/RIC-2" };
+
+  it("finds the ticket the task created", () => {
+    const target = ticket("RIC-2", "Todo");
+    expect(taskTicket(task(created), [ticket("RIC-1", "Todo"), target])).toBe(target);
+  });
+
+  it("answers null while the task has created nothing", () => {
+    expect(taskTicket(task(null), [ticket("RIC-2", "Todo")])).toBeNull();
+  });
+
+  it("answers null for a ticket not on the board: not polled yet, or closed since", () => {
+    expect(taskTicket(task(created), [ticket("RIC-1", "Todo")])).toBeNull();
   });
 });

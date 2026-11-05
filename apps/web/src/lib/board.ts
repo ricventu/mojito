@@ -1,4 +1,4 @@
-import type { BoardTickets, ProjectRow, SessionMeta, TicketSummary } from "@mojito/shared";
+import type { BoardTickets, ProjectRow, SessionMeta, TaskRecord, TicketSummary } from "@mojito/shared";
 import type { BoardFilters } from "@/lib/filters";
 
 /** Board order of the active statuses; any other non-Backlog status sorts after the last of these. */
@@ -146,6 +146,15 @@ export function sessionForTicket(sessions: SessionMeta[], identifier: string): S
     .filter((s) => s.ticket === identifier)
     .sort((a, b) => b.lastEventAt - a.lastEventAt);
   return mine.find((s) => s.state !== "ended") ?? mine[0] ?? null;
+}
+
+/**
+ * The ticket a create-ticket task made, once it is on the board: `null` before the poll that
+ * follows the creation has answered, and for a ticket closed since (the board holds open ones only).
+ */
+export function taskTicket(task: Pick<TaskRecord, "result">, tickets: TicketSummary[]): TicketSummary | null {
+  const identifier = task.result?.identifier;
+  return tickets.find((t) => t.identifier === identifier) ?? null;
 }
 
 /** Sessions waiting on the human, the one waiting longest first. */

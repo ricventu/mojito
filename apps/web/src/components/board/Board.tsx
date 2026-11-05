@@ -80,7 +80,12 @@ export function Board() {
         {tasksError && (
           <Banner text={`Background tasks unavailable: ${tasksError instanceof Error ? tasksError.message : "error"}`} />
         )}
-        <TaskStrip tasks={tasks.data ?? []} />
+        <TaskStrip
+          tasks={tasks.data ?? []}
+          tickets={tickets.data?.tickets ?? []}
+          selectedTicket={selectedTicket?.identifier}
+          onOpenTicket={setSelectedTicket}
+        />
         {failure ? (
           <p className="text-sm text-destructive">{failure instanceof Error ? failure.message : "Loading failed"}</p>
         ) : loading ? (
