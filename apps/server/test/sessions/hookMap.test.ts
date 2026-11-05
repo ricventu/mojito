@@ -107,8 +107,9 @@ describe("hookPayload", () => {
 });
 
 describe("isNoiseHook", () => {
-  it("rules out only the SessionEnd of a /clear", () => {
+  it("rules out only the SessionEnd of a /clear or a /resume: claude goes on in the same pane", () => {
     expect(isNoiseHook("SessionEnd", { reason: "clear" })).toBe(true);
+    expect(isNoiseHook("SessionEnd", { reason: "resume" })).toBe(true);
     expect(isNoiseHook("SessionEnd", { reason: "logout" })).toBe(false);
     expect(isNoiseHook("SessionEnd", {})).toBe(false);
     expect(isNoiseHook("Stop", { reason: "clear" })).toBe(false);

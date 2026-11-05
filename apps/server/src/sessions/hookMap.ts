@@ -93,14 +93,15 @@ export function hookPayload(body: unknown): HookPayload {
 const WAITING_NOTIFICATIONS = new Set(["permission_prompt", "elicitation_dialog", "elicitation_url_dialog"]);
 
 /**
- * A hook that says nothing about the session's state and must change nothing. `/clear` fires
- * SessionEnd (reason `clear`) and then SessionStart in the same, still-live claude: taken at
- * its word, the first would mark the session `ended` for good and the second could not revive it.
+ * A hook that says nothing about the session's state and must change nothing. `/clear` and
+ * `/resume` fire SessionEnd (reason `clear`, `resume`) and then SessionStart in the same, still-live
+ * claude: taken at its word, the first would mark the session `ended` for good and the second could
+ * not revive it.
  * A Notification counts only when its type says claude is waiting on the human; one with no
  * type at all still counts, since missing a real prompt costs more than a false amber.
  */
 export function isNoiseHook(event: HookEventName, payload: HookPayload): boolean {
-  if (event === "SessionEnd") return payload.reason === "clear";
+  if (event === "SessionEnd") return payload.reason === "clear" || payload.reason === "resume";
   if (event === "Notification") {
     return payload.notification_type !== undefined && !WAITING_NOTIFICATIONS.has(payload.notification_type);
   }

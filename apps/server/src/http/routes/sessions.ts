@@ -51,11 +51,13 @@ export function sessionRoutes(deps: AppDeps): Hono {
     // the browser's, so the client uploads them here and pastes the returned paths into the
     // terminal. The route keeps its name: renaming it would refuse images to an older peer.
     .post("/sessions/:id/images", async (c) => {
+      // Read first: answered mid-upload, the server closes the connection after the refusal, and
+      // a browser can report a bare network error ("Load failed") instead of it.
+      const body = await c.req.parseBody({ all: true });
       const id = c.req.param("id");
       const row = deps.sessions.get(id);
       if (!row || basename(id) !== id) return c.json({ error: `session not found: ${id}` }, 404);
       if (row.state === "ended") return c.json({ error: `session ended: ${id}` }, 409);
-      const body = await c.req.parseBody({ all: true });
       const entries = [...asList(body["images[]"]), ...asList(body.images)];
       if (entries.some((e) => !(e instanceof File))) return c.json({ error: "invalid file" }, 400);
       const files = entries as File[];

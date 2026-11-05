@@ -35,6 +35,19 @@ describe("attachFiles", () => {
   });
 });
 
+describe("attachFiles, when the connection drops", () => {
+  // fetch's own words, a different phrase in each browser ("Load failed" in Safari), say nothing.
+  it("says so in plain words and pastes nothing", async () => {
+    const paste = vi.fn();
+    const upload = vi.fn(async () => {
+      throw new TypeError("Load failed");
+    });
+    const result = await attachFiles([file("a.pdf", "application/pdf")], { upload, paste });
+    expect(result).toEqual({ ok: false, error: "upload failed: the connection dropped" });
+    expect(paste).not.toHaveBeenCalled();
+  });
+});
+
 describe("validateAttachments", () => {
   it("accepts the images and a PDF by type or by extension, whatever its case", () => {
     const set = [

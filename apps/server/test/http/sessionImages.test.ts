@@ -93,6 +93,23 @@ describe("POST /api/sessions/:id/images", () => {
     expect(await res.json()).toEqual({ error: "session not found: mj-RIC-2" });
   });
 
+  // Answered mid-upload, the server closes the connection after the refusal, and a browser can
+  // report a bare network error ("Load failed") instead of it.
+  it.each([
+    ["an ended session", "mj-RIC-1", 409],
+    ["an unknown session", "mj-RIC-2", 404],
+  ])("reads the whole upload before refusing %s", async (_label, id, status) => {
+    const { app } = withSession(id === "mj-RIC-1" ? "ended" : "running");
+    const req = new Request(`http://mojito/api/sessions/${id}/images`, {
+      method: "POST",
+      headers: { "x-mojito-token": TOKEN },
+      body: form([image("a.pdf", "application/pdf")]),
+    });
+    const res = await app.request(req);
+    expect(res.status).toBe(status);
+    expect(req.bodyUsed).toBe(true);
+  });
+
   it("answers 409 for an ended session", async () => {
     const { post } = withSession("ended");
     const res = await post(form([image("a.png", "image/png")]));

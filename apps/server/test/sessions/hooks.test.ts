@@ -145,6 +145,17 @@ describe("handleHook", () => {
     expect(sessions.get("mj-RIC-1")?.state).toBe("idle");
   });
 
+  // `/resume` is SessionEnd (reason "resume") then SessionStart with the conversation picked, in
+  // the same live claude (verified on 2.1.318). Ended, the row refused uploads and every later hook.
+  it("stays live through a /resume and follows the conversation it moved to", () => {
+    const { sessions, events, deps } = setup(meta({ state: "idle", claudeSessionId: "first", lastEventAt: 7 }));
+    handleHook("mj-RIC-1", "SessionEnd", deps, { hook_event_name: "SessionEnd", reason: "resume", session_id: "first" });
+    expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "idle", endReason: null, lastEventAt: 7 });
+    expect(events).toEqual([]);
+    handleHook("mj-RIC-1", "SessionStart", deps, { hook_event_name: "SessionStart", source: "resume", session_id: "picked" });
+    expect(sessions.get("mj-RIC-1")).toMatchObject({ state: "idle", claudeSessionId: "picked" });
+  });
+
   it("ignores an idle_prompt Notification: a finished session stays idle, not amber", () => {
     const { sessions, events, deps } = setup(meta({ state: "idle", lastEventAt: 7 }));
     handleHook("mj-RIC-1", "Notification", deps, { notification_type: "idle_prompt", message: "waiting" });

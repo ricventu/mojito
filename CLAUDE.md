@@ -77,9 +77,10 @@ app's state, left in place.
 - **Live state** comes only from Claude Code hooks (`hookSettings.ts` → curl to
   `<selfOrigin>/api/hook` — the configured host, loopback only for a wildcard bind — with
   `x-mojito-token` and claude's hook JSON as body; `hookMap.ts`, `hooks.ts`). `ended` is
-  sticky for hooks. Read from the body: SessionEnd `reason: "clear"` is ignored (a `/clear`
-  must not end a live session) and the SessionStart `source: "clear"` after it maps to idle, as
-  does `source: "resume"` (a resumed claude waits at its prompt); every hook's `session_id` (a
+  sticky for hooks. Read from the body: SessionEnd `reason: "clear"` or `"resume"` is ignored (a
+  `/clear` or a `/resume` must not end a live session; verified on 2.1.318) and the SessionStart
+  `source: "clear"` after it maps to idle, as does `source: "resume"` (a resumed claude waits at
+  its prompt); every hook's `session_id` (a
   plain id only — it reaches a shell command) is kept as `claudeSessionId`, a change emitted;
   Notification maps to
   needs-input only for blocking types (`permission_prompt`, `elicitation_dialog`, …) — the
@@ -166,8 +167,9 @@ app's state, left in place.
   stays for what reaches Linear, so the New-ticket sheet takes images only. Stored in
   `<stateDir>/images/<id>/` (0700/0600), never the repo; a PDF as `<safe name>-<hex>.pdf` (pasted
   paths are space-separated, and the name helps claude), an image under a random name; the
-  extension never comes from the client's name. Route and folder keep their names so an older
-  peer still takes images; its 400 on a PDF reaches the user. claude attaches a pasted image path
+  extension never comes from the client's name. The body is read before any refusal: answered
+  mid-upload, a browser can report a bare network error instead of it. Route and folder keep
+  their names so an older peer still takes images; its 400 on a PDF reaches the user. claude attaches a pasted image path
   outside its cwd without a permission prompt and downscales big ones itself (both verified on
   2.1.312), hence the shared 10 MB cap. A PDF's path is text it must Read, which outside the
   project prompts: `buildHookSettings` allows `Read` of that session's folder only, so it applies

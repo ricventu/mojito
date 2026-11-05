@@ -52,6 +52,8 @@ export async function attachFiles(
   try {
     paths = await io.upload(files);
   } catch (err) {
+    // A TypeError is fetch getting no answer, in words of its own ("Load failed" in Safari).
+    if (err instanceof TypeError) return { ok: false, error: "upload failed: the connection dropped" };
     return { ok: false, error: err instanceof Error ? err.message : "upload failed" };
   }
   // The trailing space ends the last path, so what is typed next is not read as part of it.

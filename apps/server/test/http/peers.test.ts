@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { PeerSnapshot } from "@mojito/shared";
 import type { PeerLink } from "../../src/peers/link";
 import { PeerRegistry } from "../../src/peers/registry";
-import { meta, setup } from "./setup";
+import { TOKEN, meta, setup } from "./setup";
 
 const snapshot = (name: string, online: boolean): PeerSnapshot => ({
   name,
@@ -175,6 +175,21 @@ describe("ALL /api/peers/:name/*", () => {
     const res = await req("/api/peers/air/sessions/mj-a/image?path=a.png");
     expect(res.status).toBe(502);
     expect(await res.json()).toEqual({ error: "air is not reachable" });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("reads an upload before answering that the peer is offline", async () => {
+    const { app, fetch } = withPeers();
+    const fd = new FormData();
+    fd.append("images", new File([new Uint8Array(3)], "a.pdf", { type: "application/pdf" }));
+    const raw = new Request("http://mojito/api/peers/air/sessions/mj-a/images", {
+      method: "POST",
+      headers: { "x-mojito-token": TOKEN },
+      body: fd,
+    });
+    const res = await app.request(raw);
+    expect(res.status).toBe(502);
+    expect(raw.bodyUsed).toBe(true);
     expect(fetch).not.toHaveBeenCalled();
   });
 

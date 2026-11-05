@@ -25,7 +25,7 @@ export function peerRoutes(deps: AppDeps): Hono {
       return c.json(res.body as object, res.status as ContentfulStatusCode);
     })
     // After the launch forward above, which keeps winning for `POST …/sessions`.
-    .all("/peers/:name/*", (c) => {
+    .all("/peers/:name/*", async (c) => {
       const name = c.req.param("name");
       const peer = deps.peers?.config(name);
       if (!peer) return c.json({ error: `peer not found: ${name}` }, 404);
@@ -34,8 +34,12 @@ export function peerRoutes(deps: AppDeps): Hono {
       const segments = url.pathname.split("/").slice(4);
       const peerPath = matchRelay(c.req.method, segments);
       if (!peerPath) return c.json({ error: "not found" }, 404);
-      if (!deps.peers?.online(name)) return c.json({ error: `${name} is not reachable` }, 502);
       const hasBody = c.req.method !== "GET" && c.req.method !== "HEAD";
+      if (!deps.peers?.online(name)) {
+        // An upload is read before it is refused, as on the session's own route.
+        if (hasBody) await c.req.arrayBuffer();
+        return c.json({ error: `${name} is not reachable` }, 502);
+      }
       return relayRequest(
         peer,
         deps.cfg.token,
