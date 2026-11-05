@@ -116,6 +116,11 @@ describe("activeFavorite", () => {
     expect(activeFavorite([{ name: "Both", search: "q=x&project=b&project=a" }], "project=a&project=b&q=x")).toBe(0);
   });
 
+  it("matches a favourite saved before the statuses took the workflow order", () => {
+    const old = { name: "Ends", search: "status=In+Review&status=Backlog" };
+    expect(activeFavorite([old], "status=Backlog&status=In+Review")).toBe(0);
+  });
+
   it("is -1 for no match and for the bare board", () => {
     expect(activeFavorite([A, M], "q=nope")).toBe(-1);
     expect(activeFavorite([{ name: "Empty", search: "" }], "")).toBe(-1);

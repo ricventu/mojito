@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  FILTER_STATUSES,
   NO_FILTERS,
   canonicalSearch,
   filterCount,
@@ -9,11 +10,18 @@ import {
   sheetProjects,
 } from "@/lib/filters";
 
+describe("FILTER_STATUSES", () => {
+  it("follows the workflow, from Backlog to In Review", () => {
+    expect(FILTER_STATUSES).toEqual(["Backlog", "Todo", "In Progress", "In Review"]);
+  });
+});
+
 describe("parseFilters", () => {
   it("parses repeated project and status", () => {
     expect(parseFilters(new URLSearchParams("project=b&project=a&status=Todo&q=x"))).toEqual({
       projects: ["a", "b"],
       statuses: ["Todo"],
+      live: false,
       q: "x",
     });
   });
@@ -22,6 +30,7 @@ describe("parseFilters", () => {
     expect(parseFilters(new URLSearchParams("doc=1&status=Done&status=Todo"))).toEqual({
       projects: [],
       statuses: ["Todo"],
+      live: false,
       q: "",
     });
   });
@@ -29,7 +38,7 @@ describe("parseFilters", () => {
   it("drops empty and duplicate projects and orders statuses canonically", () => {
     expect(
       parseFilters(new URLSearchParams("project=&project=a&project=a&status=Backlog&status=In+Review&status=Backlog")),
-    ).toEqual({ projects: ["a"], statuses: ["In Review", "Backlog"], q: "" });
+    ).toEqual({ projects: ["a"], statuses: ["Backlog", "In Review"], live: false, q: "" });
   });
 
   it("orders projects by code unit, never by the device's locale", () => {
@@ -42,12 +51,18 @@ describe("parseFilters", () => {
     ]);
   });
 
+  it("reads the active-sessions filter from live=1 only", () => {
+    expect(parseFilters(new URLSearchParams("live=1")).live).toBe(true);
+    expect(parseFilters(new URLSearchParams("live=0")).live).toBe(false);
+    expect(parseFilters(new URLSearchParams("")).live).toBe(false);
+  });
+
   it("keeps q's spaces in the live url", () => {
     expect(parseFilters(new URLSearchParams(filterSearch({ ...NO_FILTERS, q: "foo " }))).q).toBe("foo ");
   });
 
   it("round-trips awkward project names", () => {
-    const f = { projects: ["R&D", "a=b", "c+d", "Città nuova"], statuses: [], q: "" };
+    const f = { projects: ["R&D", "a=b", "c+d", "Città nuova"], statuses: [], live: false, q: "" };
     const parsed = parseFilters(new URLSearchParams(filterSearch(f)));
     expect(parsed.projects).toEqual([...f.projects].sort());
     expect(parseFilters(new URLSearchParams(filterSearch(parsed)))).toEqual(parsed);
@@ -56,13 +71,13 @@ describe("parseFilters", () => {
 
 describe("filterSearch", () => {
   it("writes the canonical order", () => {
-    expect(filterSearch({ projects: ["b", "a", "a"], statuses: ["Backlog", "In Review"], q: "x" })).toBe(
-      "project=a&project=b&status=In+Review&status=Backlog&q=x",
+    expect(filterSearch({ projects: ["b", "a", "a"], statuses: ["In Review", "Backlog"], live: true, q: "x" })).toBe(
+      "project=a&project=b&status=Backlog&status=In+Review&live=1&q=x",
     );
   });
 
   it("writes projects in code-unit order", () => {
-    expect(filterSearch({ projects: ["b", "a", "B"], statuses: [], q: "" })).toBe("project=B&project=a&project=b");
+    expect(filterSearch({ projects: ["b", "a", "B"], statuses: [], live: false, q: "" })).toBe("project=B&project=a&project=b");
   });
 
   it("omits defaults", () => {
@@ -87,13 +102,15 @@ describe("isFiltered", () => {
   it("is true for each axis alone", () => {
     expect(isFiltered({ ...NO_FILTERS, projects: ["a"] })).toBe(true);
     expect(isFiltered({ ...NO_FILTERS, statuses: ["Todo"] })).toBe(true);
+    expect(isFiltered({ ...NO_FILTERS, live: true })).toBe(true);
     expect(isFiltered({ ...NO_FILTERS, q: "x" })).toBe(true);
   });
 });
 
 describe("filterCount", () => {
-  it("counts projects and statuses, not q", () => {
-    expect(filterCount({ projects: ["a", "b"], statuses: ["Todo"], q: "x" })).toBe(3);
+  it("counts projects, statuses and active sessions, not q", () => {
+    expect(filterCount({ projects: ["a", "b"], statuses: ["Todo"], live: false, q: "x" })).toBe(3);
+    expect(filterCount({ projects: ["a", "b"], statuses: ["Todo"], live: true, q: "x" })).toBe(4);
   });
 });
 

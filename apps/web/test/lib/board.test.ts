@@ -241,7 +241,7 @@ describe("filterBoard", () => {
       [ticket("RIC-1", "Todo"), ticket("RIC-2", "Backlog")],
       [session("mj-free-aaaaaa", { project: null })],
     );
-    expect(filterBoard(sections, NO_FILTERS)).toEqual(sections);
+    expect(filterBoard(sections, NO_FILTERS, [])).toEqual(sections);
   });
 
   it("a project filter keeps only those sections and drops General", () => {
@@ -251,12 +251,12 @@ describe("filterBoard", () => {
       [session("mj-free-aaaaaa", { project: null })],
     );
     expect(sections.map((s) => s.project)).toEqual(["Alpha", "Beta", null]);
-    expect(filterBoard(sections, filters({ projects: ["Beta"] })).map((s) => s.project)).toEqual(["Beta"]);
+    expect(filterBoard(sections, filters({ projects: ["Beta"] }), []).map((s) => s.project)).toEqual(["Beta"]);
   });
 
   it("a selected unknown project matches nothing", () => {
     const sections = groupBoard([project("Alpha")], [ticket("RIC-1", "Todo")], []);
-    expect(filterBoard(sections, filters({ projects: ["Gone"] }))).toEqual([]);
+    expect(filterBoard(sections, filters({ projects: ["Gone"] }), [])).toEqual([]);
   });
 
   it("a status filter keeps only those tickets, ORed", () => {
@@ -265,7 +265,7 @@ describe("filterBoard", () => {
       [ticket("RIC-1", "In Review"), ticket("RIC-2", "Todo"), ticket("RIC-3", "In Progress")],
       [],
     );
-    const [section] = filterBoard(sections, filters({ statuses: ["Todo", "In Review"] }));
+    const [section] = filterBoard(sections, filters({ statuses: ["Todo", "In Review"] }), []);
     expect(ids(section.active)).toEqual(["RIC-1", "RIC-2"]);
   });
 
@@ -275,17 +275,17 @@ describe("filterBoard", () => {
       [ticket("RIC-1", "Todo"), ticket("RIC-2", "QA")],
       [session("mj-free-aaaaaa")],
     );
-    const [section] = filterBoard(sections, filters({ statuses: ["Todo"] }));
+    const [section] = filterBoard(sections, filters({ statuses: ["Todo"] }), []);
     expect(ids(section.active)).toEqual(["RIC-1"]);
     expect(section.loose).toEqual([]);
   });
 
   it("the Backlog group shows only with no status or Backlog selected", () => {
     const sections = groupBoard([project("Alpha")], [ticket("RIC-1", "Todo"), ticket("RIC-2", "Backlog")], []);
-    const [todo] = filterBoard(sections, filters({ statuses: ["Todo"] }));
+    const [todo] = filterBoard(sections, filters({ statuses: ["Todo"] }), []);
     expect(todo.backlog).toEqual([]);
     expect(todo.backlogOpen).toBe(false);
-    const [backlog] = filterBoard(sections, filters({ statuses: ["Backlog"] }));
+    const [backlog] = filterBoard(sections, filters({ statuses: ["Backlog"] }), []);
     expect(ids(backlog.backlog)).toEqual(["RIC-2"]);
     expect(backlog.backlogOpen).toBe(true);
     expect(backlog.active).toEqual([]);
@@ -298,15 +298,57 @@ describe("filterBoard", () => {
       [ticket("RIC-2", "Todo"), ticket("RIC-3", "Todo"), bug],
       [],
     );
-    const active = (q: string) => ids(filterBoard(sections, filters({ q }))[0].active);
+    const active = (q: string) => ids(filterBoard(sections, filters({ q }), [])[0].active);
     expect(active("ric-2")).toEqual(["RIC-2"]);
     expect(active("TITLE ric-3")).toEqual(["RIC-3"]);
     expect(active("bug")).toEqual(["RIC-4"]);
   });
 
+  describe("active sessions", () => {
+    const live = filters({ live: true });
+
+    it("keeps only tickets with a live session", () => {
+      const sessions = [
+        session("mj-RIC-1", { kind: "ticket", ticket: "RIC-1", state: "running" }),
+        session("mj-RIC-2", { kind: "ticket", ticket: "RIC-2", state: "ended" }),
+      ];
+      const sections = groupBoard([project("Alpha")], [ticket("RIC-1", "Todo"), ticket("RIC-2", "Todo"), ticket("RIC-3", "Todo")], sessions);
+      expect(ids(filterBoard(sections, live, sessions)[0].active)).toEqual(["RIC-1"]);
+    });
+
+    it("keeps live loose sessions and drops ended ones", () => {
+      const sessions = [session("mj-free-aaaaaa", { state: "idle" }), session("mj-free-bbbbbb", { state: "ended" })];
+      const sections = groupBoard([project("Alpha")], [], sessions);
+      expect(filterBoard(sections, live, sessions)[0].loose.map((s) => s.id)).toEqual(["mj-free-aaaaaa"]);
+    });
+
+    it("opens the Backlog group holding a match", () => {
+      const sessions = [session("mj-RIC-1", { kind: "ticket", ticket: "RIC-1", state: "running" })];
+      const sections = groupBoard([project("Alpha")], [ticket("RIC-1", "Backlog")], sessions);
+      const [section] = filterBoard(sections, live, sessions);
+      expect(ids(section.backlog)).toEqual(["RIC-1"]);
+      expect(section.backlogOpen).toBe(true);
+    });
+
+    it("narrows a status filter further", () => {
+      const sessions = [
+        session("mj-RIC-1", { kind: "ticket", ticket: "RIC-1", state: "running" }),
+        session("mj-RIC-2", { kind: "ticket", ticket: "RIC-2", state: "running" }),
+      ];
+      const sections = groupBoard([project("Alpha")], [ticket("RIC-1", "Todo"), ticket("RIC-2", "In Review"), ticket("RIC-3", "Todo")], sessions);
+      const [section] = filterBoard(sections, filters({ live: true, statuses: ["Todo"] }), sessions);
+      expect(ids(section.active)).toEqual(["RIC-1"]);
+    });
+
+    it("drops a section with no live session", () => {
+      const sections = groupBoard([project("Alpha")], [ticket("RIC-1", "Todo")], []);
+      expect(filterBoard(sections, live, [])).toEqual([]);
+    });
+  });
+
   it("a search trims q", () => {
     const sections = groupBoard([project("Alpha")], [ticket("RIC-1", "Todo"), ticket("RIC-2", "Todo")], []);
-    expect(ids(filterBoard(sections, filters({ q: "  ric-2 " }))[0].active)).toEqual(["RIC-2"]);
+    expect(ids(filterBoard(sections, filters({ q: "  ric-2 " }), [])[0].active)).toEqual(["RIC-2"]);
   });
 
   it("a search opens a Backlog group with a match", () => {
@@ -320,11 +362,11 @@ describe("filterBoard", () => {
       ],
       [],
     );
-    const only = filterBoard(sections, filters({ q: "ric-1" }));
+    const only = filterBoard(sections, filters({ q: "ric-1" }), []);
     expect(only.map((s) => s.project)).toEqual(["Alpha"]);
     expect(ids(only[0].backlog)).toEqual(["RIC-1"]);
     expect(only[0].backlogOpen).toBe(true);
-    const mixed = filterBoard(sections, filters({ q: "ric-2" }));
+    const mixed = filterBoard(sections, filters({ q: "ric-2" }), []);
     expect(mixed[0].backlog).toEqual([]);
     expect(mixed[0].backlogOpen).toBe(false);
   });
@@ -335,9 +377,9 @@ describe("filterBoard", () => {
       [],
       [session("mj-sh-aaaaaa", { kind: "shell" }), session("mj-cl-bbbbbb", { kind: "claude" })],
     );
-    const [section] = filterBoard(sections, filters({ q: "shell" }));
+    const [section] = filterBoard(sections, filters({ q: "shell" }), []);
     expect(section.loose.map((s) => s.id)).toEqual(["mj-sh-aaaaaa"]);
-    expect(filterBoard(sections, filters({ q: "bbbbbb" }))[0].loose.map((s) => s.id)).toEqual(["mj-cl-bbbbbb"]);
+    expect(filterBoard(sections, filters({ q: "bbbbbb" }), [])[0].loose.map((s) => s.id)).toEqual(["mj-cl-bbbbbb"]);
   });
 
   it("drops sections left empty", () => {
@@ -346,7 +388,7 @@ describe("filterBoard", () => {
       [ticket("RIC-1", "Todo", "Alpha"), ticket("RIC-2", "Backlog", "Beta")],
       [],
     );
-    expect(filterBoard(sections, filters({ statuses: ["Todo"] })).map((s) => s.project)).toEqual(["Alpha"]);
+    expect(filterBoard(sections, filters({ statuses: ["Todo"] }), []).map((s) => s.project)).toEqual(["Alpha"]);
   });
 });
 

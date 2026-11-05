@@ -309,7 +309,8 @@ app's state, left in place.
   `prose` from `@tailwindcss/typography`; links by `classifyHref` — http(s) a new tab, mailto plain,
   a relative `.md` the viewer (resolved against the document's directory, climbing above a relative
   root is inert), anything else inert text; images show their alt text only (no fetch).
-- **Board filters** (RIC-502): project (multi), status, text — the url is the only state
+- **Board filters** (RIC-502): project (multi), status, active sessions (`live=1`, RIC-549: a
+  ticket with a live session, a live loose session), text — the url is the only state
   (`lib/filters.ts` codec, `hooks/useBoardFilters.ts`). Writes **replace** the history entry
   (Back leaves the board, not one chip). `q` keeps its spaces in the live url (trimming would
   eat the space typed between two words); `canonicalSearch` trims it, and favourites are saved
@@ -318,9 +319,10 @@ app's state, left in place.
   sheet) is `byProjectName`, `localeCompare(b, "en")`. The search field keeps a local draft: react-router 8 applies
   navigations asynchronously in a transition, so a url-controlled input loses caret and
   keystrokes. `filterBoard` runs after `groupBoard`: a project filter drops General, a status
-  filter drops loose sessions and statuses outside `FILTER_STATUSES`; Backlog opens
-  (`backlogOpen`) when selected or `q` is set, so a search never hides a match in a closed
-  group. `lib/boardReturn.ts` keeps the last board search in `sessionStorage` (per tab) for the
+  filter drops loose sessions and statuses outside `FILTER_STATUSES` (workflow order, Backlog →
+  In Review, the sheet's and the url's; a favourite saved in another order still matches, being
+  re-canonicalised); Backlog opens (`backlogOpen`) when selected or `q` or `live` is set, so a
+  filter never hides a match in a closed group. `lib/boardReturn.ts` keeps the last board search in `sessionStorage` (per tab) for the
   terminal's Board link, best effort.
 - **Favourites** (`lib/favorites.ts`, `hooks/useFavorites.ts`): chips under the search row
   (tap the active one = clear), saved from the filter sheet (a same-name save replaces in

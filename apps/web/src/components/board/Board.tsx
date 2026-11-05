@@ -41,7 +41,7 @@ export function Board() {
   const sessionList = useMemo(() => sessions.data ?? [], [sessions.data]);
   const [filters, setFilters] = useBoardFilters();
   const sections = useMemo(
-    () => filterBoard(groupBoard(projects.data ?? [], tickets.data?.tickets ?? [], sessionList), filters),
+    () => filterBoard(groupBoard(projects.data ?? [], tickets.data?.tickets ?? [], sessionList), filters, sessionList),
     [projects.data, tickets.data, sessionList, filters],
   );
   const banner = tickets.data ? linearBanner(tickets.data) : null;
