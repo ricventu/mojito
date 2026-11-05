@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, GitGraph, Play, RotateCcw, SquareTerminal } from "lucide-react";
+import { Check, FileText, GitGraph, Play, RotateCcw, SquareTerminal } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 import type { Effort, Model, PeerSnapshot, SessionMeta, Settings, TicketSummary } from "@mojito/shared";
@@ -17,7 +17,7 @@ import { useResume } from "@/hooks/useResume";
 import { useSessions } from "@/hooks/useSessions";
 import { useSettings } from "@/hooks/useSettings";
 import { ApiError, apiFetch, apiJson } from "@/lib/api";
-import { sessionForTicket } from "@/lib/board";
+import { canMarkDone, DONE_STATUS, sessionForTicket } from "@/lib/board";
 import { docsHref } from "@/lib/docs/url";
 import { canResume } from "@/lib/endReason";
 import { gitHref } from "@/lib/git/url";
@@ -32,30 +32,12 @@ import { SHEET_CONTENT_CLASS } from "./styles";
 const errorMessage = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
 
 /**
- * The ticket's status as a pill in the header; tapping it moves the ticket among its team's states
- * (Linear's own list). `teamKey` is undefined while projects load and null for a project that is
- * not mapped; until the states are in, the pill is a plain badge — and when they cannot be had,
- * a line beside it says why, with a retry where one can help.
+ * Moves the ticket on Linear, for the header's pill and for Mark Done. `onMove` shows the new
+ * status at once, and takes it back (null) if Linear refuses.
  */
-function StatusPill({
-  ticket,
-  status,
-  teamKey,
-  onMove,
-}: {
-  ticket: TicketSummary;
-  status: string;
-  teamKey: string | null | undefined;
-  onMove: (status: string | null) => void;
-}) {
+function useMoveTicket(ticket: TicketSummary, onMove: (status: string | null) => void) {
   const qc = useQueryClient();
-  const states = useQuery({
-    queryKey: ["ticket-states", teamKey],
-    queryFn: () => apiFetch<string[]>(`/api/tickets/states?team=${encodeURIComponent(teamKey ?? "")}`),
-    enabled: !!teamKey,
-    staleTime: 5 * 60_000,
-  });
-  const move = useMutation({
+  return useMutation({
     mutationFn: (next: string) =>
       apiJson<unknown>(`/api/tickets/${encodeURIComponent(ticket.identifier)}/status`, "POST", { status: next }),
     onMutate: (next) => onMove(next),
@@ -65,6 +47,33 @@ function StatusPill({
       toast.error(errorMessage(e, "Status change failed"));
     },
     onSettled: () => qc.invalidateQueries({ queryKey: qk.tickets }),
+  });
+}
+
+/**
+ * The ticket's status as a pill in the header; tapping it moves the ticket among its team's states
+ * (Linear's own list). `teamKey` is undefined while projects load and null for a project that is
+ * not mapped; until the states are in, the pill is a plain badge — and when they cannot be had,
+ * a line beside it says why, with a retry where one can help.
+ */
+function StatusPill({
+  ticket,
+  status,
+  teamKey,
+  moving,
+  onPick,
+}: {
+  ticket: TicketSummary;
+  status: string;
+  teamKey: string | null | undefined;
+  moving: boolean;
+  onPick: (status: string) => void;
+}) {
+  const states = useQuery({
+    queryKey: ["ticket-states", teamKey],
+    queryFn: () => apiFetch<string[]>(`/api/tickets/states?team=${encodeURIComponent(teamKey ?? "")}`),
+    enabled: !!teamKey,
+    staleTime: 5 * 60_000,
   });
 
   if (!teamKey || !states.data || states.data.length === 0) {
@@ -103,7 +112,7 @@ function StatusPill({
   const options = states.data.includes(status) ? states.data : [status, ...states.data];
 
   return (
-    <Select value={status} disabled={move.isPending} onValueChange={(next) => move.mutate(next)}>
+    <Select value={status} disabled={moving} onValueChange={onPick}>
       <SelectTrigger
         aria-label="Status"
         className="h-auto gap-1 rounded-full border-transparent bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground shadow-none hover:bg-secondary/80 dark:bg-secondary dark:hover:bg-secondary/80 [&_svg]:size-3"
@@ -294,6 +303,9 @@ export function TicketSheet({ ticket, onClose }: Props) {
   // A move made here, shown at once and kept: Linear answers the refetch a beat later.
   const [movedTo, setMovedTo] = useState<string | null>(null);
   const status = movedTo ?? ticket.statusName;
+  const move = useMoveTicket(ticket, setMovedTo);
+  // The move shows Done at once; the button stays, as the thing in flight, until the sheet closes.
+  const markingDone = move.isPending && move.variables === DONE_STATUS;
 
   return (
     <Sheet open onOpenChange={(open) => !open && onClose()}>
@@ -308,7 +320,13 @@ export function TicketSheet({ ticket, onClose }: Props) {
             >
               {ticket.identifier}
             </a>
-            <StatusPill ticket={ticket} status={status} teamKey={teamKey} onMove={setMovedTo} />
+            <StatusPill
+              ticket={ticket}
+              status={status}
+              teamKey={teamKey}
+              moving={move.isPending}
+              onPick={(next) => move.mutate(next)}
+            />
           </div>
           <SheetTitle className="leading-snug break-words">{ticket.title}</SheetTitle>
           <SheetDescription className="sr-only">Status and session launch for {ticket.identifier}</SheetDescription>
@@ -327,6 +345,16 @@ export function TicketSheet({ ticket, onClose }: Props) {
                 </Link>
               </Button>
             </div>
+          )}
+          {(canMarkDone(status) || markingDone) && (
+            // A Done ticket leaves the board, so the sheet goes with it. A live session stays, as a loose row.
+            <Button
+              variant="outline"
+              disabled={move.isPending}
+              onClick={() => move.mutate(DONE_STATUS, { onSuccess: onClose })}
+            >
+              <Check size={16} /> {markingDone ? "Marking Done…" : "Mark Done"}
+            </Button>
           )}
           {live ? (
             <LiveSession session={session} onClose={onClose} />

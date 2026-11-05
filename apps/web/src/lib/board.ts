@@ -4,6 +4,11 @@ import type { BoardFilters } from "@/lib/filters";
 /** Board order of the active statuses; any other non-Backlog status sorts after the last of these. */
 export const STATUS_ORDER = ["In Review", "In Progress", "Todo"];
 
+export const DONE_STATUS = "Done";
+
+/** Done is the human's call, offered once the session has handed the ticket over for review. */
+export const canMarkDone = (status: string): boolean => status === "In Review";
+
 export interface BoardSection {
   /** `null` is the General section: loose sessions with no (or no longer a mapped) project. */
   project: string | null;

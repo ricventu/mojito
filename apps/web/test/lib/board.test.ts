@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { BoardTickets, ProjectRow, SessionMeta, TicketSummary } from "@mojito/shared";
 import {
+  canMarkDone,
   filterBoard,
   groupBoard,
   kanbanColumns,
@@ -416,5 +417,14 @@ describe("startedLabel", () => {
   });
   it("gives the date beyond a week", () => {
     expect(startedLabel(new Date(2026, 9, 20, 8, 0).getTime(), now)).toBe("20 Oct 08:00");
+  });
+});
+
+describe("canMarkDone", () => {
+  it("is offered only for a ticket in review", () => {
+    expect(canMarkDone("In Review")).toBe(true);
+    for (const status of ["Backlog", "Todo", "In Progress", "Done", "Canceled", ""]) {
+      expect(canMarkDone(status)).toBe(false);
+    }
   });
 });

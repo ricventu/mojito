@@ -60,7 +60,8 @@ app's state, left in place.
   worktree" switch (on by default in the sheet, RIC-527; `LaunchTicketBody.worktree`, absent in
   the body = off, so an API call or an older peer's forward keeps its meaning): on,
   `buildTicketPrompt` appends the fixed `WORKTREE_INSTRUCTION` (not a setting) as the last line.
-  Mojito writes In Progress; the session writes In Review; Done is the human's.
+  Mojito writes In Progress; the session writes In Review; Done is the human's (the ticket sheet's
+  Mark Done, offered while the ticket is In Review; a live session stays, as a loose row).
 - **Prompts are settings** (RIC-513): the ticket prompt (a template; `{ticket}` required,
   filled by `buildTicketPrompt`) and the create-ticket system prompt. Defaults live in
   `shared/src/prompts.ts` (`DEFAULT_PROMPTS`; the ticket one pinned byte-for-byte by
