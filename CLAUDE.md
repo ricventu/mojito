@@ -437,7 +437,11 @@ app's state, left in place.
 - **Installable app** (RIC-508): `public/manifest.webmanifest` + icons, linked from
   `index.html`. Its `id`/`start_url`/`scope` are `/`, v1's: the Mac's Safari Dock app was
   installed from v1's manifest at `http://localhost:8700/`, and a changed id strands it.
-  No service worker (useless offline, and a cache would fight a deploy). The PNGs were
+  No service worker (useless offline, and a cache would fight a deploy). A running page keeps its
+  build, and iOS resumes an installed app with no reload button: the server sends the page
+  `cache-control: no-cache`, and on each ws connect and return to the foreground `useEvents` compares
+  its entry script's hashed name with the served page's (`lib/appUpdate.ts`), offering Reload in a
+  toast — never reloading by itself, which would lose a half-typed ticket. The PNGs were
   rasterized from `icon.svg` by v1's `gen-icons.sh` (not ported): redraw → regenerate by
   hand. `test/manifest.test.ts` guards the id and that every listed icon exists — a renamed
   one silently un-installs the app in Chromium.

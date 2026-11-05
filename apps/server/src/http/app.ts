@@ -93,6 +93,12 @@ export function createApp(deps: AppDeps): Hono {
 
   if (deps.staticDir) {
     const root = deps.staticDir;
+    // The page names the build's hashed assets. Without this a browser may reuse it for a while
+    // on its own judgement, and an installed app then reopens on the build before a deploy.
+    app.use("*", async (c, next) => {
+      await next();
+      if (c.res.headers.get("content-type")?.startsWith("text/html")) c.header("cache-control", "no-cache");
+    });
     app.use("*", serveStatic({ root }));
     // Client-side routes (/session/<id>, …) are the app's own: every other GET gets index.html.
     app.get("*", serveStatic({ root, path: "index.html" }));

@@ -1,6 +1,8 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import type { MojitoEvent, PeersAnswer, SessionMeta, TaskRecord } from "@mojito/shared";
+import { entryScript, hasNewBuild } from "@/lib/appUpdate";
 import { openEventStream, type EventSocket } from "@/lib/eventStream";
 import { removeById, upsertById } from "@/lib/eventCache";
 import { replacePeer } from "@/lib/peers";
@@ -60,6 +62,22 @@ function dial(token: string): EventSocket {
 }
 
 /**
+ * Offers a reload when a deploy has replaced the running build. Never reloads by itself: that
+ * would throw away a half-typed ticket. The toast does not stay, since on a phone it covers the
+ * terminal's accessory bar; a missed one comes back at the next check.
+ */
+function checkForNewBuild(running: string | null): void {
+  void hasNewBuild(running, () => fetch("/", { cache: "no-cache" })).then((isNew) => {
+    if (!isNew) return;
+    toast("New version available", {
+      id: "new-build",
+      duration: 15_000,
+      action: { label: "Reload", onClick: () => window.location.reload() },
+    });
+  });
+}
+
+/**
  * Keeps the query cache live from `/ws/events`. Events are fire-and-forget, so every
  * (re)connection refetches everything, and coming back to a backgrounded tab refetches
  * sessions and tasks — a phone can leave the socket half-open with no close event.
@@ -72,16 +90,20 @@ export function useEvents(): void {
 
   useEffect(() => {
     if (!token) return;
+    const running = entryScript(document.documentElement.outerHTML);
     const dispose = openEventStream(() => dial(token), {
       onEvent: (e) => applyEvent(qc, e),
       onConnect: () => {
         for (const queryKey of Object.values(qk)) void qc.invalidateQueries({ queryKey });
+        // A deploy restarts the server, so this is how a tab left open and visible hears of it.
+        checkForNewBuild(running);
       },
     });
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       void qc.invalidateQueries({ queryKey: qk.sessions });
       void qc.invalidateQueries({ queryKey: qk.tasks });
+      checkForNewBuild(running);
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {

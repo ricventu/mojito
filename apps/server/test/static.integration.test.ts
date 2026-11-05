@@ -55,6 +55,23 @@ describe("static client", () => {
     expect(res.headers.get("content-type")).toMatch(/javascript/);
   });
 
+  // An installed app reopens from the HTTP cache: without this, iOS kept running the build from
+  // before a deploy, and a browser may reuse a page that has no cache-control for a long while.
+  it.each(["/", "/session/x"])("makes the browser revalidate the page at %s", async (path) => {
+    const res = await fetch(`${base}${path}`);
+    expect(res.headers.get("cache-control")).toBe("no-cache");
+  });
+
+  it("leaves a hashed asset's caching alone", async () => {
+    const res = await fetch(`${base}/assets/app-abc123.js`);
+    expect(res.headers.get("cache-control")).toBeNull();
+  });
+
+  it("does not touch an API answer's caching", async () => {
+    const res = await fetch(`${base}/api/health`);
+    expect(res.headers.get("cache-control")).toBeNull();
+  });
+
   it("keeps /api/health a JSON answer, not the client", async () => {
     const res = await fetch(`${base}/api/health`);
     expect(res.status).toBe(200);
