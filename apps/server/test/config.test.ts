@@ -40,7 +40,6 @@ describe("loadConfig", () => {
       linearApiKey: "lin_api_x",
       home: "/home/me",
       stateDir: "/home/me/.local/state/mojito",
-      projectsJsonPath: "/home/me/.config/mojito/projects.json",
       repoRoot: resolve(import.meta.dirname, "../../.."),
     });
   });
@@ -51,12 +50,10 @@ describe("loadConfig", () => {
       MOJITO_PORT: "4000",
       MOJITO_HOST: "0.0.0.0",
       MOJITO_STATE_DIR: "/var/mojito",
-      MOJITO_PROJECTS: "/etc/projects.json",
     });
     expect(cfg.port).toBe(4000);
     expect(cfg.host).toBe("0.0.0.0");
     expect(cfg.stateDir).toBe("/var/mojito");
-    expect(cfg.projectsJsonPath).toBe("/etc/projects.json");
   });
 
   it("falls back to the defaults on empty values", () => {

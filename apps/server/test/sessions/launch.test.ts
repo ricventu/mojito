@@ -20,7 +20,6 @@ const cfg: ServerConfig = {
   linearApiKey: "key",
   stateDir: "/state",
   repoRoot: "/mojito",
-  projectsJsonPath: "/cfg/projects.json",
   home: "/home/me",
 };
 

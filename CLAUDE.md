@@ -45,8 +45,7 @@ app's state, left in place.
   dropped by 005 with the sidebar's Hide; `end_reason`, 006; `claude_session_id`, 007), `sdk_tasks`. Tickets are never
   stored: `tickets/cache.ts` polls Linear every 45 s, scoped to the mapped project names,
   coalesces concurrent refreshes, keeps the last list (`stale`) when Linear fails.
-  `projects.json` (`~/.config/mojito/projects.json`) is imported once per database, then
-  projects are edited in Settings.
+  Projects are edited in Settings.
 - **Launch** (`sessions/launch.ts`): validate (ticket in cache, project mapped, path absolute
   and existing — a project path may be `~`/`~/…`, stored as typed and expanded to HOME by
   `homePath.ts` wherever it meets the disk) → in-memory lock per id (double tap = one 201 +

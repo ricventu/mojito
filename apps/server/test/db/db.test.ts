@@ -1,11 +1,8 @@
 import { describe, it, expect } from "vitest";
 import Database from "better-sqlite3";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { openDb, migrate } from "../../src/db/db";
 import { migrations } from "../../src/db/migrations";
-import { ProjectsRepo, importProjectsJson, importProjectsOnce } from "../../src/db/projects";
+import { ProjectsRepo } from "../../src/db/projects";
 import { SettingsRepo } from "../../src/db/settings";
 import { SessionsRepo } from "../../src/db/sessions";
 import { TasksRepo } from "../../src/db/tasks";
@@ -67,11 +64,11 @@ describe("migrate", () => {
 describe("ProjectsRepo", () => {
   it("upserts, lists sorted, gets, renames and removes", () => {
     const repo = new ProjectsRepo(openDb(":memory:"));
-    expect(repo.isEmpty()).toBe(true);
+    expect(repo.list()).toEqual([]);
     repo.upsert({ name: "Web", path: "/w", teamKey: "RIC" });
     repo.upsert({ name: "Api", path: "/a", teamKey: "RIC" });
     repo.upsert({ name: "Api", path: "/a2", teamKey: "RIC" });
-    expect(repo.isEmpty()).toBe(false);
+    expect(repo.list()).not.toEqual([]);
     expect(repo.list().map((p) => p.name)).toEqual(["Api", "Web"]);
     expect(repo.get("Api")).toEqual({ name: "Api", path: "/a2", teamKey: "RIC" });
     expect(repo.get("nope")).toBeNull();
@@ -98,89 +95,6 @@ describe("ProjectsRepo", () => {
     repo.upsert({ name: "Web", path: "/w", teamKey: "RIC" });
     repo.rename("Web", { name: "Web", path: "/w2", teamKey: "RIC" });
     expect(repo.get("Web")?.path).toBe("/w2");
-  });
-});
-
-describe("importProjectsJson", () => {
-  const write = (content: string) => {
-    const f = join(mkdtempSync(join(tmpdir(), "mj-proj-")), "projects.json");
-    writeFileSync(f, content);
-    return f;
-  };
-  it("imports string, nested and path-only entries", () => {
-    const repo = new ProjectsRepo(openDb(":memory:"));
-    const f = write(
-      JSON.stringify({
-        RIC: { path: "/a", projects: { Web: "/w", Api: "/x" } },
-        OPS: "/o",
-        DOC: { path: "/d" },
-      }),
-    );
-    expect(importProjectsJson(repo, f)).toBe(4);
-    expect(repo.get("Web")).toEqual({ name: "Web", path: "/w", teamKey: "RIC" });
-    expect(repo.get("Api")).toEqual({ name: "Api", path: "/x", teamKey: "RIC" });
-    expect(repo.get("OPS")).toEqual({ name: "OPS", path: "/o", teamKey: "OPS" });
-    expect(repo.get("DOC")).toEqual({ name: "DOC", path: "/d", teamKey: "DOC" });
-  });
-  it("returns 0 for a missing or malformed file", () => {
-    const repo = new ProjectsRepo(openDb(":memory:"));
-    expect(importProjectsJson(repo, "/nonexistent/projects.json")).toBe(0);
-    expect(importProjectsJson(repo, write("{not json"))).toBe(0);
-    expect(importProjectsJson(repo, write("null"))).toBe(0);
-    expect(repo.isEmpty()).toBe(true);
-  });
-});
-
-describe("importProjectsOnce", () => {
-  const file = () => {
-    const f = join(mkdtempSync(join(tmpdir(), "mj-proj-")), "projects.json");
-    writeFileSync(f, JSON.stringify({ RIC: "/repos/ric" }));
-    return f;
-  };
-
-  it("imports into an empty database and records that it did", () => {
-    const db = openDb(":memory:");
-    const repo = new ProjectsRepo(db);
-    const settings = new SettingsRepo(db);
-    expect(importProjectsOnce(repo, settings, file())).toBe(1);
-    expect(settings.projectsImported()).toBe(true);
-  });
-
-  // Deleting every project in Settings must stick across a restart.
-  it("never imports again, even once every project was deleted", () => {
-    const db = openDb(":memory:");
-    const repo = new ProjectsRepo(db);
-    const settings = new SettingsRepo(db);
-    const f = file();
-    importProjectsOnce(repo, settings, f);
-    repo.remove("RIC");
-    expect(importProjectsOnce(repo, settings, f)).toBeNull();
-    expect(repo.isEmpty()).toBe(true);
-  });
-
-  it("counts a missing file as the one attempt", () => {
-    const db = openDb(":memory:");
-    const settings = new SettingsRepo(db);
-    expect(importProjectsOnce(new ProjectsRepo(db), settings, "/nonexistent/projects.json")).toBe(0);
-    expect(settings.projectsImported()).toBe(true);
-  });
-
-  // A database populated before the flag existed: flag it, leave its projects as they are.
-  it("flags a database that already has projects without reading the file", () => {
-    const db = openDb(":memory:");
-    const repo = new ProjectsRepo(db);
-    const settings = new SettingsRepo(db);
-    repo.upsert({ name: "Web", path: "/repos/web", teamKey: "RIC" });
-    expect(importProjectsOnce(repo, settings, file())).toBeNull();
-    expect(repo.list().map((p) => p.name)).toEqual(["Web"]);
-    expect(settings.projectsImported()).toBe(true);
-  });
-
-  it("keeps the flag out of the settings the API serves", () => {
-    const db = openDb(":memory:");
-    const settings = new SettingsRepo(db);
-    settings.markProjectsImported();
-    expect(Object.keys(settings.get())).toEqual(["statusDefaults", "prompts", "favorites"]);
   });
 });
 

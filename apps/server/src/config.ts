@@ -24,7 +24,6 @@ export interface ServerConfig {
   linearApiKey: string;
   stateDir: string;
   repoRoot: string;
-  projectsJsonPath: string;
   home: string;
 }
 
@@ -55,7 +54,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, osHostname: str
     linearApiKey,
     stateDir: env.MOJITO_STATE_DIR ?? join(home, ".local", "state", "mojito"),
     repoRoot: REPO_ROOT,
-    projectsJsonPath: env.MOJITO_PROJECTS ?? join(home, ".config", "mojito", "projects.json"),
     home,
   };
 }

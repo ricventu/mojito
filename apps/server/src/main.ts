@@ -6,7 +6,7 @@ import { serve } from "@hono/node-server";
 import { WebSocketServer } from "ws";
 import { REPO_ROOT, loadConfig, loadEnvFile } from "./config";
 import { openDb } from "./db/db";
-import { ProjectsRepo, importProjectsOnce } from "./db/projects";
+import { ProjectsRepo } from "./db/projects";
 import { SessionsRepo } from "./db/sessions";
 import { SettingsRepo } from "./db/settings";
 import { TasksRepo } from "./db/tasks";
@@ -48,8 +48,6 @@ async function main(): Promise<void> {
   const sessions = new SessionsRepo(db);
   const tasks = new TasksRepo(db);
 
-  const imported = importProjectsOnce(projects, settings, cfg.projectsJsonPath);
-  if (imported) console.log(`imported ${imported} project(s) from ${cfg.projectsJsonPath}`);
   tasks.failInterrupted(Date.now());
 
   const bus = new EventBus();

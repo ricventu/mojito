@@ -22,8 +22,6 @@ win). Nothing it reads there reaches the sessions' environment.
   on loopback and reach it through Tailscale Serve.
 - `MOJITO_STATE_DIR` — state (default `~/.local/state/mojito`: the SQLite `mojito.db`, hook
   settings, uploaded images).
-- `MOJITO_PROJECTS` — a `projects.json` imported once into a new database (default
-  `~/.config/mojito/projects.json`); after that, projects are edited in Settings.
 
 A port already in use makes the server exit with an error rather than stay up without
 listening.

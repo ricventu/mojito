@@ -28,7 +28,7 @@ describe("POST /api/projects", () => {
     const res = await req("/api/projects", { method: "POST", json: { ...web, path: "repo/web" } });
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toMatch(/path/);
-    expect(projects.isEmpty()).toBe(true);
+    expect(projects.list()).toEqual([]);
   });
 
   it("refuses a path that does not exist", async () => {
@@ -38,7 +38,7 @@ describe("POST /api/projects", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "project path not found: /repo/web" });
     expect(exists).toHaveBeenCalledWith("/repo/web");
-    expect(projects.isEmpty()).toBe(true);
+    expect(projects.list()).toEqual([]);
   });
 
   it("keeps a path under the home directory as typed, checking it expanded", async () => {
@@ -115,7 +115,7 @@ describe("PUT /api/projects/:name", () => {
     const { req, projects } = setup();
     const res = await req("/api/projects/Web", { method: "PUT", json: web });
     expect(res.status).toBe(404);
-    expect(projects.isEmpty()).toBe(true);
+    expect(projects.list()).toEqual([]);
   });
 
   it("refuses a rename onto an existing name", async () => {
@@ -144,7 +144,7 @@ describe("DELETE /api/projects/:name", () => {
     projects.upsert(web);
     const res = await req("/api/projects/Web", { method: "DELETE" });
     expect(res.status).toBe(200);
-    expect(projects.isEmpty()).toBe(true);
+    expect(projects.list()).toEqual([]);
     expect(refresh).toHaveBeenCalled();
   });
 
