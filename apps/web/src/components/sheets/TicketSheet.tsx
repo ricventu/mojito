@@ -327,6 +327,17 @@ export function TicketSheet({ ticket, onClose }: Props) {
               moving={move.isPending}
               onPick={(next) => move.mutate(next)}
             />
+            {(canMarkDone(status) || markingDone) && (
+              // A Done ticket leaves the board, so the sheet goes with it. A live session stays, as a loose row.
+              <Button
+                variant="outline"
+                size="xs"
+                disabled={move.isPending}
+                onClick={() => move.mutate(DONE_STATUS, { onSuccess: onClose })}
+              >
+                <Check size={12} /> {markingDone ? "Marking Done…" : "Mark Done"}
+              </Button>
+            )}
           </div>
           <SheetTitle className="leading-snug break-words">{ticket.title}</SheetTitle>
           <SheetDescription className="sr-only">Status and session launch for {ticket.identifier}</SheetDescription>
@@ -345,16 +356,6 @@ export function TicketSheet({ ticket, onClose }: Props) {
                 </Link>
               </Button>
             </div>
-          )}
-          {(canMarkDone(status) || markingDone) && (
-            // A Done ticket leaves the board, so the sheet goes with it. A live session stays, as a loose row.
-            <Button
-              variant="outline"
-              disabled={move.isPending}
-              onClick={() => move.mutate(DONE_STATUS, { onSuccess: onClose })}
-            >
-              <Check size={16} /> {markingDone ? "Marking Done…" : "Mark Done"}
-            </Button>
           )}
           {live ? (
             <LiveSession session={session} onClose={onClose} />
