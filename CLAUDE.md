@@ -281,6 +281,8 @@ app's state, left in place.
   the board stay visible as loose rows (a live tmux never disappears from the UI). A "Created"
   task card (`TaskStrip`) opens its ticket's sheet like a ticket card, its id the link to Linear;
   until the ticket is on the board (`taskTicket`: the poll after creation; closed since) only the link.
+  A ticket's status is a filled pill (`StatusBadge`): violet In Review, blue In Progress, neutral
+  otherwise — emerald, sky, amber and red mean a session's state.
 - Project header: Pull / Push icons (`GitButtons`, `lib/gitSync.ts`) — a toast, or on a conflict
   the git session's terminal (pushed, from the board).
 - **Git graph page** (RIC-505, `/git/:project`, `components/git`, `lib/git`, `hooks/useGitGraph.ts`):

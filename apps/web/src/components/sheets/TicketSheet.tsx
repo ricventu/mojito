@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 import type { Effort, Model, PeerSnapshot, SessionMeta, Settings, TicketSummary } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge, statusClass } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,6 +26,7 @@ import { launchErrorAction, launchOptions, type LaunchPicks } from "@/lib/launch
 import { launchHosts, peerSessionForTicket } from "@/lib/peers";
 import { qk } from "@/lib/queryKeys";
 import { safeHref } from "@/lib/url";
+import { cn } from "@/lib/utils";
 import { LaunchOptions } from "./LaunchOptions";
 import { SHEET_CONTENT_CLASS } from "./styles";
 
@@ -87,7 +88,7 @@ function StatusPill({
             : null;
     return (
       <>
-        <Badge variant="secondary">{status}</Badge>
+        <StatusBadge status={status} />
         {why && (
           <span className="text-xs text-muted-foreground">
             Read-only: {why}
@@ -115,7 +116,7 @@ function StatusPill({
     <Select value={status} disabled={moving} onValueChange={onPick}>
       <SelectTrigger
         aria-label="Status"
-        className="h-auto gap-1 rounded-full border-transparent bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground shadow-none hover:bg-secondary/80 dark:bg-secondary dark:hover:bg-secondary/80 [&_svg]:size-3"
+        className={cn("h-auto gap-1 rounded-full border-transparent px-2 py-0.5 text-xs font-medium shadow-none [&_svg]:size-3", statusClass(status))}
       >
         <SelectValue />
       </SelectTrigger>

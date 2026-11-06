@@ -1,6 +1,7 @@
 import type { KeyboardEvent } from "react";
 import type { SessionMeta, TicketSummary } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { safeHref } from "@/lib/url";
 import { cn } from "@/lib/utils";
@@ -57,7 +58,7 @@ export function TicketCard({ ticket, session, selected, showStatus = true, onOpe
         <p className="min-w-0 text-sm leading-snug font-medium break-words">{ticket.title}</p>
         {(showStatus || ticket.labels.length > 0 || session) && (
           <div className="flex flex-wrap items-center gap-1.5">
-            {showStatus && <Badge variant="secondary">{ticket.statusName}</Badge>}
+            {showStatus && <StatusBadge status={ticket.statusName} />}
             {ticket.labels.map((label) => (
               <Badge key={label} variant="outline" className="max-w-full truncate">
                 {label}
