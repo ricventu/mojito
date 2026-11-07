@@ -5,7 +5,12 @@ export const qk = {
   projects: ["projects"],
   settings: ["settings"],
   peers: ["peers"],
+  /** Prefix of every project's worktree count (`worktreeKey`), so a reconnect re-reads them all. */
+  worktrees: ["worktrees"],
 } as const;
+
+/** A project's linked worktree count, the Clean button's badge. */
+export const worktreeKey = (project: string) => [...qk.worktrees, project] as const;
 
 /** Every favourites write, queued in one mutation scope so the PUTs run one at a time. */
 export const favoritesMutationKey = ["favorites"] as const;

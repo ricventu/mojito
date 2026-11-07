@@ -26,7 +26,8 @@ app's state, left in place.
   `Settings`, `ProjectRow`, `Favorite`), zod request bodies (`LaunchBody`, `ProjectBody`, `SettingsBody`,
   `PromptsBody`, `FavoritesBody`, `StatusBody`), `MojitoEvent`, `MODELS`/`EFFORTS`, `DEFAULT_PROMPTS`,
   `SESSION_GONE_CODE` (4404), the git graph types (`GitGraphPage`, `GraphCommit`, `GraphRef`,
-  `GraphHighlight`, `CommitDetails`, `CommitFile`, `CommitDiff`) and `isValidHash`/`isValidTicket`, the docs
+  `GraphHighlight`, `CommitDetails`, `CommitFile`, `CommitDiff`) and `isValidHash`/`isValidTicket`,
+  `CleanResult`/`WorktreeCount`, the docs
   types (`DocEntry`, `DocList`, `DocFile`, `DOC_MAX_BYTES`) and `isDocPath`, the peer types
   (`PeerSnapshot`, `PeersAnswer`) and `openEventStream` (used by the web and by the server's peer
   links; `schedule` is required — the package has no timer typings). Consumed as source, no build; zod **4** everywhere (the Agent
@@ -193,6 +194,16 @@ app's state, left in place.
   fixed id `mj-<slug>-git`: a live one is answered `alreadyOpen`, never doubled). Failures with
   nothing to resolve (no upstream, detached, network) are 422 `{error}`; one op per project at a
   time (409). `test/git/sync.test.ts` runs real git in a temp dir with the global config off.
+- **Clean** (RIC-528, `POST /api/projects/:name/clean` → `CleanResult`, `launchClean`): a Claude
+  session, not git commands — "merged" must include squash and rebase merges, which `git branch
+  --merged` does not see. Fixed id `mj-<slug>-clean` (a live one answered `alreadyOpen`, like the
+  git session; both go through `launchProjectSession`), sonnet/high, the fixed `CLEAN_PROMPT` (not
+  a setting): fetch --prune, list merged local and origin branches and the worktrees of merged
+  branches, never touch the default/checked-out branch, unmerged commits, a locked worktree (a live
+  Claude Code session holds it) or a dirty one, **wait for the human's yes in the terminal**, then
+  `worktree remove` (no --force), `branch -d`, `push origin --delete`, `worktree prune`. The badge:
+  `GET /api/projects/:name/worktrees` → `{count}` (`git/worktrees.ts`: porcelain entries minus the
+  main checkout and `prunable` ones; a `GitError` is a 409).
 - **Git graph** (RIC-505, `git/graph.ts`, `ticketBranch.ts`, `defaultBranch.ts`, `commit.ts`,
   `http/routes/gitGraph.ts`): read-only — `GET /api/projects/:name/git/graph?skip&ticket`,
   `…/git/commits/:hash` and `…/commits/:hash/diff?path&from`. Never a `fetch` or any write: the
@@ -284,7 +295,10 @@ app's state, left in place.
   A ticket's status is a filled pill (`StatusBadge`): violet In Review, blue In Progress, neutral
   otherwise — emerald, sky, amber and red mean a session's state.
 - Project header: Pull / Push icons (`GitButtons`, `lib/gitSync.ts`) — a toast, or on a conflict
-  the git session's terminal (pushed, from the board).
+  the git session's terminal (pushed, from the board). Then Clean (`CleanButton`, `lib/clean.ts`):
+  opens the clean session's terminal; its badge is the linked worktree count (hidden at 0, `9+`),
+  `worktreeKey(project)` under `qk.worktrees` (re-read on reconnect) with a 30 s `refetchInterval`
+  — worktrees come and go with sessions, which emit nothing about them.
 - **Git graph page** (RIC-505, `/git/:project`, `components/git`, `lib/git`, `hooks/useGitGraph.ts`):
   `ticket`/`commit`/`file`/`from` are the only view state (`lib/git/url.ts` is the one codec —
   `gitHref` for entry points, `parseGitSearch` drops what makes no sense). Entry points: project

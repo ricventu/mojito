@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { GitError } from "../../src/git/git";
 import type { PullOutcome, PushOutcome } from "../../src/git/sync";
 import { SyncError } from "../../src/git/sync";
 import { meta, setup } from "./setup";
@@ -91,5 +92,63 @@ describe("POST /api/projects/:name/pull|push", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "project path not found: /home/me/repo/web" });
     expect(ctx.git.pull).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/projects/:name/clean", () => {
+  it("opens the project's clean session and answers it", async () => {
+    const ctx = setup();
+    ctx.projects.upsert(web);
+    const res = await post(ctx, "clean");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ alreadyOpen: false, session: { id: "mj-web-clean", project: "Web" } });
+    expect(ctx.launch.newSession).toHaveBeenCalledWith("mj-web-clean", "/home/me/repo/web", expect.stringContaining("fetch --prune"));
+  });
+
+  it("answers the clean session already open", async () => {
+    const ctx = setup();
+    ctx.projects.upsert(web);
+    const live = meta({ id: "mj-web-clean", kind: "claude", ticket: null, state: "idle" });
+    ctx.sessions.insert(live);
+    expect(await (await post(ctx, "clean")).json()).toEqual({ alreadyOpen: true, session: live });
+  });
+
+  it("404s an unknown project", async () => {
+    const ctx = setup();
+    const res = await post(ctx, "clean", "Nope");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "project not found: Nope" });
+  });
+});
+
+describe("GET /api/projects/:name/worktrees", () => {
+  it("counts the linked worktrees of the project's checkout", async () => {
+    const worktrees = vi.fn(async (_cwd: string) => 3);
+    const ctx = setup({ worktrees });
+    ctx.projects.upsert(web);
+    const res = await ctx.req("/api/projects/Web/worktrees");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ count: 3 });
+    expect(worktrees).toHaveBeenCalledWith("/home/me/repo/web");
+  });
+
+  it("answers git's words with a 409 when it cannot list them", async () => {
+    const ctx = setup({
+      worktrees: async () => {
+        throw new GitError(["worktree"], "fatal: not a git repository", 128);
+      },
+    });
+    ctx.projects.upsert(web);
+    const res = await ctx.req("/api/projects/Web/worktrees");
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "git worktree failed: fatal: not a git repository" });
+  });
+
+  it("404s an unknown project and 400s a missing path", async () => {
+    const ctx = setup({ worktrees: async () => 0 });
+    expect((await ctx.req("/api/projects/Nope/worktrees")).status).toBe(404);
+    ctx.projects.upsert(web);
+    ctx.exists.mockReturnValue(false);
+    expect((await ctx.req("/api/projects/Web/worktrees")).status).toBe(400);
   });
 });

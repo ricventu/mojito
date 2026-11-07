@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WORKTREE_INSTRUCTION, buildGitResolvePrompt, buildTicketPrompt } from "../../src/sessions/prompt";
+import { CLEAN_PROMPT, WORKTREE_INSTRUCTION, buildGitResolvePrompt, buildTicketPrompt } from "../../src/sessions/prompt";
 
 describe("buildTicketPrompt", () => {
   it("is the exact text", () => {
@@ -38,5 +38,17 @@ describe("buildGitResolvePrompt", () => {
     expect(prompt).toContain("Push of branch main");
     expect(prompt).not.toContain("Do not push.");
     expect(prompt).toMatch(/then push it/);
+  });
+});
+
+describe("CLEAN_PROMPT", () => {
+  it("asks before deleting and keeps away from other sessions' work", () => {
+    expect(CLEAN_PROMPT).toMatch(/fetch --prune/);
+    expect(CLEAN_PROMPT).toMatch(/squash/);
+    expect(CLEAN_PROMPT).toMatch(/locked/);
+    expect(CLEAN_PROMPT).toMatch(/wait for my confirmation/i);
+    expect(CLEAN_PROMPT).toMatch(/never --force/);
+    expect(CLEAN_PROMPT).toMatch(/never force-push/i);
+    expect(CLEAN_PROMPT).toContain("worktree prune");
   });
 });

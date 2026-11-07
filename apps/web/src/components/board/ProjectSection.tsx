@@ -7,6 +7,7 @@ import { kanbanColumns, sessionForTicket, type BoardSection } from "@/lib/board"
 import { docsHref } from "@/lib/docs/url";
 import { gitHref } from "@/lib/git/url";
 import { cn } from "@/lib/utils";
+import { CleanButton } from "./CleanButton";
 import { GitButtons } from "./GitButtons";
 import { LooseSessions } from "./LooseSessions";
 import { TicketCard } from "./TicketCard";
@@ -65,6 +66,7 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
           </Button>
         )}
         {project !== null && <GitButtons project={project} />}
+        {project !== null && <CleanButton project={project} />}
         {project !== null && (
           <Button variant="ghost" size="icon-sm" aria-label={`New ticket in ${name}`} onClick={() => onNewTicket(project)}>
             <Plus size={16} />

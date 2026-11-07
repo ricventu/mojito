@@ -7,9 +7,9 @@ import { SessionsRepo } from "../../src/db/sessions";
 import { EventBus } from "../../src/events/bus";
 import { DuplicateSessionError, q } from "../../src/tmux/tmux";
 import { buildHookSettings } from "../../src/sessions/hookSettings";
-import { buildGitResolvePrompt, buildTicketPrompt } from "../../src/sessions/prompt";
+import { CLEAN_PROMPT, buildGitResolvePrompt, buildTicketPrompt } from "../../src/sessions/prompt";
 import { STALL_GRACE_MS } from "../../src/sessions/startupStall";
-import { launchFree, launchGitResolve, launchTicket, resumeSession, type LaunchDeps } from "../../src/sessions/launch";
+import { launchClean, launchFree, launchGitResolve, launchTicket, resumeSession, type LaunchDeps } from "../../src/sessions/launch";
 
 const cfg: ServerConfig = {
   name: "box",
@@ -494,6 +494,60 @@ describe("launchGitResolve", () => {
   it("refuses an unmapped project", async () => {
     const { deps } = setup();
     expect(await launchGitResolve({ ...req, project: "Nope" }, deps)).toEqual({ ok: false, status: 400, error: "project not mapped: Nope" });
+  });
+});
+
+describe("launchClean", () => {
+  it("opens the project's clean session on sonnet/high with the clean prompt", async () => {
+    const { deps, sessions, events } = setup();
+    const res = await launchClean("Web", deps);
+    const expected: SessionMeta = {
+      id: "mj-web-clean",
+      kind: "claude",
+      project: "Web",
+      ticket: null,
+      cwd: "/repo/web",
+      model: "sonnet",
+      effort: "high",
+      state: "starting",
+      alert: null,
+      createdAt: 1000,
+      lastEventAt: 1000,
+      title: null,
+      endReason: null,
+      claudeSessionId: null,
+    };
+    expect(res).toEqual({ ok: true, session: expected, alreadyOpen: false });
+    expect(deps.newSession).toHaveBeenCalledWith(
+      "mj-web-clean",
+      "/repo/web",
+      `claude --model 'sonnet' --effort 'high' --settings '/state/hooks/mj-web-clean.json' ${q(CLEAN_PROMPT)}`,
+    );
+    expect(sessions.get("mj-web-clean")).toEqual(expected);
+    expect(events).toEqual([{ type: "session.updated", session: expected }]);
+  });
+
+  it("answers the live clean session instead of opening a second one", async () => {
+    const { deps, sessions } = setup();
+    const live = row({ id: "mj-web-clean", kind: "claude", ticket: null, state: "idle" });
+    sessions.insert(live);
+    expect(await launchClean("Web", deps)).toEqual({ ok: true, session: live, alreadyOpen: true });
+    expect(deps.newSession).not.toHaveBeenCalled();
+  });
+
+  it("opens afresh over an ended clean session", async () => {
+    const { deps, sessions } = setup();
+    sessions.insert(row({ id: "mj-web-clean", kind: "claude", ticket: null, state: "ended", endReason: "exited" }));
+    const res = await launchClean("Web", deps);
+    expect(res).toMatchObject({ ok: true, alreadyOpen: false, session: { state: "starting", endReason: null } });
+    expect(deps.newSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses an unmapped project and a missing path", async () => {
+    const { deps } = setup();
+    expect(await launchClean("Nope", deps)).toEqual({ ok: false, status: 400, error: "project not mapped: Nope" });
+    const gone = setup({ exists: vi.fn(() => false) });
+    expect(await launchClean("Web", gone.deps)).toEqual({ ok: false, status: 400, error: "project path not found: /repo/web" });
   });
 });
 

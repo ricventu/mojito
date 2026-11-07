@@ -13,7 +13,7 @@ import type { TicketCache } from "../tickets/cache";
 import { DuplicateSessionError, PREFIX, hasSession, newSession, q } from "../tmux/tmux";
 import { buildHookSettings } from "./hookSettings";
 import { imagesDir } from "./images";
-import { buildGitResolvePrompt, buildTicketPrompt } from "./prompt";
+import { CLEAN_PROMPT, buildGitResolvePrompt, buildTicketPrompt } from "./prompt";
 import { watchStartupStall } from "./startupStall";
 
 export interface LaunchDeps {
@@ -242,7 +242,7 @@ export async function launchFree(body: LaunchFreeBody, deps: LaunchDeps): Promis
   return { ok: true, session };
 }
 
-export type GitResolveResult =
+export type ProjectSessionResult =
   | { ok: true; session: SessionMeta; alreadyOpen: boolean }
   | { ok: false; status: 400 | 409; error: string };
 
@@ -252,16 +252,41 @@ export type GitResolveResult =
  * session rather than putting two Claudes on one repository. Opus at xhigh effort, inlined like
  * v1's: reconciling diverged history is the hardest reading a session here gets asked to do.
  */
-export async function launchGitResolve(
+export function launchGitResolve(
   req: { project: string; op: GitOp; conflict: SyncConflict },
   deps: LaunchDeps,
-): Promise<GitResolveResult> {
+): Promise<ProjectSessionResult> {
+  return launchProjectSession(
+    { project: req.project, suffix: "git", model: "opus", effort: "xhigh", prompt: buildGitResolvePrompt(req.op, req.conflict) },
+    deps,
+  );
+}
+
+/**
+ * A project's Clean (RIC-528): the session that deletes merged branches and their worktrees
+ * once the human confirms its list (`CLEAN_PROMPT`). One per project — `mj-<slug>-clean` — like
+ * the git session. Sonnet at high effort: the work is routine, the judgment is telling a
+ * squash-merged branch from an unmerged one, and nothing is deleted before the human says yes.
+ */
+export function launchClean(project: string, deps: LaunchDeps): Promise<ProjectSessionResult> {
+  return launchProjectSession({ project, suffix: "clean", model: "sonnet", effort: "high", prompt: CLEAN_PROMPT }, deps);
+}
+
+/**
+ * A session that belongs to a project rather than a ticket, under a fixed id
+ * `mj-<slug>-<suffix>`: a live one is answered (`alreadyOpen`) instead of starting a second
+ * Claude on the same job; a row whose tmux is gone is ended first.
+ */
+async function launchProjectSession(
+  req: { project: string; suffix: string; model: Model; effort: Effort; prompt: string },
+  deps: LaunchDeps,
+): Promise<ProjectSessionResult> {
   const project = deps.projects.get(req.project);
   if (!project) return { ok: false, status: 400, error: `project not mapped: ${req.project}` };
   const cwd = expandHome(project.path, deps.cfg.home);
   if (!usableDir(deps, cwd)) return { ok: false, status: 400, error: `project path not found: ${cwd}` };
 
-  const id = `${PREFIX}${slug(req.project)}-git`;
+  const id = `${PREFIX}${slug(req.project)}-${req.suffix}`;
   if (launching.has(id)) return { ok: false, status: 409, error: `session already starting: ${id}` };
   launching.add(id);
   try {
@@ -272,11 +297,10 @@ export async function launchGitResolve(
       if (ended) deps.bus.emit({ type: "session.updated", session: ended });
     }
 
-    const model: Model = "opus";
-    const effort: Effort = "xhigh";
+    const { model, effort } = req;
     const settingsPath = hookSettingsPath(deps.cfg, id);
     deps.writeFile(settingsPath, sessionSettings(deps, id));
-    const refused = await spawn(deps, id, cwd, claudeCommand(model, effort, settingsPath, buildGitResolvePrompt(req.op, req.conflict)));
+    const refused = await spawn(deps, id, cwd, claudeCommand(model, effort, settingsPath, req.prompt));
     if (refused) return { ok: false, status: 409, error: `session already exists: ${id}` };
 
     const now = deps.now();

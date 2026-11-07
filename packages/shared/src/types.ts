@@ -123,6 +123,20 @@ export type GitSyncResult =
   | { status: "conflict"; session: SessionMeta; alreadyOpen: boolean };
 
 /**
+ * `POST /api/projects/:name/clean` (RIC-528): the project's Clean session, `alreadyOpen` when it
+ * was running and was not launched again.
+ */
+export interface CleanResult {
+  session: SessionMeta;
+  alreadyOpen: boolean;
+}
+
+/** `GET /api/projects/:name/worktrees`: the linked worktrees of the project's repository. */
+export interface WorktreeCount {
+  count: number;
+}
+
+/**
  * Another Mojito instance (`MOJITO_PEERS`) as this server sees it through its event socket.
  * Offline, `sessions` is empty: last-known states of a sleeping machine would lie.
  */

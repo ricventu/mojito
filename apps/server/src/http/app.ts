@@ -40,6 +40,8 @@ export interface AppDeps {
   taskQueue: Pick<TaskQueue, "enqueue" | "retry">;
   /** A project's Pull and Push. Default: real git (`defaultGitSync`). */
   git?: GitSync;
+  /** A project's linked worktree count, for its Clean badge. Default: real git (`countWorktrees`). */
+  worktrees?(cwd: string): Promise<number>;
   /** A project's git graph, commit details and diffs (read-only). Default: real git (`defaultGitReader`). */
   gitRead?: GitReader;
   /** A project's markdown list and documents (read-only). Default: real git and disk (`docsReader`). */
