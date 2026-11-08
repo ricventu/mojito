@@ -54,10 +54,10 @@ app's state, left in place.
   write hook settings (`<stateDir>/hooks/<id>.json`, mode 0600) → `newSession` → insert row
   `starting` → stall watch → Linear writes (In Progress + assign; failures become a
   `warning`, never fail the launch). Ticket id `mj-<TICKET>`, free sessions `mj-<slug>-<hex6>`.
-- **The prompt** is the whole instruction, in English: read ticket X from Linear and execute
-  it; when ready for review, move it to "In Review" on Linear; use `superpowers:brainstorming`
-  first only if the ticket leaves design decisions open. Brainstorming is not a launch option —
-  the session decides it, like branches. Nothing else, except the ticket sheet's "Work in a
+- **The prompt** is the whole instruction, in English: read ticket X from Linear, decide
+  whether to start with brainstorming or a development plan; once the work is complete, move it
+  to "In Review" on Linear. Brainstorming is not a launch option — the session decides it, like
+  branches. Nothing else, except the ticket sheet's "Work in a
   worktree" switch (on by default in the sheet, RIC-527; `LaunchTicketBody.worktree`, absent in
   the body = off, so an API call or an older peer's forward keeps its meaning): on,
   `buildTicketPrompt` appends the fixed `WORKTREE_INSTRUCTION` (not a setting) as the last line.

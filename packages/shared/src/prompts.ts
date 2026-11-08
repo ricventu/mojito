@@ -28,13 +28,12 @@ Do not ask questions: if the note is vague, create a ticket faithful to what it 
  * What Mojito says to Claude, as shipped; Settings can override each one. The ticket prompt is
  * the whole instruction a ticket session starts with: it names the ticket and nothing else —
  * the session reads the issue, and moves it to In Review, through the Linear MCP of the user's
- * own Claude Code. Whether to brainstorm is the session's call, not a launch option.
+ * own Claude Code. Whether to brainstorm or plan first is the session's call, not a launch option.
  */
 export const DEFAULT_PROMPTS = {
   ticket: [
-    `Read ticket ${TICKET_PLACEHOLDER} from Linear and carry it out.`,
-    "If the ticket leaves design decisions open, use the superpowers:brainstorming skill before implementing; if it is already clear and specific, skip it.",
-    'When the work is ready for review, move the ticket to "In Review" on Linear.',
+    `Read ticket ${TICKET_PLACEHOLDER} from Linear. Determine whether to start with brainstorming or a development plan.`,
+    'Once the work is complete, move the ticket to "In Review" in Linear.',
   ].join("\n"),
   createTicket: CREATE_TICKET,
 };
