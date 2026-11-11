@@ -3,6 +3,7 @@ import { TriangleAlert } from "lucide-react";
 import type { TicketSummary } from "@mojito/shared";
 import { useBoardFilters } from "@/hooks/useBoardFilters";
 import { useProjects } from "@/hooks/useProjects";
+import { useQuickDone, useQuickDoneHidden } from "@/hooks/useQuickDone";
 import { useSessions } from "@/hooks/useSessions";
 import { useTasks } from "@/hooks/useTasks";
 import { useTickets } from "@/hooks/useTickets";
@@ -39,10 +40,17 @@ export function Board() {
   const [selectedTicket, setSelectedTicket] = useState<TicketSummary | null>(null);
 
   const sessionList = useMemo(() => sessions.data ?? [], [sessions.data]);
+  // A quick Done takes its ticket off the board at once (its session becomes a loose row, as after Done).
+  const doneHidden = useQuickDoneHidden();
+  const onDoneTicket = useQuickDone();
+  const ticketList = useMemo(
+    () => (tickets.data?.tickets ?? []).filter((t) => !doneHidden.has(t.identifier)),
+    [tickets.data, doneHidden],
+  );
   const [filters, setFilters] = useBoardFilters();
   const sections = useMemo(
-    () => filterBoard(groupBoard(projects.data ?? [], tickets.data?.tickets ?? [], sessionList), filters, sessionList),
-    [projects.data, tickets.data, sessionList, filters],
+    () => filterBoard(groupBoard(projects.data ?? [], ticketList, sessionList), filters, sessionList),
+    [projects.data, ticketList, sessionList, filters],
   );
   const banner = tickets.data ? linearBanner(tickets.data) : null;
   const loading = tickets.isPending || sessions.isPending || projects.isPending;
@@ -82,7 +90,7 @@ export function Board() {
         )}
         <TaskStrip
           tasks={tasks.data ?? []}
-          tickets={tickets.data?.tickets ?? []}
+          tickets={ticketList}
           selectedTicket={selectedTicket?.identifier}
           onOpenTicket={setSelectedTicket}
         />
@@ -109,6 +117,7 @@ export function Board() {
               sessions={sessionList}
               selectedTicket={selectedTicket?.identifier}
               onOpenTicket={setSelectedTicket}
+              onDoneTicket={onDoneTicket}
               onNewTicket={onNewTicket}
               onNewSession={onNewSession}
               statusFilter={filters.statuses}

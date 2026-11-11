@@ -17,6 +17,7 @@ interface Props {
   sessions: SessionMeta[];
   selectedTicket?: string;
   onOpenTicket: (ticket: TicketSummary) => void;
+  onDoneTicket: (ticket: TicketSummary) => void;
   onNewTicket: (project?: string) => void;
   onNewSession: (project?: string) => void;
   /** The board's status filter: the kanban shows only the columns it selects. */
@@ -33,7 +34,7 @@ const LIST_CLASS = "grid grid-cols-1 gap-2 @2xl:grid-cols-3";
  * One project: its active tickets — a list on a phone, kanban columns from `@2xl` — a closed
  * Backlog group, then its loose sessions (a plain list).
  */
-export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket, onNewTicket, onNewSession, statusFilter }: Props) {
+export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket, onDoneTicket, onNewTicket, onNewSession, statusFilter }: Props) {
   const { project } = section;
   const name = project ?? "General";
   const card = (ticket: TicketSummary, showStatus = true) => (
@@ -44,6 +45,7 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
       selected={ticket.identifier === selectedTicket}
       showStatus={showStatus}
       onOpen={onOpenTicket}
+      onDone={onDoneTicket}
     />
   );
 

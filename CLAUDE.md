@@ -62,7 +62,8 @@ app's state, left in place.
   the body = off, so an API call or an older peer's forward keeps its meaning): on,
   `buildTicketPrompt` appends the fixed `WORKTREE_INSTRUCTION` (not a setting) as the last line.
   Mojito writes In Progress; the session writes In Review; Done is the human's (the ticket sheet's
-  Mark Done, offered while the ticket is In Review; a live session stays, as a loose row).
+  Mark Done, or the Done on an In Review card, both offered while the ticket is In Review; a live
+  session stays, as a loose row).
 - **Prompts are settings** (RIC-513): the ticket prompt (a template; `{ticket}` required,
   filled by `buildTicketPrompt`) and the create-ticket system prompt. Defaults live in
   `shared/src/prompts.ts` (`DEFAULT_PROMPTS`; the ticket one pinned byte-for-byte by
@@ -292,6 +293,10 @@ app's state, left in place.
   the board stay visible as loose rows (a live tmux never disappears from the UI). A "Created"
   task card (`TaskStrip`) opens its ticket's sheet like a ticket card, its id the link to Linear;
   until the ticket is on the board (`taskTicket`: the poll after creation; closed since) only the link.
+  An In Review card's Done (`hooks/useQuickDone.ts`, `lib/deferred.ts`) takes the ticket off the
+  board at once with a 3 s Undo toast, and only then writes Linear; the pending set is
+  module-level (leaving the board neither runs nor drops it), and the ticket stays hidden until
+  the tickets refetch after the write (a refusal brings it back with an error toast).
   A ticket's status is a filled pill (`StatusBadge`): violet In Review, blue In Progress, neutral
   otherwise — emerald, sky, amber and red mean a session's state.
 - Project header: Pull / Push icons (`GitButtons`, `lib/gitSync.ts`) — a toast, or on a conflict

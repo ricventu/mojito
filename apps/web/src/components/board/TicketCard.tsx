@@ -1,8 +1,11 @@
 import type { KeyboardEvent } from "react";
+import { Check } from "lucide-react";
 import type { SessionMeta, TicketSummary } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { canMarkDone } from "@/lib/board";
 import { safeHref } from "@/lib/url";
 import { cn } from "@/lib/utils";
 
@@ -13,14 +16,16 @@ interface Props {
   /** Off in a kanban column, whose heading already says it. */
   showStatus?: boolean;
   onOpen: (ticket: TicketSummary) => void;
+  /** The quick Done, offered on an In Review card. */
+  onDone?: (ticket: TicketSummary) => void;
 }
 
 /**
  * The id is a link to Linear and sits outside the tappable region: a `role="button"`
  * element's children are presentational to assistive tech, so a link inside it could not
- * be reached on its own.
+ * be reached on its own. Done sits beside it for the same reason.
  */
-export function TicketCard({ ticket, session, selected, showStatus = true, onOpen }: Props) {
+export function TicketCard({ ticket, session, selected, showStatus = true, onOpen, onDone }: Props) {
   const open = () => onOpen(ticket);
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -38,7 +43,7 @@ export function TicketCard({ ticket, session, selected, showStatus = true, onOpe
         selected && "ring-2 ring-ring",
       )}
     >
-      <div className="px-3 pt-2">
+      <div className="flex items-center justify-between gap-2 px-3 pt-2">
         <a
           href={safeHref(ticket.url)}
           target="_blank"
@@ -47,6 +52,17 @@ export function TicketCard({ ticket, session, selected, showStatus = true, onOpe
         >
           {ticket.identifier}
         </a>
+        {onDone && canMarkDone(ticket.statusName) && (
+          <Button
+            variant="outline"
+            size="xs"
+            className="-my-1"
+            aria-label={`Mark ${ticket.identifier} Done`}
+            onClick={() => onDone(ticket)}
+          >
+            <Check size={12} /> Done
+          </Button>
+        )}
       </div>
       <div
         role="button"
