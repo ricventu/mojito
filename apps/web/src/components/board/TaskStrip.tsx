@@ -39,8 +39,10 @@ function TaskCard({ task, ticket, selected, onOpenTicket }: TaskCardProps) {
   return (
     <li className={cn("rounded-lg border bg-card text-card-foreground", selected && "ring-2 ring-ring")}>
       <Collapsible>
-        {/* The note's button stretches over this row; the link and Archive sit above it, each reachable on its own. */}
-        <div className="relative flex items-start gap-2 px-3 py-2">
+        {/* The note's button stretches over this row; the link and Archive sit above it, each reachable on its own.
+            `isolate` keeps their z-10 inside the row: in the page's stacking context they were drawn over the
+            sticky toolbar (z-10 as well) when the card scrolled under it (RIC-564). */}
+        <div className="relative isolate flex items-start gap-2 px-3 py-2">
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <Badge variant="outline" className={look.className}>{look.label}</Badge>
