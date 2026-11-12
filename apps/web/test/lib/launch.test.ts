@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_PROMPTS, type Settings } from "@mojito/shared";
+import { DEFAULT_PROMPTS, type SessionMeta, type Settings } from "@mojito/shared";
 import { ApiError } from "@/lib/api";
-import { launchErrorAction, launchOptions } from "@/lib/launch";
+import { launchErrorAction, launchOptions, withLaunched } from "@/lib/launch";
 
 const settings: Settings = {
   statusDefaults: { Todo: { model: "sonnet", effort: "medium" } },
@@ -43,5 +43,42 @@ describe("launchErrorAction", () => {
       kind: "toast",
       message: "project path not found: /x",
     });
+  });
+});
+
+describe("withLaunched", () => {
+  const row = (id: string, state: SessionMeta["state"], lastEventAt: number): SessionMeta => ({
+    id,
+    kind: "ticket",
+    project: "Web",
+    ticket: "RIC-1",
+    cwd: "/repo",
+    model: "opus",
+    effort: "high",
+    state,
+    alert: null,
+    createdAt: lastEventAt,
+    lastEventAt,
+    title: null,
+    endReason: null,
+    claudeSessionId: null,
+  });
+
+  it("adds the launched session to the list", () => {
+    const other = row("mj-x", "running", 1);
+    expect(withLaunched([other], row("mj-RIC-1", "starting", 5))).toEqual([other, row("mj-RIC-1", "starting", 5)]);
+  });
+
+  it("replaces the ended row the launch reused the id of", () => {
+    expect(withLaunched([row("mj-RIC-1", "ended", 1)], row("mj-RIC-1", "starting", 5))).toEqual([row("mj-RIC-1", "starting", 5)]);
+  });
+
+  it("keeps a newer copy that an event brought before the launch answered", () => {
+    const newer = row("mj-RIC-1", "running", 6);
+    expect(withLaunched([newer], row("mj-RIC-1", "starting", 5))).toEqual([newer]);
+  });
+
+  it("leaves a list that has not loaded alone", () => {
+    expect(withLaunched(undefined, row("mj-RIC-1", "starting", 5))).toBeUndefined();
   });
 });

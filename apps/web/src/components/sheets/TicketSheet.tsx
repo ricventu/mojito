@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, FileText, GitGraph, Play, RotateCcw, SquareTerminal } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
-import type { Effort, Model, PeerSnapshot, SessionMeta, Settings, TicketSummary } from "@mojito/shared";
+import type { PeersAnswer, PeerSnapshot, SessionMeta, Settings, TicketSummary } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
 import { StatusBadge, statusClass } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -22,8 +22,8 @@ import { docsHref } from "@/lib/docs/url";
 import { canResume } from "@/lib/endReason";
 import { gitHref } from "@/lib/git/url";
 import { sessionHref } from "@/lib/host";
-import { launchErrorAction, launchOptions, type LaunchPicks } from "@/lib/launch";
-import { launchHosts, peerSessionForTicket } from "@/lib/peers";
+import { launchErrorAction, launchOptions, withLaunched, type LaunchPicks } from "@/lib/launch";
+import { launchHosts, peerSessionForTicket, withPeerSession } from "@/lib/peers";
 import { qk } from "@/lib/queryKeys";
 import { safeHref } from "@/lib/url";
 import { cn } from "@/lib/utils";
@@ -132,7 +132,8 @@ function StatusPill({
 }
 
 /**
- * Model, effort and worktree (on unless switched off), then Launch. Disabled while the request is in flight: a double tap is one POST.
+ * Model, effort and worktree (on unless switched off), then Launch, which keeps the sheet open on
+ * the new session. Disabled while the request is in flight: a double tap is one POST.
  * Both start from the defaults of the status shown in the header, and keep following it — a status
  * moved in this sheet brings its own defaults — until the human picks one by hand.
  */
@@ -140,14 +141,11 @@ function LaunchForm({
   ticket,
   status,
   settings,
-  onClose,
 }: {
   ticket: TicketSummary;
   status: string;
   settings: Settings;
-  onClose: () => void;
 }) {
-  const navigate = useNavigate();
   const qc = useQueryClient();
   const peers = usePeers();
   const [picks, setPicks] = useState<LaunchPicks>({});
@@ -158,6 +156,8 @@ function LaunchForm({
   // A peer that went offline (or stopped mapping the project) since it was picked falls back here.
   const host = hosts.find((h) => h.name === hostName) ?? hosts[0];
 
+  // The sheet stays open (RIC-584): the session goes into the cache, so the form gives way to its
+  // live state and Open terminal at once, ahead of the refetch and the events.
   const launch = useMutation({
     mutationFn: ({ peer }: { peer: PeerSnapshot | null }) =>
       apiJson<{ session: SessionMeta; warning?: string }>(
@@ -167,20 +167,20 @@ function LaunchForm({
       ),
     onSuccess: ({ session, warning }, { peer }) => {
       if (warning) toast.warning(warning);
-      onClose();
       if (peer) {
-        toast.success(`Started on ${peer.name}`);
+        qc.setQueryData<PeersAnswer>(qk.peers, (answer) => withPeerSession(answer, peer.name, session));
       } else {
+        qc.setQueryData<SessionMeta[]>(qk.sessions, (list) => withLaunched(list, session));
         void qc.invalidateQueries({ queryKey: qk.sessions });
         void qc.invalidateQueries({ queryKey: qk.tickets });
       }
-      navigate(sessionHref(peer?.name ?? null, session.id));
     },
     onError: (e, { peer }) => {
       const action = e instanceof ApiError ? launchErrorAction(e) : { kind: "toast" as const, message: errorMessage(e, "Launch failed") };
       if (action.kind === "open") {
-        onClose();
-        navigate(sessionHref(peer?.name ?? null, action.sessionId));
+        // Already running: this sheet's list was behind. The refetch brings the session in.
+        toast.info(`${ticket.identifier} already has a session${peer ? ` on ${peer.name}` : ""}`);
+        void qc.invalidateQueries({ queryKey: peer ? qk.peers : qk.sessions });
       } else {
         toast.error(action.message);
       }
@@ -365,7 +365,7 @@ export function TicketSheet({ ticket, onClose }: Props) {
           ) : settings.data ? (
             <>
               {session && canResume(session) && <EndedSession session={session} onClose={onClose} />}
-              <LaunchForm ticket={ticket} status={status} settings={settings.data} onClose={onClose} />
+              <LaunchForm ticket={ticket} status={status} settings={settings.data} />
             </>
           ) : (
             <p className="text-sm text-muted-foreground">

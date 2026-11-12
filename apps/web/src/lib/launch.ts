@@ -1,4 +1,4 @@
-import type { Effort, Model, Settings } from "@mojito/shared";
+import type { Effort, Model, SessionMeta, Settings } from "@mojito/shared";
 import type { ApiError } from "@/lib/api";
 
 /** Option labels; a `Record` over the unions so a model or effort added to `@mojito/shared` fails to compile until it is listed here. */
@@ -38,4 +38,17 @@ export function launchErrorAction(
     return { kind: "open", sessionId: body.sessionId };
   }
   return { kind: "toast", message: err.message };
+}
+
+/**
+ * The session a launch answered, into a cached session list, so the ticket sheet shows it before
+ * the refetch does. It replaces a row with its id (a ticket's id is reused, so that is its ended
+ * row) unless that row is newer: an event that reached the client before the launch's answer.
+ */
+export function withLaunched(list: SessionMeta[] | undefined, session: SessionMeta): SessionMeta[] | undefined {
+  if (!list) return list;
+  const at = list.findIndex((s) => s.id === session.id);
+  if (at === -1) return [...list, session];
+  if (list[at].lastEventAt > session.lastEventAt) return list;
+  return list.map((s, i) => (i === at ? session : s));
 }

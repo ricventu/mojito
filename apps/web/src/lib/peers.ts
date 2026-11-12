@@ -1,5 +1,6 @@
 import type { PeerSnapshot, PeersAnswer, SessionMeta, TicketSummary } from "@mojito/shared";
 import { byProjectName } from "@/lib/board";
+import { withLaunched } from "@/lib/launch";
 
 /**
  * A page of a peer's own client, logged in: its first-visit `?token=` handoff takes the token
@@ -68,6 +69,15 @@ export function peerSessionForTicket(peers: PeerSnapshot[], ticket: string): { p
     if (session) return { peer, session };
   }
   return null;
+}
+
+/** A session launched on `peerName`, into the cached answer, until its `peers.updated` arrives (`withLaunched`). */
+export function withPeerSession(answer: PeersAnswer | undefined, peerName: string, session: SessionMeta): PeersAnswer | undefined {
+  if (!answer || !answer.peers.some((p) => p.name === peerName)) return answer;
+  return {
+    ...answer,
+    peers: answer.peers.map((p) => (p.name === peerName ? { ...p, sessions: withLaunched(p.sessions, session) ?? [] } : p)),
+  };
 }
 
 /** `peers.updated` applied to the cached answer: the peer replaced in place, by name. */

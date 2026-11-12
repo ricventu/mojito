@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PeerSnapshot, PeersAnswer, SessionMeta } from "@mojito/shared";
-import { appTitle, freeLaunchHosts, freeLaunchProjects, launchHosts, peerHref, peerSessionForTicket, replacePeer, waitingPeers } from "@/lib/peers";
+import { appTitle, freeLaunchHosts, freeLaunchProjects, launchHosts, peerHref, peerSessionForTicket, replacePeer, waitingPeers, withPeerSession } from "@/lib/peers";
 
 const session = (id: string, over: Partial<SessionMeta> = {}): SessionMeta => ({
   id,
@@ -133,5 +133,23 @@ describe("appTitle", () => {
 
   it("names this instance first", () => {
     expect(appTitle("ai-tonic")).toBe("ai-tonic · Mojito");
+  });
+});
+
+describe("withPeerSession", () => {
+  const answer: PeersAnswer = { self: "box", peers: [peer("mac", ["Web"]), peer("air", ["Web"])] };
+
+  it("adds the session to that peer's snapshot only", () => {
+    const s = session("mj-RIC-1", { kind: "ticket", ticket: "RIC-1", state: "starting" });
+    expect(withPeerSession(answer, "mac", s)).toEqual({
+      self: "box",
+      peers: [peer("mac", ["Web"], { sessions: [s] }), peer("air", ["Web"])],
+    });
+  });
+
+  it("leaves an unknown peer and an unloaded answer alone", () => {
+    const s = session("mj-RIC-1");
+    expect(withPeerSession(answer, "mini", s)).toBe(answer);
+    expect(withPeerSession(undefined, "mac", s)).toBeUndefined();
   });
 });
