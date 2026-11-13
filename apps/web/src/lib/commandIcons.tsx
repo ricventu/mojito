@@ -1,0 +1,65 @@
+import {
+  Archive, Bell, Bot, Braces, BrushCleaning, Bug, BookOpen, Cloud, Code, Database, Download, Eye,
+  FileText, Flag, FlaskConical, Folder, Gauge, GitBranch, GitMerge, GitPullRequest, Globe, Hammer,
+  Key, Layers, ListChecks, Lock, Mail, MessageSquare, Package, Paintbrush, Play, Puzzle, RefreshCw,
+  Rocket, Search, Server, Settings, Shield, ShieldCheck, Sparkles, Tag, Terminal, Trash2, Upload,
+  WandSparkles, Wrench, Zap,
+  type LucideIcon,
+} from "lucide-react";
+import type { CommandIcon } from "@mojito/shared";
+
+/** Each command icon's component, imported by name so the bundle holds these and not all of lucide. */
+export const COMMAND_ICON_COMPONENTS: Record<CommandIcon, LucideIcon> = {
+  "brush-cleaning": BrushCleaning,
+  zap: Zap,
+  package: Package,
+  rocket: Rocket,
+  bug: Bug,
+  wrench: Wrench,
+  hammer: Hammer,
+  terminal: Terminal,
+  "git-branch": GitBranch,
+  "git-merge": GitMerge,
+  "git-pull-request": GitPullRequest,
+  "flask-conical": FlaskConical,
+  "shield-check": ShieldCheck,
+  shield: Shield,
+  search: Search,
+  "file-text": FileText,
+  "book-open": BookOpen,
+  "trash-2": Trash2,
+  "refresh-cw": RefreshCw,
+  download: Download,
+  upload: Upload,
+  database: Database,
+  server: Server,
+  cloud: Cloud,
+  globe: Globe,
+  lock: Lock,
+  key: Key,
+  bell: Bell,
+  mail: Mail,
+  "message-square": MessageSquare,
+  play: Play,
+  "list-checks": ListChecks,
+  sparkles: Sparkles,
+  "wand-sparkles": WandSparkles,
+  gauge: Gauge,
+  bot: Bot,
+  code: Code,
+  braces: Braces,
+  folder: Folder,
+  archive: Archive,
+  tag: Tag,
+  flag: Flag,
+  eye: Eye,
+  layers: Layers,
+  puzzle: Puzzle,
+  paintbrush: Paintbrush,
+  settings: Settings,
+};
+
+export function CommandIconView({ icon, size = 16 }: { icon: CommandIcon; size?: number }) {
+  const Icon = COMMAND_ICON_COMPONENTS[icon];
+  return <Icon size={size} />;
+}

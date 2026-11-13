@@ -9,7 +9,7 @@ export const qk = {
   worktrees: ["worktrees"],
 } as const;
 
-/** A project's linked worktree count, the Clean button's badge. */
+/** A project's linked worktree count, Clean's badge. */
 export const worktreeKey = (project: string) => [...qk.worktrees, project] as const;
 
 /** Every favourites write, queued in one mutation scope so the PUTs run one at a time. */

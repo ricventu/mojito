@@ -1,13 +1,16 @@
 import { ChevronRight, FileText, GitGraph, Plus, SquareTerminal } from "lucide-react";
 import { Link } from "react-router";
-import type { SessionMeta, TicketSummary } from "@mojito/shared";
+import { effectiveCommands, type SessionMeta, type TicketSummary } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useSettings } from "@/hooks/useSettings";
 import { kanbanColumns, sessionForTicket, type BoardSection } from "@/lib/board";
 import { docsHref } from "@/lib/docs/url";
 import { gitHref } from "@/lib/git/url";
+import { boardClean, menuCommands } from "@/lib/commands";
 import { cn } from "@/lib/utils";
-import { CleanButton } from "./CleanButton";
+import { CommandButton } from "./CommandButton";
+import { CommandsMenu } from "./CommandsMenu";
 import { GitButtons } from "./GitButtons";
 import { LooseSessions } from "./LooseSessions";
 import { TicketCard } from "./TicketCard";
@@ -37,6 +40,9 @@ const LIST_CLASS = "grid grid-cols-1 gap-2 @2xl:grid-cols-3";
 export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket, onDoneTicket, onNewTicket, onNewSession, statusFilter }: Props) {
   const { project } = section;
   const name = project ?? "General";
+  const settings = useSettings().data;
+  const commands = project !== null && settings ? effectiveCommands(settings.commands) : [];
+  const clean = project !== null ? boardClean(commands, project) : undefined;
   const card = (ticket: TicketSummary, showStatus = true) => (
     <TicketCard
       key={ticket.identifier}
@@ -68,7 +74,8 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
           </Button>
         )}
         {project !== null && <GitButtons project={project} />}
-        {project !== null && <CleanButton project={project} />}
+        {project !== null && clean && <CommandButton project={project} command={clean} />}
+        {project !== null && <CommandsMenu project={project} commands={menuCommands(commands, project)} />}
         {project !== null && (
           <Button variant="ghost" size="icon-sm" aria-label={`New ticket in ${name}`} onClick={() => onNewTicket(project)}>
             <Plus size={16} />
