@@ -1,4 +1,6 @@
 import {
+  COMMAND_ICONS,
+  CommandSchema,
   DEFAULT_COMMANDS,
   effectiveCommands,
   isDefaultCommandId,
@@ -118,4 +120,30 @@ export function importableRows(
 export function importErrorMessage(peer: string, err: unknown): string {
   if (err instanceof ApiError && err.status === 404) return `${peer} has no commands to import`;
   return err instanceof Error ? err.message : `Reading ${peer}'s commands failed.`;
+}
+
+/**
+ * A peer's `GET /api/commands` answer, made safe to show and import: anything but `{commands: [...]}`
+ * is empty; an icon this build does not know becomes the zap (a newer peer's command stays
+ * importable); an item that is not a valid command, or whose id is neither a plain word nor a
+ * custom `cmd-` id, is dropped; a repeated id keeps its first.
+ */
+export function peerCommands(body: unknown): Command[] {
+  const list = typeof body === "object" && body !== null ? (body as { commands?: unknown }).commands : undefined;
+  if (!Array.isArray(list)) return [];
+  const seen = new Set<string>();
+  const out: Command[] = [];
+  for (const raw of list) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const item = raw as Record<string, unknown>;
+    const icon = (COMMAND_ICONS as readonly unknown[]).includes(item.icon) ? item.icon : "zap";
+    const parsed = CommandSchema.safeParse({ ...item, icon });
+    if (!parsed.success) continue;
+    const command = parsed.data;
+    if (!/^[a-z]+$/.test(command.id) && !isCustomCommandId(command.id)) continue;
+    if (seen.has(command.id)) continue;
+    seen.add(command.id);
+    out.push(command);
+  }
+  return out;
 }

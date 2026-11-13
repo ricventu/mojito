@@ -9,6 +9,7 @@ import {
   draftError,
   importableRows,
   importErrorMessage,
+  peerCommands,
   newDraft,
   resetDefault,
   restoreBlocked,
@@ -239,5 +240,37 @@ describe("importErrorMessage", () => {
     expect(importErrorMessage("mac", new ApiError(502, "mac is offline", undefined))).toBe("mac is offline");
     expect(importErrorMessage("mac", new Error("boom"))).toBe("boom");
     expect(importErrorMessage("mac", "x")).toBe("Reading mac's commands failed.");
+  });
+});
+
+describe("peerCommands", () => {
+  const ok = { id: "cmd-abc123", name: "Lint", prompt: "p", icon: "bug", project: null, model: "sonnet", effort: "high" };
+
+  it("answers nothing for a body that is not {commands: [...]}", () => {
+    for (const body of [undefined, null, "x", 3, [], {}, { commands: {} }, { commands: "x" }]) {
+      expect(peerCommands(body)).toEqual([]);
+    }
+  });
+
+  it("keeps a valid command", () => {
+    expect(peerCommands({ commands: [ok] })).toEqual([ok]);
+  });
+
+  it("replaces an unknown icon with zap", () => {
+    expect(peerCommands({ commands: [{ ...ok, icon: "sparkles-9000" }] })[0]!.icon).toBe("zap");
+    expect(peerCommands({ commands: [{ ...ok, icon: undefined }] })[0]!.icon).toBe("zap");
+  });
+
+  it("drops malformed items and odd ids", () => {
+    const { name: _n, ...noName } = ok;
+    const rows = peerCommands({
+      commands: [null, "x", noName, { ...ok, id: "cmd-1", prompt: "x".repeat(20001) }, { ...ok, id: "Bad Id!" }, { ...ok, id: 4 }, ok],
+    });
+    expect(rows).toEqual([ok]);
+  });
+
+  it("keeps the first of a repeated id", () => {
+    const rows = peerCommands({ commands: [ok, { ...ok, name: "Other" }] });
+    expect(rows.map((c) => c.name)).toEqual(["Lint"]);
   });
 });

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { importCommands, type Command } from "@mojito/shared";
+import { importCommands } from "@mojito/shared";
 import { toast } from "sonner";
 import { SHEET_CONTENT_CLASS } from "@/components/sheets/styles";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useProjects } from "@/hooks/useProjects";
 import { apiFetch } from "@/lib/api";
-import { importableRows, importErrorMessage } from "@/lib/commandForm";
+import { importableRows, importErrorMessage, peerCommands } from "@/lib/commandForm";
 import { CommandIconView } from "@/lib/commandIcons";
 import { hostApi } from "@/lib/host";
 import type { CommandsWrite } from "./CommandDialog";
@@ -24,7 +24,7 @@ function Body({ peer, write, onClose }: Props) {
   // Read afresh on each opening: the peer's list is a snapshot, never refetched under the reader.
   const query = useQuery({
     queryKey: ["peer-commands", peer],
-    queryFn: () => apiFetch<{ commands: Command[] }>(hostApi(peer, "/api/commands")),
+    queryFn: () => apiFetch<unknown>(hostApi(peer, "/api/commands")).then(peerCommands),
     gcTime: 0,
     staleTime: Infinity,
     refetchOnWindowFocus: false,
@@ -35,11 +35,14 @@ function Body({ peer, write, onClose }: Props) {
   const [unticked, setUnticked] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
-  const rows = query.data && projects.data ? importableRows(query.data.commands, projects.data.map((p) => p.name)) : [];
+  const rows = query.data && projects.data ? importableRows(query.data, projects.data.map((p) => p.name)) : [];
   const picked = rows.filter((r) => r.disabledReason === null && !unticked.has(r.command.id)).map((r) => r.command);
 
   const run = useMutation({
-    mutationFn: () => write((s) => importCommands(s, picked)),
+    mutationFn: () => {
+      setError(null);
+      return write((s) => importCommands(s, picked));
+    },
     onSuccess: () => {
       toast.success(`Imported ${picked.length} command${picked.length === 1 ? "" : "s"} from ${peer}`);
       onClose();
@@ -48,6 +51,7 @@ function Body({ peer, write, onClose }: Props) {
   });
 
   function toggle(id: string, on: boolean) {
+    setError(null);
     setUnticked((u) => {
       const next = new Set(u);
       if (on) next.delete(id);
