@@ -1,11 +1,11 @@
 import { existsSync } from "node:fs";
-import type { CommandResult, GitOp, GitSyncResult, WorktreeCount } from "@mojito/shared";
+import type { GitOp, GitSyncResult, WorktreeCount } from "@mojito/shared";
 import { Hono } from "hono";
 import { expandHome } from "../../homePath";
 import { GitError, readGit, runGit } from "../../git/git";
 import { SyncError, pull, push } from "../../git/sync";
 import { countWorktrees } from "../../git/worktrees";
-import { launchClean, launchGitResolve } from "../../sessions/launch";
+import { launchGitResolve } from "../../sessions/launch";
 import type { AppDeps } from "../app";
 
 /** The two operations, bound to a checkout. Injectable so the route is tested without git. */
@@ -47,15 +47,6 @@ export function gitRoutes(deps: AppDeps): Hono {
         if (err instanceof GitError) return c.json({ error: err.message.slice(0, 500) }, 409);
         throw err;
       }
-    })
-    // Clean (RIC-528): the project's clean session, which lists and asks before it deletes.
-    .post("/projects/:name/clean", async (c) => {
-      const name = c.req.param("name");
-      const found = checkout(name);
-      if ("error" in found) return c.json({ error: found.error }, found.status);
-      const launched = await launchClean(name, deps.launch);
-      if (!launched.ok) return c.json({ error: launched.error }, launched.status);
-      return c.json({ session: launched.session, alreadyOpen: launched.alreadyOpen } satisfies CommandResult);
     })
     .post("/projects/:name/:op{pull|push}", async (c) => {
     const name = c.req.param("name");

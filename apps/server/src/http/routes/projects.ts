@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
-import { ProjectBody } from "@mojito/shared";
+import { ProjectBody, removeCommandsProject, renameCommandsProject, type CommandsSetting } from "@mojito/shared";
 import { Hono } from "hono";
 import { expandHome } from "../../homePath";
 import type { AppDeps } from "../app";
@@ -24,6 +24,15 @@ export function projectRoutes(deps: AppDeps): Hono {
   const changed = () => {
     void deps.tickets.refresh();
     deps.bus.emit({ type: "projects.changed" });
+  };
+
+  // A project's own commands follow its rename and go with its deletion.
+  const updateCommands = (next: (s: CommandsSetting) => CommandsSetting) => {
+    const before = deps.settings.get().commands;
+    const after = next(before);
+    if (JSON.stringify(after) === JSON.stringify(before)) return;
+    deps.settings.setCommands(after);
+    deps.bus.emit({ type: "settings.updated" });
   };
 
   return new Hono()
@@ -50,6 +59,7 @@ export function projectRoutes(deps: AppDeps): Hono {
       if (p.name !== name) {
         if (deps.projects.get(p.name)) return c.json({ error: `project already exists: ${p.name}` }, 409);
         deps.projects.rename(name, p);
+        updateCommands((s) => renameCommandsProject(s, name, p.name));
       } else {
         deps.projects.upsert(p);
       }
@@ -60,6 +70,7 @@ export function projectRoutes(deps: AppDeps): Hono {
       const name = c.req.param("name");
       if (!deps.projects.get(name)) return c.json({ error: `project not found: ${name}` }, 404);
       deps.projects.remove(name);
+      updateCommands((s) => removeCommandsProject(s, name));
       changed();
       return c.json({ ok: true });
     });

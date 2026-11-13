@@ -16,6 +16,7 @@ import type { TicketCache } from "../tickets/cache";
 import { tokenMatches } from "../token";
 import { errorMessage } from "./body";
 import { gitRoutes, type GitSync } from "./routes/git";
+import { commandRoutes } from "./routes/commands";
 import { docsRoutes, type DocsReader } from "./routes/docs";
 import { fsRoutes } from "./routes/fs";
 import { gitGraphRoutes, type GitReader } from "./routes/gitGraph";
@@ -85,6 +86,7 @@ export function createApp(deps: AppDeps): Hono {
   app.route("/api", projectRoutes(deps));
   app.route("/api", fsRoutes(deps));
   app.route("/api", gitRoutes(deps));
+  app.route("/api", commandRoutes(deps));
   app.route("/api", gitGraphRoutes(deps));
   app.route("/api", docsRoutes(deps));
   app.route("/api", settingsRoutes(deps));

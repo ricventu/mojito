@@ -4,11 +4,12 @@ export const RELAY_TIMEOUT_MS = 30_000;
 
 /**
  * What a client may ask a peer through this instance (`/api/peers/<name>/…`): the HTTP side of
- * opening a peer's session in place — image upload and view, the git graph, the docs. A
+ * opening a peer's session in place — image upload and view, the git graph, the docs, the commands list (for import). A
  * `:slot` is one path segment; anything not listed is not relayed (settings, hooks, launch,
  * projects…: those are the peer's own client's).
  */
 const ALLOWED: { method: string; pattern: string[] }[] = [
+  { method: "GET", pattern: ["commands"] },
   { method: "POST", pattern: ["sessions", ":id", "images"] },
   { method: "GET", pattern: ["sessions", ":id", "image"] },
   { method: "GET", pattern: ["projects", ":project", "git", "graph"] },

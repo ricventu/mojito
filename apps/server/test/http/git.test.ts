@@ -96,28 +96,10 @@ describe("POST /api/projects/:name/pull|push", () => {
 });
 
 describe("POST /api/projects/:name/clean", () => {
-  it("opens the project's clean session and answers it", async () => {
+  it("is gone: Clean is a command now", async () => {
     const ctx = setup();
     ctx.projects.upsert(web);
-    const res = await post(ctx, "clean");
-    expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ alreadyOpen: false, session: { id: "mj-web-clean", project: "Web" } });
-    expect(ctx.launch.newSession).toHaveBeenCalledWith("mj-web-clean", "/home/me/repo/web", expect.stringContaining("fetch --prune"));
-  });
-
-  it("answers the clean session already open", async () => {
-    const ctx = setup();
-    ctx.projects.upsert(web);
-    const live = meta({ id: "mj-web-clean", kind: "claude", ticket: null, state: "idle" });
-    ctx.sessions.insert(live);
-    expect(await (await post(ctx, "clean")).json()).toEqual({ alreadyOpen: true, session: live });
-  });
-
-  it("404s an unknown project", async () => {
-    const ctx = setup();
-    const res = await post(ctx, "clean", "Nope");
-    expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: "project not found: Nope" });
+    expect((await post(ctx, "clean")).status).toBe(404);
   });
 });
 

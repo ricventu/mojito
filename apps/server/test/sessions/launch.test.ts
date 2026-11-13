@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CLEAN_PROMPT, DEFAULT_PROMPTS, type LaunchFreeBody, type LaunchTicketBody, type MojitoEvent, type SessionMeta, type TicketSummary } from "@mojito/shared";
+import { CLEAN_PROMPT, DEFAULT_COMMANDS, DEFAULT_PROMPTS, type LaunchFreeBody, type LaunchTicketBody, type MojitoEvent, type SessionMeta, type TicketSummary } from "@mojito/shared";
 import type { ServerConfig } from "../../src/config";
 import { openDb } from "../../src/db/db";
 import { ProjectsRepo } from "../../src/db/projects";
@@ -9,7 +9,7 @@ import { DuplicateSessionError, q } from "../../src/tmux/tmux";
 import { buildHookSettings } from "../../src/sessions/hookSettings";
 import { buildGitResolvePrompt, buildTicketPrompt } from "../../src/sessions/prompt";
 import { STALL_GRACE_MS } from "../../src/sessions/startupStall";
-import { launchClean, launchFree, launchGitResolve, launchTicket, resumeSession, type LaunchDeps } from "../../src/sessions/launch";
+import { launchCommand, launchFree, launchGitResolve, launchTicket, resumeSession, type LaunchDeps } from "../../src/sessions/launch";
 
 const cfg: ServerConfig = {
   name: "box",
@@ -497,7 +497,10 @@ describe("launchGitResolve", () => {
   });
 });
 
-describe("launchClean", () => {
+const CLEAN = DEFAULT_COMMANDS[0];
+const launchClean = (project: string, deps: LaunchDeps) => launchCommand(project, CLEAN, deps);
+
+describe("launchCommand (Clean)", () => {
   it("opens the project's clean session on sonnet/high with the clean prompt", async () => {
     const { deps, sessions, events } = setup();
     const res = await launchClean("Web", deps);
@@ -541,6 +544,20 @@ describe("launchClean", () => {
     const res = await launchClean("Web", deps);
     expect(res).toMatchObject({ ok: true, alreadyOpen: false, session: { state: "starting", endReason: null } });
     expect(deps.newSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs a custom command under its own id with its own model and prompt", async () => {
+    const { deps } = setup();
+    const cmd = { ...CLEAN, id: "cmd-a1b2c3", name: "Lint", prompt: "run lint", model: "opus" as const, effort: "low" as const };
+    const res = await launchCommand("Web", cmd, deps);
+    expect(res).toMatchObject({ ok: true, alreadyOpen: false, session: { id: "mj-web-cmd-a1b2c3", model: "opus", effort: "low" } });
+  });
+
+  it("refuses a live row that is not this command's", async () => {
+    const { deps, sessions } = setup();
+    sessions.insert(row({ id: "mj-web-clean", kind: "claude", ticket: null, project: "Web-clean", state: "idle" }));
+    expect(await launchClean("Web", deps)).toEqual({ ok: false, status: 409, error: "another session holds mj-web-clean", sessionId: "mj-web-clean" });
+    expect(deps.newSession).not.toHaveBeenCalled();
   });
 
   it("refuses an unmapped project and a missing path", async () => {

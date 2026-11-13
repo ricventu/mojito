@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
-import { CLEAN_PROMPT, LaunchTicketBody, type Effort, type GitOp, type LaunchFreeBody, type Model, type Prompts, type SessionMeta } from "@mojito/shared";
+import { LaunchTicketBody, type Command, type Effort, type GitOp, type LaunchFreeBody, type Model, type Prompts, type SessionMeta } from "@mojito/shared";
 import { selfOrigin, type ServerConfig } from "../config";
 import type { ProjectsRepo } from "../db/projects";
 import type { SessionsRepo } from "../db/sessions";
@@ -244,7 +244,7 @@ export async function launchFree(body: LaunchFreeBody, deps: LaunchDeps): Promis
 
 export type ProjectSessionResult =
   | { ok: true; session: SessionMeta; alreadyOpen: boolean }
-  | { ok: false; status: 400 | 409; error: string };
+  | { ok: false; status: 400 | 409; error: string; sessionId?: string };
 
 /**
  * The Claude session that finishes a Pull or Push Mojito stopped short of (`git/sync.ts`). One
@@ -263,13 +263,11 @@ export function launchGitResolve(
 }
 
 /**
- * A project's Clean (RIC-528): the session that deletes merged branches and their worktrees
- * once the human confirms its list (`CLEAN_PROMPT`). One per project — `mj-<slug>-clean` — like
- * the git session. Sonnet at high effort: the work is routine, the judgment is telling a
- * squash-merged branch from an unmerged one, and nothing is deleted before the human says yes.
+ * A quick command (RIC-581) run in a project: one session per project and command, under
+ * `mj-<slug>-<command id>` (Clean is `mj-<slug>-clean`), like the git session.
  */
-export function launchClean(project: string, deps: LaunchDeps): Promise<ProjectSessionResult> {
-  return launchProjectSession({ project, suffix: "clean", model: "sonnet", effort: "high", prompt: CLEAN_PROMPT }, deps);
+export function launchCommand(project: string, command: Command, deps: LaunchDeps): Promise<ProjectSessionResult> {
+  return launchProjectSession({ project, suffix: command.id, model: command.model, effort: command.effort, prompt: command.prompt }, deps);
 }
 
 /**
@@ -292,7 +290,14 @@ async function launchProjectSession(
   try {
     const existing = deps.sessions.get(id);
     if (existing && existing.state !== "ended") {
-      if (await deps.hasSession(id)) return { ok: true, session: existing, alreadyOpen: true };
+      if (await deps.hasSession(id)) {
+        // Only this project's own session of this kind is "already open": a project named like
+        // `<slug>-<suffix>` or a ticket session must not be answered as one.
+        if (existing.project === req.project && existing.ticket === null && existing.kind === "claude") {
+          return { ok: true, session: existing, alreadyOpen: true };
+        }
+        return { ok: false, status: 409, error: `another session holds ${id}`, sessionId: id };
+      }
       const ended = deps.sessions.patch(id, { state: "ended", endReason: "gone" });
       if (ended) deps.bus.emit({ type: "session.updated", session: ended });
     }

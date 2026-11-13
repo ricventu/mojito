@@ -12,6 +12,7 @@ describe("matchRelay", () => {
     );
     expect(matchRelay("GET", ["projects", "Web", "docs"])).toBe("/api/projects/Web/docs");
     expect(matchRelay("GET", ["projects", "Web", "docs", "file"])).toBe("/api/projects/Web/docs/file");
+    expect(matchRelay("GET", ["commands"])).toBe("/api/commands");
   });
 
   it("decodes a param and encodes it again", () => {
