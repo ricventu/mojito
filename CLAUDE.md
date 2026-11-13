@@ -24,11 +24,12 @@ app's state, left in place.
 
 - `packages/shared` — types (`SessionMeta`, `TaskRecord`, `TicketSummary`, `BoardTickets`,
   `Settings`, `ProjectRow`, `Favorite`), zod request bodies (`LaunchBody`, `ProjectBody`, `SettingsBody`,
-  `PromptsBody`, `FavoritesBody`, `StatusBody`), `MojitoEvent`, `MODELS`/`EFFORTS`, `DEFAULT_PROMPTS`,
+  `PromptsBody`, `FavoritesBody`, `StatusBody`, `CommandsSettingBody`), `MojitoEvent`, `MODELS`/`EFFORTS`, `DEFAULT_PROMPTS`,
   `SESSION_GONE_CODE` (4404), the git graph types (`GitGraphPage`, `GraphCommit`, `GraphRef`,
   `GraphHighlight`, `CommitDetails`, `CommitFile`, `CommitDiff`) and `isValidHash`/`isValidTicket`,
   `CommandResult`/`WorktreeCount`, the commands types (`Command`, `CommandsSetting`, `COMMAND_ICONS`,
-  `DEFAULT_COMMANDS`, `CLEAN_PROMPT`, `effectiveCommands`, `commandsFor`, `importCommands`, `AssistBody`), the docs
+  `DEFAULT_COMMANDS`, `CLEAN_PROMPT`, `COMMAND_PROMPT_MAX`, `effectiveCommands`, `commandsFor`, `importCommands`,
+  `sanitizeCommand`, `readCommandsSetting`, `AssistBody`), the docs
   types (`DocEntry`, `DocList`, `DocFile`, `DOC_MAX_BYTES`) and `isDocPath`, the peer types
   (`PeerSnapshot`, `PeersAnswer`), the folder picker's `DirEntry`/`DirList`, and
   `openEventStream` (used by the web and by the server's peer links; `schedule` is required — the package has no timer typings). Consumed as source, no build; zod **4** everywhere (the Agent
@@ -204,14 +205,22 @@ app's state, left in place.
   (deleted default ids), normalized on every write (`normalizeCommands`: an item equal to its
   default is dropped, so it follows later changes to the shipped text). Two id namespaces: a plain
   word for defaults (`clean`), `cmd-<hex6>` for custom, so a default added later never takes a
-  custom command's id. `effectiveCommands` is the list in force and hides a default whose name a
-  custom command uses (the server accepts that; the web form refuses creating the clash).
+  custom command's id. `effectiveCommands` is the list in force; a default is hidden only when it
+  is **unedited** (no stored copy) and a stored command uses its shipped name — the human's own
+  command wins. An edited default is never hidden by a name (hidden, it could be neither edited,
+  reset nor restored); a name clash in force is refused (`CommandsSettingBody`, and the web form
+  refuses a name already in force). A prompt is at most `COMMAND_PROMPT_MAX` (8000) characters:
+  it is one argv entry of `tmux new-session`, and tmux refuses a command over ~16 KB ("command too
+  long", tmux 3.7c), which surfaced as a 500 on Run. The stored value is read leniently
+  (`readCommandsSetting`, not the write schema): an item that no longer validates (an icon dropped
+  from the list becomes `zap`; a lowered cap, a repeated id or name) is dropped alone with one
+  warning, never the whole setting — served empty, the next write would wipe the human's commands.
   `GET /api/commands` lists them; `POST /api/projects/:name/commands/:id` → `CommandResult`
   (`{session, alreadyOpen}`) runs one through `launchProjectSession`: a live session is answered
   `alreadyOpen`, but only if the row is **this command's** (same project, no ticket, kind claude) —
   else 409 with `sessionId` (a hyphenated slug can collide; a case-only project rename or an adopted
-  row answers 409 too, the web's toast offers Open). Ids are `mj-<slug>-<command id>`, except Clean,
-  which keeps `mj-<slug>-clean` (RIC-528): a session, not git commands — "merged" must include
+  row answers 409 too, the web's toast offers Open). Ids are `mj-<slug>-<command id>`, so Clean
+  keeps `mj-<slug>-clean` (RIC-528): a session, not git commands — "merged" must include
   squash and rebase merges, which `git branch --merged` does not see; its fixed default prompt
   `CLEAN_PROMPT` waits for the human's yes in the terminal before deleting anything. The worktree
   badge, `GET /api/projects/:name/worktrees` → `{count}` (`git/worktrees.ts`: porcelain entries
@@ -295,7 +304,7 @@ app's state, left in place.
   client** (spec `2026-11-02-peer-sessions-in-place-design.md`), so the browser only ever talks to
   this instance: an **allowlisted** HTTP relay, `/api/peers/:name/<rest>` (`peers/relay.ts`,
   `matchRelay` + `relayRequest`), and the pty relay above. The table is image upload
-  and view, the git graph/commit/diff, the docs list/file — nothing else (not settings, hooks, projects; no DELETE either: there is no Kill, and a peer's
+  and view, the git graph/commit/diff, the docs list/file, the commands list (GET, for import) — nothing else (not settings, hooks, projects; no DELETE either: there is no Kill, and a peer's
   rows are forgotten on the peer): off the table is 404, so a client bug
   cannot write a peer's settings. Each segment is decoded and must be one plain name (no
   `.`/`..`/`/`); the literal segments are matched verbatim and only the `:param` slots are

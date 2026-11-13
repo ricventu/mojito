@@ -34,7 +34,18 @@ export interface CommandsSetting {
   removed: string[];
 }
 
-export const EMPTY_COMMANDS: CommandsSetting = { items: [], removed: [] };
+/** Frozen, arrays too: it is shared, and a push into it would leak into every later read. */
+export const EMPTY_COMMANDS: CommandsSetting = Object.freeze({
+  items: Object.freeze([]) as unknown as Command[],
+  removed: Object.freeze([]) as unknown as string[],
+});
+
+/**
+ * A command's prompt is passed to claude as one argv entry of `tmux new-session`, and tmux refuses
+ * a command over ~16 KB ("command too long"; 15 000 characters run, 17 000 fail on tmux 3.7c).
+ * Half of that leaves room for the rest of the command line and for multi-byte characters.
+ */
+export const COMMAND_PROMPT_MAX = 8000;
 
 /**
  * The whole prompt of a project's Clean session (`launchClean`): merged branches, local and on
@@ -72,7 +83,7 @@ export function newCommandId(
 export const CommandSchema = z.object({
   id: z.string(),
   name: z.string().trim().min(1).max(40),
-  prompt: z.string().min(1).max(20000),
+  prompt: z.string().min(1).max(COMMAND_PROMPT_MAX),
   icon: z.enum(COMMAND_ICONS),
   project: z.string().min(1).nullable(),
   model: z.enum(MODELS),
@@ -83,16 +94,18 @@ const nameKey = (name: string): string => name.trim().toLowerCase();
 
 /**
  * The commands in force: each default in shipped order (its stored edit if any, none if removed),
- * then the custom items in stored order. A default whose name a custom command already uses is
- * left out: the human's own command wins.
+ * then the custom items in stored order. An unedited default (no stored copy) whose shipped name a
+ * stored command already uses is left out: the human's own command wins. An edited default is
+ * never hidden by a name — it is the human's too, and hidden it could not be edited, reset or
+ * restored; a clash with it is refused on write instead (`CommandsSettingBody`).
  */
 export function effectiveCommands(s: CommandsSetting): Command[] {
   const customs = s.items.filter((c) => isCustomCommandId(c.id));
-  const customNames = new Set(customs.map((c) => nameKey(c.name)));
   const defaults = DEFAULT_COMMANDS.flatMap((d) => {
     if (s.removed.includes(d.id)) return [];
-    const shown = s.items.find((c) => c.id === d.id) ?? d;
-    return customNames.has(nameKey(shown.name)) || customNames.has(nameKey(d.name)) ? [] : [shown];
+    const edited = s.items.find((c) => c.id === d.id);
+    if (edited) return [edited];
+    return s.items.some((c) => nameKey(c.name) === nameKey(d.name)) ? [] : [d];
   });
   return [...defaults, ...customs];
 }
@@ -133,6 +146,59 @@ export function normalizeCommands(s: CommandsSetting): CommandsSetting {
   const items = s.items.filter((c) => !DEFAULT_COMMANDS.some((d) => sameCommand(c, d)));
   const removed = s.removed.filter((id, i) => isDefaultCommandId(id) && !items.some((c) => c.id === id) && s.removed.indexOf(id) === i);
   return { items, removed };
+}
+
+const PLAIN_ID = /^[a-z]+$/;
+
+/**
+ * One command read from outside a write's validation (the stored setting, a peer's list), made
+ * safe: an icon this build does not know becomes the zap, then it must be a valid command whose id
+ * is a plain word (a default's shape, perhaps one this version does not ship) or a `cmd-` id.
+ */
+export function sanitizeCommand(raw: unknown): Command | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const item = raw as Record<string, unknown>;
+  const icon = (COMMAND_ICONS as readonly unknown[]).includes(item.icon) ? item.icon : "zap";
+  const parsed = CommandSchema.safeParse({ ...item, icon });
+  if (!parsed.success) return null;
+  return PLAIN_ID.test(parsed.data.id) || isCustomCommandId(parsed.data.id) ? parsed.data : null;
+}
+
+/**
+ * The stored `commands` setting, read leniently. Rules change between versions (an icon dropped, a
+ * cap lowered, a new default named like a stored command), and a value that no longer passes
+ * `CommandsSettingBody` must not be served empty: the next write would wipe the human's commands.
+ * Each item is sanitized (`sanitizeCommand`) and must carry a shipped default's id or a `cmd-` id,
+ * else it alone is dropped; a repeated id keeps its first, a repeated name (trimmed, any case) its
+ * first; `removed` keeps its strings. Not an object, or no lists, answers none. `warn` is called at
+ * most once per read, with every problem found.
+ */
+export function readCommandsSetting(raw: unknown, warn?: (problem: string) => void): CommandsSetting {
+  const value = typeof raw === "object" && raw !== null && !Array.isArray(raw) ? (raw as { items?: unknown; removed?: unknown }) : null;
+  const rawItems = Array.isArray(value?.items) ? (value.items as unknown[]) : null;
+  const rawRemoved = Array.isArray(value?.removed) ? (value.removed as unknown[]) : null;
+  if (!rawItems && !rawRemoved) {
+    warn?.(value ? "no items or removed list" : "not an object");
+    return EMPTY_COMMANDS;
+  }
+  const problems: string[] = [];
+  if (!rawItems) problems.push("items is not a list");
+  if (!rawRemoved) problems.push("removed is not a list");
+  const items: Command[] = [];
+  const names = new Set<string>();
+  for (const [i, entry] of (rawItems ?? []).entries()) {
+    const command = sanitizeCommand(entry);
+    if (!command || (!isDefaultCommandId(command.id) && !isCustomCommandId(command.id))) problems.push(`item ${i} dropped (not a valid command)`);
+    else if (items.some((c) => c.id === command.id)) problems.push(`item ${i} dropped (repeated id ${command.id})`);
+    else if (names.has(nameKey(command.name))) problems.push(`item ${i} dropped (repeated name ${command.name})`);
+    else {
+      names.add(nameKey(command.name));
+      items.push(command);
+    }
+  }
+  if (problems.length > 0) warn?.(problems.join("; "));
+  const removed = (rawRemoved ?? []).filter((r): r is string => typeof r === "string");
+  return normalizeCommands({ items, removed });
 }
 
 export function renameCommandsProject(s: CommandsSetting, from: string, to: string): CommandsSetting {
@@ -177,6 +243,7 @@ export const ASSIST_PROMPT = [
   "The user gives you a rough idea or a finished prompt. Rewrite it as a clear, self-contained instruction in English for that session.",
   "Keep the user's intent and every constraint they state; do not add goals they did not ask for.",
   "Where the work could be destructive (deleting, force-pushing, resetting, discarding changes), tell the session to stop and ask the human before doing it.",
+  `Keep the prompt under ${COMMAND_PROMPT_MAX} characters.`,
   "Propose a short name for the command (at most 40 characters) and pick exactly one icon from the list in the message.",
   'Answer with JSON only, no prose and no code fence: {"name": string, "prompt": string, "icon": string}.',
 ].join("\n");

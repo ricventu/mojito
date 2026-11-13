@@ -11,11 +11,9 @@ import { useSettings } from "@/hooks/useSettings";
 import { apiJson } from "@/lib/api";
 import { commandGroups, commandTag, restoreBlocked, restoreDefault } from "@/lib/commandForm";
 import { CommandIconView } from "@/lib/commandIcons";
-import { qk } from "@/lib/queryKeys";
+import { commandsMutationKey, qk } from "@/lib/queryKeys";
 import { CommandDialog, type CommandsWrite } from "./CommandDialog";
 import { ImportCommandsDialog } from "./ImportCommandsDialog";
-
-const WRITE_KEY = ["commands"] as const;
 
 /**
  * The commands writes, one at a time in one scope. Each reads the stored commands from the cache
@@ -25,7 +23,7 @@ const WRITE_KEY = ["commands"] as const;
 function useCommandsWrite(): CommandsWrite {
   const qc = useQueryClient();
   const write = useMutation({
-    mutationKey: WRITE_KEY,
+    mutationKey: commandsMutationKey,
     scope: { id: "commands" },
     mutationFn: async (update: (s: CommandsSetting) => CommandsSetting) => {
       const current = qc.getQueryData<Settings>(qk.settings)?.commands;
@@ -36,7 +34,7 @@ function useCommandsWrite(): CommandsWrite {
     },
     // This write is still counted: 1 means it is the last one queued.
     onSettled: () => {
-      if (qc.isMutating({ mutationKey: WRITE_KEY }) === 1) void qc.invalidateQueries({ queryKey: qk.settings });
+      if (qc.isMutating({ mutationKey: commandsMutationKey }) === 1) void qc.invalidateQueries({ queryKey: qk.settings });
     },
   });
   return write.mutateAsync;

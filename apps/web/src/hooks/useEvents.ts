@@ -6,7 +6,7 @@ import { entryScript, hasNewBuild } from "@/lib/appUpdate";
 import { openEventStream, type EventSocket } from "@/lib/eventStream";
 import { removeById, upsertById } from "@/lib/eventCache";
 import { replacePeer } from "@/lib/peers";
-import { favoritesMutationKey, qk } from "@/lib/queryKeys";
+import { commandsMutationKey, favoritesMutationKey, qk } from "@/lib/queryKeys";
 import { getToken, subscribeToken } from "@/lib/token";
 
 function applyEvent(qc: QueryClient, e: MojitoEvent) {
@@ -23,9 +23,9 @@ function applyEvent(qc: QueryClient, e: MojitoEvent) {
       );
       break;
     case "settings.updated":
-      // While favourites writes are queued, each one's own echo would refetch a list the
-      // next write already supersedes; the queue re-reads the settings once it drains.
-      if (qc.isMutating({ mutationKey: favoritesMutationKey }) === 0) {
+      // While favourites or commands writes are queued, each one's own echo would refetch a
+      // list the next write already supersedes; each queue re-reads the settings once it drains.
+      if (qc.isMutating({ mutationKey: favoritesMutationKey }) === 0 && qc.isMutating({ mutationKey: commandsMutationKey }) === 0) {
         void qc.invalidateQueries({ queryKey: qk.settings });
       }
       break;

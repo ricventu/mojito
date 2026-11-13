@@ -1,12 +1,10 @@
 import {
-  COMMAND_ICONS,
-  CommandSchema,
   DEFAULT_COMMANDS,
   effectiveCommands,
   isDefaultCommandId,
-  isCustomCommandId,
   newCommandId,
   normalizeCommands,
+  sanitizeCommand,
   type AssistAnswer,
   type Command,
   type CommandsSetting,
@@ -81,13 +79,13 @@ export function restoreDefault(s: CommandsSetting, id: string): CommandsSetting 
 }
 
 /**
- * A removed default cannot come back while a custom command uses its name: it would stay hidden
- * behind it (`effectiveCommands`), so Restore would seem to do nothing.
+ * A removed default cannot come back while a stored command uses its shipped name: having no stored
+ * copy, it would stay hidden behind it (`effectiveCommands`), so Restore would seem to do nothing.
  */
 export function restoreBlocked(s: CommandsSetting, id: string): boolean {
   const shipped = DEFAULT_COMMANDS.find((d) => d.id === id);
   if (!shipped) return false;
-  return s.items.some((c) => isCustomCommandId(c.id) && nameKey(c.name) === nameKey(shipped.name));
+  return s.items.some((c) => c.id !== id && nameKey(c.name) === nameKey(shipped.name));
 }
 
 /** The card's groups: "All projects" (null) first, then each project by name; list order inside. */
@@ -124,26 +122,17 @@ export function importErrorMessage(peer: string, err: unknown): string {
 
 /**
  * A peer's `GET /api/commands` answer, made safe to show and import: anything but `{commands: [...]}`
- * is empty; an icon this build does not know becomes the zap (a newer peer's command stays
- * importable); an item that is not a valid command, or whose id is neither a plain word nor a
- * custom `cmd-` id, is dropped; a repeated id keeps its first.
+ * is empty; each item goes through `sanitizeCommand` (an icon this build does not know becomes the
+ * zap, so a newer peer's command stays importable; an invalid item or an odd id is dropped); a
+ * repeated id keeps its first.
  */
 export function peerCommands(body: unknown): Command[] {
   const list = typeof body === "object" && body !== null ? (body as { commands?: unknown }).commands : undefined;
   if (!Array.isArray(list)) return [];
-  const seen = new Set<string>();
   const out: Command[] = [];
   for (const raw of list) {
-    if (typeof raw !== "object" || raw === null) continue;
-    const item = raw as Record<string, unknown>;
-    const icon = (COMMAND_ICONS as readonly unknown[]).includes(item.icon) ? item.icon : "zap";
-    const parsed = CommandSchema.safeParse({ ...item, icon });
-    if (!parsed.success) continue;
-    const command = parsed.data;
-    if (!/^[a-z]+$/.test(command.id) && !isCustomCommandId(command.id)) continue;
-    if (seen.has(command.id)) continue;
-    seen.add(command.id);
-    out.push(command);
+    const command = sanitizeCommand(raw);
+    if (command && !out.some((c) => c.id === command.id)) out.push(command);
   }
   return out;
 }

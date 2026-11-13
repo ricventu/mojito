@@ -15,6 +15,9 @@ export const worktreeKey = (project: string) => [...qk.worktrees, project] as co
 /** Every favourites write, queued in one mutation scope so the PUTs run one at a time. */
 export const favoritesMutationKey = ["favorites"] as const;
 
+/** Every commands write (Settings → Commands), queued the same way. */
+export const commandsMutationKey = ["commands"] as const;
+
 /**
  * The git page's queries. Deliberately not in `qk`: `useEvents` invalidates every `qk` value on
  * each (re)connect, and the graph is a snapshot — rows jumping under the reader is worse than

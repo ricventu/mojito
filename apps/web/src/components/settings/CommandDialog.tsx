@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2, RotateCcw, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
-import { isDefaultCommandId, type AssistAnswer, type AssistBody, type Command, type CommandsSetting, type Settings } from "@mojito/shared";
+import { COMMAND_PROMPT_MAX, isDefaultCommandId, type AssistAnswer, type AssistBody, type Command, type CommandsSetting, type Settings } from "@mojito/shared";
 import { LaunchOptions } from "@/components/sheets/LaunchOptions";
 import { SHEET_CONTENT_CLASS } from "@/components/sheets/styles";
 import { Button } from "@/components/ui/button";
@@ -129,7 +129,7 @@ function Form({ command, settings, write, onClose }: Props) {
         <Textarea
           id="command-prompt"
           value={draft.prompt}
-          maxLength={20000}
+          maxLength={COMMAND_PROMPT_MAX}
           readOnly={assist.isPending}
           onChange={(e) => edit({ prompt: e.target.value })}
           placeholder="What the session should do, roughly or in full"

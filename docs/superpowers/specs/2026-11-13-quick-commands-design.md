@@ -56,7 +56,7 @@ session on every run.
 interface Command {
   id: string;            // a default's word ("clean"), or "cmd-<hex6>" for a custom one
   name: string;          // trimmed, 1-40, unique case-insensitively across all commands
-  prompt: string;        // 1-20000
+  prompt: string;        // 1-8000 (COMMAND_PROMPT_MAX)
   icon: CommandIcon;     // one of COMMAND_ICONS
   project: string | null; // null = every mapped project
   model: Model;
@@ -80,10 +80,12 @@ interface CommandsSetting { items: Command[]; removed: string[] }
   not a default is dropped.
 - `effectiveCommands(setting)` (shared, pure, unit-tested): each default in `DEFAULT_COMMANDS`
   order — the stored copy if any, skipped if removed — then the custom items in stored order.
-  A default whose name a custom command already uses (a later version shipping a name the human
-  had taken) is left out: the human's own command wins, and nothing they saved turns into an
-  "edited default". Name uniqueness is validated on the effective list at write time, so a save
-  never fails over a clash the human did not make.
+  An **unedited** default (no stored copy) whose shipped name a stored command already uses (a
+  later version shipping a name the human had taken) is left out: the human's own command wins,
+  and nothing they saved turns into an "edited default". An edited default is never hidden by a
+  name — hidden, it could be neither edited, reset nor restored (final review). Name uniqueness
+  is validated on the effective list at write time, so a save never fails over a clash the human
+  did not make.
   `Settings.commands` is the stored form (the form needs to know what is edited/removed); clients
   and the server both derive the effective list with this one function.
 - `commandsFor(effective, project)`: the commands offered in a project — global ones and that
@@ -92,8 +94,17 @@ interface CommandsSetting { items: Command[]; removed: string[] }
   server can validate the AI's pick; the web maps each name to its lucide component in one table
   (`lib/commandIcons.tsx`), guarded by a test that every name has a component.
 - `CommandsSettingBody` (zod) validates the shape, uniqueness of ids and names, the icon, the id
-  pattern; `SettingsBody.commands` is optional like the other keys. A corrupt stored value is
-  warned once and served as empty (as `favorites` is).
+  pattern; `SettingsBody.commands` is optional like the other keys. The stored value is read
+  leniently (`readCommandsSetting`), not with this write-time schema: an item that no longer
+  validates (an unknown icon becomes `zap`; a lowered cap, an unknown id, a repeated id or name) is
+  dropped alone with one warning, and only a value that is no object or carries no lists is served
+  empty — a rule change must never make the whole setting unreadable, or the next write would
+  wipe it (final review).
+- **Prompt cap** (final review): `COMMAND_PROMPT_MAX` = 8000 characters. The prompt is one argv
+  entry of `tmux new-session`, and tmux refuses a command over ~16 KB ("command too long": 15 000
+  characters run, 17 000 fail on tmux 3.7c), so a longer prompt would save but never run. The
+  assist answer is held to it too (`ASSIST_PROMPT` asks for less; a longer one is a 502), and the
+  dialog's textarea has `maxLength`.
 - Project rename (`ProjectsRepo.rename` route) rewrites `project` on that project's commands in the
   same request; a project removal deletes its bound custom commands and drops any edited default
   bound to it (the shipped default comes back, global) — my call. Either change emits
@@ -101,9 +112,10 @@ interface CommandsSetting { items: Command[]; removed: string[] }
 
 ## Running a command
 
-- `POST /api/projects/:name/commands/:id` → 201/200 `{session, alreadyOpen}` (the type that is
-  `CleanResult` today, renamed `CommandResult`). 404 when the command is not in
-  `commandsFor(effective, name)`; 400 project not mapped / path missing; 409 as today.
+- `POST /api/projects/:name/commands/:id` → 200 `{session, alreadyOpen}` (the type that is
+  `CleanResult` today, renamed `CommandResult`). 404 when the project is not mapped or the command
+  is not in `commandsFor(effective, name)`; 400 path missing; 409 as today (with `sessionId` when
+  another live row holds the id).
 - Server: `launchCommand(project, command)` = `launchProjectSession({ project, suffix: command.id,
   model, effort, prompt })` — fixed id `mj-<slug>-<command id>`, so Clean keeps
   `mj-<slug>-clean`, and a renamed command keeps its live session.

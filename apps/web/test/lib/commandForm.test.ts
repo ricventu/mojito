@@ -1,4 +1,4 @@
-import { DEFAULT_COMMANDS, EMPTY_COMMANDS, effectiveCommands, type Command, type CommandsSetting } from "@mojito/shared";
+import { COMMAND_PROMPT_MAX, DEFAULT_COMMANDS, EMPTY_COMMANDS, effectiveCommands, type Command, type CommandsSetting } from "@mojito/shared";
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../../src/lib/api";
 import {
@@ -143,6 +143,19 @@ describe("restoreBlocked", () => {
   it("lets a removed default back otherwise", () => {
     expect(restoreBlocked(setting([custom()], ["clean"]), "clean")).toBe(false);
   });
+
+  it("agrees with effectiveCommands: blocked exactly when the restored default would stay hidden", () => {
+    const cases = [
+      setting([custom({ name: "Clean" })], ["clean"]),
+      setting([custom({ name: "Tidy" })], ["clean"]),
+      setting([custom()], ["clean"]),
+      setting([], ["clean"]),
+    ];
+    for (const s of cases) {
+      const hidden = !effectiveCommands(restoreDefault(s, "clean")).some((c) => c.id === "clean");
+      expect(restoreBlocked(s, "clean")).toBe(hidden);
+    }
+  });
 });
 
 describe("commandGroups", () => {
@@ -197,6 +210,14 @@ describe("draftError", () => {
   it("lets a command keep its own name", () => {
     expect(draftError(setting([custom()]), custom({ name: "deps" }))).toBeNull();
     expect(draftError(EMPTY_COMMANDS, { ...CLEAN })).toBeNull();
+  });
+
+  it("a custom Clean beside a renamed Clean keeps both in force; a second Tidy is refused", () => {
+    const s = setting([{ ...CLEAN, name: "Tidy" }]);
+    expect(draftError(s, draft({ name: "Clean" }))).toBeNull();
+    const saved = saveDraft(s, draft({ name: "Clean" }), () => "abcdef");
+    expect(effectiveCommands(saved).map((c) => c.name)).toEqual(["Tidy", "Clean"]);
+    expect(draftError(s, draft({ name: "tidy" }))).toBe("A command named tidy already exists.");
   });
 
   it("allows the name of a removed default", () => {
@@ -264,7 +285,7 @@ describe("peerCommands", () => {
   it("drops malformed items and odd ids", () => {
     const { name: _n, ...noName } = ok;
     const rows = peerCommands({
-      commands: [null, "x", noName, { ...ok, id: "cmd-1", prompt: "x".repeat(20001) }, { ...ok, id: "Bad Id!" }, { ...ok, id: 4 }, ok],
+      commands: [null, "x", noName, { ...ok, id: "cmd-1", prompt: "x".repeat(COMMAND_PROMPT_MAX + 1) }, { ...ok, id: "Bad Id!" }, { ...ok, id: 4 }, ok],
     });
     expect(rows).toEqual([ok]);
   });

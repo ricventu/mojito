@@ -183,6 +183,22 @@ describe("/api/settings", () => {
     }
   });
 
+  it("reads a stored row leniently: an unknown icon becomes zap, a bad item alone is dropped, warning once", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { settings, db } = setup();
+      const ok = { id: "cmd-aaaaaa", name: "A", prompt: "p", icon: "skull", project: null, model: "sonnet", effort: "high" };
+      const bad = { ...ok, id: "cmd-bbbbbb", name: "B", prompt: "" };
+      db.prepare("INSERT INTO settings (key, value) VALUES ('commands', ?)").run(JSON.stringify({ items: [ok, bad], removed: [] }));
+      expect(settings.get().commands).toEqual({ items: [{ ...ok, icon: "zap" }], removed: [] });
+      expect(settings.get().commands.items).toHaveLength(1);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toMatch(/commands/);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("emits settings.updated on a successful PUT only", async () => {
     const { req, events } = setup();
     const res = await req("/api/settings", { method: "PUT", json: { favorites: [{ name: "A", search: "" }] } });

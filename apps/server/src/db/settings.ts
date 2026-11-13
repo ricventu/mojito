@@ -1,4 +1,4 @@
-import { CommandsSettingBody, DEFAULT_PROMPTS, EMPTY_COMMANDS, FavoritesBody, normalizeCommands, type CommandsSetting, type PromptKey, type Settings, type SettingsBody, type StatusDefault } from "@mojito/shared";
+import { DEFAULT_PROMPTS, EMPTY_COMMANDS, FavoritesBody, normalizeCommands, readCommandsSetting, type CommandsSetting, type PromptKey, type Settings, type SettingsBody, type StatusDefault } from "@mojito/shared";
 import type { Db } from "./db";
 
 const STATUSES = ["Backlog", "Todo", "In Progress", "In Review"] as const;
@@ -51,13 +51,13 @@ export class SettingsRepo {
     }
     const storedCommands = this.read("commands");
     if (storedCommands !== undefined) {
-      const commands = CommandsSettingBody.safeParse(storedCommands);
-      if (commands.success) out.commands = commands.data;
-      else if (!this.warnedCommands) {
+      // Lenient, not the write schema: a stored item a later version no longer accepts is dropped
+      // alone, never the whole setting (served empty, the next write would wipe it).
+      out.commands = readCommandsSetting(storedCommands, (why) => {
+        if (this.warnedCommands) return;
         this.warnedCommands = true;
-        const why = commands.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ");
-        console.warn(`settings: stored commands are invalid, serving none (${why})`);
-      }
+        console.warn(`settings: stored commands: dropped what no longer validates (${why})`);
+      });
     }
     return out;
   }

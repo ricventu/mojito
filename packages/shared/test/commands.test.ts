@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  COMMAND_PROMPT_MAX,
+  CommandSchema,
   CommandsSettingBody,
   DEFAULT_COMMANDS,
   EMPTY_COMMANDS,
@@ -9,6 +11,7 @@ import {
   isCustomCommandId,
   newCommandId,
   normalizeCommands,
+  readCommandsSetting,
   removeCommandsProject,
   renameCommandsProject,
   type Command,
@@ -33,6 +36,39 @@ describe("commands", () => {
     expect(effectiveCommands({ items: [], removed: ["clean"] })).toEqual([]));
   it("effectiveCommands hides a default shadowed by a custom name", () =>
     expect(effectiveCommands({ items: [custom({ name: "clean" })], removed: [] }).map((c) => c.id)).toEqual(["cmd-1a2b3c"]));
+  it("effectiveCommands never hides an edited default by name: renamed Tidy and a custom Clean are both in force", () => {
+    const tidy = { ...clean, name: "Tidy" };
+    const mine = custom({ id: "cmd-abcdef", name: "Clean", icon: "zap" });
+    const s = { items: [tidy, mine], removed: [] };
+    expect(effectiveCommands(s).map((c) => c.name)).toEqual(["Tidy", "Clean"]);
+    expect(CommandsSettingBody.safeParse(s).success).toBe(true);
+    // A custom Tidy beside the edited Tidy is still a clash in force.
+    expect(CommandsSettingBody.safeParse({ items: [tidy, custom({ name: "tidy" })], removed: [] }).success).toBe(false);
+    // An edited default that keeps its shipped name is not hidden either: two Cleans in force are refused.
+    expect(effectiveCommands({ items: [{ ...clean, model: "opus" as const }, mine], removed: [] }).map((c) => c.id)).toEqual(["clean", "cmd-abcdef"]);
+    expect(CommandsSettingBody.safeParse({ items: [{ ...clean, model: "opus" as const }, mine], removed: [] }).success).toBe(false);
+  });
+  it("importCommands of a custom Clean keeps a renamed Clean in force", () => {
+    const tidy = { ...clean, name: "Tidy" };
+    const mine = custom({ id: "cmd-abcdef", name: "Clean" });
+    expect(effectiveCommands(importCommands({ items: [tidy], removed: [] }, [mine])).map((c) => c.name)).toEqual(["Tidy", "Clean"]);
+  });
+  it("default ids are plain words, unique, and never git (the git-resolve session's suffix)", () => {
+    const ids = DEFAULT_COMMANDS.map((c) => c.id);
+    for (const id of ids) expect(id).toMatch(/^[a-z]+$/);
+    expect(ids).not.toContain("git");
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+  it("EMPTY_COMMANDS is frozen, arrays too", () => {
+    expect(Object.isFrozen(EMPTY_COMMANDS)).toBe(true);
+    expect(Object.isFrozen(EMPTY_COMMANDS.items)).toBe(true);
+    expect(Object.isFrozen(EMPTY_COMMANDS.removed)).toBe(true);
+  });
+  it("a prompt is capped at COMMAND_PROMPT_MAX (8000: tmux refuses a longer argv)", () => {
+    expect(COMMAND_PROMPT_MAX).toBe(8000);
+    expect(CommandSchema.safeParse(custom({ prompt: "x".repeat(8000) })).success).toBe(true);
+    expect(CommandSchema.safeParse(custom({ prompt: "x".repeat(8001) })).success).toBe(false);
+  });
   it("commandsFor: global ones and the project's own", () => {
     const web = custom({ id: "cmd-000001", name: "W", project: "Web" });
     const api = custom({ id: "cmd-000002", name: "A", project: "Api" });
@@ -77,6 +113,41 @@ describe("commands", () => {
       const fresh = importCommands(EMPTY_COMMANDS, [custom({ id: "deploy", name: "Deploy" })], () => "abcdef");
       expect(fresh.items[0].id).toBe("cmd-abcdef");
       expect(importCommands({ items: [], removed: ["clean"] }, [clean])).toEqual(EMPTY_COMMANDS);
+    });
+  });
+  describe("readCommandsSetting", () => {
+    const warn = () => vi.fn<(message: string) => void>();
+    it("reads a valid setting as stored, normalized", () => {
+      const w = warn();
+      expect(readCommandsSetting({ items: [custom(), { ...clean }], removed: ["clean"] }, w)).toEqual({ items: [custom()], removed: ["clean"] });
+      expect(w).not.toHaveBeenCalled();
+    });
+    it("an unknown icon becomes zap", () =>
+      expect(readCommandsSetting({ items: [{ ...custom(), icon: "skull" }], removed: [] }).items[0]!.icon).toBe("zap"));
+    it("one bad item is dropped, the others survive, with one warning", () => {
+      const w = warn();
+      const items = [
+        custom(),
+        { ...custom({ id: "cmd-222222", name: "Long" }), prompt: "x".repeat(COMMAND_PROMPT_MAX + 1) },
+        custom({ id: "deploy", name: "Deploy" }), // no such default
+        "x",
+        custom({ id: "cmd-333333", name: "Lint" }),
+      ];
+      expect(readCommandsSetting({ items, removed: [] }, w).items.map((c) => c.id)).toEqual(["cmd-1a2b3c", "cmd-333333"]);
+      expect(w).toHaveBeenCalledTimes(1);
+    });
+    it("a repeated id keeps the first; a repeated name drops the later item", () => {
+      const items = [custom(), custom({ name: "Other" }), custom({ id: "cmd-444444", name: " DEPS " }), custom({ id: "cmd-555555", name: "Five" })];
+      expect(readCommandsSetting({ items, removed: [] }).items.map((c) => c.id)).toEqual(["cmd-1a2b3c", "cmd-555555"]);
+    });
+    it("removed keeps only strings (then normalized)", () =>
+      expect(readCommandsSetting({ items: [], removed: ["clean", 3, null, "nope"] }).removed).toEqual(["clean"]));
+    it("a whole-garbage value is empty, with one warning", () => {
+      for (const raw of [null, "x", 3, [], {}, { items: "x", removed: [] }, { items: [], removed: {} }]) {
+        const w = warn();
+        expect(readCommandsSetting(raw, w)).toEqual(EMPTY_COMMANDS);
+        expect(w).toHaveBeenCalledTimes(1);
+      }
     });
   });
 });

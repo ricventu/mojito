@@ -1,4 +1,4 @@
-import { ASSIST_PROMPT, COMMAND_ICONS } from "@mojito/shared";
+import { ASSIST_PROMPT, COMMAND_ICONS, COMMAND_PROMPT_MAX } from "@mojito/shared";
 import { describe, expect, it, vi } from "vitest";
 import { AssistError, assistCommand } from "../../src/commands/assist";
 import type { QueryFn } from "../../src/tasks/runner";
@@ -34,6 +34,15 @@ describe("assistCommand", () => {
     expect((await assistCommand({ text: "x", icon: "rocket" }, { query: ok(text) })).icon).toBe("rocket");
     expect((await assistCommand({ text: "x" }, { query: ok(text) })).icon).toBe("zap");
   });
+
+  it("refuses a prompt over COMMAND_PROMPT_MAX: tmux could never run it", async () => {
+    const at = JSON.stringify({ name: "A", prompt: "x".repeat(COMMAND_PROMPT_MAX), icon: "zap" });
+    expect((await assistCommand({ text: "x" }, { query: ok(at) })).prompt).toHaveLength(COMMAND_PROMPT_MAX);
+    const over = JSON.stringify({ name: "A", prompt: "x".repeat(COMMAND_PROMPT_MAX + 1), icon: "zap" });
+    await expect(assistCommand({ text: "x" }, { query: ok(over) })).rejects.toThrow(new AssistError("the answer was too long"));
+  });
+
+  it("tells the model the prompt's cap", () => expect(ASSIST_PROMPT).toContain(`${COMMAND_PROMPT_MAX} characters`));
 
   it("trims the name and cuts it to 40", async () => {
     const text = JSON.stringify({ name: `  ${"n".repeat(50)}  `, prompt: "p", icon: "zap" });

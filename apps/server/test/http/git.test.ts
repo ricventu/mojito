@@ -54,6 +54,14 @@ describe("POST /api/projects/:name/pull|push", () => {
     expect(ctx.launch.newSession).not.toHaveBeenCalled();
   });
 
+  it("forwards the sessionId of a 409 from the git session's launch", async () => {
+    const ctx = withGit(async () => conflict);
+    ctx.sessions.insert(meta({ id: "mj-web-git", kind: "claude", ticket: null, project: "Web-git", state: "idle" }));
+    const res = await post(ctx, "pull");
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "another session holds mj-web-git", sessionId: "mj-web-git" });
+  });
+
   it("answers git's own message when the operation fails", async () => {
     const ctx = withGit(async () => {
       throw new SyncError("main has no upstream: push it first");

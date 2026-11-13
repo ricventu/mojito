@@ -1,4 +1,4 @@
-import { ASSIST_PROMPT, COMMAND_ICONS, type AssistAnswer, type AssistBody, type CommandIcon } from "@mojito/shared";
+import { ASSIST_PROMPT, COMMAND_ICONS, COMMAND_PROMPT_MAX, type AssistAnswer, type AssistBody, type CommandIcon } from "@mojito/shared";
 import { z } from "zod";
 import { agentEnv, type QueryFn } from "../tasks/runner";
 
@@ -11,7 +11,8 @@ export interface AssistDeps {
   timeoutMs?: number;
 }
 
-const Proposal = z.object({ name: z.string(), prompt: z.string().trim().min(1).max(20000), icon: z.string() });
+/** The prompt's cap is checked apart, so an over-long answer gets its own message. */
+const Proposal = z.object({ name: z.string(), prompt: z.string().trim().min(1), icon: z.string() });
 
 const message = ({ text, project }: AssistBody): string =>
   [
@@ -74,6 +75,8 @@ export async function assistCommand(body: AssistBody, deps: AssistDeps): Promise
     const answer = await Promise.race([run(), timedOut]);
     const parsed = Proposal.safeParse(parseAnswer(answer));
     if (!parsed.success) throw new AssistError("the assistant's answer had no name or prompt");
+    // A longer prompt could be saved nowhere and run nowhere (tmux's argv limit).
+    if (parsed.data.prompt.length > COMMAND_PROMPT_MAX) throw new AssistError("the answer was too long");
     const name = parsed.data.name.trim().slice(0, 40).trim();
     if (!name) throw new AssistError("the assistant's answer had no name or prompt");
     const icon = (COMMAND_ICONS as readonly string[]).includes(parsed.data.icon) ? (parsed.data.icon as CommandIcon) : (body.icon ?? "zap");

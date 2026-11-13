@@ -68,7 +68,7 @@ export function gitRoutes(deps: AppDeps): Hono {
       }
       if (outcome.status !== "conflict") return c.json(outcome satisfies GitSyncResult);
       const launched = await launchGitResolve({ project: name, op, conflict: outcome }, deps.launch);
-      if (!launched.ok) return c.json({ error: launched.error }, launched.status);
+      if (!launched.ok) return c.json({ error: launched.error, ...(launched.sessionId ? { sessionId: launched.sessionId } : {}) }, launched.status);
       const result: GitSyncResult = { status: "conflict", session: launched.session, alreadyOpen: launched.alreadyOpen };
       return c.json(result);
     } finally {
