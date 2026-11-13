@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_PROMPTS } from "@mojito/shared";
+import { DEFAULT_COMMANDS, DEFAULT_PROMPTS, type Settings } from "@mojito/shared";
 import { defaultSettings } from "../../src/db/settings";
 import { setup } from "./setup";
 
@@ -131,6 +131,53 @@ describe("/api/settings", () => {
       expect(warn).toHaveBeenCalledTimes(1);
       expect(String(warn.mock.calls[0][0])).toMatch(/favorites/);
       expect(String(warn.mock.calls[0][0])).toMatch(/name/);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("answers no stored commands on a fresh database", async () => {
+    const { req } = setup();
+    expect(((await (await req("/api/settings")).json()) as Settings).commands).toEqual({ items: [], removed: [] });
+  });
+
+  it("stores commands normalized", async () => {
+    const { req, settings } = setup();
+    const res = await req("/api/settings", {
+      method: "PUT",
+      json: { commands: { items: [DEFAULT_COMMANDS[0]], removed: ["clean", "x"] } },
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as Settings).commands).toEqual({ items: [], removed: ["clean"] });
+    expect(settings.get().commands).toEqual({ items: [], removed: ["clean"] });
+  });
+
+  it("refuses commands with a duplicate effective name", async () => {
+    const { req, settings } = setup();
+    const c = { ...DEFAULT_COMMANDS[0], id: "cmd-aaaaaa", name: "x" };
+    const res = await req("/api/settings", {
+      method: "PUT",
+      json: { commands: { items: [c, { ...c, id: "cmd-bbbbbb", name: "X" }], removed: [] } },
+    });
+    expect(res.status).toBe(400);
+    expect(settings.get().commands).toEqual({ items: [], removed: [] });
+  });
+
+  it("setCommands stores the normalized value", () => {
+    const { settings } = setup();
+    settings.setCommands({ items: [DEFAULT_COMMANDS[0]], removed: ["x", "x"] });
+    expect(settings.get().commands).toEqual({ items: [], removed: [] });
+  });
+
+  it("reads a corrupt commands row as none, warning once", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { settings, db } = setup();
+      db.prepare("INSERT INTO settings (key, value) VALUES ('commands', ?)").run(JSON.stringify({ items: 1 }));
+      expect(settings.get().commands).toEqual({ items: [], removed: [] });
+      expect(settings.get().commands).toEqual({ items: [], removed: [] });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toMatch(/commands/);
     } finally {
       warn.mockRestore();
     }

@@ -1,4 +1,4 @@
-import { DEFAULT_PROMPTS, FavoritesBody, type PromptKey, type Settings, type SettingsBody, type StatusDefault } from "@mojito/shared";
+import { CommandsSettingBody, DEFAULT_PROMPTS, EMPTY_COMMANDS, FavoritesBody, normalizeCommands, type CommandsSetting, type PromptKey, type Settings, type SettingsBody, type StatusDefault } from "@mojito/shared";
 import type { Db } from "./db";
 
 const STATUSES = ["Backlog", "Todo", "In Progress", "In Review"] as const;
@@ -6,7 +6,7 @@ const STATUSES = ["Backlog", "Todo", "In Progress", "In Review"] as const;
 export function defaultSettings(): Settings {
   const statusDefaults: Record<string, StatusDefault> = {};
   for (const s of STATUSES) statusDefaults[s] = { model: "opus", effort: "high" };
-  return { statusDefaults, prompts: { ...DEFAULT_PROMPTS }, favorites: [] };
+  return { statusDefaults, prompts: { ...DEFAULT_PROMPTS }, favorites: [], commands: EMPTY_COMMANDS };
 }
 
 const PROMPT_KEYS = Object.keys(DEFAULT_PROMPTS) as PromptKey[];
@@ -14,6 +14,9 @@ const PROMPT_KEYS = Object.keys(DEFAULT_PROMPTS) as PromptKey[];
 export class SettingsRepo {
   /** A corrupt favourites row is reported once, not on every read. */
   private warnedFavorites = false;
+
+  /** Same for a corrupt commands row. */
+  private warnedCommands = false;
 
   constructor(private db: Db) {}
 
@@ -46,7 +49,21 @@ export class SettingsRepo {
         console.warn(`settings: stored favorites are invalid, serving none (${why})`);
       }
     }
+    const storedCommands = this.read("commands");
+    if (storedCommands !== undefined) {
+      const commands = CommandsSettingBody.safeParse(storedCommands);
+      if (commands.success) out.commands = commands.data;
+      else if (!this.warnedCommands) {
+        this.warnedCommands = true;
+        const why = commands.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ");
+        console.warn(`settings: stored commands are invalid, serving none (${why})`);
+      }
+    }
     return out;
+  }
+
+  setCommands(commands: CommandsSetting): void {
+    this.set({ commands });
   }
 
   /** Replaces each part `s` carries and keeps the others. */
@@ -62,5 +79,6 @@ export class SettingsRepo {
       put.run("prompts", JSON.stringify(edited));
     }
     if (s.favorites) put.run("favorites", JSON.stringify(s.favorites));
+    if (s.commands) put.run("commands", JSON.stringify(normalizeCommands(s.commands)));
   }
 }

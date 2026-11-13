@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_PROMPTS, type SessionMeta, type Settings } from "@mojito/shared";
+import { DEFAULT_PROMPTS, EMPTY_COMMANDS, type SessionMeta, type Settings } from "@mojito/shared";
 import { ApiError } from "@/lib/api";
 import { launchErrorAction, launchOptions, withLaunched } from "@/lib/launch";
 
@@ -7,6 +7,7 @@ const settings: Settings = {
   statusDefaults: { Todo: { model: "sonnet", effort: "medium" } },
   prompts: DEFAULT_PROMPTS,
   favorites: [],
+  commands: EMPTY_COMMANDS,
 };
 
 describe("launchOptions", () => {
