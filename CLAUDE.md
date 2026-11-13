@@ -29,8 +29,8 @@ app's state, left in place.
   `GraphHighlight`, `CommitDetails`, `CommitFile`, `CommitDiff`) and `isValidHash`/`isValidTicket`,
   `CleanResult`/`WorktreeCount`, the docs
   types (`DocEntry`, `DocList`, `DocFile`, `DOC_MAX_BYTES`) and `isDocPath`, the peer types
-  (`PeerSnapshot`, `PeersAnswer`) and `openEventStream` (used by the web and by the server's peer
-  links; `schedule` is required — the package has no timer typings). Consumed as source, no build; zod **4** everywhere (the Agent
+  (`PeerSnapshot`, `PeersAnswer`), the folder picker's `DirEntry`/`DirList`, and
+  `openEventStream` (used by the web and by the server's peer links; `schedule` is required — the package has no timer typings). Consumed as source, no build; zod **4** everywhere (the Agent
   SDK's peer).
 - `apps/server` — Node 22, Hono 4 on `@hono/node-server`, `ws` on the http `upgrade` event,
   `node-pty`, `better-sqlite3`. Built with tsup (`tsup.config.ts` bundles `@mojito/shared`
@@ -205,6 +205,13 @@ app's state, left in place.
   `worktree remove` (no --force), `branch -d`, `push origin --delete`, `worktree prune`. The badge:
   `GET /api/projects/:name/worktrees` → `{count}` (`git/worktrees.ts`: porcelain entries minus the
   main checkout and `prunable` ones; a `GitError` is a 409).
+- **Folder picker** (RIC-585, `GET /api/fs/dirs?path` → `DirList`, `fs/dirs.ts`,
+  `http/routes/fs.ts`): a folder's subfolders, for the Path field in Settings. `path` absent or
+  empty = HOME, `~`/`~/…` expanded, else absolute, then `resolve`d (`..` and a trailing slash
+  are fine). Hidden folders (leading `.`) are never listed, a symlink to a folder counts, a broken
+  or unreadable child is skipped; `git` marks a `.git` entry (a worktree's file too). 400 relative
+  or NUL, 404 missing or not a folder, 403 unreadable. Not fenced to HOME (the token already opens
+  a shell) and not on the peer relay's table: Settings edits this instance only.
 - **Git graph** (RIC-505, `git/graph.ts`, `ticketBranch.ts`, `defaultBranch.ts`, `commit.ts`,
   `http/routes/gitGraph.ts`): read-only — `GET /api/projects/:name/git/graph?skip&ticket`,
   `…/git/commits/:hash` and `…/commits/:hash/diff?path&from`. Never a `fetch` or any write: the
@@ -433,6 +440,9 @@ app's state, left in place.
   from `sm` (`sheets/styles.ts`, pure CSS: a resize never remounts an open modal), centred on the
   column beside a docked sidebar: the `aside` carries `data-sidebar-docked`, which sets
   `--dock-width` (`index.css`, must equal its `w-72`). The filter sheet stays a right drawer.
+- Settings → Projects: the Path field's Browse swaps the dialog's form for `FolderPicker` (same
+  dialog, the other fields kept). It opens at the typed path, else HOME — a typed path that fails
+  opens HOME with the error shown — and writes the pick as `~/…` under HOME (`lib/folderPicker.ts`).
 - Overlay sheets (filter, sidebar) draw their own ✕ (`showCloseButton={false}`): shadcn's
   built-in one is absolutely positioned and ignores the safe-area insets.
 - Terminal (`components/terminal`, `lib/terminal`): `syncGeometry` always publishes the size,

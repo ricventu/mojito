@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { FolderOpen } from "lucide-react";
 import { ProjectBody, type ProjectRow } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { apiJson } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
+import { FolderPicker } from "./FolderPicker";
 
 /** User-facing text for the field a client-side check rejected; the server's own messages are shown as they come. */
 const FIELD_ERRORS: Record<string, string> = {
@@ -34,6 +36,8 @@ function Form({ project, onClose }: Props) {
   const [path, setPath] = useState(project?.path ?? "");
   const [teamKey, setTeamKey] = useState(project?.teamKey ?? "");
   const [error, setError] = useState<string | null>(null);
+  // The folder picker replaces the form in the same dialog; the fields above are kept.
+  const [browsing, setBrowsing] = useState(false);
 
   const save = useMutation({
     mutationFn: (body: ProjectBody) =>
@@ -61,6 +65,20 @@ function Form({ project, onClose }: Props) {
     save.mutate(parsed.data);
   }
 
+  if (browsing) {
+    return (
+      <FolderPicker
+        start={path}
+        onPick={(picked) => {
+          setPath(picked);
+          setError(null);
+          setBrowsing(false);
+        }}
+        onCancel={() => setBrowsing(false)}
+      />
+    );
+  }
+
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
       <DialogHeader>
@@ -73,16 +91,28 @@ function Form({ project, onClose }: Props) {
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="project-path">Path</Label>
-        <Input
-          id="project-path"
-          value={path}
-          onChange={(e) => setPath(e.target.value)}
-          placeholder="~/code/project"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          className="font-mono"
-        />
+        <div className="flex gap-2">
+          <Input
+            id="project-path"
+            value={path}
+            onChange={(e) => setPath(e.target.value)}
+            placeholder="~/code/project"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            className="font-mono"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Browse folders"
+            title="Browse folders"
+            onClick={() => setBrowsing(true)}
+          >
+            <FolderOpen size={16} />
+          </Button>
+        </div>
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="project-team">Team key</Label>
