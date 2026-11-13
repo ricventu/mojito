@@ -11,6 +11,7 @@ import {
   type Effort,
   type Model,
 } from "@mojito/shared";
+import { ApiError } from "@/lib/api";
 import { byProjectName } from "@/lib/board";
 
 /**
@@ -100,4 +101,21 @@ export function commandGroups(effective: Command[]): { project: string | null; c
 export function commandTag(s: CommandsSetting, id: string): "Default" | "Edited" | null {
   if (!isDefaultCommandId(id)) return null;
   return s.items.some((c) => c.id === id) ? "Edited" : "Default";
+}
+
+/** A peer's commands for the import list: one bound to a project this instance does not map is disabled. */
+export function importableRows(
+  incoming: Command[],
+  mapped: string[],
+): { command: Command; disabledReason: string | null }[] {
+  return incoming.map((command) => ({
+    command,
+    disabledReason: command.project !== null && !mapped.includes(command.project) ? `${command.project} is not mapped here` : null,
+  }));
+}
+
+/** Why reading a peer's commands failed; a 404 is an older Mojito without the route. */
+export function importErrorMessage(peer: string, err: unknown): string {
+  if (err instanceof ApiError && err.status === 404) return `${peer} has no commands to import`;
+  return err instanceof Error ? err.message : `Reading ${peer}'s commands failed.`;
 }

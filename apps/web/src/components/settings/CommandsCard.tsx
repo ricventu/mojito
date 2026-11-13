@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Download, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { DEFAULT_COMMANDS, effectiveCommands, type Command, type CommandsSetting, type Settings } from "@mojito/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { usePeers } from "@/hooks/usePeers";
 import { useSettings } from "@/hooks/useSettings";
 import { apiJson } from "@/lib/api";
 import { commandGroups, commandTag, restoreBlocked, restoreDefault } from "@/lib/commandForm";
 import { CommandIconView } from "@/lib/commandIcons";
 import { qk } from "@/lib/queryKeys";
 import { CommandDialog, type CommandsWrite } from "./CommandDialog";
+import { ImportCommandsDialog } from "./ImportCommandsDialog";
 
 const WRITE_KEY = ["commands"] as const;
 
@@ -51,6 +53,9 @@ export function CommandsCard() {
   // `undefined` = closed, `null` = adding, a command = editing it.
   const [editing, setEditing] = useState<Command | null | undefined>(undefined);
   const stored = settings.data?.commands;
+  const onlinePeers = (usePeers().data?.peers ?? []).filter((p) => p.online);
+  // The peer whose import list is open.
+  const [importing, setImporting] = useState<string | null>(null);
 
   function restore(id: string) {
     write((s) => restoreDefault(s, id)).then(
@@ -105,6 +110,15 @@ export function CommandsCard() {
             {effectiveCommands(stored).length === 0 && (
               <p className="text-sm text-muted-foreground">No commands. Add one, or restore a default.</p>
             )}
+            {onlinePeers.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {onlinePeers.map((p) => (
+                  <Button key={p.name} variant="outline" size="sm" onClick={() => setImporting(p.name)}>
+                    <Download size={14} /> Import from {p.name}
+                  </Button>
+                ))}
+              </div>
+            )}
             {stored.removed.length > 0 && (
               <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
                 Removed defaults:
@@ -138,6 +152,7 @@ export function CommandsCard() {
       {editing !== undefined && settings.data && (
         <CommandDialog command={editing} settings={settings.data} write={write} onClose={() => setEditing(undefined)} />
       )}
+      {importing !== null && <ImportCommandsDialog peer={importing} write={write} onClose={() => setImporting(null)} />}
     </Card>
   );
 }

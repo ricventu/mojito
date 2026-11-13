@@ -1,11 +1,14 @@
 import { DEFAULT_COMMANDS, EMPTY_COMMANDS, effectiveCommands, type Command, type CommandsSetting } from "@mojito/shared";
 import { describe, expect, it } from "vitest";
+import { ApiError } from "../../src/lib/api";
 import {
   applyAssist,
   commandGroups,
   commandTag,
   deleteCommand,
   draftError,
+  importableRows,
+  importErrorMessage,
   newDraft,
   resetDefault,
   restoreBlocked,
@@ -201,5 +204,40 @@ describe("draftError", () => {
 
   it("accepts a fine draft", () => {
     expect(draftError(EMPTY_COMMANDS, draft())).toBeNull();
+  });
+});
+
+describe("importableRows", () => {
+  const mk = (id: string, project: string | null): Command => ({
+    id,
+    name: id,
+    prompt: "p",
+    icon: "zap",
+    project,
+    model: "sonnet",
+    effort: "high",
+  });
+
+  it("enables global commands and ones bound to a mapped project", () => {
+    const rows = importableRows([mk("a", null), mk("b", "mojito")], ["mojito"]);
+    expect(rows.map((r) => r.disabledReason)).toEqual([null, null]);
+  });
+
+  it("disables one bound to a project this instance does not map", () => {
+    const rows = importableRows([mk("a", "other")], ["mojito"]);
+    expect(rows[0]!.disabledReason).toBe("other is not mapped here");
+    expect(rows[0]!.command.id).toBe("a");
+  });
+});
+
+describe("importErrorMessage", () => {
+  it("names a peer with no commands route on 404", () => {
+    expect(importErrorMessage("mac", new ApiError(404, "Not found", undefined))).toBe("mac has no commands to import");
+  });
+
+  it("passes any other message through", () => {
+    expect(importErrorMessage("mac", new ApiError(502, "mac is offline", undefined))).toBe("mac is offline");
+    expect(importErrorMessage("mac", new Error("boom"))).toBe("boom");
+    expect(importErrorMessage("mac", "x")).toBe("Reading mac's commands failed.");
   });
 });
