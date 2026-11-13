@@ -60,4 +60,18 @@ describe("GET /api/fs/dirs", () => {
     expect(res.status).toBe(401);
     expect(ctx.listDirs).not.toHaveBeenCalled();
   });
+
+  it("answers 504 when the folder does not answer in time", async () => {
+    vi.useFakeTimers();
+    try {
+      const ctx = { ...setup({ listDirs: () => new Promise<DirListResult>(() => {}) }) };
+      const pending = ctx.req("/api/fs/dirs?path=/mnt");
+      await vi.advanceTimersByTimeAsync(10_000);
+      const res = await pending;
+      expect(res.status).toBe(504);
+      expect(await res.json()).toEqual({ error: "folder did not answer within 10 s: /mnt" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

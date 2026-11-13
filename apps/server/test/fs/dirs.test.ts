@@ -98,4 +98,17 @@ describe("listDirs", () => {
     expect(res.ok && res.list.parent).toBeNull();
     expect(res.ok && res.list.path).toBe("/");
   });
+
+  it("never probes .git inside the folders macOS guards under HOME", async () => {
+    for (const d of ["Desktop", "Documents", "Downloads", "code"]) mkdirSync(join(tmp, d, ".git"), { recursive: true });
+    const mac = await listDirs(tmp, tmp, "darwin");
+    expect(mac.ok && mac.list.dirs).toEqual([
+      { name: "code", git: true },
+      { name: "Desktop", git: false },
+      { name: "Documents", git: false },
+      { name: "Downloads", git: false },
+    ]);
+    const linux = await listDirs(tmp, tmp, "linux");
+    expect(linux.ok && linux.list.dirs.every((d) => d.git)).toBe(true);
+  });
 });

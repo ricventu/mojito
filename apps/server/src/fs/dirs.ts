@@ -17,12 +17,24 @@ async function isDir(path: string, entry: { isDirectory(): boolean; isSymbolicLi
 }
 
 /**
+ * HOME's children macOS privacy controls guard: touching anything inside one (even an `lstat` of
+ * `.git`) from the LaunchAgent's node can put a permission prompt on the Mac's screen, and a
+ * "Don't Allow" sticks to that process and the sessions it spawns. They are never repos.
+ */
+const MAC_GUARDED = new Set(["Desktop", "Documents", "Downloads"]);
+
+/**
  * The subfolders of `path` (absolute, normalised), for the project folder picker. Hidden ones
  * (a leading `.`) are left out; a child that cannot be read is skipped, never fails the list.
  * A missing path or a file is `not-found`, an unreadable folder `forbidden`; any other error
  * is the server's (rethrown, a 500).
  */
-export async function listDirs(path: string, home: string): Promise<DirListResult> {
+export async function listDirs(
+  path: string,
+  home: string,
+  platform: NodeJS.Platform = process.platform,
+): Promise<DirListResult> {
+  const guarded = platform === "darwin" && path === home;
   let entries;
   try {
     entries = await readdir(path, { withFileTypes: true });
@@ -38,6 +50,7 @@ export async function listDirs(path: string, home: string): Promise<DirListResul
       .map(async (e): Promise<DirEntry | null> => {
         const child = join(path, e.name);
         if (!(await isDir(child, e))) return null;
+        if (guarded && MAC_GUARDED.has(e.name)) return { name: e.name, git: false };
         const git = await lstat(join(child, ".git")).then(
           () => true,
           () => false,

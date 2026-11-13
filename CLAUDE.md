@@ -210,7 +210,10 @@ app's state, left in place.
   empty = HOME, `~`/`~/…` expanded, else absolute, then `resolve`d (`..` and a trailing slash
   are fine). Hidden folders (leading `.`) are never listed, a symlink to a folder counts, a broken
   or unreadable child is skipped; `git` marks a `.git` entry (a worktree's file too). 400 relative
-  or NUL, 404 missing or not a folder, 403 unreadable. Not fenced to HOME (the token already opens
+  or NUL, 404 missing or not a folder, 403 unreadable, 504 after 10 s (a stale network mount hangs a
+  `stat` for good). On macOS HOME's Desktop/Documents/Downloads are never probed for `.git`: from the
+  LaunchAgent's node that raises a privacy prompt on the Mac's screen, and a "Don't Allow" sticks to
+  the process and its sessions. Not fenced to HOME (the token already opens
   a shell) and not on the peer relay's table: Settings edits this instance only.
 - **Git graph** (RIC-505, `git/graph.ts`, `ticketBranch.ts`, `defaultBranch.ts`, `commit.ts`,
   `http/routes/gitGraph.ts`): read-only — `GET /api/projects/:name/git/graph?skip&ticket`,

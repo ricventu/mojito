@@ -4,6 +4,8 @@ import { listDirs } from "../../fs/dirs";
 import { expandHome } from "../../homePath";
 import type { AppDeps } from "../app";
 
+const LIST_TIMEOUT_MS = 10_000;
+
 /**
  * A folder's subfolders, read-only, for the project folder picker (RIC-585). `path` absent or
  * empty is HOME; `~`/`~/…` is expanded, anything else must be absolute, and `..` segments are
@@ -19,7 +21,13 @@ export function fsRoutes(deps: AppDeps): Hono {
     const expanded = expandHome(typed, deps.cfg.home);
     if (!isAbsolute(expanded)) return c.json({ error: `path must be absolute: ${typed}` }, 400);
     const path = resolve(expanded);
-    const res = await list(path);
+    // A stale network mount can hang a readdir or a stat for good; the picker must get an answer.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<"late">((done) => {
+      timer = setTimeout(() => done("late"), LIST_TIMEOUT_MS);
+    });
+    const res = await Promise.race([list(path), late]).finally(() => clearTimeout(timer));
+    if (res === "late") return c.json({ error: `folder did not answer within ${LIST_TIMEOUT_MS / 1000} s: ${path}` }, 504);
     if (res.ok) return c.json(res.list);
     return res.reason === "not-found"
       ? c.json({ error: `folder not found: ${path}` }, 404)
