@@ -1,4 +1,5 @@
 import { serveStatic } from "@hono/node-server/serve-static";
+import type { AssistAnswer, AssistBody } from "@mojito/shared";
 import { Hono } from "hono";
 import type { ServerConfig } from "../config";
 import type { Db } from "../db/db";
@@ -51,6 +52,8 @@ export interface AppDeps {
   docsRead?: DocsReader;
   /** A folder's subfolders, for the project folder picker. Default: the real disk (`listDirs`). */
   listDirs?(path: string): Promise<DirListResult>;
+  /** The command form's AI help. Default: the Agent SDK (`assistCommand`). */
+  assist?(body: AssistBody): Promise<AssistAnswer>;
   /** The other instances (`MOJITO_PEERS`); none when absent. */
   peers?: PeerRegistry;
   /** The fetch a launch on a peer goes through. Default: the global one. */

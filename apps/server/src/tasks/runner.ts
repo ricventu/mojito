@@ -35,7 +35,7 @@ const TOOL_PREFIX = `mcp__${LINEAR_MCP_NAME}__`;
  * own credentials scrubbed as for every child, and no Anthropic API credential either, so the
  * agent always runs on the logged-in subscription and never bills an API key.
  */
-function agentEnv(): Record<string, string> {
+export function agentEnv(): Record<string, string> {
   const { ANTHROPIC_API_KEY: _key, ANTHROPIC_AUTH_TOKEN: _token, ...env } = spawnEnv() as Record<string, string>;
   return env;
 }

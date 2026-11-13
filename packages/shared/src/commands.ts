@@ -170,3 +170,27 @@ export function importCommands(local: CommandsSetting, incoming: Command[], rand
   }
   return normalizeCommands({ items, removed });
 }
+
+/** The system prompt of the command form's AI help: fixed, not a setting. One line per paragraph. */
+export const ASSIST_PROMPT = [
+  "You help write a quick command for Mojito: a prompt that starts a Claude Code session working in a project's git repository.",
+  "The user gives you a rough idea or a finished prompt. Rewrite it as a clear, self-contained instruction in English for that session.",
+  "Keep the user's intent and every constraint they state; do not add goals they did not ask for.",
+  "Where the work could be destructive (deleting, force-pushing, resetting, discarding changes), tell the session to stop and ask the human before doing it.",
+  "Propose a short name for the command (at most 40 characters) and pick exactly one icon from the list in the message.",
+  'Answer with JSON only, no prose and no code fence: {"name": string, "prompt": string, "icon": string}.',
+].join("\n");
+
+export const AssistBody = z.object({
+  text: z.string().trim().min(1).max(20000),
+  project: z.string().optional(),
+  /** The form's current icon: the fallback when the assistant picks one outside the list. */
+  icon: z.enum(COMMAND_ICONS).optional(),
+});
+export type AssistBody = z.infer<typeof AssistBody>;
+
+export interface AssistAnswer {
+  name: string;
+  prompt: string;
+  icon: CommandIcon;
+}

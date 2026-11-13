@@ -1,5 +1,6 @@
 import { DEFAULT_COMMANDS } from "@mojito/shared";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { AssistError } from "../../src/commands/assist";
 import { meta, setup } from "./setup";
 
 const web = { name: "Web", path: "~/repo/web", teamKey: "RIC" };
@@ -80,5 +81,31 @@ describe("POST /api/projects/:name/commands/:id", () => {
     ctx.settings.setCommands({ items: [{ ...DEFAULT_COMMANDS[0], model: "opus" }], removed: [] });
     const res = await run(ctx, "clean");
     expect(await res.json()).toMatchObject({ session: { model: "opus" } });
+  });
+});
+
+describe("POST /api/commands/assist", () => {
+  const post = (ctx: ReturnType<typeof setup>, json: unknown) => ctx.req("/api/commands/assist", { method: "POST", json });
+
+  it("answers the assistant's proposal", async () => {
+    const answer = { name: "Deps", prompt: "Update.", icon: "package" as const };
+    const assist = vi.fn(async () => answer);
+    const res = await post(setup({ assist }), { text: "update deps", project: "Web" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(answer);
+    expect(assist).toHaveBeenCalledWith({ text: "update deps", project: "Web" });
+  });
+
+  it("400s an empty text", async () => {
+    const assist = vi.fn();
+    const res = await post(setup({ assist }), { text: "   " });
+    expect(res.status).toBe(400);
+    expect(assist).not.toHaveBeenCalled();
+  });
+
+  it("502s an AssistError", async () => {
+    const res = await post(setup({ assist: async () => { throw new AssistError("the assistant timed out"); } }), { text: "x" });
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: "the assistant timed out" });
   });
 });

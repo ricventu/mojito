@@ -22,6 +22,7 @@ import { EndWatch } from "./sessions/ends";
 import { oomKilledSince, paneScope } from "./sessions/oom";
 import { startPaneWatch } from "./sessions/paneWatch";
 import { linearImageFetcher } from "./tasks/images";
+import { assistCommand } from "./commands/assist";
 import { TaskQueue } from "./tasks/runner";
 import { TicketCache } from "./tickets/cache";
 import { PREFIX, listSessions, livePanes } from "./tmux/tmux";
@@ -108,6 +109,7 @@ async function main(): Promise<void> {
     tickets,
     launch,
     taskQueue,
+    assist: (body) => assistCommand(body, { query }),
     peers,
     staticDir,
   });

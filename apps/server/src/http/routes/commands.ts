@@ -1,8 +1,11 @@
 import { existsSync } from "node:fs";
-import { commandsFor, effectiveCommands, type CommandResult } from "@mojito/shared";
+import { query } from "@anthropic-ai/claude-agent-sdk";
+import { AssistBody, commandsFor, effectiveCommands, type CommandResult } from "@mojito/shared";
 import { Hono } from "hono";
+import { AssistError, assistCommand } from "../../commands/assist";
 import { expandHome } from "../../homePath";
 import { launchCommand } from "../../sessions/launch";
+import { parseBody } from "../body";
 import type { AppDeps } from "../app";
 
 /**
@@ -11,8 +14,19 @@ import type { AppDeps } from "../app";
  */
 export function commandRoutes(deps: AppDeps): Hono {
   const exists = deps.exists ?? existsSync;
+  const assist = deps.assist ?? ((b: AssistBody) => assistCommand(b, { query }));
   return new Hono()
     .get("/commands", (c) => c.json({ commands: effectiveCommands(deps.settings.get().commands) }))
+    .post("/commands/assist", async (c) => {
+      const body = await parseBody(c, AssistBody);
+      if (!body.ok) return c.json({ error: body.error }, 400);
+      try {
+        return c.json(await assist(body.data));
+      } catch (err) {
+        if (err instanceof AssistError) return c.json({ error: err.message }, 502);
+        throw err;
+      }
+    })
     .post("/projects/:name/commands/:id", async (c) => {
       const name = c.req.param("name");
       const project = deps.projects.get(name);
