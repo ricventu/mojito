@@ -132,8 +132,8 @@ function StatusPill({
 }
 
 /**
- * Model, effort and worktree (on unless switched off), then Launch, which keeps the sheet open on
- * the new session. Disabled while the request is in flight: a double tap is one POST.
+ * Model, effort and worktree (on unless switched off), then Launch, which closes the sheet and stays
+ * on the board, where the card shows the new session. Disabled while the request is in flight: a double tap is one POST.
  * Both start from the defaults of the status shown in the header, and keep following it — a status
  * moved in this sheet brings its own defaults — until the human picks one by hand.
  */
@@ -141,10 +141,12 @@ function LaunchForm({
   ticket,
   status,
   settings,
+  onClose,
 }: {
   ticket: TicketSummary;
   status: string;
   settings: Settings;
+  onClose: () => void;
 }) {
   const qc = useQueryClient();
   const peers = usePeers();
@@ -156,8 +158,8 @@ function LaunchForm({
   // A peer that went offline (or stopped mapping the project) since it was picked falls back here.
   const host = hosts.find((h) => h.name === hostName) ?? hosts[0];
 
-  // The sheet stays open (RIC-584): the session goes into the cache, so the form gives way to its
-  // live state and Open terminal at once, ahead of the refetch and the events.
+  // The sheet closes onto the board: the session goes into the cache, so its card shows the live
+  // state at once, ahead of the refetch and the events.
   const launch = useMutation({
     mutationFn: ({ peer }: { peer: PeerSnapshot | null }) =>
       apiJson<{ session: SessionMeta; warning?: string }>(
@@ -167,6 +169,8 @@ function LaunchForm({
       ),
     onSuccess: ({ session, warning }, { peer }) => {
       if (warning) toast.warning(warning);
+      toast.success(`${ticket.identifier} started${peer ? ` on ${peer.name}` : ""}`);
+      onClose();
       if (peer) {
         qc.setQueryData<PeersAnswer>(qk.peers, (answer) => withPeerSession(answer, peer.name, session));
       } else {
@@ -365,7 +369,7 @@ export function TicketSheet({ ticket, onClose }: Props) {
           ) : settings.data ? (
             <>
               {session && canResume(session) && <EndedSession session={session} onClose={onClose} />}
-              <LaunchForm ticket={ticket} status={status} settings={settings.data} />
+              <LaunchForm ticket={ticket} status={status} settings={settings.data} onClose={onClose} />
             </>
           ) : (
             <p className="text-sm text-muted-foreground">

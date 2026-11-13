@@ -391,10 +391,11 @@ app's state, left in place.
   instance's projects. `SidebarToggle` carries an amber dot when a peer has a session
   waiting; the board and its waiting pill stay local. The ticket sheet's "Run on"
   (`launchHosts`: this instance, then online peers mapping the ticket's project) shows only with
-  more than one host. A ticket launch, local or on a peer, **keeps the sheet open** (RIC-584): the
-  answered session is written into `qk.sessions`/`qk.peers` (`withLaunched`, `withPeerSession`: a
-  newer copy an event already brought wins), so the form gives way to the session's state and Open
-  at once; a 409 with `sessionId` is a toast and a refetch. The new-session sheet still opens the
+  more than one host. A ticket launch, local or on a peer, **closes the sheet onto the board**, with a
+  "started" toast (RIC-584 kept it open on the session; reverted on request): the answered session
+  is written into `qk.sessions`/`qk.peers` (`withLaunched`, `withPeerSession`: a newer copy an event
+  already brought wins), so its card shows the state at once; a 409 with `sessionId` is a toast and
+  a refetch, the sheet left open to show that session. The new-session sheet still opens the
   terminal (it has no page of its own to stay on). The new-session sheet has
   the same "Run on" (`freeLaunchHosts`): its Project list is this instance's projects and every
   online peer's (`freeLaunchProjects`), the hosts are those mapping the picked one (General: all
