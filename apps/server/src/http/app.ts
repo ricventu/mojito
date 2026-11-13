@@ -7,6 +7,7 @@ import type { SessionsRepo } from "../db/sessions";
 import type { SettingsRepo } from "../db/settings";
 import type { TasksRepo } from "../db/tasks";
 import type { EventBus } from "../events/bus";
+import type { DirListResult } from "../fs/dirs";
 import type { LinearClient } from "../linear/client";
 import type { PeerRegistry } from "../peers/registry";
 import type { LaunchDeps } from "../sessions/launch";
@@ -16,6 +17,7 @@ import { tokenMatches } from "../token";
 import { errorMessage } from "./body";
 import { gitRoutes, type GitSync } from "./routes/git";
 import { docsRoutes, type DocsReader } from "./routes/docs";
+import { fsRoutes } from "./routes/fs";
 import { gitGraphRoutes, type GitReader } from "./routes/gitGraph";
 import { healthRoutes } from "./routes/health";
 import { hookRoutes } from "./routes/hook";
@@ -46,6 +48,8 @@ export interface AppDeps {
   gitRead?: GitReader;
   /** A project's markdown list and documents (read-only). Default: real git and disk (`docsReader`). */
   docsRead?: DocsReader;
+  /** A folder's subfolders, for the project folder picker. Default: the real disk (`listDirs`). */
+  listDirs?(path: string): Promise<DirListResult>;
   /** The other instances (`MOJITO_PEERS`); none when absent. */
   peers?: PeerRegistry;
   /** The fetch a launch on a peer goes through. Default: the global one. */
@@ -79,6 +83,7 @@ export function createApp(deps: AppDeps): Hono {
   app.route("/api", healthRoutes());
   app.route("/api", hookRoutes(deps));
   app.route("/api", projectRoutes(deps));
+  app.route("/api", fsRoutes(deps));
   app.route("/api", gitRoutes(deps));
   app.route("/api", gitGraphRoutes(deps));
   app.route("/api", docsRoutes(deps));
