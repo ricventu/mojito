@@ -1,4 +1,4 @@
-import { Loader2, Zap } from "lucide-react";
+import { FileText, GitGraph, Loader2, Zap } from "lucide-react";
 import { Link } from "react-router";
 import type { Command } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useRunCommand } from "@/hooks/useRunCommand";
 import { CommandIconView } from "@/lib/commandIcons";
+import { docsHref } from "@/lib/docs/url";
+import { gitHref } from "@/lib/git/url";
 
 /** The project header's quick commands (RIC-581): pick one to open its session; the last item manages them. */
 export function CommandsMenu({ project, commands }: { project: string; commands: Command[] }) {
@@ -23,6 +25,20 @@ export function CommandsMenu({ project, commands }: { project: string; commands:
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        {/* Below sm the header has no room for these two buttons: they live here. */}
+        <DropdownMenuItem asChild className="sm:hidden">
+          <Link to={gitHref(project)}>
+            <GitGraph size={16} />
+            Git graph
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="sm:hidden">
+          <Link to={docsHref(project)}>
+            <FileText size={16} />
+            Docs
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="sm:hidden" />
         {commands.map((c) => (
           <DropdownMenuItem key={c.id} onSelect={() => run.mutate(c)}>
             <CommandIconView icon={c.icon} />

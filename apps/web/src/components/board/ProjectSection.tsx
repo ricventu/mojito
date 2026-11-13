@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useSettings } from "@/hooks/useSettings";
 import { kanbanColumns, sessionForTicket, type BoardSection } from "@/lib/board";
+import { boardClean, menuCommands } from "@/lib/commands";
 import { docsHref } from "@/lib/docs/url";
 import { gitHref } from "@/lib/git/url";
-import { boardClean, menuCommands } from "@/lib/commands";
 import { cn } from "@/lib/utils";
 import { CommandButton } from "./CommandButton";
 import { CommandsMenu } from "./CommandsMenu";
@@ -57,17 +57,17 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
 
   return (
     <section className="flex flex-col gap-2">
-      <header className="flex items-center gap-2">
+      <header className="flex items-center gap-1 sm:gap-2">
         <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{name}</h2>
         {project !== null && (
-          <Button asChild variant="ghost" size="icon-sm">
+          <Button asChild variant="ghost" size="icon-sm" className="hidden sm:inline-flex">
             <Link to={gitHref(project)} aria-label={`Git graph of ${project}`} title="Git graph">
               <GitGraph size={16} />
             </Link>
           </Button>
         )}
         {project !== null && (
-          <Button asChild variant="ghost" size="icon-sm">
+          <Button asChild variant="ghost" size="icon-sm" className="hidden sm:inline-flex">
             <Link to={docsHref(project)} aria-label={`Docs of ${project}`} title="Docs">
               <FileText size={16} />
             </Link>
