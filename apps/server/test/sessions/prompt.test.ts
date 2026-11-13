@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CLEAN_PROMPT, WORKTREE_INSTRUCTION, buildGitResolvePrompt, buildTicketPrompt } from "../../src/sessions/prompt";
+import { CLEAN_PROMPT } from "@mojito/shared";
+import { WORKTREE_INSTRUCTION, buildGitResolvePrompt, buildTicketPrompt } from "../../src/sessions/prompt";
 
 describe("buildTicketPrompt", () => {
   it("is the exact text", () => {

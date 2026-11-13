@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_PROMPTS, type LaunchFreeBody, type LaunchTicketBody, type MojitoEvent, type SessionMeta, type TicketSummary } from "@mojito/shared";
+import { CLEAN_PROMPT, DEFAULT_PROMPTS, type LaunchFreeBody, type LaunchTicketBody, type MojitoEvent, type SessionMeta, type TicketSummary } from "@mojito/shared";
 import type { ServerConfig } from "../../src/config";
 import { openDb } from "../../src/db/db";
 import { ProjectsRepo } from "../../src/db/projects";
@@ -7,7 +7,7 @@ import { SessionsRepo } from "../../src/db/sessions";
 import { EventBus } from "../../src/events/bus";
 import { DuplicateSessionError, q } from "../../src/tmux/tmux";
 import { buildHookSettings } from "../../src/sessions/hookSettings";
-import { CLEAN_PROMPT, buildGitResolvePrompt, buildTicketPrompt } from "../../src/sessions/prompt";
+import { buildGitResolvePrompt, buildTicketPrompt } from "../../src/sessions/prompt";
 import { STALL_GRACE_MS } from "../../src/sessions/startupStall";
 import { launchClean, launchFree, launchGitResolve, launchTicket, resumeSession, type LaunchDeps } from "../../src/sessions/launch";
 

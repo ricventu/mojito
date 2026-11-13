@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import type { CleanResult, GitOp, GitSyncResult, WorktreeCount } from "@mojito/shared";
+import type { CommandResult, GitOp, GitSyncResult, WorktreeCount } from "@mojito/shared";
 import { Hono } from "hono";
 import { expandHome } from "../../homePath";
 import { GitError, readGit, runGit } from "../../git/git";
@@ -55,7 +55,7 @@ export function gitRoutes(deps: AppDeps): Hono {
       if ("error" in found) return c.json({ error: found.error }, found.status);
       const launched = await launchClean(name, deps.launch);
       if (!launched.ok) return c.json({ error: launched.error }, launched.status);
-      return c.json({ session: launched.session, alreadyOpen: launched.alreadyOpen } satisfies CleanResult);
+      return c.json({ session: launched.session, alreadyOpen: launched.alreadyOpen } satisfies CommandResult);
     })
     .post("/projects/:name/:op{pull|push}", async (c) => {
     const name = c.req.param("name");

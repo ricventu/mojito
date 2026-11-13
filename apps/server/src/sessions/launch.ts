@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
-import { LaunchTicketBody, type Effort, type GitOp, type LaunchFreeBody, type Model, type Prompts, type SessionMeta } from "@mojito/shared";
+import { CLEAN_PROMPT, LaunchTicketBody, type Effort, type GitOp, type LaunchFreeBody, type Model, type Prompts, type SessionMeta } from "@mojito/shared";
 import { selfOrigin, type ServerConfig } from "../config";
 import type { ProjectsRepo } from "../db/projects";
 import type { SessionsRepo } from "../db/sessions";
@@ -13,7 +13,7 @@ import type { TicketCache } from "../tickets/cache";
 import { DuplicateSessionError, PREFIX, hasSession, newSession, q } from "../tmux/tmux";
 import { buildHookSettings } from "./hookSettings";
 import { imagesDir } from "./images";
-import { CLEAN_PROMPT, buildGitResolvePrompt, buildTicketPrompt } from "./prompt";
+import { buildGitResolvePrompt, buildTicketPrompt } from "./prompt";
 import { watchStartupStall } from "./startupStall";
 
 export interface LaunchDeps {

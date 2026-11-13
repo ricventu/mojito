@@ -4,6 +4,7 @@ export * from "./events";
 export * from "./api";
 export * from "./pty";
 export * from "./prompts";
+export * from "./commands";
 export * from "./git";
 export * from "./docs";
 export * from "./images";

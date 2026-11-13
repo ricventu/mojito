@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { EFFORTS, MODELS } from "./models";
+import { CommandsSettingBody } from "./commands";
 import { PromptsBody } from "./prompts";
 
 export const LaunchTicketBody = z.object({
@@ -58,6 +59,7 @@ export const SettingsBody = z.object({
   statusDefaults: z.record(z.string(), z.object({ model: z.enum(MODELS), effort: z.enum(EFFORTS) })).optional(),
   prompts: PromptsBody.optional(),
   favorites: FavoritesBody.optional(),
+  commands: CommandsSettingBody.optional(),
 });
 export type SettingsBody = z.infer<typeof SettingsBody>;
 

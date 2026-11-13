@@ -1,4 +1,5 @@
 import type { Effort, Model } from "./models";
+import type { CommandsSetting } from "./commands";
 import type { Prompts } from "./prompts";
 
 export type SessionState = "starting" | "running" | "needs-input" | "idle" | "ended";
@@ -17,6 +18,8 @@ export interface Favorite {
 
 export interface Settings {
   statusDefaults: Record<string, StatusDefault>;
+  /** The stored form (edits and removals against the defaults); `effectiveCommands` derives the list. */
+  commands: CommandsSetting;
   /** Always complete: a prompt never edited answers its default. */
   prompts: Prompts;
   favorites: Favorite[];
@@ -123,10 +126,10 @@ export type GitSyncResult =
   | { status: "conflict"; session: SessionMeta; alreadyOpen: boolean };
 
 /**
- * `POST /api/projects/:name/clean` (RIC-528): the project's Clean session, `alreadyOpen` when it
- * was running and was not launched again.
+ * `POST /api/projects/:name/commands/:id` (RIC-581, was Clean's RIC-528): the command's session,
+ * `alreadyOpen` when it was running and was not launched again.
  */
-export interface CleanResult {
+export interface CommandResult {
   session: SessionMeta;
   alreadyOpen: boolean;
 }

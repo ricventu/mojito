@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BrushCleaning, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
-import type { CleanResult, WorktreeCount } from "@mojito/shared";
+import type { CommandResult, WorktreeCount } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
 import { apiFetch, apiJson } from "@/lib/api";
 import { cleanLabel, cleanMessage, worktreeBadge } from "@/lib/clean";
@@ -26,7 +26,7 @@ export function CleanButton({ project }: { project: string }) {
     retry: false,
   });
   const clean = useMutation({
-    mutationFn: () => apiJson<CleanResult>(`${path}/clean`, "POST"),
+    mutationFn: () => apiJson<CommandResult>(`${path}/clean`, "POST"),
     onSuccess: (result) => {
       void qc.invalidateQueries({ queryKey: qk.sessions });
       toast.info(cleanMessage(result.alreadyOpen));
