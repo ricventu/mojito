@@ -27,7 +27,8 @@ app's state, left in place.
   `PromptsBody`, `FavoritesBody`, `StatusBody`), `MojitoEvent`, `MODELS`/`EFFORTS`, `DEFAULT_PROMPTS`,
   `SESSION_GONE_CODE` (4404), the git graph types (`GitGraphPage`, `GraphCommit`, `GraphRef`,
   `GraphHighlight`, `CommitDetails`, `CommitFile`, `CommitDiff`) and `isValidHash`/`isValidTicket`,
-  `CleanResult`/`WorktreeCount`, the docs
+  `CommandResult`/`WorktreeCount`, the commands types (`Command`, `CommandsSetting`, `COMMAND_ICONS`,
+  `DEFAULT_COMMANDS`, `CLEAN_PROMPT`, `effectiveCommands`, `commandsFor`, `importCommands`, `AssistBody`), the docs
   types (`DocEntry`, `DocList`, `DocFile`, `DOC_MAX_BYTES`) and `isDocPath`, the peer types
   (`PeerSnapshot`, `PeersAnswer`), the folder picker's `DirEntry`/`DirList`, and
   `openEventStream` (used by the web and by the server's peer links; `schedule` is required — the package has no timer typings). Consumed as source, no build; zod **4** everywhere (the Agent
@@ -195,16 +196,32 @@ app's state, left in place.
   fixed id `mj-<slug>-git`: a live one is answered `alreadyOpen`, never doubled). Failures with
   nothing to resolve (no upstream, detached, network) are 422 `{error}`; one op per project at a
   time (409). `test/git/sync.test.ts` runs real git in a temp dir with the global config off.
-- **Clean** (RIC-528, `POST /api/projects/:name/clean` → `CleanResult`, `launchClean`): a Claude
-  session, not git commands — "merged" must include squash and rebase merges, which `git branch
-  --merged` does not see. Fixed id `mj-<slug>-clean` (a live one answered `alreadyOpen`, like the
-  git session; both go through `launchProjectSession`), sonnet/high, the fixed `CLEAN_PROMPT` (not
-  a setting): fetch --prune, list merged local and origin branches and the worktrees of merged
-  branches, never touch the default/checked-out branch, unmerged commits, a locked worktree (a live
-  Claude Code session holds it) or a dirty one, **wait for the human's yes in the terminal**, then
-  `worktree remove` (no --force), `branch -d`, `push origin --delete`, `worktree prune`. The badge:
-  `GET /api/projects/:name/worktrees` → `{count}` (`git/worktrees.ts`: porcelain entries minus the
-  main checkout and `prunable` ones; a `GitError` is a 409).
+- **Commands** (RIC-581, spec `2026-11-13-quick-commands-design.md`; `shared/src/commands.ts`,
+  `http/routes/commands.ts`, `launchCommand`): a quick command is a prompt that opens a Claude
+  session in a project (`Command`: name, prompt, lucide `icon` from `COMMAND_ICONS`, `project` or
+  null = every mapped project, model, effort). The `commands` settings key stores only the **diff
+  from `DEFAULT_COMMANDS`**: `items` (custom commands + edited copies of defaults) and `removed`
+  (deleted default ids), normalized on every write (`normalizeCommands`: an item equal to its
+  default is dropped, so it follows later changes to the shipped text). Two id namespaces: a plain
+  word for defaults (`clean`), `cmd-<hex6>` for custom, so a default added later never takes a
+  custom command's id. `effectiveCommands` is the list in force and hides a default whose name a
+  custom command uses (the server accepts that; the web form refuses creating the clash).
+  `GET /api/commands` lists them; `POST /api/projects/:name/commands/:id` → `CommandResult`
+  (`{session, alreadyOpen}`) runs one through `launchProjectSession`: a live session is answered
+  `alreadyOpen`, but only if the row is **this command's** (same project, no ticket, kind claude) —
+  else 409 with `sessionId` (a hyphenated slug can collide; a case-only project rename or an adopted
+  row answers 409 too, the web's toast offers Open). Ids are `mj-<slug>-<command id>`, except Clean,
+  which keeps `mj-<slug>-clean` (RIC-528): a session, not git commands — "merged" must include
+  squash and rebase merges, which `git branch --merged` does not see; its fixed default prompt
+  `CLEAN_PROMPT` waits for the human's yes in the terminal before deleting anything. The worktree
+  badge, `GET /api/projects/:name/worktrees` → `{count}` (`git/worktrees.ts`: porcelain entries
+  minus the main checkout and `prunable` ones; a `GitError` is a 409), belongs to the `clean` id
+  only. `POST /api/commands/assist` (`commands/assist.ts`) is a one-shot Agent SDK call (no tools,
+  sonnet, 60 s) that turns a rough idea into name/prompt/icon (an icon outside the list falls back
+  to the form's); its `ASSIST_PROMPT` is fixed, not a setting. `GET /api/commands` is the one new
+  entry on the peer relay table: import reads a peer, never writes it. A project **rename** moves
+  its bound commands, its **removal** drops them (an edited default bound to it falls back to the
+  shipped one) — `http/routes/projects.ts`.
 - **Folder picker** (RIC-585, `GET /api/fs/dirs?path` → `DirList`, `fs/dirs.ts`,
   `http/routes/fs.ts`): a folder's subfolders, for the Path field in Settings. `path` absent or
   empty = HOME, `~`/`~/…` expanded, else absolute, then `resolve`d (`..` and a trailing slash
@@ -310,10 +327,14 @@ app's state, left in place.
   A ticket's status is a filled pill (`StatusBadge`): violet In Review, blue In Progress, neutral
   otherwise — emerald, sky, amber and red mean a session's state.
 - Project header: Pull / Push icons (`GitButtons`, `lib/gitSync.ts`) — a toast, or on a conflict
-  the git session's terminal (pushed, from the board). Then Clean (`CleanButton`, `lib/clean.ts`):
-  opens the clean session's terminal; its badge is the linked worktree count (hidden at 0, `9+`),
-  `worktreeKey(project)` under `qk.worktrees` (re-read on reconnect) with a 30 s `refetchInterval`
-  — worktrees come and go with sessions, which emit nothing about them.
+  the git session's terminal (pushed, from the board). Then Clean, the default command, as its
+  own button (`CommandButton`, `lib/commands.ts`: `boardClean`) when it is offered to the
+  project: it opens the clean session's terminal; its badge is the linked worktree count (hidden
+  at 0, `9+`), `worktreeKey(project)` under `qk.worktrees` (re-read on reconnect) with a 30 s
+  `refetchInterval` — worktrees come and go with sessions, which emit nothing about them. Every
+  other command is in a commands menu (`CommandsMenu`, `menuCommands`), run by
+  `hooks/useRunCommand.ts` (toast "Started"/"is already open"; a 409 with `sessionId` offers
+  Open). Below `sm` Git graph and Docs move into that menu too, so the header fits 320px.
 - **Git graph page** (RIC-505, `/git/:project`, `components/git`, `lib/git`, `hooks/useGitGraph.ts`):
   `ticket`/`commit`/`file`/`from` are the only view state (`lib/git/url.ts` is the one codec —
   `gitHref` for entry points, `parseGitSearch` drops what makes no sense). Entry points: project
@@ -446,6 +467,12 @@ app's state, left in place.
 - Settings → Projects: the Path field's Browse swaps the dialog's form for `FolderPicker` (same
   dialog, the other fields kept). It opens at the typed path, else HOME — a typed path that fails
   opens HOME with the error shown — and writes the pick as `~/…` under HOME (`lib/folderPicker.ts`).
+- Settings → Commands (`components/settings/CommandsCard`, `CommandDialog`, `IconGrid`;
+  `lib/commandForm.ts`, `lib/commandIcons.tsx` maps each `COMMAND_ICONS` name to its lucide
+  component): add, edit and delete commands, restore a deleted default; "Write with AI" fills the
+  form from the assist endpoint. "Import" (`ImportCommandsDialog`) reads another instance's
+  commands through the relay and merges them with `importCommands`; the answer goes through
+  `peerCommands` first (an unknown icon becomes `zap`, an invalid command is dropped).
 - Overlay sheets (filter, sidebar) draw their own ✕ (`showCloseButton={false}`): shadcn's
   built-in one is absolutely positioned and ignores the safe-area insets.
 - Terminal (`components/terminal`, `lib/terminal`): `syncGeometry` always publishes the size,
