@@ -108,7 +108,10 @@ export function FavoritesCard() {
     <Card>
       <CardHeader>
         <CardTitle>Favourites</CardTitle>
-        <CardDescription>Saved board filters, in the order the board shows them.</CardDescription>
+        <CardDescription>
+          Saved board filters, in the order the board shows them. To change one's filters, tap it on the board, change
+          them in Filters, then Update.
+        </CardDescription>
       </CardHeader>
       {settings.isError ? (
         <CardContent>

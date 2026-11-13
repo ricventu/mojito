@@ -357,7 +357,14 @@ app's state, left in place.
   terminal's Board link, best effort.
 - **Favourites** (`lib/favorites.ts`, `hooks/useFavorites.ts`): chips under the search row
   (tap the active one = clear), saved from the filter sheet (a same-name save replaces in
-  place), managed in the Settings `FavoritesCard`. The PUT replaces the whole list, so nothing
+  place), managed in the Settings `FavoritesCard`. RIC-579: the name field comes filled with
+  `favoriteName` (the filters in canonical order, `·`-joined, > 2 projects counted, ≤ 60;
+  `uniqueName` numbers a taken one) and follows the filters until typed in — no AI, so every
+  device derives the same name. Editing a favourite's filters is the sheet's Update: the sheet
+  remembers the favourite lit when it opened (its content mounts on each open), and once the
+  filters leave it offers "Update <name>" beside "Save as new favourite"; `updateFavorite`
+  renames a favourite still carrying its automatic name, keeps a chosen one. Filters already
+  saved show "Saved as <name>" instead of a save. The PUT replaces the whole list, so nothing
   writes before settings have loaded (`ready`). `save(update)` computes from the newest queued
   write (else the cache) at call time, and the PUTs run serially in one mutation scope; the
   queued variables are the optimistic state, so a refetch mid-queue can neither flash an older

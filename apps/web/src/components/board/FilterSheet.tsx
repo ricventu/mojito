@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X } from "lucide-react";
+import { Star, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -9,7 +9,14 @@ import { BOTTOM_SHEET_CLASS } from "@/components/sheets/styles";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useProjects } from "@/hooks/useProjects";
-import { addFavorite } from "@/lib/favorites";
+import {
+  activeFavorite,
+  addFavorite,
+  favoriteIndex,
+  favoriteName,
+  uniqueName,
+  updateFavorite,
+} from "@/lib/favorites";
 import {
   canonicalSearch,
   FILTER_STATUSES,
@@ -39,59 +46,108 @@ function FilterChip({ label, on, onToggle }: { label: string; on: boolean; onTog
 }
 
 /**
- * Footer action: name the current filters and save them as a favourite (a same name updates
- * that one). Offered only once settings have loaded: the list it adds to must be the
- * server's. The toast waits for the server; a refused save keeps the name to fix.
+ * Footer actions for favourites. The content of an open sheet is mounted afresh on each
+ * open, so `base` is the favourite the board showed when the sheet opened (its chip lit):
+ * once the filters move away from it, Update gives it the new filters. Filters already saved
+ * as a favourite show its name instead of a save. A new favourite's name is filled in from the
+ * filters, and follows them until the human types. Offered only once settings have loaded:
+ * the list written must be the server's. Toasts wait for the server; a refused save keeps the
+ * form to retry.
  */
-function SaveFavorite({ filters }: { filters: BoardFilters }) {
-  const { ready, save } = useFavorites();
+function FavoriteActions({ filters }: { filters: BoardFilters }) {
+  const { favorites, ready, save } = useFavorites();
+  // `undefined` until settings have loaded, then the base's name or null.
+  const [base, setBase] = useState<string | null | undefined>(undefined);
   const [naming, setNaming] = useState(false);
-  const [name, setName] = useState("");
+  const [typed, setTyped] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const search = canonicalSearch(filters);
+  const active = activeFavorite(favorites, search);
+  if (base === undefined && ready) setBase(active === -1 ? null : favorites[active].name);
+  const baseIndex = base ? favoriteIndex(favorites, base) : -1;
+  const name = typed ?? uniqueName(favorites, favoriteName(filters));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!isFiltered(filters) || saving) return;
-    const typed = name.trim();
-    const search = canonicalSearch(filters);
+    const wanted = name.trim();
+    if (!isFiltered(filters) || saving || wanted === "") return;
     // Filled by the update, which runs on the list current when the write is queued.
-    const outcome = { replaced: false, stored: typed };
+    const outcome = { replaced: false, stored: wanted };
     setSaving(true);
     const saved = await save((current) => {
-      const { list, replaced } = addFavorite(current, typed, search);
+      const { list, replaced } = addFavorite(current, wanted, search);
       // A same-name save keeps the stored name's capitalisation: name that one.
       outcome.replaced = replaced;
-      outcome.stored = list.find((f) => f.name.toLowerCase() === typed.toLowerCase())?.name ?? typed;
+      outcome.stored = list[favoriteIndex(list, wanted)]?.name ?? wanted;
       return list;
     });
     setSaving(false);
     if (!saved) return;
     toast.success(outcome.replaced ? `Updated ${outcome.stored}` : `Saved ${outcome.stored}`);
+    setBase(outcome.stored);
     setNaming(false);
-    setName("");
+    setTyped(null);
   }
 
-  if (!naming) {
+  async function update() {
+    if (!base || !isFiltered(filters) || saving) return;
+    const outcome = { name: null as string | null };
+    setSaving(true);
+    const saved = await save((current) => {
+      const at = favoriteIndex(current, base);
+      if (at === -1) return current;
+      const list = updateFavorite(current, at, search);
+      outcome.name = list[at].name;
+      return list;
+    });
+    setSaving(false);
+    if (outcome.name === null) {
+      toast.error(`${base} is no longer a favourite`);
+      return;
+    }
+    if (!saved) return;
+    toast.success(`Updated ${outcome.name}`);
+    setBase(outcome.name);
+  }
+
+  if (naming) {
     return (
-      <Button variant="outline" disabled={!ready || !isFiltered(filters)} onClick={() => setNaming(true)}>
-        Save as favourite
-      </Button>
+      <form onSubmit={(e) => void submit(e)} className="flex gap-2">
+        <Input
+          autoFocus
+          aria-label="Favourite name"
+          placeholder="Favourite name"
+          maxLength={60}
+          value={name}
+          onChange={(e) => setTyped(e.target.value)}
+        />
+        <Button type="submit" disabled={!ready || saving || name.trim() === "" || !isFiltered(filters)}>
+          Save
+        </Button>
+      </form>
     );
   }
+  if (active !== -1) {
+    return (
+      <p className="flex min-h-9 items-center justify-center gap-1.5 text-sm text-muted-foreground">
+        <Star size={14} className="shrink-0" />
+        <span className="min-w-0 truncate">Saved as {favorites[active].name}</span>
+      </p>
+    );
+  }
+  const canSave = ready && isFiltered(filters) && !saving;
   return (
-    <form onSubmit={(e) => void submit(e)} className="flex gap-2">
-      <Input
-        autoFocus
-        aria-label="Favourite name"
-        placeholder="Favourite name"
-        maxLength={60}
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-      />
-      <Button type="submit" disabled={!ready || saving || name.trim() === "" || !isFiltered(filters)}>
-        Save
+    <>
+      {baseIndex !== -1 && (
+        <Button disabled={!canSave} onClick={() => void update()}>
+          <Star size={14} />
+          <span className="min-w-0 truncate">Update {favorites[baseIndex].name}</span>
+        </Button>
+      )}
+      <Button variant="outline" disabled={!canSave} onClick={() => setNaming(true)}>
+        {baseIndex !== -1 ? "Save as new favourite" : "Save as favourite"}
       </Button>
-    </form>
+    </>
   );
 }
 
@@ -165,7 +221,7 @@ export function FilterSheet({ open, onOpenChange, filters, setFilters }: Props) 
           <Button variant="ghost" disabled={!isFiltered(filters)} onClick={() => setFilters(NO_FILTERS)}>
             Clear
           </Button>
-          <SaveFavorite filters={filters} />
+          <FavoriteActions filters={filters} />
         </div>
       </SheetContent>
     </Sheet>

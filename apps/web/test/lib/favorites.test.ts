@@ -4,11 +4,16 @@ import {
   activeFavorite,
   addFavorite,
   currentFavorites,
+  favoriteIndex,
+  favoriteName,
   moveFavorite,
   removeFavorite,
   renameFavorite,
   renameRefusal,
+  uniqueName,
+  updateFavorite,
 } from "@/lib/favorites";
+import { NO_FILTERS, type BoardFilters } from "@/lib/filters";
 
 const A: Favorite = { name: "A", search: "project=a" };
 const M: Favorite = { name: "Mojito", search: "project=mojito" };
@@ -141,5 +146,101 @@ describe("currentFavorites", () => {
 
   it("is undefined while settings have never loaded", () => {
     expect(currentFavorites(undefined, [])).toBeUndefined();
+  });
+});
+
+describe("favoriteIndex", () => {
+  it("finds a name in any case, -1 for none", () => {
+    expect(favoriteIndex([A, M], "MOJITO")).toBe(1);
+    expect(favoriteIndex([A, M], "Gone")).toBe(-1);
+  });
+});
+
+describe("favoriteName", () => {
+  const f = (over: Partial<BoardFilters>): BoardFilters => ({ ...NO_FILTERS, ...over });
+
+  it("joins projects, statuses, Active and the quoted text", () => {
+    expect(
+      favoriteName(f({ projects: ["Mojito"], statuses: ["Todo", "In Progress"], live: true, q: " login " })),
+    ).toBe('Mojito · Todo · In Progress · Active · "login"');
+  });
+
+  it("keeps the url's canonical order, whatever order they were picked in", () => {
+    expect(favoriteName(f({ projects: ["b", "a"], statuses: ["In Review", "Backlog"] }))).toBe(
+      "a · b · Backlog · In Review",
+    );
+  });
+
+  it("counts more than two projects instead of listing them", () => {
+    expect(favoriteName(f({ projects: ["a", "b", "c"], statuses: ["Todo"] }))).toBe("3 projects · Todo");
+  });
+
+  it("names a single filter alone", () => {
+    expect(favoriteName(f({ live: true }))).toBe("Active");
+    expect(favoriteName(f({ q: "x" }))).toBe('"x"');
+  });
+
+  it("caps the name at 60 characters with an ellipsis", () => {
+    const name = favoriteName(f({ q: "y".repeat(100) }));
+    expect(name).toHaveLength(60);
+    expect(name.endsWith("…")).toBe(true);
+  });
+
+  it("is empty for the bare board", () => {
+    expect(favoriteName(NO_FILTERS)).toBe("");
+  });
+});
+
+describe("uniqueName", () => {
+  it("keeps a free name", () => {
+    expect(uniqueName([A, M], "Todo")).toBe("Todo");
+  });
+
+  it("numbers a taken name, in any case", () => {
+    expect(uniqueName([A, M], "mojito")).toBe("mojito 2");
+    expect(uniqueName([M, { name: "Mojito 2", search: "q=a" }], "Mojito")).toBe("Mojito 3");
+  });
+
+  it("ignores the entry being renamed", () => {
+    expect(uniqueName([A, M], "Mojito", 1)).toBe("Mojito");
+  });
+
+  it("stays within 60 characters when numbered", () => {
+    const long = "z".repeat(60);
+    const name = uniqueName([{ name: long, search: "q=z" }], long);
+    expect(name).toHaveLength(60);
+    expect(name.endsWith("… 2")).toBe(true);
+  });
+});
+
+describe("updateFavorite", () => {
+  it("replaces the search, keeping a name the human chose and the position", () => {
+    const list = [A, M, C];
+    expect(updateFavorite(list, 1, "project=mojito&status=Todo")).toEqual([
+      A,
+      { name: "Mojito", search: "project=mojito&status=Todo" },
+      C,
+    ]);
+    expect(list[1]).toEqual(M);
+  });
+
+  it("renames a favourite still named after its filters", () => {
+    const auto: Favorite = { name: "Mojito · Todo", search: "project=Mojito&status=Todo" };
+    expect(updateFavorite([A, auto], 1, "project=Mojito&status=In+Review")).toEqual([
+      A,
+      { name: "Mojito · In Review", search: "project=Mojito&status=In+Review" },
+    ]);
+  });
+
+  it("numbers the new automatic name when another favourite has it", () => {
+    const auto: Favorite = { name: "Todo", search: "status=Todo" };
+    const taken: Favorite = { name: "Backlog", search: "q=b" };
+    expect(updateFavorite([taken, auto], 1, "status=Backlog")[1].name).toBe("Backlog 2");
+  });
+
+  it("returns the same list for an equal search or a missing index", () => {
+    const list = [A, M];
+    expect(updateFavorite(list, 0, "project=a")).toBe(list);
+    expect(updateFavorite(list, 4, "q=x")).toBe(list);
   });
 });
