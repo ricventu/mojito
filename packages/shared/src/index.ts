@@ -7,4 +7,5 @@ export * from "./prompts";
 export * from "./git";
 export * from "./docs";
 export * from "./images";
+export * from "./fs";
 export * from "./eventStream";
