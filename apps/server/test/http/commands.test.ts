@@ -4,7 +4,7 @@ import { AssistError } from "../../src/commands/assist";
 import { meta, setup } from "./setup";
 
 const web = { name: "Web", path: "~/repo/web", teamKey: "RIC" };
-const custom = { id: "cmd-a1b2c3", name: "Lint", prompt: "run lint", icon: "bug" as const, project: "Api", model: "sonnet" as const, effort: "low" as const };
+const custom = { id: "cmd-a1b2c3", name: "Lint", prompt: "run lint", icon: "bug" as const, project: "Api", excluded: [], model: "sonnet" as const, effort: "low" as const };
 
 const run = (ctx: ReturnType<typeof setup>, id: string, project = "Web") =>
   ctx.req(`/api/projects/${encodeURIComponent(project)}/commands/${id}`, { method: "POST" });
@@ -66,6 +66,15 @@ describe("POST /api/projects/:name/commands/:id", () => {
     const res = await run(ctx, custom.id);
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: `command not found: ${custom.id}` });
+  });
+
+  it("404s a general command that excludes the project, runs it elsewhere", async () => {
+    const ctx = setup();
+    ctx.projects.upsert(web);
+    ctx.settings.setCommands({ items: [{ ...DEFAULT_COMMANDS[0], excluded: [web.name] }], removed: [] });
+    expect((await run(ctx, "clean")).status).toBe(404);
+    ctx.settings.setCommands({ items: [{ ...DEFAULT_COMMANDS[0], excluded: ["Other"] }], removed: [] });
+    expect((await run(ctx, "clean")).status).toBe(200);
   });
 
   it("404s a removed default", async () => {

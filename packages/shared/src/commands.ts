@@ -22,8 +22,13 @@ export interface Command {
   name: string;
   prompt: string;
   icon: CommandIcon;
-  /** Null = offered on every mapped project. */
+  /** Null = offered on every mapped project but those in `excluded`. */
   project: string | null;
+  /**
+   * The projects a general command is not offered on (RIC-587): unique, plain-`sort()`ed, and `[]`
+   * for a project's own command — `CommandSchema` keeps it so.
+   */
+  excluded: string[];
   model: Model;
   effort: Effort;
 }
@@ -66,7 +71,7 @@ export const CLEAN_PROMPT = [
 ].join("\n");
 
 export const DEFAULT_COMMANDS: readonly Command[] = [
-  { id: "clean", name: "Clean", icon: "brush-cleaning", project: null, model: "sonnet", effort: "high", prompt: CLEAN_PROMPT },
+  { id: "clean", name: "Clean", icon: "brush-cleaning", project: null, excluded: [], model: "sonnet", effort: "high", prompt: CLEAN_PROMPT },
 ];
 
 const CUSTOM_ID = /^cmd-[0-9a-f]{6}$/;
@@ -80,15 +85,26 @@ export function newCommandId(
   return `cmd-${random()}`;
 }
 
-export const CommandSchema = z.object({
-  id: z.string(),
-  name: z.string().trim().min(1).max(40),
-  prompt: z.string().min(1).max(COMMAND_PROMPT_MAX),
-  icon: z.enum(COMMAND_ICONS),
-  project: z.string().min(1).nullable(),
-  model: z.enum(MODELS),
-  effort: z.enum(EFFORTS),
-});
+/** Unique and plain-`sort()`ed (never the device's locale: the stored form compares as strings). */
+export const canonicalExcluded = (names: readonly string[]): string[] => [...new Set(names)].sort();
+
+/**
+ * One command. `excluded` is absent in a command stored before RIC-587 or read from an older peer
+ * (then `[]`), and is canonicalised here, so every reader — a write, the stored setting, an import —
+ * holds the same form: `[]` for a project's own command, else `canonicalExcluded`.
+ */
+export const CommandSchema = z
+  .object({
+    id: z.string(),
+    name: z.string().trim().min(1).max(40),
+    prompt: z.string().min(1).max(COMMAND_PROMPT_MAX),
+    icon: z.enum(COMMAND_ICONS),
+    project: z.string().min(1).nullable(),
+    excluded: z.array(z.string().min(1)).max(100).default([]),
+    model: z.enum(MODELS),
+    effort: z.enum(EFFORTS),
+  })
+  .transform((c): Command => ({ ...c, excluded: c.project === null ? canonicalExcluded(c.excluded) : [] }));
 
 const nameKey = (name: string): string => name.trim().toLowerCase();
 
@@ -132,14 +148,15 @@ export const CommandsSettingBody = z
     }
   });
 
-/** The commands offered in a project: global ones and the project's own. */
+/** The commands offered in a project: the general ones that do not exclude it, and the project's own. */
 export function commandsFor(effective: Command[], project: string): Command[] {
-  return effective.filter((c) => c.project === null || c.project === project);
+  return effective.filter((c) => (c.project === null ? !c.excluded.includes(project) : c.project === project));
 }
 
 const sameCommand = (a: Command, b: Command): boolean =>
   a.id === b.id && a.name === b.name && a.prompt === b.prompt && a.icon === b.icon &&
-  a.project === b.project && a.model === b.model && a.effort === b.effort;
+  a.project === b.project && a.model === b.model && a.effort === b.effort &&
+  a.excluded.length === b.excluded.length && a.excluded.every((p, i) => p === b.excluded[i]);
 
 /** Drops items equal to their default, then removed ids that are no default or still have an item. */
 export function normalizeCommands(s: CommandsSetting): CommandsSetting {
@@ -201,13 +218,25 @@ export function readCommandsSetting(raw: unknown, warn?: (problem: string) => vo
   return normalizeCommands({ items, removed });
 }
 
+/** A project's own commands move with its rename, and its name is renamed where it is excluded. */
 export function renameCommandsProject(s: CommandsSetting, from: string, to: string): CommandsSetting {
-  return { ...s, items: s.items.map((c) => (c.project === from ? { ...c, project: to } : c)) };
+  const items = s.items.map((c) => {
+    if (c.project === from) return { ...c, project: to };
+    if (c.excluded.includes(from)) return { ...c, excluded: canonicalExcluded(c.excluded.map((p) => (p === from ? to : p))) };
+    return c;
+  });
+  return { ...s, items };
 }
 
-/** Deletes the project's custom commands and drops its edited defaults (the shipped one returns). */
+/**
+ * Deletes the project's custom commands and drops its edited defaults (the shipped one returns);
+ * its name leaves every `excluded`, so a default edited only to skip it is the default again.
+ */
 export function removeCommandsProject(s: CommandsSetting, project: string): CommandsSetting {
-  return normalizeCommands({ ...s, items: s.items.filter((c) => c.project !== project) });
+  const items = s.items
+    .filter((c) => c.project !== project)
+    .map((c) => (c.excluded.includes(project) ? { ...c, excluded: c.excluded.filter((p) => p !== project) } : c));
+  return normalizeCommands({ ...s, items });
 }
 
 /**

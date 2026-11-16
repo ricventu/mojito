@@ -9,7 +9,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { usePeers } from "@/hooks/usePeers";
 import { useSettings } from "@/hooks/useSettings";
 import { apiJson } from "@/lib/api";
-import { commandGroups, commandTag, restoreBlocked, restoreDefault } from "@/lib/commandForm";
+import { commandGroups, commandTag, excludedNote, restoreBlocked, restoreDefault } from "@/lib/commandForm";
 import { CommandIconView } from "@/lib/commandIcons";
 import { commandsMutationKey, qk } from "@/lib/queryKeys";
 import { CommandDialog, type CommandsWrite } from "./CommandDialog";
@@ -88,6 +88,7 @@ export function CommandsCard() {
                 <ul className="flex flex-col divide-y">
                   {group.commands.map((c) => {
                     const tag = commandTag(stored, c.id);
+                    const note = excludedNote(c);
                     return (
                       <li key={c.id}>
                         <button
@@ -96,7 +97,10 @@ export function CommandsCard() {
                           className="flex w-full items-center gap-2 rounded-md py-2 text-left outline-none hover:bg-accent/50 focus-visible:ring-[3px] focus-visible:ring-ring/50"
                         >
                           <CommandIconView icon={c.icon} size={16} />
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium">{c.name}</span>
+                          <span className="flex min-w-0 flex-1 flex-col">
+                            <span className="truncate text-sm font-medium">{c.name}</span>
+                            {note && <span className="truncate text-xs text-muted-foreground">{note}</span>}
+                          </span>
                           {tag && <Badge variant={tag === "Edited" ? "outline" : "secondary"}>{tag}</Badge>}
                         </button>
                       </li>

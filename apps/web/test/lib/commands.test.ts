@@ -37,6 +37,7 @@ const custom = (id: string, name: string, project: string | null): Command => ({
   prompt: "p",
   icon: "zap",
   project,
+  excluded: [],
   model: "sonnet",
   effort: "high",
 });

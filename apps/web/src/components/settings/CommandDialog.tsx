@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Loader2, RotateCcw, Sparkles, Trash2, Undo2 } from "lucide-react";
+import { Copy, Loader2, RotateCcw, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { COMMAND_PROMPT_MAX, isDefaultCommandId, type AssistAnswer, type AssistBody, type Command, type CommandsSetting, type Settings } from "@mojito/shared";
 import { LaunchOptions } from "@/components/sheets/LaunchOptions";
 import { SHEET_CONTENT_CLASS } from "@/components/sheets/styles";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,9 +20,12 @@ import {
   commandTag,
   deleteCommand,
   draftError,
+  duplicateDraft,
+  excludedChoices,
   newDraft,
   resetDefault,
   saveDraft,
+  toggleExcluded,
   type CommandDraft,
 } from "@/lib/commandForm";
 import { FALLBACK } from "@/lib/launch";
@@ -47,10 +51,16 @@ interface Props {
   onClose: () => void;
 }
 
-function Form({ command, settings, write, onClose }: Props) {
+interface FormProps extends Props {
+  /** A new command's starting fields (a duplicate's), instead of an empty form. */
+  initial?: CommandDraft;
+  onDuplicate: (copy: CommandDraft) => void;
+}
+
+function Form({ command, settings, write, onClose, initial, onDuplicate }: FormProps) {
   const projects = useProjects();
   const [form, setForm] = useState<FormState>(() => ({
-    draft: command ?? newDraft(settings.statusDefaults["In Progress"] ?? FALLBACK),
+    draft: initial ?? command ?? newDraft(settings.statusDefaults["In Progress"] ?? FALLBACK),
     undo: null,
   }));
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +68,9 @@ function Form({ command, settings, write, onClose }: Props) {
   const { draft, undo } = form;
   const tag = command ? commandTag(settings.commands, command.id) : null;
 
-  const edit = (patch: Partial<CommandDraft>) => setForm((f) => ({ draft: { ...f.draft, ...patch }, undo: null }));
+  // A function patch reads the latest draft: two quick ticks must both land.
+  const edit = (patch: Partial<CommandDraft> | ((d: CommandDraft) => Partial<CommandDraft>)) =>
+    setForm((f) => ({ draft: { ...f.draft, ...(typeof patch === "function" ? patch(f.draft) : patch) }, undo: null }));
 
   const assist = useMutation({
     mutationFn: (body: AssistBody) => apiJson<AssistAnswer>("/api/commands/assist", "POST", body),
@@ -68,6 +80,7 @@ function Form({ command, settings, write, onClose }: Props) {
   // A project the server no longer maps still shows, so opening the dialog never changes the command.
   const mapped = (projects.data ?? []).map((p) => p.name);
   const projectChoices = [...new Set(draft.project ? [...mapped, draft.project] : mapped)].sort(byProjectName);
+  const skipChoices = draft.project === null ? excludedChoices(mapped, draft.excluded) : [];
 
   async function run(update: (s: CommandsSetting) => CommandsSetting, done: string) {
     setError(null);
@@ -124,6 +137,28 @@ function Form({ command, settings, write, onClose }: Props) {
           </SelectContent>
         </Select>
       </div>
+      {skipChoices.length > 0 && (
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="mb-1.5 text-sm leading-none font-medium">Skip on</legend>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            {skipChoices.map((name) => {
+              const id = `command-skip-${name}`;
+              return (
+                <div key={name} className="flex min-w-0 items-center gap-2">
+                  <Checkbox
+                    id={id}
+                    checked={draft.excluded.includes(name)}
+                    onCheckedChange={(v) => edit((d) => ({ excluded: toggleExcluded(d.excluded, name, v === true) }))}
+                  />
+                  <label htmlFor={id} className="truncate text-sm">
+                    {name}
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        </fieldset>
+      )}
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="command-prompt">Prompt</Label>
         <Textarea
@@ -202,6 +237,11 @@ function Form({ command, settings, write, onClose }: Props) {
             <RotateCcw size={16} /> Reset to default
           </Button>
         )}
+        {command && (
+          <Button type="button" variant="outline" disabled={pending} onClick={() => onDuplicate(duplicateDraft(settings.commands, draft))}>
+            <Copy size={16} /> Duplicate
+          </Button>
+        )}
         <Button type="submit" disabled={pending}>
           {busy ? "Saving…" : "Save"}
         </Button>
@@ -210,16 +250,30 @@ function Form({ command, settings, write, onClose }: Props) {
   );
 }
 
-/** Add or edit one quick command; mounted per opening, so it never shows the last one's fields. */
+/**
+ * Add or edit one quick command; mounted per opening, so it never shows the last one's fields.
+ * Duplicate turns it into a new command holding a copy of the form (RIC-587): the original stays
+ * as stored, and the copy is written only by its own Save.
+ */
 export function CommandDialog(props: Props) {
+  const [copy, setCopy] = useState<{ of: string; draft: CommandDraft } | null>(null);
+  const command = copy ? null : props.command;
   return (
     <Sheet open onOpenChange={(open) => !open && props.onClose()}>
       <SheetContent side="bottom" className={SHEET_CONTENT_CLASS}>
         <SheetHeader className="pr-12">
-          <SheetTitle>{props.command ? "Edit command" : "New command"}</SheetTitle>
-          <SheetDescription>A prompt that opens a Claude session in a project.</SheetDescription>
+          <SheetTitle>{command ? "Edit command" : "New command"}</SheetTitle>
+          <SheetDescription>
+            {copy ? `A copy of ${copy.of}, added when you save it.` : "A prompt that opens a Claude session in a project."}
+          </SheetDescription>
         </SheetHeader>
-        <Form {...props} />
+        <Form
+          key={copy ? "copy" : "edit"}
+          {...props}
+          command={command}
+          initial={copy?.draft}
+          onDuplicate={(draft) => setCopy({ of: props.command?.name ?? draft.name, draft })}
+        />
       </SheetContent>
     </Sheet>
   );

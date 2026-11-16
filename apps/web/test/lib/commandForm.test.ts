@@ -14,7 +14,12 @@ import {
   resetDefault,
   restoreBlocked,
   restoreDefault,
+  copyName,
+  duplicateDraft,
+  excludedChoices,
+  excludedNote,
   saveDraft,
+  toggleExcluded,
   type CommandDraft,
 } from "../../src/lib/commandForm";
 
@@ -26,6 +31,7 @@ const custom = (over: Partial<Command> = {}): Command => ({
   prompt: "Update the dependencies.",
   icon: "package",
   project: null,
+  excluded: [],
   model: "sonnet",
   effort: "medium",
   ...over,
@@ -41,6 +47,7 @@ describe("newDraft", () => {
       prompt: "",
       icon: "zap",
       project: null,
+      excluded: [],
       model: "opus",
       effort: "xhigh",
     });
@@ -108,6 +115,64 @@ describe("saveDraft", () => {
     const other = custom({ id: "cmd-222222", name: "Other" });
     const next = saveDraft(setting([custom(), other]), custom({ name: "  Deps 2 " }));
     expect(next.items.map((c) => c.name)).toEqual(["Deps 2", "Other"]);
+  });
+
+  it("stores excluded canonical, and empty for a project's own command", () => {
+    expect(saveDraft(EMPTY_COMMANDS, { ...custom(), excluded: ["Web", "Api", "Web"] }).items[0]!.excluded).toEqual(["Api", "Web"]);
+    expect(saveDraft(EMPTY_COMMANDS, { ...custom(), project: "Web", excluded: ["Api"] }).items[0]!.excluded).toEqual([]);
+  });
+
+  it("an exclusion on Clean is an edit; unticked again, Clean is the default", () => {
+    const skipped = saveDraft(EMPTY_COMMANDS, { ...CLEAN, excluded: ["Web"] });
+    expect(skipped.items).toEqual([{ ...CLEAN, excluded: ["Web"] }]);
+    expect(saveDraft(skipped, { ...CLEAN, excluded: [] })).toEqual(EMPTY_COMMANDS);
+  });
+});
+
+describe("copyName", () => {
+  it("adds copy, then numbers it while the name is taken (any case)", () => {
+    expect(copyName([custom()], "Deps")).toBe("Deps copy");
+    expect(copyName([custom(), custom({ id: "cmd-2", name: "deps COPY" })], "Deps")).toBe("Deps copy 2");
+    expect(copyName([custom({ name: "Deps copy" }), custom({ id: "cmd-2", name: "Deps copy 2" })], "Deps")).toBe("Deps copy 3");
+  });
+
+  it("clips the name so the copy fits in 40 characters", () => {
+    const long = "x".repeat(40);
+    expect(copyName([], long)).toBe(`${"x".repeat(35)} copy`);
+    expect(copyName([custom({ name: `${"x".repeat(35)} copy` })], long)).toBe(`${"x".repeat(33)} copy 2`);
+  });
+
+  it("trims the name first", () => expect(copyName([], "  Deps ")).toBe("Deps copy"));
+});
+
+describe("duplicateDraft", () => {
+  it("is a new command with the form's fields and a free copy name", () => {
+    const draft: CommandDraft = { ...custom({ excluded: ["Api"] }), prompt: "edited, unsaved" };
+    expect(duplicateDraft(setting([custom()]), draft)).toEqual({ ...draft, id: null, name: "Deps copy" });
+  });
+
+  it("copies a default as a custom command", () => {
+    const copy = duplicateDraft(EMPTY_COMMANDS, { ...CLEAN });
+    expect(copy).toMatchObject({ id: null, name: "Clean copy", prompt: CLEAN.prompt });
+    const saved = saveDraft(EMPTY_COMMANDS, copy, () => "abcdef");
+    expect(effectiveCommands(saved).map((c) => c.id)).toEqual(["clean", "cmd-abcdef"]);
+  });
+});
+
+describe("excluded in the form", () => {
+  it("excludedChoices: mapped projects and excluded names no longer mapped, by name", () =>
+    expect(excludedChoices(["web", "Api"], ["Gone", "Api"])).toEqual(["Api", "Gone", "web"]));
+
+  it("toggleExcluded adds and removes a name, kept canonical", () => {
+    expect(toggleExcluded(["Web"], "Api", true)).toEqual(["Api", "Web"]);
+    expect(toggleExcluded(["Api", "Web"], "Api", false)).toEqual(["Web"]);
+    expect(toggleExcluded(["Api"], "Api", true)).toEqual(["Api"]);
+  });
+
+  it("excludedNote names the skipped projects of a general command only", () => {
+    expect(excludedNote(custom({ excluded: ["Api", "Web"] }))).toBe("Not on Api, Web");
+    expect(excludedNote(custom())).toBeNull();
+    expect(excludedNote(custom({ project: "Web", excluded: ["Api"] }))).toBeNull();
   });
 });
 
@@ -236,6 +301,7 @@ describe("importableRows", () => {
     prompt: "p",
     icon: "zap",
     project,
+    excluded: [],
     model: "sonnet",
     effort: "high",
   });
@@ -265,7 +331,7 @@ describe("importErrorMessage", () => {
 });
 
 describe("peerCommands", () => {
-  const ok = { id: "cmd-abc123", name: "Lint", prompt: "p", icon: "bug", project: null, model: "sonnet", effort: "high" };
+  const ok = { id: "cmd-abc123", name: "Lint", prompt: "p", icon: "bug", project: null, excluded: ["Api"], model: "sonnet", effort: "high" };
 
   it("answers nothing for a body that is not {commands: [...]}", () => {
     for (const body of [undefined, null, "x", 3, [], {}, { commands: {} }, { commands: "x" }]) {
@@ -275,6 +341,11 @@ describe("peerCommands", () => {
 
   it("keeps a valid command", () => {
     expect(peerCommands({ commands: [ok] })).toEqual([ok]);
+  });
+
+  it("reads an older peer's command, which has no excluded, as excluding nothing", () => {
+    const { excluded: _e, ...older } = ok;
+    expect(peerCommands({ commands: [older] })).toEqual([{ ...ok, excluded: [] }]);
   });
 
   it("replaces an unknown icon with zap", () => {

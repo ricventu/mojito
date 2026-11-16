@@ -20,7 +20,7 @@ import {
 
 const custom = (over: Partial<Command> = {}): Command => ({
   id: "cmd-1a2b3c", name: "Deps", prompt: "Update the dependencies.", icon: "package",
-  project: null, model: "sonnet", effort: "high", ...over,
+  project: null, excluded: [], model: "sonnet", effort: "high", ...over,
 });
 const clean = DEFAULT_COMMANDS[0];
 
@@ -74,6 +74,34 @@ describe("commands", () => {
     const api = custom({ id: "cmd-000002", name: "A", project: "Api" });
     expect(commandsFor([clean, web, api], "Web")).toEqual([clean, web]);
   });
+  it("commandsFor: a general command is not offered on a project it excludes", () => {
+    const deps = custom({ excluded: ["Api"] });
+    expect(commandsFor([deps], "Api")).toEqual([]);
+    expect(commandsFor([deps], "Web")).toEqual([deps]);
+    // A project's own command ignores excluded (it is always [] once parsed anyway).
+    expect(commandsFor([custom({ project: "Api", excluded: ["Api"] })], "Api")).toHaveLength(1);
+  });
+  describe("CommandSchema: excluded", () => {
+    const parse = (raw: unknown) => CommandSchema.parse(raw);
+    it("defaults to [] (a stored command or an older peer's has none)", () => {
+      const { excluded: _, ...old } = custom();
+      expect(parse(old).excluded).toEqual([]);
+    });
+    it("is deduplicated and sorted with plain sort", () =>
+      expect(parse(custom({ excluded: ["web", "Api", "web", "Zed"] })).excluded).toEqual(["Api", "Zed", "web"]));
+    it("is emptied for a project's own command", () =>
+      expect(parse(custom({ project: "Web", excluded: ["Api"] })).excluded).toEqual([]));
+    it("refuses an empty name and more than 100 names", () => {
+      expect(CommandSchema.safeParse(custom({ excluded: [""] })).success).toBe(false);
+      expect(CommandSchema.safeParse(custom({ excluded: Array.from({ length: 101 }, (_, i) => `p${i}`) })).success).toBe(false);
+    });
+    it("readCommandsSetting keeps it, canonical", () =>
+      expect(readCommandsSetting({ items: [custom({ excluded: ["b", "a"] })], removed: [] }).items[0]!.excluded).toEqual(["a", "b"]));
+  });
+  it("normalizeCommands: Clean with an exclusion is an edit, without one it is the default again", () => {
+    expect(normalizeCommands({ items: [{ ...clean, excluded: ["Web"] }], removed: [] }).items).toHaveLength(1);
+    expect(normalizeCommands({ items: [{ ...clean, excluded: [] }], removed: [] }).items).toEqual([]);
+  });
   it("normalizeCommands drops an item equal to its default and stray removed ids", () =>
     expect(normalizeCommands({ items: [{ ...clean }], removed: ["nope", "clean"] })).toEqual({ items: [], removed: ["clean"] }));
   it("normalizeCommands: an edited default un-removes it", () =>
@@ -95,6 +123,14 @@ describe("commands", () => {
     expect(renameCommandsProject({ items: [web, cleanWeb], removed: [] }, "Web", "Site").items.map((c) => c.project)).toEqual(["Site", "Site"]);
     expect(removeCommandsProject({ items: [web, cleanWeb, custom({ id: "cmd-999999", name: "G" })], removed: [] }, "Web"))
       .toEqual({ items: [custom({ id: "cmd-999999", name: "G" })], removed: [] });
+  });
+  it("renameCommandsProject renames it inside excluded; removeCommandsProject drops it there", () => {
+    const deps = custom({ excluded: ["Api", "Web"] });
+    expect(renameCommandsProject({ items: [deps], removed: [] }, "Web", "Site").items[0]!.excluded).toEqual(["Api", "Site"]);
+    expect(renameCommandsProject({ items: [deps], removed: [] }, "Web", "Aaa").items[0]!.excluded).toEqual(["Aaa", "Api"]);
+    expect(removeCommandsProject({ items: [deps], removed: [] }, "Web").items[0]!.excluded).toEqual(["Api"]);
+    // Clean edited only to skip Web is the default again once Web is gone.
+    expect(removeCommandsProject({ items: [{ ...clean, excluded: ["Web"] }], removed: [] }, "Web")).toEqual(EMPTY_COMMANDS);
   });
   describe("importCommands", () => {
     it("same id replaces", () => {

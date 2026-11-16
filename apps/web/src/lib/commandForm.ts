@@ -1,4 +1,5 @@
 import {
+  canonicalExcluded,
   DEFAULT_COMMANDS,
   effectiveCommands,
   isDefaultCommandId,
@@ -27,7 +28,44 @@ const nameKey = (name: string): string => name.trim().toLowerCase();
 
 /** A new command: no name or prompt yet, the zap icon, the new-session sheet's model and effort. */
 export function newDraft(defaults: { model: Model; effort: Effort }, project?: string): CommandDraft {
-  return { id: null, name: "", prompt: "", icon: "zap", project: project ?? null, model: defaults.model, effort: defaults.effort };
+  return { id: null, name: "", prompt: "", icon: "zap", project: project ?? null, excluded: [], model: defaults.model, effort: defaults.effort };
+}
+
+const NAME_MAX = 40;
+
+/**
+ * A copy's name: `<name> copy`, numbered `copy 2`, `copy 3`… while a command in force has it (any
+ * case), the name clipped so the whole fits the 40-character limit.
+ */
+export function copyName(effective: Command[], name: string): string {
+  const taken = (n: string) => effective.some((c) => nameKey(c.name) === nameKey(n));
+  for (let n = 1; ; n++) {
+    const suffix = n === 1 ? " copy" : ` copy ${n}`;
+    const candidate = name.trim().slice(0, NAME_MAX - suffix.length).trimEnd() + suffix;
+    if (!taken(candidate)) return candidate;
+  }
+}
+
+/**
+ * Duplicate (RIC-587): the form as it stands, unsaved edits too, as a new command under a free copy
+ * name. A default's copy is a custom command; nothing is stored until it is saved.
+ */
+export function duplicateDraft(s: CommandsSetting, draft: CommandDraft): CommandDraft {
+  return { ...draft, id: null, name: copyName(effectiveCommands(s), draft.name) };
+}
+
+/** The "Skip on" list: the mapped projects, and an excluded one no longer mapped so it can be unticked. */
+export function excludedChoices(mapped: string[], excluded: string[]): string[] {
+  return [...new Set([...mapped, ...excluded])].sort(byProjectName);
+}
+
+export function toggleExcluded(excluded: string[], project: string, skip: boolean): string[] {
+  return canonicalExcluded(skip ? [...excluded, project] : excluded.filter((p) => p !== project));
+}
+
+/** The card's line under a general command that skips projects. */
+export function excludedNote(c: Command): string | null {
+  return c.project === null && c.excluded.length > 0 ? `Not on ${c.excluded.join(", ")}` : null;
 }
 
 /** The AI help's answer in the form: prompt and icon always, the name only when there is none to keep. */
@@ -55,7 +93,9 @@ export function saveDraft(s: CommandsSetting, draft: CommandDraft, random?: () =
     do id = newCommandId(random);
     while (s.items.some((c) => c.id === id));
   }
-  const command: Command = { ...draft, id, name: draft.name.trim() };
+  // Canonical as `CommandSchema` makes it, or Clean un-ticked back to the default would still differ.
+  const excluded = draft.project === null ? canonicalExcluded(draft.excluded) : [];
+  const command: Command = { ...draft, id, name: draft.name.trim(), excluded };
   const at = s.items.findIndex((c) => c.id === id);
   const items = at >= 0 ? s.items.map((c, i) => (i === at ? command : c)) : [...s.items, command];
   return normalizeCommands({ ...s, items });

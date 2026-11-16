@@ -157,7 +157,7 @@ describe("DELETE /api/projects/:name", () => {
 });
 
 describe("commands follow their project", () => {
-  const custom = { id: "cmd-a1b2c3", name: "Lint", prompt: "p", icon: "bug" as const, project: "Web", model: "sonnet" as const, effort: "low" as const };
+  const custom = { id: "cmd-a1b2c3", name: "Lint", prompt: "p", icon: "bug" as const, project: "Web", excluded: [] as string[], model: "sonnet" as const, effort: "low" as const };
   const settingsUpdated = (events: { type: string }[]) => events.filter((e) => e.type === "settings.updated").length;
 
   it("moves a bound command on a rename", async () => {
@@ -178,6 +178,17 @@ describe("commands follow their project", () => {
     expect((await req("/api/projects/Web", { method: "DELETE" })).status).toBe(200);
     expect(settings.get().commands).toEqual({ items: [], removed: [] });
     expect(settingsUpdated(events)).toBe(1);
+  });
+
+  it("renames the project inside a general command's excluded, and drops it there on delete", async () => {
+    const { req, projects, settings } = setup();
+    projects.upsert(web);
+    const deps = { ...custom, id: "cmd-d0d0d0", name: "Deps", project: null, excluded: ["Api", "Web"] };
+    settings.setCommands({ items: [deps], removed: [] });
+    await req("/api/projects/Web", { method: "PUT", json: { ...web, name: "Site" } });
+    expect(settings.get().commands.items).toEqual([{ ...deps, excluded: ["Api", "Site"] }]);
+    await req("/api/projects/Site", { method: "DELETE" });
+    expect(settings.get().commands.items).toEqual([{ ...deps, excluded: ["Api"] }]);
   });
 
   it("emits nothing when no command is bound to the project", async () => {

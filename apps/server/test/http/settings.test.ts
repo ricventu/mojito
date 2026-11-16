@@ -190,7 +190,8 @@ describe("/api/settings", () => {
       const ok = { id: "cmd-aaaaaa", name: "A", prompt: "p", icon: "skull", project: null, model: "sonnet", effort: "high" };
       const bad = { ...ok, id: "cmd-bbbbbb", name: "B", prompt: "" };
       db.prepare("INSERT INTO settings (key, value) VALUES ('commands', ?)").run(JSON.stringify({ items: [ok, bad], removed: [] }));
-      expect(settings.get().commands).toEqual({ items: [{ ...ok, icon: "zap" }], removed: [] });
+      // A row stored before RIC-587 has no excluded: it reads as [].
+      expect(settings.get().commands).toEqual({ items: [{ ...ok, icon: "zap", excluded: [] }], removed: [] });
       expect(settings.get().commands.items).toHaveLength(1);
       expect(warn).toHaveBeenCalledTimes(1);
       expect(String(warn.mock.calls[0][0])).toMatch(/commands/);

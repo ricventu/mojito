@@ -200,7 +200,11 @@ app's state, left in place.
 - **Commands** (RIC-581, spec `2026-11-13-quick-commands-design.md`; `shared/src/commands.ts`,
   `http/routes/commands.ts`, `launchCommand`): a quick command is a prompt that opens a Claude
   session in a project (`Command`: name, prompt, lucide `icon` from `COMMAND_ICONS`, `project` or
-  null = every mapped project, model, effort). The `commands` settings key stores only the **diff
+  null = every mapped project but those in `excluded` (RIC-587, spec
+  `2026-11-16-commands-duplicate-exclude-design.md`; `CommandSchema` defaults it to `[]` — older rows
+  and peers have none — and keeps it unique, plain-`sort()`ed, `[]` for a bound command; `commandsFor`
+  honours it, so the run route 404s an excluded project; a project rename/removal renames/drops it
+  there too), model, effort). The `commands` settings key stores only the **diff
   from `DEFAULT_COMMANDS`**: `items` (custom commands + edited copies of defaults) and `removed`
   (deleted default ids), normalized on every write (`normalizeCommands`: an item equal to its
   default is dropped, so it follows later changes to the shipped text). Two id namespaces: a plain
@@ -486,7 +490,10 @@ app's state, left in place.
 - Settings → Commands (`components/settings/CommandsCard`, `CommandDialog`, `IconGrid`;
   `lib/commandForm.ts`, `lib/commandIcons.tsx` maps each `COMMAND_ICONS` name to its lucide
   component): add, edit and delete commands, restore a deleted default; "Write with AI" fills the
-  form from the assist endpoint. "Import" (`ImportCommandsDialog`) reads another instance's
+  form from the assist endpoint. "Skip on" (an "All projects" command only) ticks the projects it
+  is not offered on; the card shows "Not on …". Duplicate (`duplicateDraft`) turns the edit dialog
+  into "New command" with the form as it stands and a free `<name> copy` name (`copyName`); nothing
+  is written until Save, and a default's copy is a custom command. "Import" (`ImportCommandsDialog`) reads another instance's
   commands through the relay and merges them with `importCommands`; the answer goes through
   `peerCommands` first (an unknown icon becomes `zap`, an invalid command is dropped).
 - Overlay sheets (filter, sidebar) draw their own ✕ (`showCloseButton={false}`): shadcn's
