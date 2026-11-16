@@ -489,8 +489,9 @@ app's state, left in place.
   opens HOME with the error shown — and writes the pick as `~/…` under HOME (`lib/folderPicker.ts`).
 - Settings → Commands (`components/settings/CommandsCard`, `CommandDialog`, `IconGrid`;
   `lib/commandForm.ts`, `lib/commandIcons.tsx` maps each `COMMAND_ICONS` name to its lucide
-  component): add, edit and delete commands, restore a deleted default; "Write with AI" fills the
-  form from the assist endpoint. "Skip on" (an "All projects" command only) is a select that adds
+  component): add, edit and delete commands, restore a deleted default; "Write with AI" first asks
+  what the command should do (a field of its own, not the Prompt), then fills the form from the
+  assist endpoint. "Skip on" (an "All projects" command only) is a select that adds
   a project it is not offered on (`skipOptions`; keyed on the list, so it empties after each pick)
   and a removable badge per skipped project — not one checkbox per project, by the human's choice;
   the card shows "Not on …". Duplicate (`duplicateDraft`) turns the edit dialog

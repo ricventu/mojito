@@ -169,7 +169,9 @@ A `CommandsCard` (id `commands`, for the menu's link), after Projects:
 - The answer is parsed with zod; an icon outside the list falls back to the form's current one; a
   parse failure or a 60 s timeout is a 502 `{error}`. Not a stored task: it is synchronous and
   stateless, and the form shows a spinner on the button.
-- Web: the button (lucide `Sparkles`, "Write with AI") is disabled with an empty prompt; the
+- Web: the button (lucide `Sparkles`, "Write with AI") first asks "What should this command
+  do?" in a field of its own (Generate, or Cmd/Ctrl+Enter; Cancel) — that text, not the Prompt
+  field, is what the assistant gets, so the prompt stays as it is until the answer; the
   result replaces name (only if the name field is empty or the dialog is new), prompt and icon,
   and an "Undo" next to the button restores the three previous values until the next edit or
   save.

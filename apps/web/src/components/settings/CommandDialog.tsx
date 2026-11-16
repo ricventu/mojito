@@ -65,6 +65,8 @@ function Form({ command, settings, write, onClose, initial, onDuplicate }: FormP
   }));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** What the AI should write, asked for when "Write with AI" is tapped; null while not asking. */
+  const [idea, setIdea] = useState<string | null>(null);
   const { draft, undo } = form;
   const tag = command ? commandTag(settings.commands, command.id) : null;
 
@@ -74,7 +76,10 @@ function Form({ command, settings, write, onClose, initial, onDuplicate }: FormP
 
   const assist = useMutation({
     mutationFn: (body: AssistBody) => apiJson<AssistAnswer>("/api/commands/assist", "POST", body),
-    onSuccess: (answer) => setForm((f) => ({ draft: applyAssist(f.draft, answer), undo: f.draft })),
+    onSuccess: (answer) => {
+      setForm((f) => ({ draft: applyAssist(f.draft, answer), undo: f.draft }));
+      setIdea(null);
+    },
   });
 
   // A project the server no longer maps still shows, so opening the dialog never changes the command.
@@ -108,6 +113,8 @@ function Form({ command, settings, write, onClose, initial, onDuplicate }: FormP
   }
 
   const pending = busy || assist.isPending;
+
+  const generate = (text: string) => assist.mutate({ text, project: draft.project ?? undefined, icon: draft.icon });
 
   return (
     <form onSubmit={save} noValidate className="flex flex-col gap-4 px-4">
@@ -190,27 +197,61 @@ function Form({ command, settings, write, onClose, initial, onDuplicate }: FormP
           placeholder="What the session should do, roughly or in full"
           className="max-h-[40dvh] min-h-24"
         />
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={draft.prompt.trim() === "" || pending}
-            onClick={() => assist.mutate({ text: draft.prompt, project: draft.project ?? undefined, icon: draft.icon })}
-          >
-            {assist.isPending ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-            {assist.isPending ? "Writing…" : "Write with AI"}
-          </Button>
-          {undo && (
-            <Button type="button" variant="ghost" size="sm" onClick={() => setForm({ draft: undo, undo: null })}>
-              <Undo2 size={14} /> Undo
+        {idea === null ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => setIdea("")}>
+              <Sparkles size={14} /> Write with AI
             </Button>
-          )}
-        </div>
-        {assist.isError && (
-          <p role="alert" className="text-sm text-destructive">
-            {assist.error.message}
-          </p>
+            {undo && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setForm({ draft: undo, undo: null })}>
+                <Undo2 size={14} /> Undo
+              </Button>
+            )}
+          </div>
+        ) : (
+          // Asked first: the idea is its own text, so the prompt above stays as it is until the answer.
+          <div className="flex flex-col gap-1.5 rounded-md border p-3">
+            <Label htmlFor="command-idea">What should this command do?</Label>
+            <Textarea
+              id="command-idea"
+              autoFocus
+              value={idea}
+              readOnly={assist.isPending}
+              onChange={(e) => setIdea(e.target.value)}
+              onKeyDown={(e) => {
+                // Cmd/Ctrl+Enter generates; a plain Enter is a new line, and never submits the form.
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && idea.trim() !== "" && !pending) {
+                  e.preventDefault();
+                  generate(idea);
+                }
+              }}
+              placeholder="e.g. update the dependencies, run the tests, open a PR"
+              className="max-h-[30dvh] min-h-20"
+            />
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={assist.isPending}
+                onClick={() => {
+                  setIdea(null);
+                  assist.reset();
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="button" size="sm" disabled={idea.trim() === "" || pending} onClick={() => generate(idea)}>
+                {assist.isPending ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                {assist.isPending ? "Writing…" : "Generate"}
+              </Button>
+            </div>
+            {assist.isError && (
+              <p role="alert" className="text-sm text-destructive">
+                {assist.error.message}
+              </p>
+            )}
+          </div>
         )}
       </div>
       <div className="flex flex-col gap-1.5">
