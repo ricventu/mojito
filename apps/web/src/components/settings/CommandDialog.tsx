@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Copy, Loader2, RotateCcw, Sparkles, Trash2, Undo2 } from "lucide-react";
+import { Copy, Loader2, RotateCcw, Sparkles, Trash2, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 import { COMMAND_PROMPT_MAX, isDefaultCommandId, type AssistAnswer, type AssistBody, type Command, type CommandsSetting, type Settings } from "@mojito/shared";
 import { LaunchOptions } from "@/components/sheets/LaunchOptions";
 import { SHEET_CONTENT_CLASS } from "@/components/sheets/styles";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,10 +21,10 @@ import {
   deleteCommand,
   draftError,
   duplicateDraft,
-  excludedChoices,
   newDraft,
   resetDefault,
   saveDraft,
+  skipOptions,
   toggleExcluded,
   type CommandDraft,
 } from "@/lib/commandForm";
@@ -80,7 +80,7 @@ function Form({ command, settings, write, onClose, initial, onDuplicate }: FormP
   // A project the server no longer maps still shows, so opening the dialog never changes the command.
   const mapped = (projects.data ?? []).map((p) => p.name);
   const projectChoices = [...new Set(draft.project ? [...mapped, draft.project] : mapped)].sort(byProjectName);
-  const skipChoices = draft.project === null ? excludedChoices(mapped, draft.excluded) : [];
+  const skipChoices = draft.project === null ? skipOptions(mapped, draft.excluded) : [];
 
   async function run(update: (s: CommandsSetting) => CommandsSetting, done: string) {
     setError(null);
@@ -137,27 +137,47 @@ function Form({ command, settings, write, onClose, initial, onDuplicate }: FormP
           </SelectContent>
         </Select>
       </div>
-      {skipChoices.length > 0 && (
-        <fieldset className="flex flex-col gap-1.5">
-          <legend className="mb-1.5 text-sm leading-none font-medium">Skip on</legend>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {skipChoices.map((name) => {
-              const id = `command-skip-${name}`;
-              return (
-                <div key={name} className="flex min-w-0 items-center gap-2">
-                  <Checkbox
-                    id={id}
-                    checked={draft.excluded.includes(name)}
-                    onCheckedChange={(v) => edit((d) => ({ excluded: toggleExcluded(d.excluded, name, v === true) }))}
-                  />
-                  <label htmlFor={id} className="truncate text-sm">
+      {draft.project === null && (skipChoices.length > 0 || draft.excluded.length > 0) && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="command-skip">Skip on</Label>
+          {skipChoices.length > 0 && (
+            // Keyed on the list so it remounts empty after each pick: it adds, it holds no value.
+            <Select
+              key={draft.excluded.join("\u0000")}
+              onValueChange={(name) => edit((d) => ({ excluded: toggleExcluded(d.excluded, name, true) }))}
+            >
+              <SelectTrigger id="command-skip" className="w-full">
+                <SelectValue placeholder="Add a project to skip" />
+              </SelectTrigger>
+              <SelectContent>
+                {skipChoices.map((name) => (
+                  <SelectItem key={name} value={name}>
                     {name}
-                  </label>
-                </div>
-              );
-            })}
-          </div>
-        </fieldset>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {draft.excluded.length > 0 && (
+            <ul className="flex flex-wrap gap-1.5">
+              {[...draft.excluded].sort(byProjectName).map((name) => (
+                <li key={name} className="min-w-0">
+                  <Badge variant="secondary" className="max-w-full gap-1 pr-0.5">
+                    <span className="truncate">{name}</span>
+                    <button
+                      type="button"
+                      aria-label={`Offer on ${name} again`}
+                      onClick={() => edit((d) => ({ excluded: toggleExcluded(d.excluded, name, false) }))}
+                      className="rounded-sm p-0.5 outline-none hover:bg-foreground/10 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    >
+                      <X size={12} />
+                    </button>
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="command-prompt">Prompt</Label>

@@ -33,10 +33,12 @@ The human picked A, and Duplicate with it.
 - A project **rename** renames it inside every `excluded`; a **removal** drops it from them (an
   edited default whose only edit was that exclusion is then equal to its default and is dropped by
   `normalizeCommands`).
-- Settings → Commands form: under Project, when it is "All projects" and there are projects, a
-  "Skip on" list of checkboxes, one per mapped project (plus any excluded name no longer mapped, so
-  it can be unchecked — as the Project select keeps an unmapped project). The card shows
-  "Not on a, b" under such a command's name.
+- Settings → Commands form: under Project, when it is "All projects", a "Skip on" select (the
+  mapped projects not skipped yet; picking one adds it and the select empties again) and, under it,
+  a badge per skipped project with an ✕ to offer the command there again — an excluded name no
+  longer mapped shows as a badge too, so it can be removed. Asked by the human over a list of
+  checkboxes, which grows with every project. The card shows "Not on a, b" under such a command's
+  name.
 - **Duplicate**: a button in the edit dialog's footer. It turns the dialog into "New command" with
   the form's current fields (unsaved edits included — a "save as copy"), no id, and the name
   `"<name> copy"` (numbered `copy 2`, `copy 3`… when taken, clipped to 40). Nothing is written until

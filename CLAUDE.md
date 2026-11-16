@@ -490,8 +490,10 @@ app's state, left in place.
 - Settings → Commands (`components/settings/CommandsCard`, `CommandDialog`, `IconGrid`;
   `lib/commandForm.ts`, `lib/commandIcons.tsx` maps each `COMMAND_ICONS` name to its lucide
   component): add, edit and delete commands, restore a deleted default; "Write with AI" fills the
-  form from the assist endpoint. "Skip on" (an "All projects" command only) ticks the projects it
-  is not offered on; the card shows "Not on …". Duplicate (`duplicateDraft`) turns the edit dialog
+  form from the assist endpoint. "Skip on" (an "All projects" command only) is a select that adds
+  a project it is not offered on (`skipOptions`; keyed on the list, so it empties after each pick)
+  and a removable badge per skipped project — not one checkbox per project, by the human's choice;
+  the card shows "Not on …". Duplicate (`duplicateDraft`) turns the edit dialog
   into "New command" with the form as it stands and a free `<name> copy` name (`copyName`); nothing
   is written until Save, and a default's copy is a custom command. "Import" (`ImportCommandsDialog`) reads another instance's
   commands through the relay and merges them with `importCommands`; the answer goes through

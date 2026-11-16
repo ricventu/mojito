@@ -16,7 +16,7 @@ import {
   restoreDefault,
   copyName,
   duplicateDraft,
-  excludedChoices,
+  skipOptions,
   excludedNote,
   saveDraft,
   toggleExcluded,
@@ -160,8 +160,8 @@ describe("duplicateDraft", () => {
 });
 
 describe("excluded in the form", () => {
-  it("excludedChoices: mapped projects and excluded names no longer mapped, by name", () =>
-    expect(excludedChoices(["web", "Api"], ["Gone", "Api"])).toEqual(["Api", "Gone", "web"]));
+  it("skipOptions: the mapped projects not skipped yet, by name", () =>
+    expect(skipOptions(["web", "Zed", "Api"], ["Gone", "Api"])).toEqual(["web", "Zed"]));
 
   it("toggleExcluded adds and removes a name, kept canonical", () => {
     expect(toggleExcluded(["Web"], "Api", true)).toEqual(["Api", "Web"]);

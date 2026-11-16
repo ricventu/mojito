@@ -54,9 +54,9 @@ export function duplicateDraft(s: CommandsSetting, draft: CommandDraft): Command
   return { ...draft, id: null, name: copyName(effectiveCommands(s), draft.name) };
 }
 
-/** The "Skip on" list: the mapped projects, and an excluded one no longer mapped so it can be unticked. */
-export function excludedChoices(mapped: string[], excluded: string[]): string[] {
-  return [...new Set([...mapped, ...excluded])].sort(byProjectName);
+/** The "Skip on" select's options: the mapped projects not skipped yet, by name. */
+export function skipOptions(mapped: string[], excluded: string[]): string[] {
+  return mapped.filter((p) => !excluded.includes(p)).sort(byProjectName);
 }
 
 export function toggleExcluded(excluded: string[], project: string, skip: boolean): string[] {
