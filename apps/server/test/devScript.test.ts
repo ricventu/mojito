@@ -8,8 +8,10 @@ describe("the server's dev script", () => {
   const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
   const dev: string = pkg.scripts.dev;
 
-  it("pins the port Vite proxies to", () => {
-    expect(dev).toMatch(/\bMOJITO_PORT=3100\b/);
+  it("pins the port Vite proxies to, both overridden by MOJITO_DEV_PORT", () => {
+    expect(dev).toMatch(/\bMOJITO_PORT=\$\{MOJITO_DEV_PORT:-3700\}(\s|$)/);
+    const vite = readFileSync(new URL("../../web/vite.config.ts", import.meta.url), "utf8");
+    expect(vite).toContain('process.env.MOJITO_DEV_PORT || "3700"');
   });
 
   it("uses a state dir of its own", () => {

@@ -3,9 +3,9 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 
-// `pnpm dev` pins the server to 3100 and a state dir of its own (apps/server/package.json),
-// clear of the service on 8700 and of its database.
-const API = "http://127.0.0.1:3100";
+// `pnpm dev` pins the server to 3700 (`MOJITO_DEV_PORT` overrides it, read by both sides) and a
+// state dir of its own (apps/server/package.json), clear of the service on 8700 and of its database.
+const API = `http://127.0.0.1:${process.env.MOJITO_DEV_PORT || "3700"}`;
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

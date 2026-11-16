@@ -528,7 +528,7 @@ app's state, left in place.
 ## Commands
 
 ```bash
-pnpm dev                       # server (tsx watch, :3100, ~/.local/state/mojito-dev) + Vite (:5173, proxies /api and /ws)
+pnpm dev                       # server (tsx watch, :3700 or $MOJITO_DEV_PORT, ~/.local/state/mojito-dev) + Vite (:5173, proxies /api and /ws)
 pnpm test && pnpm typecheck
 pnpm build                     # apps/web/dist + apps/server/dist/main.js
 make deploy                    # from ~/code/mojito: pull (if tracked), frozen install,
