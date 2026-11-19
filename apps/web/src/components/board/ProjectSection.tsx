@@ -129,6 +129,11 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
       )}
 
       {section.loose.length > 0 && <LooseSessions project={name} loose={section.loose} />}
+
+      {/* Only a project can be empty (General is dropped then), and only with no filter narrowing the board. */}
+      {section.active.length + section.backlog.length + section.loose.length === 0 && (
+        <p className="text-xs text-muted-foreground">No open tickets.</p>
+      )}
     </section>
   );
 }

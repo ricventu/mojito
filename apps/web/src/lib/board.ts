@@ -49,8 +49,9 @@ function byStatusThenIdentifier(a: TicketSummary, b: TicketSummary): number {
 }
 
 /**
- * One section per configured project (alphabetical), then General last. A section with
- * no ticket and no loose session is dropped. Tickets are placed by their own project name;
+ * One section per configured project (alphabetical), then General last. A project's section
+ * stays even with no ticket and no loose session (RIC-592): its header is where a new project
+ * gets its first ticket, a Pull or a command. General is dropped when empty. Tickets are placed by their own project name;
  * a loose session whose project is no longer mapped lands in General rather than vanishing.
  * "On the board" means shown: a ticket whose project is not mapped gets no card, so its
  * session is loose too.
@@ -80,7 +81,7 @@ export function groupBoard(
 
   return [...names, null]
     .map(section)
-    .filter((s) => s.active.length + s.backlog.length + s.loose.length > 0);
+    .filter((s) => s.project !== null || s.loose.length > 0);
 }
 
 /**
@@ -89,7 +90,9 @@ export function groupBoard(
  * outside `FILTER_STATUSES` is hidden with it), shows Backlog only if selected, and hides
  * loose sessions, which have no status. `live` keeps the tickets with a live session among
  * `sessions` and the live loose sessions. `q` matches ticket identifier, title and labels, and
- * loose sessions by ticket, id or kind. A section left empty is dropped.
+ * loose sessions by ticket, id or kind. A section left empty is dropped once a status, search or
+ * `live` filter narrows the board (it holds no match); with none, an empty project stays, as in
+ * `groupBoard`, and so does one a project filter selects.
  */
 export function filterBoard(sections: BoardSection[], f: BoardFilters, sessions: SessionMeta[]): BoardSection[] {
   const q = f.q.trim().toLowerCase();
@@ -102,6 +105,7 @@ export function filterBoard(sections: BoardSection[], f: BoardFilters, sessions:
   const sessionMatches = (s: SessionMeta) =>
     (!f.live || s.state !== "ended") && (q === "" || has(s.ticket ?? "") || has(s.id) || has(s.kind));
   const backlogShown = !hasStatus || f.statuses.includes("Backlog");
+  const narrowed = hasStatus || f.live || q !== "";
 
   return sections
     .filter((s) => f.projects.length === 0 || (s.project !== null && f.projects.includes(s.project)))
@@ -117,7 +121,7 @@ export function filterBoard(sections: BoardSection[], f: BoardFilters, sessions:
         loose: hasStatus ? [] : s.loose.filter(sessionMatches),
       };
     })
-    .filter((s) => s.active.length + s.backlog.length + s.loose.length > 0);
+    .filter((s) => !narrowed || s.active.length + s.backlog.length + s.loose.length > 0);
 }
 
 /** The board's kanban columns, in workflow order left to right (the list reads the other way: STATUS_ORDER). */

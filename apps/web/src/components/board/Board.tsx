@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router";
 import { TriangleAlert } from "lucide-react";
 import type { TicketSummary } from "@mojito/shared";
 import { useBoardFilters } from "@/hooks/useBoardFilters";
@@ -107,7 +108,13 @@ export function Board() {
               </Button>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No tickets and no sessions.</p>
+            <p className="text-sm text-muted-foreground">
+              No projects yet.{" "}
+              <Link to="/settings" className="underline underline-offset-2 hover:text-foreground">
+                Add one in Settings
+              </Link>
+              .
+            </p>
           )
         ) : (
           sections.map((section) => (

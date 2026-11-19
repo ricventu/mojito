@@ -134,8 +134,8 @@ describe("groupBoard", () => {
         session("mj-RIC-6", { kind: "ticket", ticket: "RIC-6", project: "Gone" }),
       ],
     );
-    expect(sections.map((s) => s.project)).toEqual([null]);
-    expect(sections[0].loose.map((s) => s.id).sort()).toEqual(["mj-RIC-5", "mj-RIC-6"]);
+    expect(sections.map((s) => s.project)).toEqual(["Alpha", null]);
+    expect(sections[1].loose.map((s) => s.id).sort()).toEqual(["mj-RIC-5", "mj-RIC-6"]);
   });
 
   // The ticket is listed but its project has no section, so it has no card either.
@@ -145,8 +145,8 @@ describe("groupBoard", () => {
       [ticket("RIC-7", "Todo", "Gone")],
       [session("mj-RIC-7", { kind: "ticket", ticket: "RIC-7", project: "Gone" })],
     );
-    expect(sections.map((s) => s.project)).toEqual([null]);
-    expect(sections[0].loose.map((s) => s.id)).toEqual(["mj-RIC-7"]);
+    expect(sections.map((s) => s.project)).toEqual(["Alpha", null]);
+    expect(sections[1].loose.map((s) => s.id)).toEqual(["mj-RIC-7"]);
   });
 
   it("puts project-less free sessions in a trailing General section", () => {
@@ -161,16 +161,23 @@ describe("groupBoard", () => {
 
   it("gives a free session whose project left the map a place in General", () => {
     const sections = groupBoard([project("Alpha")], [], [session("mj-gone-aaaaaa", { project: "Gone" })]);
-    expect(sections.map((s) => s.project)).toEqual([null]);
+    expect(sections.map((s) => s.project)).toEqual(["Alpha", null]);
   });
 
-  it("omits General without loose sessions and projects with nothing in them", () => {
+  it("omits General without loose sessions", () => {
     const sections = groupBoard(
       [project("Alpha"), project("Beta")],
       [ticket("RIC-1", "Todo", "Beta")],
       [session("mj-RIC-1", { kind: "ticket", ticket: "RIC-1", project: "Beta" })],
     );
-    expect(sections.map((s) => s.project)).toEqual(["Beta"]);
+    expect(sections.map((s) => s.project)).toEqual(["Alpha", "Beta"]);
+  });
+
+  // RIC-592: a new project has no tickets yet, and its header is where its first ticket is made.
+  it("keeps a mapped project with no ticket and no session", () => {
+    const sections = groupBoard([project("Alpha"), project("Beta")], [ticket("RIC-1", "Todo", "Beta")], []);
+    expect(sections.map((s) => s.project)).toEqual(["Alpha", "Beta"]);
+    expect(sections[0]).toEqual({ project: "Alpha", active: [], backlog: [], backlogOpen: false, loose: [] });
   });
 
   it("keeps a project that only has Backlog tickets", () => {
@@ -252,6 +259,20 @@ describe("filterBoard", () => {
     );
     expect(sections.map((s) => s.project)).toEqual(["Alpha", "Beta", null]);
     expect(filterBoard(sections, filters({ projects: ["Beta"] }), []).map((s) => s.project)).toEqual(["Beta"]);
+  });
+
+  it("keeps an empty project with no filters, and when a project filter selects it", () => {
+    const sections = groupBoard([project("Alpha"), project("Beta")], [ticket("RIC-1", "Todo", "Beta")], []);
+    expect(filterBoard(sections, NO_FILTERS, []).map((s) => s.project)).toEqual(["Alpha", "Beta"]);
+    expect(filterBoard(sections, filters({ projects: ["Alpha"] }), []).map((s) => s.project)).toEqual(["Alpha"]);
+  });
+
+  it("drops an empty project once a status, search or live filter narrows the board", () => {
+    const sections = groupBoard([project("Alpha"), project("Beta")], [ticket("RIC-1", "Todo", "Beta")], []);
+    const live = [session("mj-RIC-1", { kind: "ticket", ticket: "RIC-1", project: "Beta" })];
+    expect(filterBoard(sections, filters({ statuses: ["Todo"] }), []).map((s) => s.project)).toEqual(["Beta"]);
+    expect(filterBoard(sections, filters({ q: "ric-1" }), []).map((s) => s.project)).toEqual(["Beta"]);
+    expect(filterBoard(sections, filters({ live: true }), live).map((s) => s.project)).toEqual(["Beta"]);
   });
 
   it("a selected unknown project matches nothing", () => {
