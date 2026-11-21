@@ -338,7 +338,9 @@ app's state, left in place.
   module-level (leaving the board neither runs nor drops it), and the ticket stays hidden until
   the tickets refetch after the write (a refusal brings it back with an error toast).
   A ticket's status is a filled pill (`StatusBadge`): violet In Review, blue In Progress, neutral
-  otherwise — emerald, sky, amber and red mean a session's state.
+  otherwise — emerald, sky, amber and red mean a session's state. A label stays an outline pill
+  with a dot in its Linear colour (RIC-608: `TicketSummary.labelColors`, optional for older
+  peers, `#rrggbb` only — checked on the server and again by `lib/labels.ts`, it reaches a style).
 - Project header: Pull / Push icons (`GitButtons`, `lib/gitSync.ts`) — a toast, or on a conflict
   the git session's terminal (pushed, from the board). Then Clean, the default command, as its
   own button (`CommandButton`, `lib/commands.ts`: `boardClean`) when it is offered to the

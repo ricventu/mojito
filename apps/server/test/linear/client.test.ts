@@ -21,7 +21,7 @@ describe("LinearClient.listOpenIssues", () => {
     url: "https://linear.app/acme/issue/RIC-46/do-thing",
     state: { name: "In Progress", type: "started" },
     project: { name: "Web" },
-    labels: { nodes: [{ name: "bug" }] },
+    labels: { nodes: [{ name: "bug", color: "#EB5757" }, { name: "odd", color: "red; x" }] },
     assignee: { isMe: true },
   };
 
@@ -40,7 +40,9 @@ describe("LinearClient.listOpenIssues", () => {
         statusName: "In Progress",
         statusType: "started",
         project: "Web",
-        labels: ["bug"],
+        labels: ["bug", "odd"],
+        // Only a #rrggbb colour is kept: it ends up in a style attribute.
+        labelColors: { bug: "#eb5757" },
         assignedToMe: true,
       },
     ]);
@@ -77,6 +79,7 @@ describe("LinearClient.listOpenIssues", () => {
       statusType: "",
       project: null,
       labels: [],
+      labelColors: {},
       assignedToMe: false,
     });
   });

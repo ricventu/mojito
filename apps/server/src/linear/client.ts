@@ -16,7 +16,7 @@ interface IssueNode {
   url?: string;
   state?: { name?: string; type?: string };
   project?: { name?: string } | null;
-  labels?: { nodes?: { name: string }[] };
+  labels?: { nodes?: { name: string; color?: string }[] };
   assignee?: { isMe?: boolean } | null;
 }
 
@@ -26,7 +26,10 @@ function parseIdentifier(ticket: string): { teamKey: string; number: number } {
   return { teamKey: m[1], number: Number(m[2]) };
 }
 
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+
 function mapIssueNode(node: IssueNode): TicketSummary {
+  const labels = node.labels?.nodes ?? [];
   return {
     identifier: node.identifier ?? "",
     title: node.title ?? "",
@@ -35,7 +38,11 @@ function mapIssueNode(node: IssueNode): TicketSummary {
     statusName: node.state?.name ?? "",
     statusType: node.state?.type ?? "",
     project: node.project?.name ?? null,
-    labels: node.labels?.nodes?.map((l) => l.name) ?? [],
+    labels: labels.map((l) => l.name),
+    // Only a #rrggbb colour is kept: the web puts it in a style attribute.
+    labelColors: Object.fromEntries(
+      labels.flatMap((l) => (l.color && HEX_COLOR_RE.test(l.color) ? [[l.name, l.color.toLowerCase()]] : [])),
+    ),
     assignedToMe: node.assignee?.isMe ?? false,
   };
 }
@@ -92,7 +99,7 @@ export class LinearClient {
         issues(filter: { ${filter} }, first: 100) {
           nodes {
             identifier title url state { name type } project { name }
-            labels { nodes { name } } assignee { isMe }
+            labels { nodes { name color } } assignee { isMe }
           }
         }
       }`,

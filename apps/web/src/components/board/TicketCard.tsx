@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import type { CSSProperties, KeyboardEvent } from "react";
 import { Check } from "lucide-react";
 import type { SessionMeta, TicketSummary } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { canMarkDone } from "@/lib/board";
+import { labelColor } from "@/lib/labels";
 import { safeHref } from "@/lib/url";
 import { cn } from "@/lib/utils";
 
@@ -75,11 +76,22 @@ export function TicketCard({ ticket, session, selected, showStatus = true, onOpe
         {(showStatus || ticket.labels.length > 0 || session) && (
           <div className="flex flex-wrap items-center gap-1.5">
             {showStatus && <StatusBadge status={ticket.statusName} />}
-            {ticket.labels.map((label) => (
-              <Badge key={label} variant="outline" className="max-w-full truncate">
-                {label}
-              </Badge>
-            ))}
+            {ticket.labels.map((label) => {
+              const color = labelColor(ticket, label);
+              return (
+                <Badge key={label} variant="outline" className="max-w-full">
+                  {/* Linear's own dot: a filled pill would read as a status or a session state. */}
+                  {color && (
+                    <span
+                      aria-hidden
+                      className="size-2 shrink-0 rounded-full bg-(--label-color)"
+                      style={{ "--label-color": color } as CSSProperties}
+                    />
+                  )}
+                  <span className="truncate">{label}</span>
+                </Badge>
+              );
+            })}
             {session && <StateBadge state={session.state} endReason={session.endReason} />}
           </div>
         )}

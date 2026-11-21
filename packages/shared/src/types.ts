@@ -39,6 +39,11 @@ export interface TicketSummary {
   statusType: string;
   project: string | null;
   labels: string[];
+  /**
+   * Linear's colour for each label, lowercase `#rrggbb` (RIC-608). Optional: an older peer's
+   * tickets have none. Read through the web's `labelColor`, which checks the shape again.
+   */
+  labelColors?: Record<string, string>;
   assignedToMe: boolean;
 }
 
