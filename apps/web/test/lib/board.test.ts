@@ -325,6 +325,33 @@ describe("filterBoard", () => {
     expect(active("bug")).toEqual(["RIC-4"]);
   });
 
+  describe("labels", () => {
+    const labelled = (id: string, status: string, labels: string[]) => ({ ...ticket(id, status), labels });
+
+    it("keeps tickets carrying any selected label, by exact name", () => {
+      const sections = groupBoard(
+        [project("Alpha")],
+        [labelled("RIC-1", "Todo", ["Bug"]), labelled("RIC-2", "Todo", ["Feature"]), labelled("RIC-3", "Todo", ["bug"]), ticket("RIC-4", "Todo")],
+        [],
+      );
+      expect(ids(filterBoard(sections, filters({ labels: ["Bug"] }), [])[0].active)).toEqual(["RIC-1"]);
+      expect(ids(filterBoard(sections, filters({ labels: ["Bug", "Feature"] }), [])[0].active)).toEqual(["RIC-1", "RIC-2"]);
+    });
+
+    it("hides loose sessions, opens Backlog and drops a section left empty", () => {
+      const sections = groupBoard(
+        [project("Alpha"), project("Beta")],
+        [labelled("RIC-1", "Backlog", ["Bug"]), ticket("RIC-2", "Todo", "Beta")],
+        [session("mj-free-aaaaaa")],
+      );
+      const out = filterBoard(sections, filters({ labels: ["Bug"] }), []);
+      expect(out.map((s) => s.project)).toEqual(["Alpha"]);
+      expect(ids(out[0].backlog)).toEqual(["RIC-1"]);
+      expect(out[0].backlogOpen).toBe(true);
+      expect(out[0].loose).toEqual([]);
+    });
+  });
+
   describe("active sessions", () => {
     const live = filters({ live: true });
 

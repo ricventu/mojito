@@ -14,13 +14,14 @@ function clip(text: string, max: number): string {
 /**
  * The name a favourite gets unless the human types one: its filters in the url's canonical
  * order (so every device derives the same name from the same search), joined by " · ".
- * More than two projects are counted, not listed. "" for the bare board.
+ * More than two projects, or labels, are counted, not listed. "" for the bare board.
  */
 export function favoriteName(f: BoardFilters): string {
-  const { projects, statuses, live, q } = parseFilters(new URLSearchParams(canonicalSearch(f)));
+  const { projects, statuses, labels, live, q } = parseFilters(new URLSearchParams(canonicalSearch(f)));
   const parts = [
     ...(projects.length > 2 ? [`${projects.length} projects`] : projects),
     ...statuses,
+    ...(labels.length > 2 ? [`${labels.length} labels`] : labels),
     ...(live ? ["Active"] : []),
     ...(q !== "" ? [`"${q}"`] : []),
   ];

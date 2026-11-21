@@ -88,24 +88,28 @@ export function groupBoard(
  * The board narrowed by the url filters, after `groupBoard`. A project filter keeps those
  * sections (General never matches one). A status filter keeps those active tickets (any status
  * outside `FILTER_STATUSES` is hidden with it), shows Backlog only if selected, and hides
- * loose sessions, which have no status. `live` keeps the tickets with a live session among
- * `sessions` and the live loose sessions. `q` matches ticket identifier, title and labels, and
- * loose sessions by ticket, id or kind. A section left empty is dropped once a status, search or
- * `live` filter narrows the board (it holds no match); with none, an empty project stays, as in
- * `groupBoard`, and so does one a project filter selects.
+ * loose sessions, which have no status. A label filter keeps the tickets carrying any of those
+ * labels (by exact name), opens Backlog, and hides loose sessions, which have no labels. `live`
+ * keeps the tickets with a live session among `sessions` and the live loose sessions. `q` matches
+ * ticket identifier, title and labels, and loose sessions by ticket, id or kind. A section left
+ * empty is dropped once a status, label, search or `live` filter narrows the board (it holds no
+ * match); with none, an empty project stays, as in `groupBoard`, and so does one a project
+ * filter selects.
  */
 export function filterBoard(sections: BoardSection[], f: BoardFilters, sessions: SessionMeta[]): BoardSection[] {
   const q = f.q.trim().toLowerCase();
   const hasStatus = f.statuses.length > 0;
+  const hasLabel = f.labels.length > 0;
   const has = (text: string) => text.toLowerCase().includes(q);
   const liveTickets = new Set(sessions.filter((s) => s.state !== "ended").map((s) => s.ticket));
   const ticketMatches = (t: TicketSummary) =>
+    (!hasLabel || t.labels.some((l) => f.labels.includes(l))) &&
     (!f.live || liveTickets.has(t.identifier)) &&
     (q === "" || has(t.identifier) || has(t.title) || t.labels.some(has));
   const sessionMatches = (s: SessionMeta) =>
     (!f.live || s.state !== "ended") && (q === "" || has(s.ticket ?? "") || has(s.id) || has(s.kind));
   const backlogShown = !hasStatus || f.statuses.includes("Backlog");
-  const narrowed = hasStatus || f.live || q !== "";
+  const narrowed = hasStatus || hasLabel || f.live || q !== "";
 
   return sections
     .filter((s) => f.projects.length === 0 || (s.project !== null && f.projects.includes(s.project)))
@@ -117,8 +121,8 @@ export function filterBoard(sections: BoardSection[], f: BoardFilters, sessions:
           (t) => (!hasStatus || f.statuses.includes(t.statusName)) && ticketMatches(t),
         ),
         backlog,
-        backlogOpen: backlog.length > 0 && (f.statuses.includes("Backlog") || f.live || q !== ""),
-        loose: hasStatus ? [] : s.loose.filter(sessionMatches),
+        backlogOpen: backlog.length > 0 && (f.statuses.includes("Backlog") || hasLabel || f.live || q !== ""),
+        loose: hasStatus || hasLabel ? [] : s.loose.filter(sessionMatches),
       };
     })
     .filter((s) => !narrowed || s.active.length + s.backlog.length + s.loose.length > 0);

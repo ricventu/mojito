@@ -9,6 +9,7 @@ import { BOTTOM_SHEET_CLASS } from "@/components/sheets/styles";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useProjects } from "@/hooks/useProjects";
+import { useTickets } from "@/hooks/useTickets";
 import {
   activeFavorite,
   addFavorite,
@@ -25,6 +26,7 @@ import {
   sheetProjects,
   type BoardFilters,
 } from "@/lib/filters";
+import { sheetLabels } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -37,10 +39,25 @@ interface Props {
 const toggle = (list: string[], value: string) =>
   list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 
-function FilterChip({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }) {
+interface ChipProps {
+  label: string;
+  on: boolean;
+  onToggle: () => void;
+  /** A label's Linear colour, a dot before the name (`labelColor` checked it). */
+  color?: string | null;
+}
+
+function FilterChip({ label, on, onToggle, color }: ChipProps) {
   return (
     <Button type="button" size="sm" variant={on ? "default" : "outline"} aria-pressed={on} onClick={onToggle}>
-      {label}
+      {color && (
+        <span
+          aria-hidden
+          style={{ "--label-color": color } as React.CSSProperties}
+          className="size-2 shrink-0 rounded-full bg-(--label-color)"
+        />
+      )}
+      <span className="min-w-0 truncate">{label}</span>
     </Button>
   );
 }
@@ -151,9 +168,11 @@ function FavoriteActions({ filters }: { filters: BoardFilters }) {
   );
 }
 
-/** Projects, statuses and active sessions of the board, applied live: there is no Apply button. */
+/** Projects, statuses, labels and active sessions of the board, applied live: there is no Apply button. */
 export function FilterSheet({ open, onOpenChange, filters, setFilters }: Props) {
   const projects = useProjects();
+  const tickets = useTickets();
+  const labels = sheetLabels(tickets.data?.tickets ?? [], filters.labels);
   const wide = useMediaQuery("(min-width: 640px)");
   const names = sheetProjects(
     (projects.data ?? []).map((p) => p.name),
@@ -177,7 +196,7 @@ export function FilterSheet({ open, onOpenChange, filters, setFilters }: Props) 
               <X size={16} />
             </Button>
           </SheetClose>
-          <SheetDescription className="sr-only">Pick projects, statuses and sessions to show on the board.</SheetDescription>
+          <SheetDescription className="sr-only">Pick projects, statuses, labels and sessions to show on the board.</SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-5 px-4">
           <fieldset className="flex flex-col gap-1">
@@ -202,6 +221,21 @@ export function FilterSheet({ open, onOpenChange, filters, setFilters }: Props) 
                   label={status}
                   on={filters.statuses.includes(status)}
                   onToggle={() => setFilters({ ...filters, statuses: toggle(filters.statuses, status) })}
+                />
+              ))}
+            </div>
+          </fieldset>
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 text-sm font-medium">Labels</legend>
+            {labels.length === 0 && <p className="text-sm text-muted-foreground">No labels.</p>}
+            <div className="flex flex-wrap gap-2">
+              {labels.map(({ name, color }) => (
+                <FilterChip
+                  key={name}
+                  label={name}
+                  color={color}
+                  on={filters.labels.includes(name)}
+                  onToggle={() => setFilters({ ...filters, labels: toggle(filters.labels, name) })}
                 />
               ))}
             </div>

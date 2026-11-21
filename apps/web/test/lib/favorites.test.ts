@@ -175,6 +175,17 @@ describe("favoriteName", () => {
     expect(favoriteName(f({ projects: ["a", "b", "c"], statuses: ["Todo"] }))).toBe("3 projects · Todo");
   });
 
+  it("puts labels after statuses, before Active", () => {
+    expect(favoriteName(f({ projects: ["Mojito"], statuses: ["Todo"], labels: ["Bug"], live: true }))).toBe(
+      "Mojito · Todo · Bug · Active",
+    );
+    expect(favoriteName(f({ labels: ["b", "a"] }))).toBe("a · b");
+  });
+
+  it("counts more than two labels instead of listing them", () => {
+    expect(favoriteName(f({ labels: ["a", "b", "c"] }))).toBe("3 labels");
+  });
+
   it("names a single filter alone", () => {
     expect(favoriteName(f({ live: true }))).toBe("Active");
     expect(favoriteName(f({ q: "x" }))).toBe('"x"');
