@@ -3,8 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, FileText, GitGraph, Play, RotateCcw, SquareTerminal } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
-import type { PeersAnswer, PeerSnapshot, SessionMeta, Settings, TicketSummary } from "@mojito/shared";
+import { PRIORITIES, type PeersAnswer, type PeerSnapshot, type SessionMeta, type Settings, type TicketSummary } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
+import { PriorityIcon } from "@/components/PriorityIcon";
 import { StatusBadge, statusClass } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -24,6 +25,7 @@ import { gitHref } from "@/lib/git/url";
 import { sessionHref } from "@/lib/host";
 import { launchErrorAction, launchOptions, withLaunched, type LaunchPicks } from "@/lib/launch";
 import { launchHosts, peerSessionForTicket, withPeerSession } from "@/lib/peers";
+import { priorityInfo, ticketPriority } from "@/lib/priority";
 import { qk } from "@/lib/queryKeys";
 import { safeHref } from "@/lib/url";
 import { cn } from "@/lib/utils";
@@ -49,6 +51,47 @@ function useMoveTicket(ticket: TicketSummary, onMove: (status: string | null) =>
     },
     onSettled: () => qc.invalidateQueries({ queryKey: qk.tickets }),
   });
+}
+
+/**
+ * Sets the ticket's priority on Linear, for the header's priority pill. `onSet` shows it at once
+ * and takes it back (null) if Linear refuses.
+ */
+function useSetPriority(ticket: TicketSummary, onSet: (priority: number | null) => void) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (next: number) =>
+      apiJson<unknown>(`/api/tickets/${encodeURIComponent(ticket.identifier)}/priority`, "POST", { priority: next }),
+    onMutate: (next) => onSet(next),
+    onSuccess: (_data, next) => toast.success(`${ticket.identifier} → ${priorityInfo(next).name}`),
+    onError: (e) => {
+      onSet(null);
+      toast.error(errorMessage(e, "Priority change failed"));
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: qk.tickets }),
+  });
+}
+
+/** The ticket's priority as a pill beside its status; tapping it picks among Linear's five. */
+function PriorityPill({ priority, setting, onPick }: { priority: number; setting: boolean; onPick: (priority: number) => void }) {
+  return (
+    <Select value={String(priority)} disabled={setting} onValueChange={(v) => onPick(Number(v))}>
+      <SelectTrigger
+        aria-label="Priority"
+        className="h-auto gap-1 rounded-full border-transparent bg-muted px-2 py-0.5 text-xs font-medium text-foreground shadow-none [&_svg]:size-3"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent position="popper" align="start">
+        {PRIORITIES.map((p) => (
+          <SelectItem key={p.value} value={String(p.value)}>
+            <PriorityIcon priority={p.value} />
+            {p.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
 }
 
 /**
@@ -311,6 +354,10 @@ export function TicketSheet({ ticket, onClose }: Props) {
   const move = useMoveTicket(ticket, setMovedTo);
   // The move shows Done at once; the button stays, as the thing in flight, until the sheet closes.
   const markingDone = move.isPending && move.variables === DONE_STATUS;
+  // Likewise a priority set here.
+  const [pickedPriority, setPickedPriority] = useState<number | null>(null);
+  const priority = pickedPriority ?? ticketPriority(ticket);
+  const prioritize = useSetPriority(ticket, setPickedPriority);
 
   return (
     <Sheet open onOpenChange={(open) => !open && onClose()}>
@@ -331,6 +378,11 @@ export function TicketSheet({ ticket, onClose }: Props) {
               teamKey={teamKey}
               moving={move.isPending}
               onPick={(next) => move.mutate(next)}
+            />
+            <PriorityPill
+              priority={priority}
+              setting={prioritize.isPending}
+              onPick={(next) => next !== priority && prioritize.mutate(next)}
             />
             {(canMarkDone(status) || markingDone) && (
               // A Done ticket leaves the board, so the sheet goes with it. A live session stays, as a loose row.

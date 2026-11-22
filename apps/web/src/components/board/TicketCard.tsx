@@ -2,11 +2,13 @@ import type { CSSProperties, KeyboardEvent } from "react";
 import { Check } from "lucide-react";
 import type { SessionMeta, TicketSummary } from "@mojito/shared";
 import { StateBadge } from "@/components/StateBadge";
+import { PriorityIcon } from "@/components/PriorityIcon";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { canMarkDone } from "@/lib/board";
 import { labelColor } from "@/lib/labels";
+import { priorityInfo, ticketPriority } from "@/lib/priority";
 import { safeHref } from "@/lib/url";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +37,7 @@ export function TicketCard({ ticket, session, selected, showStatus = true, onOpe
     }
   };
   const waiting = session?.state === "needs-input";
+  const priority = ticketPriority(ticket);
 
   return (
     <li
@@ -45,14 +48,22 @@ export function TicketCard({ ticket, session, selected, showStatus = true, onOpe
       )}
     >
       <div className="flex items-center justify-between gap-2 px-3 pt-2">
-        <a
-          href={safeHref(ticket.url)}
-          target="_blank"
-          rel="noreferrer"
-          className="font-mono text-xs text-muted-foreground underline-offset-2 hover:underline"
-        >
-          {ticket.identifier}
-        </a>
+        <span className="flex min-w-0 items-center gap-1.5">
+          {/* No mark for No priority: a card says only what was decided. */}
+          {priority !== 0 && (
+            <span role="img" aria-label={`Priority: ${priorityInfo(priority).name}`} title={priorityInfo(priority).name} className="flex">
+              <PriorityIcon priority={priority} />
+            </span>
+          )}
+          <a
+            href={safeHref(ticket.url)}
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-xs text-muted-foreground underline-offset-2 hover:underline"
+          >
+            {ticket.identifier}
+          </a>
+        </span>
         {onDone && canMarkDone(ticket.statusName) && (
           <Button
             variant="outline"

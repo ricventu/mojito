@@ -24,7 +24,7 @@ app's state, left in place.
 
 - `packages/shared` — types (`SessionMeta`, `TaskRecord`, `TicketSummary`, `BoardTickets`,
   `Settings`, `ProjectRow`, `Favorite`), zod request bodies (`LaunchBody`, `ProjectBody`, `SettingsBody`,
-  `PromptsBody`, `FavoritesBody`, `StatusBody`, `CommandsSettingBody`), `MojitoEvent`, `MODELS`/`EFFORTS`, `DEFAULT_PROMPTS`,
+  `PromptsBody`, `FavoritesBody`, `StatusBody`, `PriorityBody`, `CommandsSettingBody`), `PRIORITIES`/`isPriority`, `MojitoEvent`, `MODELS`/`EFFORTS`, `DEFAULT_PROMPTS`,
   `SESSION_GONE_CODE` (4404), the git graph types (`GitGraphPage`, `GraphCommit`, `GraphRef`,
   `GraphHighlight`, `CommitDetails`, `CommitFile`, `CommitDiff`) and `isValidHash`/`isValidTicket`,
   `CommandResult`/`WorktreeCount`, the commands types (`Command`, `CommandsSetting`, `COMMAND_ICONS`,
@@ -48,6 +48,9 @@ app's state, left in place.
   dropped by 005 with the sidebar's Hide; `end_reason`, 006; `claude_session_id`, 007), `sdk_tasks`. Tickets are never
   stored: `tickets/cache.ts` polls Linear every 45 s, scoped to the mapped project names,
   coalesces concurrent refreshes, keeps the last list (`stale`) when Linear fails.
+  Each ticket carries Linear's `priority` (RIC-610: 0 none, 1 urgent … 4 low; anything else is
+  stored as 0; optional in `TicketSummary`, an older peer sends none); `POST
+  /api/tickets/:id/priority` (`PriorityBody`, 0-4) writes it, mirroring `/status`.
   Projects are edited in Settings.
 - **Launch** (`sessions/launch.ts`): validate (ticket in cache, project mapped, path absolute
   and existing — a project path may be `~`/`~/…`, stored as typed and expanded to HOME by
@@ -341,6 +344,10 @@ app's state, left in place.
   otherwise — emerald, sky, amber and red mean a session's state. A label stays an outline pill
   with a dot in its Linear colour (RIC-608: `TicketSummary.labelColors`, optional for older
   peers, `#rrggbb` only — checked on the server and again by `lib/labels.ts`, it reaches a style).
+  Priority (RIC-610, `lib/priority.ts`, `PRIORITIES` in shared, `PriorityIcon`): within each status,
+  and in Backlog, tickets go Urgent → High → Medium → Low → No priority, then by number — always,
+  no sort switch. The card shows a neutral mark before the id (none for No priority); the ticket
+  sheet's priority pill beside the status sets it on Linear (optimistic, rolled back on refusal).
 - Project header: Pull / Push icons (`GitButtons`, `lib/gitSync.ts`) — a toast, or on a conflict
   the git session's terminal (pushed, from the board). Then Clean, the default command, as its
   own button (`CommandButton`, `lib/commands.ts`: `boardClean`) when it is offered to the
@@ -376,7 +383,9 @@ app's state, left in place.
   `prose` from `@tailwindcss/typography`; links by `classifyHref` — http(s) a new tab, mailto plain,
   a relative `.md` the viewer (resolved against the document's directory, climbing above a relative
   root is inert), anything else inert text; images show their alt text only (no fetch).
-- **Board filters** (RIC-502): project (multi), status, label (multi, `label=`, RIC-609: any of
+- **Board filters** (RIC-502): project (multi), status, priority (multi, `priority=` with
+  `urgent|high|medium|low|none`, RIC-610: canonical order Urgent → No priority; `none` also takes a
+  ticket with no priority sent), label (multi, `label=`, RIC-609: any of
   them, by exact name; the sheet offers the loaded tickets' labels plus a selected one gone since,
   `sheetLabels`), active sessions (`live=1`, RIC-549: a
   ticket with a live session, a live loose session), text — the url is the only state
@@ -387,10 +396,10 @@ app's state, left in place.
   locale (favourites compare as strings across devices), and so do its labels; display order (sections, sidebar,
   sheet) is `byProjectName`, `localeCompare(b, "en")`. The search field keeps a local draft: react-router 8 applies
   navigations asynchronously in a transition, so a url-controlled input loses caret and
-  keystrokes. `filterBoard` runs after `groupBoard`: a project filter drops General, a status
-  or label filter drops loose sessions (they have neither); a status filter drops statuses outside `FILTER_STATUSES` (workflow order, Backlog →
+  keystrokes. `filterBoard` runs after `groupBoard`: a project filter drops General, a status,
+  priority or label filter drops loose sessions (they have neither); a status filter drops statuses outside `FILTER_STATUSES` (workflow order, Backlog →
   In Review, the sheet's and the url's; a favourite saved in another order still matches, being
-  re-canonicalised); Backlog opens (`backlogOpen`) when selected or a label, `q` or `live` is set, so a
+  re-canonicalised); Backlog opens (`backlogOpen`) when selected or a priority, label, `q` or `live` is set, so a
   filter never hides a match in a closed group. `lib/boardReturn.ts` keeps the last board search in `sessionStorage` (per tab) for the
   terminal's Board link, best effort.
 - **Favourites** (`lib/favorites.ts`, `hooks/useFavorites.ts`): chips under the search row

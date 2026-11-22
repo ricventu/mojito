@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Star, X } from "lucide-react";
 import { toast } from "sonner";
+import { PRIORITIES } from "@mojito/shared";
+import { PriorityIcon } from "@/components/PriorityIcon";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -41,15 +43,18 @@ const toggle = (list: string[], value: string) =>
 
 interface ChipProps {
   label: string;
+  /** A mark before the name (a priority's icon). */
+  icon?: React.ReactNode;
   on: boolean;
   onToggle: () => void;
   /** A label's Linear colour, a dot before the name (`labelColor` checked it). */
   color?: string | null;
 }
 
-function FilterChip({ label, on, onToggle, color }: ChipProps) {
+function FilterChip({ label, icon, on, onToggle, color }: ChipProps) {
   return (
     <Button type="button" size="sm" variant={on ? "default" : "outline"} aria-pressed={on} onClick={onToggle}>
+      {icon}
       {color && (
         <span
           aria-hidden
@@ -168,7 +173,7 @@ function FavoriteActions({ filters }: { filters: BoardFilters }) {
   );
 }
 
-/** Projects, statuses, labels and active sessions of the board, applied live: there is no Apply button. */
+/** Projects, statuses, priorities, labels and active sessions of the board, applied live: there is no Apply button. */
 export function FilterSheet({ open, onOpenChange, filters, setFilters }: Props) {
   const projects = useProjects();
   const tickets = useTickets();
@@ -196,7 +201,7 @@ export function FilterSheet({ open, onOpenChange, filters, setFilters }: Props) 
               <X size={16} />
             </Button>
           </SheetClose>
-          <SheetDescription className="sr-only">Pick projects, statuses, labels and sessions to show on the board.</SheetDescription>
+          <SheetDescription className="sr-only">Pick projects, statuses, priorities, labels and sessions to show on the board.</SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-5 px-4">
           <fieldset className="flex flex-col gap-1">
@@ -221,6 +226,20 @@ export function FilterSheet({ open, onOpenChange, filters, setFilters }: Props) 
                   label={status}
                   on={filters.statuses.includes(status)}
                   onToggle={() => setFilters({ ...filters, statuses: toggle(filters.statuses, status) })}
+                />
+              ))}
+            </div>
+          </fieldset>
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 text-sm font-medium">Priority</legend>
+            <div className="flex flex-wrap gap-2">
+              {PRIORITIES.map((p) => (
+                <FilterChip
+                  key={p.key}
+                  label={p.name}
+                  icon={<PriorityIcon priority={p.value} className={filters.priorities.includes(p.key) ? "text-current" : undefined} />}
+                  on={filters.priorities.includes(p.key)}
+                  onToggle={() => setFilters({ ...filters, priorities: toggle(filters.priorities, p.key) })}
                 />
               ))}
             </div>
