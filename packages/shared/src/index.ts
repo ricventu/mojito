@@ -10,3 +10,4 @@ export * from "./docs";
 export * from "./images";
 export * from "./fs";
 export * from "./eventStream";
+export * from "./priority";

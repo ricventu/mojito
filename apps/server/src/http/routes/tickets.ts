@@ -1,4 +1,4 @@
-import { LaunchTicketBody, StatusBody } from "@mojito/shared";
+import { LaunchTicketBody, PriorityBody, StatusBody } from "@mojito/shared";
 import { Hono } from "hono";
 import type { AppDeps } from "../app";
 import { errorMessage, parseBody } from "../body";
@@ -25,6 +25,19 @@ export function ticketRoutes(deps: AppDeps): Hono {
       if (!body.ok) return c.json({ error: body.error }, 400);
       try {
         await deps.linear.setStatus(id, body.data.status);
+      } catch (err) {
+        return c.json({ error: errorMessage(err) }, 502);
+      }
+      await deps.tickets.refresh();
+      return c.json({ ok: true });
+    })
+    .post("/tickets/:id/priority", async (c) => {
+      const id = c.req.param("id");
+      if (!validTicket(id)) return c.json({ error: `invalid ticket id: ${id}` }, 400);
+      const body = await parseBody(c, PriorityBody);
+      if (!body.ok) return c.json({ error: body.error }, 400);
+      try {
+        await deps.linear.setPriority(id, body.data.priority);
       } catch (err) {
         return c.json({ error: errorMessage(err) }, 502);
       }

@@ -23,6 +23,7 @@ describe("LinearClient.listOpenIssues", () => {
     project: { name: "Web" },
     labels: { nodes: [{ name: "bug", color: "#EB5757" }, { name: "odd", color: "red; x" }] },
     assignee: { isMe: true },
+    priority: 2,
   };
 
   it("scopes by project through a variable and maps nodes onto TicketSummary", async () => {
@@ -44,8 +45,29 @@ describe("LinearClient.listOpenIssues", () => {
         // Only a #rrggbb colour is kept: it ends up in a style attribute.
         labelColors: { bug: "#eb5757" },
         assignedToMe: true,
+        priority: 2,
       },
     ]);
+    expect(calls[0].body.query).toContain("priority");
+  });
+
+  it("keeps a priority only when it is Linear's 0-4 integer", async () => {
+    const { fetchImpl } = seq([
+      {
+        issues: {
+          nodes: [
+            { identifier: "A-1", priority: 1 },
+            { identifier: "A-2", priority: 4 },
+            { identifier: "A-3", priority: 7 },
+            { identifier: "A-4", priority: 1.5 },
+            { identifier: "A-5", priority: null },
+            { identifier: "A-6", priority: "1" },
+          ],
+        },
+      },
+    ]);
+    const items = await new LinearClient("key", fetchImpl).listOpenIssues([]);
+    expect(items.map((i) => i.priority)).toEqual([1, 4, 0, 0, 0, 0]);
   });
 
   it("declares no variables and does not filter by project for an empty list", async () => {
@@ -81,6 +103,7 @@ describe("LinearClient.listOpenIssues", () => {
       labels: [],
       labelColors: {},
       assignedToMe: false,
+      priority: 0,
     });
   });
 });
@@ -170,6 +193,19 @@ describe("LinearClient.setStatus", () => {
     const client = new LinearClient("k", fetchImpl);
     await expect(client.setStatus("RIC-9", "Todo")).rejects.toThrow("issue not found: RIC-9");
     await expect(client.setStatus("nope", "Todo")).rejects.toThrow("invalid ticket id: nope");
+  });
+});
+
+describe("LinearClient.setPriority", () => {
+  it("writes Linear's priority value on the issue", async () => {
+    const { fetchImpl, calls } = seq([
+      { issues: { nodes: [{ id: "I1", team: { id: "T1" } }] } },
+      { issueUpdate: { success: true } },
+    ]);
+    await new LinearClient("k", fetchImpl).setPriority("RIC-9", 1);
+    expect(calls[0].body.variables).toEqual({ key: "RIC", n: 9 });
+    expect(calls[1].body.query).toContain("priority: $priority");
+    expect(calls[1].body.variables).toEqual({ id: "I1", priority: 1 });
   });
 });
 

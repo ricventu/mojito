@@ -84,3 +84,39 @@ describe("POST /api/tickets/:id/status", () => {
     expect(linear.setStatus).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /api/tickets/:id/priority", () => {
+  it("writes the priority and refreshes the board", async () => {
+    const { req, linear, refresh } = setup();
+    const res = await req("/api/tickets/RIC-1/priority", { method: "POST", json: { priority: 3 } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(linear.setPriority).toHaveBeenCalledWith("RIC-1", 3);
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("refuses a value outside Linear's 0-4", async () => {
+    const { req, linear } = setup();
+    for (const priority of [5, -1, 1.5, "high", null]) {
+      const res = await req("/api/tickets/RIC-1/priority", { method: "POST", json: { priority } });
+      expect(res.status).toBe(400);
+    }
+    expect(linear.setPriority).not.toHaveBeenCalled();
+  });
+
+  it("refuses an invalid ticket id before reaching Linear", async () => {
+    const { req, linear } = setup();
+    const res = await req("/api/tickets/ric-1/priority", { method: "POST", json: { priority: 1 } });
+    expect(res.status).toBe(400);
+    expect(linear.setPriority).not.toHaveBeenCalled();
+  });
+
+  it("answers 502 with Linear's message on failure", async () => {
+    const { req, linear, refresh } = setup();
+    linear.setPriority.mockRejectedValue(new Error("Linear API error: 503"));
+    const res = await req("/api/tickets/RIC-1/priority", { method: "POST", json: { priority: 1 } });
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: "Linear API error: 503" });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+});

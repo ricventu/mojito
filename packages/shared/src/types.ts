@@ -45,6 +45,11 @@ export interface TicketSummary {
    */
   labelColors?: Record<string, string>;
   assignedToMe: boolean;
+  /**
+   * Linear's priority: 0 none, 1 urgent … 4 low (RIC-610). Optional: an older peer's tickets have
+   * none, read as 0 through the web's `ticketPriority`.
+   */
+  priority?: number;
 }
 
 export interface BoardTickets {

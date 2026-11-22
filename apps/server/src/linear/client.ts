@@ -1,4 +1,4 @@
-import type { TicketSummary } from "@mojito/shared";
+import { isPriority, type TicketSummary } from "@mojito/shared";
 
 const ENDPOINT = "https://api.linear.app/graphql";
 
@@ -18,6 +18,7 @@ interface IssueNode {
   project?: { name?: string } | null;
   labels?: { nodes?: { name: string; color?: string }[] };
   assignee?: { isMe?: boolean } | null;
+  priority?: unknown;
 }
 
 function parseIdentifier(ticket: string): { teamKey: string; number: number } {
@@ -44,6 +45,8 @@ function mapIssueNode(node: IssueNode): TicketSummary {
       labels.flatMap((l) => (l.color && HEX_COLOR_RE.test(l.color) ? [[l.name, l.color.toLowerCase()]] : [])),
     ),
     assignedToMe: node.assignee?.isMe ?? false,
+    // Linear's 0-4; anything else (it is sorted and compared on) reads as no priority.
+    priority: isPriority(node.priority) ? node.priority : 0,
   };
 }
 
@@ -99,7 +102,7 @@ export class LinearClient {
         issues(filter: { ${filter} }, first: 100) {
           nodes {
             identifier title url state { name type } project { name }
-            labels { nodes { name color } } assignee { isMe }
+            labels { nodes { name color } } assignee { isMe } priority
           }
         }
       }`,
@@ -138,6 +141,17 @@ export class LinearClient {
         issueUpdate(id: $id, input: { stateId: $stateId }) { success }
       }`,
       variables: { id: ref.id, stateId: target.id },
+    });
+  }
+
+  /** Sets Linear's priority (0 none, 1 urgent … 4 low). */
+  async setPriority(identifier: string, priority: number): Promise<void> {
+    const ref = await this.issueRef(identifier);
+    await this.query<{ issueUpdate: { success: boolean } }>({
+      query: `mutation ($id: String!, $priority: Int!) {
+        issueUpdate(id: $id, input: { priority: $priority }) { success }
+      }`,
+      variables: { id: ref.id, priority },
     });
   }
 

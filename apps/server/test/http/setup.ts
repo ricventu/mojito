@@ -57,6 +57,7 @@ export function setup(over: Partial<AppDeps> = {}) {
     listOpenIssues: vi.fn(async () => []),
     listTeamStates: vi.fn(async (_team: string) => ["Backlog", "Todo", "In Progress"]),
     setStatus: vi.fn(async (_id: string, _status: string) => {}),
+    setPriority: vi.fn(async (_id: string, _priority: number) => {}),
     assignToMe: vi.fn(async (_id: string) => {}),
     uploadImage: vi.fn(async (_file: { filename: string; contentType: string; size: number; bytes: Uint8Array }) => "https://uploads.linear.app/x"),
   };

@@ -38,7 +38,7 @@ export interface AppDeps {
   sessions: SessionsRepo;
   tasks: TasksRepo;
   bus: EventBus;
-  linear: Pick<LinearClient, "listTeamStates" | "setStatus" | "uploadImage">;
+  linear: Pick<LinearClient, "listTeamStates" | "setStatus" | "setPriority" | "uploadImage">;
   tickets: TicketCache;
   launch: LaunchDeps;
   taskQueue: Pick<TaskQueue, "enqueue" | "retry">;
