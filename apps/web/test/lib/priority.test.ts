@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TicketSummary } from "@mojito/shared";
-import { priorityInfo, priorityRank, ticketPriority } from "@/lib/priority";
+import { priorityInfo, priorityRank, settledPick, ticketPriority } from "@/lib/priority";
 
 const t = (priority?: unknown) =>
   ({ identifier: "RIC-1", ...(priority === undefined ? {} : { priority }) }) as unknown as TicketSummary;
@@ -21,5 +21,14 @@ describe("priorityInfo", () => {
   it("names each value and its url key", () => {
     expect(priorityInfo(1)).toEqual({ value: 1, key: "urgent", name: "Urgent" });
     expect(priorityInfo(0)).toEqual({ value: 0, key: "none", name: "No priority" });
+  });
+});
+
+describe("settledPick", () => {
+  it("keeps a priority picked in the sheet until the ticket agrees, then lets the ticket speak", () => {
+    expect(settledPick(2, 0, true)).toBe(2); // write in flight
+    expect(settledPick(2, 0, false)).toBe(2); // refetch not in yet
+    expect(settledPick(2, 2, false)).toBeNull(); // caught up: a later change elsewhere shows
+    expect(settledPick(null, 3, false)).toBeNull();
   });
 });

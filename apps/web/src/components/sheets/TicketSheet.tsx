@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, FileText, GitGraph, Play, RotateCcw, SquareTerminal } from "lucide-react";
 import { Link, useNavigate } from "react-router";
@@ -25,7 +25,7 @@ import { gitHref } from "@/lib/git/url";
 import { sessionHref } from "@/lib/host";
 import { launchErrorAction, launchOptions, withLaunched, type LaunchPicks } from "@/lib/launch";
 import { launchHosts, peerSessionForTicket, withPeerSession } from "@/lib/peers";
-import { priorityInfo, ticketPriority } from "@/lib/priority";
+import { priorityInfo, settledPick, ticketPriority } from "@/lib/priority";
 import { qk } from "@/lib/queryKeys";
 import { safeHref } from "@/lib/url";
 import { cn } from "@/lib/utils";
@@ -358,6 +358,11 @@ export function TicketSheet({ ticket, onClose }: Props) {
   const [pickedPriority, setPickedPriority] = useState<number | null>(null);
   const priority = pickedPriority ?? ticketPriority(ticket);
   const prioritize = useSetPriority(ticket, setPickedPriority);
+  const actualPriority = ticketPriority(ticket);
+  // Once Linear agrees, the ticket speaks again: a change from another device must show here.
+  useEffect(() => {
+    setPickedPriority((picked) => settledPick(picked, actualPriority, prioritize.isPending));
+  }, [actualPriority, prioritize.isPending]);
 
   return (
     <Sheet open onOpenChange={(open) => !open && onClose()}>
