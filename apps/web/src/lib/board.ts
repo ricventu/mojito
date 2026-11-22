@@ -1,5 +1,6 @@
 import type { BoardTickets, ProjectRow, SessionMeta, TaskRecord, TicketSummary } from "@mojito/shared";
 import type { BoardFilters } from "@/lib/filters";
+import { priorityInfo, priorityRank, ticketPriority } from "@/lib/priority";
 
 /** Board order of the active statuses; any other non-Backlog status sorts after the last of these. */
 export const STATUS_ORDER = ["In Review", "In Progress", "Todo"];
@@ -44,8 +45,13 @@ function byIdentifier(a: TicketSummary, b: TicketSummary): number {
   return prefixA.localeCompare(prefixB) || ticketNumber(a.identifier) - ticketNumber(b.identifier);
 }
 
-function byStatusThenIdentifier(a: TicketSummary, b: TicketSummary): number {
-  return statusRank(a.statusName) - statusRank(b.statusName) || byIdentifier(a, b);
+/** Urgent → Low, then No priority (RIC-610), then by number. */
+function byPriorityThenIdentifier(a: TicketSummary, b: TicketSummary): number {
+  return priorityRank(ticketPriority(a)) - priorityRank(ticketPriority(b)) || byIdentifier(a, b);
+}
+
+function byStatusThenPriority(a: TicketSummary, b: TicketSummary): number {
+  return statusRank(a.statusName) - statusRank(b.statusName) || byPriorityThenIdentifier(a, b);
 }
 
 /**
@@ -72,8 +78,8 @@ export function groupBoard(
     const own = project === null ? [] : tickets.filter((t) => t.project === project);
     return {
       project,
-      active: own.filter((t) => t.statusName !== "Backlog").sort(byStatusThenIdentifier),
-      backlog: own.filter((t) => t.statusName === "Backlog").sort(byIdentifier),
+      active: own.filter((t) => t.statusName !== "Backlog").sort(byStatusThenPriority),
+      backlog: own.filter((t) => t.statusName === "Backlog").sort(byPriorityThenIdentifier),
       backlogOpen: false,
       loose: looseSessions.filter((s) => (s.project !== null && known.has(s.project) ? s.project : null) === project),
     };
@@ -88,7 +94,9 @@ export function groupBoard(
  * The board narrowed by the url filters, after `groupBoard`. A project filter keeps those
  * sections (General never matches one). A status filter keeps those active tickets (any status
  * outside `FILTER_STATUSES` is hidden with it), shows Backlog only if selected, and hides
- * loose sessions, which have no status. A label filter keeps the tickets carrying any of those
+ * loose sessions, which have no status. A priority filter keeps the tickets with any of those
+ * priorities (`none` also takes a ticket with no priority sent), opens Backlog and hides loose
+ * sessions, like a label filter. A label filter keeps the tickets carrying any of those
  * labels (by exact name), opens Backlog, and hides loose sessions, which have no labels. `live`
  * keeps the tickets with a live session among `sessions` and the live loose sessions. `q` matches
  * ticket identifier, title and labels, and loose sessions by ticket, id or kind. A section left
@@ -100,16 +108,18 @@ export function filterBoard(sections: BoardSection[], f: BoardFilters, sessions:
   const q = f.q.trim().toLowerCase();
   const hasStatus = f.statuses.length > 0;
   const hasLabel = f.labels.length > 0;
+  const hasPriority = f.priorities.length > 0;
   const has = (text: string) => text.toLowerCase().includes(q);
   const liveTickets = new Set(sessions.filter((s) => s.state !== "ended").map((s) => s.ticket));
   const ticketMatches = (t: TicketSummary) =>
+    (!hasPriority || f.priorities.includes(priorityInfo(ticketPriority(t)).key)) &&
     (!hasLabel || t.labels.some((l) => f.labels.includes(l))) &&
     (!f.live || liveTickets.has(t.identifier)) &&
     (q === "" || has(t.identifier) || has(t.title) || t.labels.some(has));
   const sessionMatches = (s: SessionMeta) =>
     (!f.live || s.state !== "ended") && (q === "" || has(s.ticket ?? "") || has(s.id) || has(s.kind));
   const backlogShown = !hasStatus || f.statuses.includes("Backlog");
-  const narrowed = hasStatus || hasLabel || f.live || q !== "";
+  const narrowed = hasStatus || hasPriority || hasLabel || f.live || q !== "";
 
   return sections
     .filter((s) => f.projects.length === 0 || (s.project !== null && f.projects.includes(s.project)))
@@ -121,8 +131,8 @@ export function filterBoard(sections: BoardSection[], f: BoardFilters, sessions:
           (t) => (!hasStatus || f.statuses.includes(t.statusName)) && ticketMatches(t),
         ),
         backlog,
-        backlogOpen: backlog.length > 0 && (f.statuses.includes("Backlog") || hasLabel || f.live || q !== ""),
-        loose: hasStatus || hasLabel ? [] : s.loose.filter(sessionMatches),
+        backlogOpen: backlog.length > 0 && (f.statuses.includes("Backlog") || hasPriority || hasLabel || f.live || q !== ""),
+        loose: hasStatus || hasPriority || hasLabel ? [] : s.loose.filter(sessionMatches),
       };
     })
     .filter((s) => !narrowed || s.active.length + s.backlog.length + s.loose.length > 0);

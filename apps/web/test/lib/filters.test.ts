@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  FILTER_PRIORITIES,
   FILTER_STATUSES,
   NO_FILTERS,
   canonicalSearch,
@@ -21,6 +22,7 @@ describe("parseFilters", () => {
     expect(parseFilters(new URLSearchParams("project=b&project=a&status=Todo&q=x"))).toEqual({
       projects: ["a", "b"],
       statuses: ["Todo"],
+      priorities: [],
       labels: [],
       live: false,
       q: "x",
@@ -31,6 +33,7 @@ describe("parseFilters", () => {
     expect(parseFilters(new URLSearchParams("doc=1&status=Done&status=Todo"))).toEqual({
       projects: [],
       statuses: ["Todo"],
+      priorities: [],
       labels: [],
       live: false,
       q: "",
@@ -40,7 +43,7 @@ describe("parseFilters", () => {
   it("drops empty and duplicate projects and orders statuses canonically", () => {
     expect(
       parseFilters(new URLSearchParams("project=&project=a&project=a&status=Backlog&status=In+Review&status=Backlog")),
-    ).toEqual({ projects: ["a"], statuses: ["Backlog", "In Review"], labels: [], live: false, q: "" });
+    ).toEqual({ projects: ["a"], statuses: ["Backlog", "In Review"], priorities: [], labels: [], live: false, q: "" });
   });
 
   it("orders projects by code unit, never by the device's locale", () => {
@@ -67,6 +70,17 @@ describe("parseFilters", () => {
     ]);
   });
 
+  it("parses priorities in Urgent → No priority order, unknown and repeated ones dropped", () => {
+    expect(
+      parseFilters(new URLSearchParams("priority=none&priority=urgent&priority=bogus&priority=urgent&priority=Low")).priorities,
+    ).toEqual(["urgent", "none"]);
+    expect(FILTER_PRIORITIES).toEqual(["urgent", "high", "medium", "low", "none"]);
+  });
+
+  it("reads a search saved before priorities existed", () => {
+    expect(parseFilters(new URLSearchParams("project=a&status=Todo&label=Bug")).priorities).toEqual([]);
+  });
+
   it("reads a search saved before labels existed", () => {
     expect(parseFilters(new URLSearchParams("project=a&status=Todo")).labels).toEqual([]);
   });
@@ -81,7 +95,7 @@ describe("parseFilters", () => {
   });
 
   it("round-trips awkward project names", () => {
-    const f = { projects: ["R&D", "a=b", "c+d", "Città nuova"], statuses: [], labels: [], live: false, q: "" };
+    const f = { projects: ["R&D", "a=b", "c+d", "Città nuova"], statuses: [], priorities: [], labels: [], live: false, q: "" };
     const parsed = parseFilters(new URLSearchParams(filterSearch(f)));
     expect(parsed.projects).toEqual([...f.projects].sort());
     expect(parseFilters(new URLSearchParams(filterSearch(parsed)))).toEqual(parsed);
@@ -90,8 +104,17 @@ describe("parseFilters", () => {
 
 describe("filterSearch", () => {
   it("writes the canonical order", () => {
-    expect(filterSearch({ projects: ["b", "a", "a"], statuses: ["In Review", "Backlog"], labels: ["Bug", "Aa"], live: true, q: "x" })).toBe(
-      "project=a&project=b&status=Backlog&status=In+Review&label=Aa&label=Bug&live=1&q=x",
+    expect(
+      filterSearch({
+        projects: ["b", "a", "a"],
+        statuses: ["In Review", "Backlog"],
+        priorities: ["none", "urgent"],
+        labels: ["Bug", "Aa"],
+        live: true,
+        q: "x",
+      }),
+    ).toBe(
+      "project=a&project=b&status=Backlog&status=In+Review&priority=urgent&priority=none&label=Aa&label=Bug&live=1&q=x",
     );
   });
 
@@ -122,6 +145,7 @@ describe("isFiltered", () => {
     expect(isFiltered({ ...NO_FILTERS, projects: ["a"] })).toBe(true);
     expect(isFiltered({ ...NO_FILTERS, statuses: ["Todo"] })).toBe(true);
     expect(isFiltered({ ...NO_FILTERS, labels: ["Bug"] })).toBe(true);
+    expect(isFiltered({ ...NO_FILTERS, priorities: ["none"] })).toBe(true);
     expect(isFiltered({ ...NO_FILTERS, live: true })).toBe(true);
     expect(isFiltered({ ...NO_FILTERS, q: "x" })).toBe(true);
   });
@@ -129,8 +153,9 @@ describe("isFiltered", () => {
 
 describe("filterCount", () => {
   it("counts projects, statuses and active sessions, not q", () => {
-    expect(filterCount({ projects: ["a", "b"], statuses: ["Todo"], labels: [], live: false, q: "x" })).toBe(3);
-    expect(filterCount({ projects: ["a", "b"], statuses: ["Todo"], labels: ["Bug"], live: true, q: "x" })).toBe(5);
+    expect(filterCount({ projects: ["a", "b"], statuses: ["Todo"], priorities: [], labels: [], live: false, q: "x" })).toBe(3);
+    expect(filterCount({ projects: ["a", "b"], statuses: ["Todo"], priorities: [], labels: ["Bug"], live: true, q: "x" })).toBe(5);
+    expect(filterCount({ ...NO_FILTERS, priorities: ["urgent", "high"] })).toBe(2);
   });
 });
 

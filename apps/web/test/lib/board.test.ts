@@ -66,6 +66,28 @@ describe("groupBoard", () => {
     expect(section.active.map((t) => t.identifier)).toEqual(["RIC-2", "RIC-12", "RIC-4", "RIC-9", "RIC-10", "RIC-3"]);
   });
 
+  it("orders by priority within a status, No priority (or none sent) last, then by number", () => {
+    const p = (id: string, status: string, priority?: number) => ({ ...ticket(id, status), ...(priority === undefined ? {} : { priority }) });
+    const [section] = groupBoard(
+      [project("Alpha")],
+      [
+        p("RIC-10", "Todo", 0),
+        p("RIC-11", "Todo"),
+        p("RIC-12", "Todo", 4),
+        p("RIC-13", "Todo", 1),
+        p("RIC-20", "Todo", 2),
+        p("RIC-9", "Todo", 2),
+        p("RIC-5", "In Progress", 4),
+        p("RIC-1", "Backlog", 0),
+        p("RIC-2", "Backlog", 3),
+        p("RIC-3", "Backlog", 1),
+      ],
+      [],
+    );
+    expect(section.active.map((t) => t.identifier)).toEqual(["RIC-5", "RIC-13", "RIC-9", "RIC-20", "RIC-12", "RIC-10", "RIC-11"]);
+    expect(section.backlog.map((t) => t.identifier)).toEqual(["RIC-3", "RIC-2", "RIC-1"]);
+  });
+
   it("keeps Backlog tickets apart from the active ones", () => {
     const [section] = groupBoard(
       [project("Alpha")],
@@ -345,6 +367,34 @@ describe("filterBoard", () => {
         [session("mj-free-aaaaaa")],
       );
       const out = filterBoard(sections, filters({ labels: ["Bug"] }), []);
+      expect(out.map((s) => s.project)).toEqual(["Alpha"]);
+      expect(ids(out[0].backlog)).toEqual(["RIC-1"]);
+      expect(out[0].backlogOpen).toBe(true);
+      expect(out[0].loose).toEqual([]);
+    });
+  });
+
+  describe("priorities", () => {
+    const prio = (id: string, status: string, priority?: number) => ({ ...ticket(id, status), ...(priority === undefined ? {} : { priority }) });
+
+    it("keeps tickets with any selected priority; none matches a ticket with no priority sent", () => {
+      const sections = groupBoard(
+        [project("Alpha")],
+        [prio("RIC-1", "Todo", 2), prio("RIC-2", "Todo", 1), prio("RIC-3", "Todo", 0), prio("RIC-4", "Todo")],
+        [],
+      );
+      expect(ids(filterBoard(sections, filters({ priorities: ["high"] }), [])[0].active)).toEqual(["RIC-1"]);
+      expect(ids(filterBoard(sections, filters({ priorities: ["urgent", "high"] }), [])[0].active)).toEqual(["RIC-2", "RIC-1"]);
+      expect(ids(filterBoard(sections, filters({ priorities: ["none"] }), [])[0].active)).toEqual(["RIC-3", "RIC-4"]);
+    });
+
+    it("hides loose sessions, opens Backlog and drops a section left empty", () => {
+      const sections = groupBoard(
+        [project("Alpha"), project("Beta")],
+        [prio("RIC-1", "Backlog", 1), ticket("RIC-2", "Todo", "Beta")],
+        [session("mj-free-aaaaaa")],
+      );
+      const out = filterBoard(sections, filters({ priorities: ["urgent"] }), []);
       expect(out.map((s) => s.project)).toEqual(["Alpha"]);
       expect(ids(out[0].backlog)).toEqual(["RIC-1"]);
       expect(out[0].backlogOpen).toBe(true);

@@ -182,6 +182,17 @@ describe("favoriteName", () => {
     expect(favoriteName(f({ labels: ["b", "a"] }))).toBe("a · b");
   });
 
+  it("puts priorities after statuses, before labels, by name", () => {
+    expect(favoriteName(f({ projects: ["Mojito"], statuses: ["Todo"], priorities: ["urgent"], labels: ["Bug"] }))).toBe(
+      "Mojito · Todo · Urgent · Bug",
+    );
+    expect(favoriteName(f({ priorities: ["none", "high"] }))).toBe("High · No priority");
+  });
+
+  it("counts more than two priorities instead of listing them", () => {
+    expect(favoriteName(f({ priorities: ["urgent", "high", "low"] }))).toBe("3 priorities");
+  });
+
   it("counts more than two labels instead of listing them", () => {
     expect(favoriteName(f({ labels: ["a", "b", "c"] }))).toBe("3 labels");
   });

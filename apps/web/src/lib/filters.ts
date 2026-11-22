@@ -1,15 +1,22 @@
 // The board's filters live in the url and nowhere else. A project or label name is free text, so
 // `project`, `status` and `label` repeat, one parameter per value; no separator is safe to join on.
-// `live=1` narrows to what has a live session.
+// `live=1` narrows to what has a live session. `priority` repeats too, with Linear's priorities as
+// fixed words (`urgent` … `none`).
 
+import { PRIORITIES } from "@mojito/shared";
 import { byProjectName } from "@/lib/board";
 
 /** The workflow's sequence: the sheet's order and the url's canonical one. */
 export const FILTER_STATUSES = ["Backlog", "Todo", "In Progress", "In Review"] as const;
 
+/** The url's priority words in board order, Urgent → No priority: the sheet's and the url's. */
+export const FILTER_PRIORITIES: readonly string[] = PRIORITIES.map((p) => p.key);
+
 export interface BoardFilters {
   projects: string[];
   statuses: string[];
+  /** `FILTER_PRIORITIES` words; a ticket with any of them matches (RIC-610). */
+  priorities: string[];
   /** Linear label names; a ticket carrying any of them matches (RIC-609). */
   labels: string[];
   /** Only what has a live (not ended) session: the sheet's "Active" under Sessions. */
@@ -17,7 +24,7 @@ export interface BoardFilters {
   q: string;
 }
 
-export const NO_FILTERS: BoardFilters = { projects: [], statuses: [], labels: [], live: false, q: "" };
+export const NO_FILTERS: BoardFilters = { projects: [], statuses: [], priorities: [], labels: [], live: false, q: "" };
 
 // Plain `sort()` (UTF-16 code units), not `localeCompare`: favourites are compared as strings
 // across devices, so the canonical form must not depend on the device's locale or ICU.
@@ -29,11 +36,16 @@ function normStatuses(values: string[]): string[] {
   return FILTER_STATUSES.filter((s) => values.includes(s));
 }
 
+function normPriorities(values: string[]): string[] {
+  return FILTER_PRIORITIES.filter((p) => values.includes(p));
+}
+
 /** Canonical filters from a url. `q` is kept as typed so the live url keeps a space being typed. */
 export function parseFilters(params: URLSearchParams): BoardFilters {
   return {
     projects: normNames(params.getAll("project")),
     statuses: normStatuses(params.getAll("status")),
+    priorities: normPriorities(params.getAll("priority")),
     labels: normNames(params.getAll("label")),
     live: params.get("live") === "1",
     q: params.get("q") ?? "",
@@ -45,6 +57,7 @@ export function filterSearch(f: BoardFilters): string {
   const params = new URLSearchParams();
   for (const p of normNames(f.projects)) params.append("project", p);
   for (const s of normStatuses(f.statuses)) params.append("status", s);
+  for (const p of normPriorities(f.priorities)) params.append("priority", p);
   for (const l of normNames(f.labels)) params.append("label", l);
   if (f.live) params.set("live", "1");
   if (f.q.trim() !== "") params.set("q", f.q);
@@ -57,12 +70,19 @@ export function canonicalSearch(f: BoardFilters): string {
 }
 
 export function isFiltered(f: BoardFilters): boolean {
-  return f.projects.length > 0 || f.statuses.length > 0 || f.labels.length > 0 || f.live || f.q.trim() !== "";
+  return (
+    f.projects.length > 0 ||
+    f.statuses.length > 0 ||
+    f.priorities.length > 0 ||
+    f.labels.length > 0 ||
+    f.live ||
+    f.q.trim() !== ""
+  );
 }
 
 /** What the filter button's badge counts: chips, not the search text. */
 export function filterCount(f: BoardFilters): number {
-  return f.projects.length + f.statuses.length + f.labels.length + (f.live ? 1 : 0);
+  return f.projects.length + f.statuses.length + f.priorities.length + f.labels.length + (f.live ? 1 : 0);
 }
 
 /** Projects to offer in the sheet: the configured ones plus any selected one no longer configured. */

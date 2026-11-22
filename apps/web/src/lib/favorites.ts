@@ -1,4 +1,5 @@
 import type { Favorite } from "@mojito/shared";
+import { PRIORITIES } from "@mojito/shared";
 import { canonicalSearch, parseFilters, type BoardFilters } from "@/lib/filters";
 
 const sameName = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
@@ -14,13 +15,15 @@ function clip(text: string, max: number): string {
 /**
  * The name a favourite gets unless the human types one: its filters in the url's canonical
  * order (so every device derives the same name from the same search), joined by " · ".
- * More than two projects, or labels, are counted, not listed. "" for the bare board.
+ * More than two projects, priorities or labels are counted, not listed. "" for the bare board.
  */
 export function favoriteName(f: BoardFilters): string {
-  const { projects, statuses, labels, live, q } = parseFilters(new URLSearchParams(canonicalSearch(f)));
+  const { projects, statuses, priorities, labels, live, q } = parseFilters(new URLSearchParams(canonicalSearch(f)));
+  const priorityNames = priorities.map((key) => PRIORITIES.find((p) => p.key === key)?.name ?? key);
   const parts = [
     ...(projects.length > 2 ? [`${projects.length} projects`] : projects),
     ...statuses,
+    ...(priorities.length > 2 ? [`${priorities.length} priorities`] : priorityNames),
     ...(labels.length > 2 ? [`${labels.length} labels`] : labels),
     ...(live ? ["Active"] : []),
     ...(q !== "" ? [`"${q}"`] : []),
