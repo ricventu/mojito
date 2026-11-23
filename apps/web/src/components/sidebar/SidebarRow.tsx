@@ -26,6 +26,14 @@ const ROW_LINK =
   "flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left outline-none hover:bg-accent/60 focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 /**
+ * The open session: a filled row and a bar on its left edge, in the foreground colour. The fill
+ * alone was barely apart from the others (RIC-611), and a hover gave any row the same look; the
+ * bar is neutral because a colour in the sidebar means a session's state.
+ */
+const CURRENT_ROW =
+  "bg-accent text-accent-foreground before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-foreground";
+
+/**
  * One live session: its state dot and label are a link to its terminal (so Cmd/middle-click
  * and a long-press work as on any link). A peer's session is the same row: its terminal opens
  * in this client, through the relay.
@@ -38,7 +46,13 @@ export function SidebarRow({ session, to, label, current, replace, onPick }: Pro
       <span aria-hidden className={cn("size-2 shrink-0 rounded-full", dot.className)} />
       <span className="sr-only">{dot.label}:</span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className={cn("truncate text-sm font-medium", session.kind === "ticket" && session.ticket && "font-mono")}>
+        <span
+          className={cn(
+            "truncate text-sm",
+            current ? "font-semibold" : "font-medium",
+            session.kind === "ticket" && session.ticket && "font-mono",
+          )}
+        >
           {primary}
         </span>
         {secondary && <span className="truncate text-xs text-muted-foreground">{secondary}</span>}
@@ -47,7 +61,7 @@ export function SidebarRow({ session, to, label, current, replace, onPick }: Pro
   );
 
   return (
-    <li className={cn("flex flex-col rounded-md", current && "bg-accent text-accent-foreground")}>
+    <li className={cn("relative flex flex-col rounded-md", current && CURRENT_ROW)}>
       <Link
         to={to}
         replace={replace}
