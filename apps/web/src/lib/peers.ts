@@ -42,16 +42,23 @@ export function freeLaunchProjects(selfProjects: string[], peers: PeerSnapshot[]
   return [...new Set([...selfProjects, ...online])].sort(byProjectName);
 }
 
+/** A host in the new-session sheet's "Run on": `unavailable` says why it cannot run the pick, null when it can. */
+export interface FreeLaunchHost extends LaunchHost {
+  unavailable: string | null;
+}
+
 /**
- * Where a free session can run: the hosts that map its project, this instance first when it
- * does. General (`null`) needs no checkout — it starts in the home directory — so it runs on
- * this instance and every online peer.
+ * Every host a free session could run on, this instance first, then each peer (RIC-620): one
+ * that cannot run the picked project stays listed with the reason — offline, or no checkout of
+ * it — so the choice is always visible and never a surprise. General (`null`) needs no checkout
+ * (it starts in the home directory), so every online host can run it.
  */
-export function freeLaunchHosts(project: string | null, self: string, selfProjects: string[], peers: PeerSnapshot[]): LaunchHost[] {
-  const maps = (projects: string[]) => project === null || projects.includes(project);
-  const here = maps(selfProjects) ? [{ name: self, peer: null }] : [];
-  const others = peers.filter((p) => p.online && maps(p.projects));
-  return [...here, ...others.map((p) => ({ name: p.name, peer: p }))];
+export function freeLaunchHosts(project: string | null, self: string, selfProjects: string[], peers: PeerSnapshot[]): FreeLaunchHost[] {
+  const missing = (projects: string[]) => (project === null || projects.includes(project) ? null : `no ${project} here`);
+  return [
+    { name: self, peer: null, unavailable: missing(selfProjects) },
+    ...peers.map((p) => ({ name: p.name, peer: p, unavailable: p.online ? missing(p.projects) : "offline" })),
+  ];
 }
 
 /** Whether a session on another instance is asking for input. */

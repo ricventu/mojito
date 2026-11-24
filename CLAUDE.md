@@ -464,8 +464,10 @@ app's state, left in place.
   a refetch, the sheet left open to show that session. The new-session sheet still opens the
   terminal (it has no page of its own to stay on). The new-session sheet has
   the same "Run on" (`freeLaunchHosts`): its Project list is this instance's projects and every
-  online peer's (`freeLaunchProjects`), the hosts are those mapping the picked one (General: all
-  online), and it shows with a choice or when the only host is a peer. A
+  online peer's (`freeLaunchProjects`), the hosts that can run it are those mapping the pick (General: all
+  online), and with peers it always shows (RIC-620), every host listed — one that cannot run the
+  pick disabled with why (`· offline`, `· no <project> here`), the pick falling back to the first
+  that can. A
   ticket already running on a peer (`peerSessionForTicket`) shows "Session on <peer>" and an
   in-app Open link instead of the Launch form: the board is local, and a Launch would start a
   second agent on the same ticket. The board's card shows that session too (RIC-617,

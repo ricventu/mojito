@@ -70,19 +70,40 @@ describe("freeLaunchProjects", () => {
 
 describe("freeLaunchHosts", () => {
   const peers = [peer("mac", ["Web"]), peer("air", ["Web"], { online: false }), peer("mini", ["Ios"])];
+  const names = (hosts: ReturnType<typeof freeLaunchHosts>) => hosts.map((h) => [h.name, h.unavailable]);
 
-  it("is this instance first when it maps the project, then the online peers that map it", () => {
-    expect(freeLaunchHosts("Web", "box", ["Web"], peers).map((h) => h.name)).toEqual(["box", "mac"]);
+  it("lists every host, this instance first, each peer in its order, saying why one cannot run it", () => {
+    expect(names(freeLaunchHosts("Web", "box", ["Web"], peers))).toEqual([
+      ["box", null],
+      ["mac", null],
+      ["air", "offline"],
+      ["mini", "no Web here"],
+    ]);
   });
 
-  it("leaves this instance out when the project is only on a peer", () => {
+  it("keeps this instance listed, unavailable, when the project is only on a peer", () => {
     const hosts = freeLaunchHosts("Ios", "box", ["Web"], peers);
-    expect(hosts.map((h) => h.name)).toEqual(["mini"]);
-    expect(hosts[0].peer?.name).toBe("mini");
+    expect(names(hosts)).toEqual([
+      ["box", "no Ios here"],
+      ["mac", "no Ios here"],
+      ["air", "offline"],
+      ["mini", null],
+    ]);
+    expect(hosts[3].peer?.name).toBe("mini");
+    expect(hosts[0].peer).toBeNull();
   });
 
   it("General runs anywhere online", () => {
-    expect(freeLaunchHosts(null, "box", [], peers).map((h) => h.name)).toEqual(["box", "mac", "mini"]);
+    expect(names(freeLaunchHosts(null, "box", [], peers))).toEqual([
+      ["box", null],
+      ["mac", null],
+      ["air", "offline"],
+      ["mini", null],
+    ]);
+  });
+
+  it("is this instance alone without peers", () => {
+    expect(names(freeLaunchHosts("Web", "box", ["Web"], []))).toEqual([["box", null]]);
   });
 });
 

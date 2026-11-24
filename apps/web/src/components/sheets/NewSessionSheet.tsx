@@ -42,8 +42,9 @@ function Form({ project: preselected, settings, onClose }: { project?: string; s
   // A project only an offline peer mapped is gone from the list: General takes its place.
   const project = projectPick === GENERAL || choices.includes(projectPick) ? projectPick : GENERAL;
   const hosts = freeLaunchHosts(project === GENERAL ? null : project, peers.data?.self ?? "", selfProjects, peerList);
-  // A host that went offline (or does not map the project just picked) falls back to the first.
-  const host = hosts.find((h) => h.name === hostName) ?? hosts[0];
+  const runnable = hosts.filter((h) => h.unavailable === null);
+  // A host that went offline (or does not map the project just picked) falls back to the first that can run it.
+  const host = runnable.find((h) => h.name === hostName) ?? runnable[0];
 
   const launch = useMutation({
     mutationFn: ({ peer }: { peer: PeerSnapshot | null }) =>
@@ -107,18 +108,19 @@ function Form({ project: preselected, settings, onClose }: { project?: string; s
           </SelectContent>
         </Select>
       </div>
-      {/* Shown when there is a choice, or when the one host is a peer: where it runs is never a surprise. */}
-      {host && (hosts.length > 1 || host.peer) && (
+      {/* Shown whenever there are peers, every host listed (one that cannot run the pick says why): where it runs is never a surprise. */}
+      {hosts.length > 1 && (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="new-session-host">Run on</Label>
-          <Select value={host.name} onValueChange={setHostName}>
+          <Select value={host?.name ?? ""} onValueChange={setHostName}>
             <SelectTrigger id="new-session-host" className="w-full">
-              <SelectValue />
+              <SelectValue placeholder="No host can run it" />
             </SelectTrigger>
             <SelectContent>
               {hosts.map((h) => (
-                <SelectItem key={h.name} value={h.name}>
+                <SelectItem key={h.name} value={h.name} disabled={h.unavailable !== null}>
                   {h.peer ? h.name : `${h.name} (this one)`}
+                  {h.unavailable && <span className="text-muted-foreground"> · {h.unavailable}</span>}
                 </SelectItem>
               ))}
             </SelectContent>
