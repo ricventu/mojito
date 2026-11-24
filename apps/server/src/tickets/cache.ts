@@ -37,6 +37,20 @@ export class TicketCache {
     return this.tickets.find((t) => t.identifier === identifier) ?? null;
   }
 
+  /**
+   * `get`, but a miss reads Linear once more before answering null. The board a launch comes
+   * from may know a ticket this cache does not yet: one just created through another instance
+   * (it refreshes its own cache, this one sees it at the next poll) — RIC-618. The read must
+   * start after the call, so a poll already in flight (it may predate the ticket) is waited out.
+   */
+  async find(identifier: string): Promise<TicketSummary | null> {
+    const cached = this.get(identifier);
+    if (cached) return cached;
+    if (this.inflight) await this.inflight;
+    await this.refresh();
+    return this.get(identifier);
+  }
+
   /** Concurrent callers share the in-flight request; one after it settles starts a new one. */
   refresh(): Promise<void> {
     this.inflight ??= this.run().finally(() => {

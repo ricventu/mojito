@@ -44,7 +44,7 @@ function setup(over: Partial<LaunchDeps> = {}, opts: { stateDir?: string } = {})
   bus.subscribe((e) => events.push(e));
   const cached = [ticket("RIC-1", "Web"), ticket("RIC-2", "Unmapped"), ticket("RIC-3", null)];
   const tickets = {
-    get: vi.fn((id: string) => cached.find((t) => t.identifier === id) ?? null),
+    find: vi.fn(async (id: string) => cached.find((t) => t.identifier === id) ?? null),
     refresh: vi.fn(async () => {}),
   };
   const linear = { setStatus: vi.fn(async () => {}), assignToMe: vi.fn(async () => {}) };

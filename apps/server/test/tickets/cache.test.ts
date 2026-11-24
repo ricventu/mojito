@@ -119,6 +119,55 @@ describe("TicketCache", () => {
     expect(cache.get("RIC-9")).toBeNull();
   });
 
+  it("find() answers a cached ticket without asking Linear", async () => {
+    const { cache, listOpenIssues } = setup(async () => [ticket("RIC-1")]);
+    await cache.refresh();
+    expect((await cache.find("RIC-1"))?.identifier).toBe("RIC-1");
+    expect(listOpenIssues).toHaveBeenCalledTimes(1);
+  });
+
+  // RIC-618: a ticket created through another instance is on that instance's board at once,
+  // but this one only sees it at its next poll; a launch forwarded here must not 404 meanwhile.
+  it("find() reads Linear again for a ticket the cache does not know yet", async () => {
+    let list = [ticket("RIC-1")];
+    const { cache, listOpenIssues } = setup(async () => list);
+    await cache.refresh();
+    list = [ticket("RIC-1"), ticket("RIC-2")];
+    expect((await cache.find("RIC-2"))?.identifier).toBe("RIC-2");
+    expect(listOpenIssues).toHaveBeenCalledTimes(2);
+  });
+
+  it("find() does not settle for a poll that was already in flight: it may predate the ticket", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let calls = 0;
+    const { cache, listOpenIssues } = setup(async () => {
+      calls += 1;
+      if (calls === 1) {
+        await gate;
+        return [ticket("RIC-1")];
+      }
+      return [ticket("RIC-1"), ticket("RIC-2")];
+    });
+    const poll = cache.refresh();
+    const found = cache.find("RIC-2");
+    release();
+    await poll;
+    expect((await found)?.identifier).toBe("RIC-2");
+    expect(listOpenIssues).toHaveBeenCalledTimes(2);
+  });
+
+  it("find() answers null for a ticket Linear does not have either, or when Linear fails", async () => {
+    let fail = false;
+    const { cache } = setup(async () => {
+      if (fail) throw new Error("boom");
+      return [ticket("RIC-1")];
+    });
+    expect(await cache.find("RIC-9")).toBeNull();
+    fail = true;
+    expect(await cache.find("RIC-9")).toBeNull();
+  });
+
   it("start() refreshes immediately then every POLL_MS; stop() ends it", async () => {
     vi.useFakeTimers();
     const { cache, listOpenIssues } = setup(async () => [ticket("RIC-1")]);

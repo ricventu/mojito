@@ -22,7 +22,7 @@ export interface LaunchDeps {
   projects: ProjectsRepo;
   bus: EventBus;
   linear: Pick<LinearClient, "setStatus" | "assignToMe">;
-  tickets: Pick<TicketCache, "get" | "refresh">;
+  tickets: Pick<TicketCache, "find" | "refresh">;
   newSession: typeof newSession;
   hasSession(name: string): Promise<boolean>;
   exists(path: string): boolean;
@@ -122,7 +122,7 @@ export async function launchTicket(body: LaunchTicketBody, deps: LaunchDeps): Pr
   if (!LaunchTicketBody.shape.ticket.safeParse(body.ticket).success) {
     return { ok: false, status: 400, error: `invalid ticket id: ${body.ticket}` };
   }
-  const ticket = deps.tickets.get(body.ticket);
+  const ticket = await deps.tickets.find(body.ticket);
   if (!ticket) return { ok: false, status: 404, error: `ticket not found: ${body.ticket}` };
   if (ticket.project === null) return { ok: false, status: 400, error: `ticket has no project: ${body.ticket}` };
   const project = deps.projects.get(ticket.project);

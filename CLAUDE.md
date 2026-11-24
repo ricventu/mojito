@@ -52,7 +52,9 @@ app's state, left in place.
   stored as 0; optional in `TicketSummary`, an older peer sends none); `POST
   /api/tickets/:id/priority` (`PriorityBody`, 0-4) writes it, mirroring `/status`.
   Projects are edited in Settings.
-- **Launch** (`sessions/launch.ts`): validate (ticket in cache, project mapped, path absolute
+- **Launch** (`sessions/launch.ts`): validate (ticket in cache — `TicketCache.find`: a miss
+  reads Linear once more, a poll already in flight waited out first, since a ticket just created
+  through a peer is on the board before this instance's next poll (RIC-618) — project mapped, path absolute
   and existing — a project path may be `~`/`~/…`, stored as typed and expanded to HOME by
   `homePath.ts` wherever it meets the disk) → in-memory lock per id (double tap = one 201 +
   one 409) → live row check (dead tmux → row ended, proceed; live → 409 with `sessionId`) →
