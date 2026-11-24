@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 interface Props {
   ticket: TicketSummary;
   session: SessionMeta | null;
+  /** Where `session` runs, named once there are peers (`cardSession`); null names nothing. */
+  host?: string | null;
   selected?: boolean;
   /** Off in a kanban column, whose heading already says it. */
   showStatus?: boolean;
@@ -28,7 +30,7 @@ interface Props {
  * element's children are presentational to assistive tech, so a link inside it could not
  * be reached on its own. Done sits beside it for the same reason.
  */
-export function TicketCard({ ticket, session, selected, showStatus = true, onOpen, onDone }: Props) {
+export function TicketCard({ ticket, session, host = null, selected, showStatus = true, onOpen, onDone }: Props) {
   const open = () => onOpen(ticket);
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -103,7 +105,7 @@ export function TicketCard({ ticket, session, selected, showStatus = true, onOpe
                 </Badge>
               );
             })}
-            {session && <StateBadge state={session.state} endReason={session.endReason} />}
+            {session && <StateBadge state={session.state} endReason={session.endReason} host={host} />}
           </div>
         )}
         {waiting && session.alert && (

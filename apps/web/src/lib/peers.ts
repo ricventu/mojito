@@ -71,6 +71,25 @@ export function peerSessionForTicket(peers: PeerSnapshot[], ticket: string): { p
   return null;
 }
 
+/**
+ * The session a ticket card shows, and the host to name on it (RIC-617): a live one here, else a
+ * live one on a peer, else an ended one here — the ticket sheet's order (a peer's snapshot holds
+ * live sessions only). `host` is null without peers: one instance has nothing to tell apart.
+ * With peers this instance is named too, or a bare state beside `· mac` would still be a guess.
+ */
+export function cardSession(
+  local: SessionMeta | null,
+  peers: PeerSnapshot[],
+  self: string | undefined,
+  ticket: string,
+): { session: SessionMeta; host: string | null } | null {
+  const here = peers.length > 0 ? (self ?? null) : null;
+  if (local && local.state !== "ended") return { session: local, host: here };
+  const remote = peerSessionForTicket(peers, ticket);
+  if (remote) return { session: remote.session, host: remote.peer.name };
+  return local ? { session: local, host: here } : null;
+}
+
 /** A session launched on `peerName`, into the cached answer, until its `peers.updated` arrives (`withLaunched`). */
 export function withPeerSession(answer: PeersAnswer | undefined, peerName: string, session: SessionMeta): PeersAnswer | undefined {
   if (!answer || !answer.peers.some((p) => p.name === peerName)) return answer;

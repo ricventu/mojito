@@ -414,6 +414,15 @@ describe("filterBoard", () => {
       expect(ids(filterBoard(sections, live, sessions)[0].active)).toEqual(["RIC-1"]);
     });
 
+    it("keeps a ticket whose live session is on a peer (RIC-617)", () => {
+      // The board is grouped from this instance's sessions; `live` is also handed the peers'.
+      const sections = groupBoard([project("Alpha")], [ticket("RIC-1", "Todo"), ticket("RIC-2", "Todo")], []);
+      const onPeer = [session("mj-RIC-2", { kind: "ticket", ticket: "RIC-2", state: "needs-input" })];
+      const out = filterBoard(sections, live, onPeer);
+      expect(ids(out[0].active)).toEqual(["RIC-2"]);
+      expect(out[0].loose).toEqual([]);
+    });
+
     it("keeps live loose sessions and drops ended ones", () => {
       const sessions = [session("mj-free-aaaaaa", { state: "idle" }), session("mj-free-bbbbbb", { state: "ended" })];
       const sections = groupBoard([project("Alpha")], [], sessions);

@@ -98,7 +98,8 @@ export function groupBoard(
  * priorities (`none` also takes a ticket with no priority sent), opens Backlog and hides loose
  * sessions, like a label filter. A label filter keeps the tickets carrying any of those
  * labels (by exact name), opens Backlog, and hides loose sessions, which have no labels. `live`
- * keeps the tickets with a live session among `sessions` and the live loose sessions. `q` matches
+ * keeps the tickets with a live session among `sessions` — this instance's and the peers' (RIC-617:
+ * a ticket running on another machine is active too) — and the live loose sessions. `q` matches
  * ticket identifier, title and labels, and loose sessions by ticket, id or kind. A section left
  * empty is dropped once a status, label, search or `live` filter narrows the board (it holds no
  * match); with none, an empty project stays, as in `groupBoard`, and so does one a project

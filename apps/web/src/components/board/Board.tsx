@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { TriangleAlert } from "lucide-react";
 import type { TicketSummary } from "@mojito/shared";
 import { useBoardFilters } from "@/hooks/useBoardFilters";
+import { usePeers } from "@/hooks/usePeers";
 import { useProjects } from "@/hooks/useProjects";
 import { useQuickDone, useQuickDoneHidden } from "@/hooks/useQuickDone";
 import { useSessions } from "@/hooks/useSessions";
@@ -49,9 +50,15 @@ export function Board() {
     [tickets.data, doneHidden],
   );
   const [filters, setFilters] = useBoardFilters();
+  const peers = usePeers();
+  // What the active-sessions filter counts: a ticket running on a peer is active too (RIC-617).
+  const liveSessions = useMemo(
+    () => [...sessionList, ...(peers.data?.peers ?? []).flatMap((p) => p.sessions)],
+    [sessionList, peers.data],
+  );
   const sections = useMemo(
-    () => filterBoard(groupBoard(projects.data ?? [], ticketList, sessionList), filters, sessionList),
-    [projects.data, ticketList, sessionList, filters],
+    () => filterBoard(groupBoard(projects.data ?? [], ticketList, sessionList), filters, liveSessions),
+    [projects.data, ticketList, sessionList, filters, liveSessions],
   );
   const banner = tickets.data ? linearBanner(tickets.data) : null;
   const loading = tickets.isPending || sessions.isPending || projects.isPending;

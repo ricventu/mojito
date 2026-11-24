@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PeerSnapshot, PeersAnswer, SessionMeta } from "@mojito/shared";
-import { appTitle, freeLaunchHosts, freeLaunchProjects, launchHosts, peerHref, peerSessionForTicket, replacePeer, waitingPeers, withPeerSession } from "@/lib/peers";
+import { appTitle, cardSession, freeLaunchHosts, freeLaunchProjects, launchHosts, peerHref, peerSessionForTicket, replacePeer, waitingPeers, withPeerSession } from "@/lib/peers";
 
 const session = (id: string, over: Partial<SessionMeta> = {}): SessionMeta => ({
   id,
@@ -108,6 +108,39 @@ describe("peerSessionForTicket", () => {
   it("is null when no peer runs it", () => {
     expect(peerSessionForTicket([peer("mac", [], { sessions: [session("mj-x")] })], "RIC-7")).toBeNull();
     expect(peerSessionForTicket([], "RIC-7")).toBeNull();
+  });
+});
+
+describe("cardSession", () => {
+  const ticket = (id: string, state: SessionMeta["state"]) => session(id, { kind: "ticket", ticket: "RIC-7", state });
+  const local = ticket("mj-RIC-7", "running");
+  const ended = ticket("mj-RIC-7", "ended");
+  const remote = ticket("mj-RIC-7", "needs-input");
+  const mac = peer("mac", ["Web"], { sessions: [remote] });
+
+  it("prefers this instance's live session, naming this instance once there are peers", () => {
+    expect(cardSession(local, [mac], "box", "RIC-7")).toEqual({ session: local, host: "box" });
+  });
+
+  it("shows a peer's live session over an ended one here", () => {
+    expect(cardSession(ended, [mac], "box", "RIC-7")).toEqual({ session: remote, host: "mac" });
+    expect(cardSession(null, [mac], "box", "RIC-7")).toEqual({ session: remote, host: "mac" });
+  });
+
+  it("falls back to the ended session here", () => {
+    expect(cardSession(ended, [peer("mac", [])], "box", "RIC-7")).toEqual({ session: ended, host: "box" });
+  });
+
+  it("names no host without peers", () => {
+    expect(cardSession(local, [], "box", "RIC-7")).toEqual({ session: local, host: null });
+  });
+
+  it("names this instance with only offline peers", () => {
+    expect(cardSession(local, [peer("mac", [], { online: false })], "box", "RIC-7")).toEqual({ session: local, host: "box" });
+  });
+
+  it("is null with no session anywhere", () => {
+    expect(cardSession(null, [peer("mac", [])], "box", "RIC-7")).toBeNull();
   });
 });
 

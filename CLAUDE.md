@@ -466,7 +466,10 @@ app's state, left in place.
   online), and it shows with a choice or when the only host is a peer. A
   ticket already running on a peer (`peerSessionForTicket`) shows "Session on <peer>" and an
   in-app Open link instead of the Launch form: the board is local, and a Launch would start a
-  second agent on the same ticket.
+  second agent on the same ticket. The board's card shows that session too (RIC-617,
+  `cardSession`, the sheet's order: live here → live on a peer → ended here), and with peers its
+  state pill names the host, this instance's included (`Running · mac`, `StateBadge`'s `host`);
+  a peer's needs-input gets the amber border, and `live=1` counts peers' sessions.
 - **A peer's session in this client** (`lib/host.ts`, `hooks/useHost.ts`, `lib/peerSession.ts`):
   `/session/:id`, `/git/:project` and `/docs/:project` take `?host=<peer>`, absent = this instance
   (the git/docs codecs keep `host` as written and every in-page link carries it). **`host` is

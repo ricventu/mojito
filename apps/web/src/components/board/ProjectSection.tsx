@@ -3,11 +3,13 @@ import { Link } from "react-router";
 import { effectiveCommands, type SessionMeta, type TicketSummary } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { usePeers } from "@/hooks/usePeers";
 import { useSettings } from "@/hooks/useSettings";
 import { kanbanColumns, sessionForTicket, type BoardSection } from "@/lib/board";
 import { boardClean, menuCommands } from "@/lib/commands";
 import { docsHref } from "@/lib/docs/url";
 import { gitHref } from "@/lib/git/url";
+import { cardSession } from "@/lib/peers";
 import { cn } from "@/lib/utils";
 import { CommandButton } from "./CommandButton";
 import { CommandsMenu } from "./CommandsMenu";
@@ -43,17 +45,23 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
   const settings = useSettings().data;
   const commands = project !== null && settings ? effectiveCommands(settings.commands) : [];
   const clean = project !== null ? boardClean(commands, project) : undefined;
-  const card = (ticket: TicketSummary, showStatus = true) => (
-    <TicketCard
-      key={ticket.identifier}
-      ticket={ticket}
-      session={sessionForTicket(sessions, ticket.identifier)}
-      selected={ticket.identifier === selectedTicket}
-      showStatus={showStatus}
-      onOpen={onOpenTicket}
-      onDone={onDoneTicket}
-    />
-  );
+  const peers = usePeers().data;
+  const card = (ticket: TicketSummary, showStatus = true) => {
+    // The ticket's session wherever it runs, and the host to name (RIC-617).
+    const shown = cardSession(sessionForTicket(sessions, ticket.identifier), peers?.peers ?? [], peers?.self, ticket.identifier);
+    return (
+      <TicketCard
+        key={ticket.identifier}
+        ticket={ticket}
+        session={shown?.session ?? null}
+        host={shown?.host ?? null}
+        selected={ticket.identifier === selectedTicket}
+        showStatus={showStatus}
+        onOpen={onOpenTicket}
+        onDone={onDoneTicket}
+      />
+    );
+  };
 
   return (
     <section className="flex flex-col gap-2">
