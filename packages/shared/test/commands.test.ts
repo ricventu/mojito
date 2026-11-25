@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   COMMAND_PROMPT_MAX,
+  CommandRunBody,
   CommandSchema,
   CommandsSettingBody,
   DEFAULT_COMMANDS,
@@ -9,6 +10,7 @@ import {
   effectiveCommands,
   importCommands,
   isCustomCommandId,
+  isRunnableCommandId,
   newCommandId,
   normalizeCommands,
   readCommandsSetting,
@@ -20,7 +22,7 @@ import {
 
 const custom = (over: Partial<Command> = {}): Command => ({
   id: "cmd-1a2b3c", name: "Deps", prompt: "Update the dependencies.", icon: "package",
-  project: null, excluded: [], model: "sonnet", effort: "high", ...over,
+  project: null, excluded: [], model: "sonnet", effort: "high", worktree: false, ...over,
 });
 const clean = DEFAULT_COMMANDS[0];
 
@@ -185,5 +187,41 @@ describe("commands", () => {
         expect(w).toHaveBeenCalledTimes(1);
       }
     });
+  });
+});
+
+describe("worktree (RIC-622)", () => {
+  it("CommandSchema reads a command with no worktree as off, and keeps one that has it", () => {
+    const { worktree: _, ...old } = custom();
+    expect(CommandSchema.parse(old).worktree).toBe(false);
+    expect(CommandSchema.parse(custom({ worktree: true })).worktree).toBe(true);
+  });
+  it("Clean ships with it off", () => expect(clean.worktree).toBe(false));
+  it("normalizeCommands stores a default edited only in its worktree", () => {
+    const edited = { ...clean, worktree: true };
+    expect(normalizeCommands({ items: [edited], removed: [] }).items).toEqual([edited]);
+  });
+});
+
+describe("CommandRunBody", () => {
+  const body = { prompt: "Do it.", model: "opus", effort: "high", worktree: true };
+  it("takes a prompt and the run's options", () => expect(CommandRunBody.parse(body)).toEqual(body));
+  it("refuses an empty or oversized prompt", () => {
+    expect(CommandRunBody.safeParse({ ...body, prompt: "" }).success).toBe(false);
+    expect(CommandRunBody.safeParse({ ...body, prompt: "x".repeat(COMMAND_PROMPT_MAX + 1) }).success).toBe(false);
+  });
+  it("needs every option", () => {
+    expect(CommandRunBody.safeParse({ prompt: "Do it." }).success).toBe(false);
+    expect(CommandRunBody.safeParse({ ...body, model: "gpt" }).success).toBe(false);
+  });
+});
+
+describe("isRunnableCommandId", () => {
+  it("takes a plain word and a custom id", () => {
+    expect(isRunnableCommandId("clean")).toBe(true);
+    expect(isRunnableCommandId("cmd-a1b2c3")).toBe(true);
+  });
+  it("refuses anything that could reach a session id unsafely", () => {
+    for (const id of ["", "Clean", "cmd-xyz", "a b", "a;b", "cmd-a1b2c3-x", "../x"]) expect(isRunnableCommandId(id)).toBe(false);
   });
 });

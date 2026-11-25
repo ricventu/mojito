@@ -7,7 +7,7 @@ import { SessionsRepo } from "../../src/db/sessions";
 import { EventBus } from "../../src/events/bus";
 import { DuplicateSessionError, q } from "../../src/tmux/tmux";
 import { buildHookSettings } from "../../src/sessions/hookSettings";
-import { buildGitResolvePrompt, buildTicketPrompt } from "../../src/sessions/prompt";
+import { WORKTREE_INSTRUCTION, buildGitResolvePrompt, buildTicketPrompt } from "../../src/sessions/prompt";
 import { STALL_GRACE_MS } from "../../src/sessions/startupStall";
 import { launchCommand, launchFree, launchGitResolve, launchTicket, resumeSession, type LaunchDeps } from "../../src/sessions/launch";
 
@@ -551,6 +551,15 @@ describe("launchCommand (Clean)", () => {
     const cmd = { ...CLEAN, id: "cmd-a1b2c3", name: "Lint", prompt: "run lint", model: "opus" as const, effort: "low" as const };
     const res = await launchCommand("Web", cmd, deps);
     expect(res).toMatchObject({ ok: true, alreadyOpen: false, session: { id: "mj-web-cmd-a1b2c3", model: "opus", effort: "low" } });
+    expect(deps.newSession).toHaveBeenCalledWith("mj-web-cmd-a1b2c3", "/repo/web", expect.stringMatching(/ 'run lint'$/));
+  });
+
+  it("ends the prompt with the worktree instruction when the run asks for one (RIC-622)", async () => {
+    const { deps } = setup();
+    const cmd = { ...CLEAN, id: "cmd-a1b2c3", prompt: "run lint", worktree: true };
+    await launchCommand("Web", cmd, deps);
+    const command = vi.mocked(deps.newSession).mock.calls[0][2];
+    expect(command.endsWith(` ${q(`run lint\n${WORKTREE_INSTRUCTION}`)}`)).toBe(true);
   });
 
   it("refuses a live row that is not this command's", async () => {

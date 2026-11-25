@@ -31,6 +31,11 @@ export interface Command {
   excluded: string[];
   model: Model;
   effort: Effort;
+  /**
+   * Run in a git worktree of its own (RIC-622): the run sheet's switch starts here, and on it the
+   * session's prompt ends with the ticket launch's worktree instruction. Absent before = off.
+   */
+  worktree: boolean;
 }
 
 /** The stored form: custom commands and edited copies of defaults, plus the removed defaults' ids. */
@@ -71,7 +76,7 @@ export const CLEAN_PROMPT = [
 ].join("\n");
 
 export const DEFAULT_COMMANDS: readonly Command[] = [
-  { id: "clean", name: "Clean", icon: "brush-cleaning", project: null, excluded: [], model: "sonnet", effort: "high", prompt: CLEAN_PROMPT },
+  { id: "clean", name: "Clean", icon: "brush-cleaning", project: null, excluded: [], model: "sonnet", effort: "high", worktree: false, prompt: CLEAN_PROMPT },
 ];
 
 const CUSTOM_ID = /^cmd-[0-9a-f]{6}$/;
@@ -103,8 +108,27 @@ export const CommandSchema = z
     excluded: z.array(z.string().min(1)).max(100).default([]),
     model: z.enum(MODELS),
     effort: z.enum(EFFORTS),
+    worktree: z.boolean().default(false),
   })
   .transform((c): Command => ({ ...c, excluded: c.project === null ? canonicalExcluded(c.excluded) : [] }));
+
+/**
+ * `POST /api/projects/:name/commands/:id/run` (RIC-622): the command as the sender has it and the
+ * run sheet's picks. On a peer the command is the sender's, so nothing is looked up by id.
+ */
+export const CommandRunBody = z.object({
+  prompt: z.string().min(1).max(COMMAND_PROMPT_MAX),
+  model: z.enum(MODELS),
+  effort: z.enum(EFFORTS),
+  worktree: z.boolean(),
+});
+export type CommandRunBody = z.infer<typeof CommandRunBody>;
+
+/**
+ * An id a run may carry: a plain word (a default, perhaps one this version does not ship) or a
+ * `cmd-<hex6>`. It becomes the session id's suffix, which reaches tmux and the hook commands.
+ */
+export const isRunnableCommandId = (id: string): boolean => /^[a-z]+$/.test(id) || isCustomCommandId(id);
 
 const nameKey = (name: string): string => name.trim().toLowerCase();
 
@@ -155,7 +179,7 @@ export function commandsFor(effective: Command[], project: string): Command[] {
 
 const sameCommand = (a: Command, b: Command): boolean =>
   a.id === b.id && a.name === b.name && a.prompt === b.prompt && a.icon === b.icon &&
-  a.project === b.project && a.model === b.model && a.effort === b.effort &&
+  a.project === b.project && a.model === b.model && a.effort === b.effort && a.worktree === b.worktree &&
   a.excluded.length === b.excluded.length && a.excluded.every((p, i) => p === b.excluded[i]);
 
 /** Drops items equal to their default, then removed ids that are no default or still have an item. */

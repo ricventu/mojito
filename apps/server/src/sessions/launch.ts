@@ -13,7 +13,7 @@ import type { TicketCache } from "../tickets/cache";
 import { DuplicateSessionError, PREFIX, hasSession, newSession, q } from "../tmux/tmux";
 import { buildHookSettings } from "./hookSettings";
 import { imagesDir } from "./images";
-import { buildGitResolvePrompt, buildTicketPrompt } from "./prompt";
+import { buildGitResolvePrompt, buildTicketPrompt, withWorktree } from "./prompt";
 import { watchStartupStall } from "./startupStall";
 
 export interface LaunchDeps {
@@ -264,10 +264,16 @@ export function launchGitResolve(
 
 /**
  * A quick command (RIC-581) run in a project: one session per project and command, under
- * `mj-<slug>-<command id>` (Clean is `mj-<slug>-clean`), like the git session.
+ * `mj-<slug>-<command id>` (Clean is `mj-<slug>-clean`), like the git session. With `worktree`
+ * (RIC-622) the prompt ends with the ticket launch's worktree instruction.
  */
-export function launchCommand(project: string, command: Command, deps: LaunchDeps): Promise<ProjectSessionResult> {
-  return launchProjectSession({ project, suffix: command.id, model: command.model, effort: command.effort, prompt: command.prompt }, deps);
+export function launchCommand(
+  project: string,
+  command: Pick<Command, "id" | "prompt" | "model" | "effort" | "worktree">,
+  deps: LaunchDeps,
+): Promise<ProjectSessionResult> {
+  const prompt = withWorktree(command.prompt, command.worktree);
+  return launchProjectSession({ project, suffix: command.id, model: command.model, effort: command.effort, prompt }, deps);
 }
 
 /**

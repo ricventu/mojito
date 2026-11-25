@@ -13,6 +13,12 @@ describe("matchRelay", () => {
     expect(matchRelay("GET", ["projects", "Web", "docs"])).toBe("/api/projects/Web/docs");
     expect(matchRelay("GET", ["projects", "Web", "docs", "file"])).toBe("/api/projects/Web/docs/file");
     expect(matchRelay("GET", ["commands"])).toBe("/api/commands");
+    expect(matchRelay("POST", ["projects", "Web", "commands", "cmd-a1b2c3", "run"])).toBe("/api/projects/Web/commands/cmd-a1b2c3/run");
+  });
+
+  it("relays a command's run, never the stored-command route or a settings write", () => {
+    expect(matchRelay("POST", ["projects", "Web", "commands", "clean"])).toBeNull();
+    expect(matchRelay("POST", ["commands", "assist"])).toBeNull();
   });
 
   it("decodes a param and encodes it again", () => {

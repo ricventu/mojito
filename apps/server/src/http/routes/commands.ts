@@ -1,16 +1,17 @@
 import { existsSync } from "node:fs";
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { AssistBody, commandsFor, effectiveCommands, type CommandResult } from "@mojito/shared";
-import { Hono } from "hono";
+import { AssistBody, CommandRunBody, commandsFor, effectiveCommands, isRunnableCommandId, type CommandResult } from "@mojito/shared";
+import { Hono, type Context } from "hono";
 import { AssistError, assistCommand } from "../../commands/assist";
 import { expandHome } from "../../homePath";
-import { launchCommand } from "../../sessions/launch";
+import { launchCommand, type ProjectSessionResult } from "../../sessions/launch";
 import { parseBody } from "../body";
 import type { AppDeps } from "../app";
 
 /**
  * Quick commands (RIC-581): the list in force, and a command run in a project: a Claude session
- * under `mj-<slug>-<command id>`, answered like the project's git session (`alreadyOpen`).
+ * under `mj-<slug>-<command id>`, answered like the project's git session (`alreadyOpen`). The
+ * bodyless run of a stored command stays for a client on an older build.
  */
 export function commandRoutes(deps: AppDeps): Hono {
   const exists = deps.exists ?? existsSync;
@@ -36,8 +37,25 @@ export function commandRoutes(deps: AppDeps): Hono {
       const id = c.req.param("id");
       const command = commandsFor(effectiveCommands(deps.settings.get().commands), name).find((x) => x.id === id);
       if (!command) return c.json({ error: `command not found: ${id}` }, 404);
-      const launched = await launchCommand(name, command, deps.launch);
-      if (!launched.ok) return c.json({ error: launched.error, ...(launched.sessionId ? { sessionId: launched.sessionId } : {}) }, launched.status);
-      return c.json({ session: launched.session, alreadyOpen: launched.alreadyOpen } satisfies CommandResult);
+      return answer(c, await launchCommand(name, command, deps.launch));
+    })
+    // The run sheet's (RIC-622): the command as the sender has it, with the sheet's picks. Nothing
+    // is looked up by id — on a peer it is the sender's command — the id only names the session.
+    .post("/projects/:name/commands/:id/run", async (c) => {
+      const name = c.req.param("name");
+      const project = deps.projects.get(name);
+      if (!project) return c.json({ error: `project not found: ${name}` }, 404);
+      const id = c.req.param("id");
+      if (!isRunnableCommandId(id)) return c.json({ error: `invalid command id: ${id}` }, 400);
+      const body = await parseBody(c, CommandRunBody);
+      if (!body.ok) return c.json({ error: body.error }, 400);
+      const cwd = expandHome(project.path, deps.cfg.home);
+      if (!exists(cwd)) return c.json({ error: `project path not found: ${cwd}` }, 400);
+      return answer(c, await launchCommand(name, { id, ...body.data }, deps.launch));
     });
+}
+
+function answer(c: Context, launched: ProjectSessionResult) {
+  if (!launched.ok) return c.json({ error: launched.error, ...(launched.sessionId ? { sessionId: launched.sessionId } : {}) }, launched.status);
+  return c.json({ session: launched.session, alreadyOpen: launched.alreadyOpen } satisfies CommandResult);
 }

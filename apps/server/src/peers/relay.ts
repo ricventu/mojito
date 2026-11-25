@@ -4,12 +4,15 @@ export const RELAY_TIMEOUT_MS = 30_000;
 
 /**
  * What a client may ask a peer through this instance (`/api/peers/<name>/…`): the HTTP side of
- * opening a peer's session in place — image upload and view, the git graph, the docs, the commands list (for import). A
+ * opening a peer's session in place — image upload and view, the git graph, the docs, the commands list (for import),
+ * and a command's run (the run sheet's Run on). A
  * `:slot` is one path segment; anything not listed is not relayed (settings, hooks, launch,
  * projects…: those are the peer's own client's).
  */
 const ALLOWED: { method: string; pattern: string[] }[] = [
   { method: "GET", pattern: ["commands"] },
+  // A command run from this client's sheet (RIC-622): the body carries the command itself.
+  { method: "POST", pattern: ["projects", ":project", "commands", ":id", "run"] },
   { method: "POST", pattern: ["sessions", ":id", "images"] },
   { method: "GET", pattern: ["sessions", ":id", "image"] },
   { method: "GET", pattern: ["projects", ":project", "git", "graph"] },

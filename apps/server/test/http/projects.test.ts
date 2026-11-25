@@ -157,7 +157,7 @@ describe("DELETE /api/projects/:name", () => {
 });
 
 describe("commands follow their project", () => {
-  const custom = { id: "cmd-a1b2c3", name: "Lint", prompt: "p", icon: "bug" as const, project: "Web", excluded: [] as string[], model: "sonnet" as const, effort: "low" as const };
+  const custom = { id: "cmd-a1b2c3", name: "Lint", prompt: "p", icon: "bug" as const, project: "Web", excluded: [] as string[], model: "sonnet" as const, effort: "low" as const, worktree: false };
   const settingsUpdated = (events: { type: string }[]) => events.filter((e) => e.type === "settings.updated").length;
 
   it("moves a bound command on a rename", async () => {

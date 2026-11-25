@@ -1,9 +1,12 @@
 import { DEFAULT_PROMPTS, TICKET_PLACEHOLDER, type GitOp } from "@mojito/shared";
 import type { SyncConflict } from "../git/sync";
 
-/** Appended to the ticket prompt when the launch asks for a worktree. */
+/** Appended to a ticket's or a command's prompt when the launch asks for a worktree. */
 export const WORKTREE_INSTRUCTION =
   "Work in a git worktree of your own, not in this checkout: other sessions may share it. Create the worktree before changing anything.";
+
+/** The prompt, with `WORKTREE_INSTRUCTION` as its last line when asked. */
+export const withWorktree = (prompt: string, worktree: boolean): string => (worktree ? `${prompt}\n${WORKTREE_INSTRUCTION}` : prompt);
 
 /**
  * The whole prompt a ticket session starts with: the ticket prompt from Settings (the shipped
@@ -13,8 +16,7 @@ export const WORKTREE_INSTRUCTION =
  */
 export function buildTicketPrompt(ticket: string, template: string = DEFAULT_PROMPTS.ticket, worktree = false): string {
   // split/join rather than replaceAll with a string: the identifier is inserted literally.
-  const prompt = template.split(TICKET_PLACEHOLDER).join(ticket);
-  return worktree ? `${prompt}\n${WORKTREE_INSTRUCTION}` : prompt;
+  return withWorktree(template.split(TICKET_PLACEHOLDER).join(ticket), worktree);
 }
 
 /**
