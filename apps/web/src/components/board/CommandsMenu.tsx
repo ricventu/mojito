@@ -1,4 +1,4 @@
-import { FileText, GitGraph, Loader2, Zap } from "lucide-react";
+import { FileText, GitGraph, Zap } from "lucide-react";
 import { Link } from "react-router";
 import type { Command } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
@@ -9,19 +9,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useRunCommand } from "@/hooks/useRunCommand";
 import { CommandIconView } from "@/lib/commandIcons";
 import { docsHref } from "@/lib/docs/url";
 import { gitHref } from "@/lib/git/url";
 
-/** The project header's quick commands (RIC-581): pick one to open its session; the last item manages them. */
-export function CommandsMenu({ project, commands }: { project: string; commands: Command[] }) {
-  const run = useRunCommand(project);
+/**
+ * The project header's quick commands (RIC-581): pick one to open its run sheet (RIC-622, `onRun`);
+ * the last item manages them.
+ */
+export function CommandsMenu({ project, commands, onRun }: { project: string; commands: Command[]; onRun: (command: Command) => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label={`Commands for ${project}`} title="Commands" disabled={run.isPending}>
-          {run.isPending ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
+        <Button variant="ghost" size="icon-sm" aria-label={`Commands for ${project}`} title="Commands">
+          <Zap size={16} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -40,7 +41,7 @@ export function CommandsMenu({ project, commands }: { project: string; commands:
         </DropdownMenuItem>
         <DropdownMenuSeparator className="sm:hidden" />
         {commands.map((c) => (
-          <DropdownMenuItem key={c.id} onSelect={() => run.mutate(c)}>
+          <DropdownMenuItem key={c.id} onSelect={() => onRun(c)}>
             <CommandIconView icon={c.icon} />
             {c.name}
           </DropdownMenuItem>

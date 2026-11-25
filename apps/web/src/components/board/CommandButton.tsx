@@ -1,21 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
 import type { Command, WorktreeCount } from "@mojito/shared";
 import { Button } from "@/components/ui/button";
-import { useRunCommand } from "@/hooks/useRunCommand";
 import { apiFetch } from "@/lib/api";
 import { CommandIconView } from "@/lib/commandIcons";
 import { cleanLabel, worktreeBadge } from "@/lib/commands";
 import { worktreeKey } from "@/lib/queryKeys";
 
 /**
- * A command with its own button on the project header (Clean, RIC-528): opens the command's
- * session. Clean's badge counts the linked worktrees, re-read every 30 s while the page is
+ * A command with its own button on the project header (Clean, RIC-528): opens the command's run
+ * sheet (RIC-622, `onRun`). Clean's badge counts the linked worktrees, re-read every 30 s while the page is
  * visible (worktrees come and go with sessions, which emit nothing about them) and on every
  * reconnect (it lives under `qk`).
  */
-export function CommandButton({ project, command }: { project: string; command: Command }) {
-  const run = useRunCommand(project);
+export function CommandButton({ project, command, onRun }: { project: string; command: Command; onRun: (command: Command) => void }) {
   const isClean = command.id === "clean";
   const worktrees = useQuery({
     queryKey: worktreeKey(project),
@@ -35,11 +32,10 @@ export function CommandButton({ project, command }: { project: string; command: 
       size="icon-sm"
       aria-label={label}
       title={label}
-      disabled={run.isPending}
-      onClick={() => run.mutate(command)}
+      onClick={() => onRun(command)}
       className="relative"
     >
-      {run.isPending ? <Loader2 size={16} className="animate-spin" /> : <CommandIconView icon={command.icon} />}
+      <CommandIconView icon={command.icon} />
       {badge && (
         <span
           aria-hidden

@@ -34,6 +34,7 @@ const custom = (over: Partial<Command> = {}): Command => ({
   excluded: [],
   model: "sonnet",
   effort: "medium",
+  worktree: false,
   ...over,
 });
 
@@ -50,6 +51,7 @@ describe("newDraft", () => {
       excluded: [],
       model: "opus",
       effort: "xhigh",
+      worktree: false,
     });
   });
 
@@ -304,6 +306,7 @@ describe("importableRows", () => {
     excluded: [],
     model: "sonnet",
     effort: "high",
+    worktree: false,
   });
 
   it("enables global commands and ones bound to a mapped project", () => {
@@ -331,7 +334,12 @@ describe("importErrorMessage", () => {
 });
 
 describe("peerCommands", () => {
-  const ok = { id: "cmd-abc123", name: "Lint", prompt: "p", icon: "bug", project: null, excluded: ["Api"], model: "sonnet", effort: "high" };
+  const ok = { id: "cmd-abc123", name: "Lint", prompt: "p", icon: "bug", project: null, excluded: ["Api"], model: "sonnet", effort: "high", worktree: true };
+
+  it("reads an older peer's command, which has no worktree, as off", () => {
+    const { worktree: _w, ...older } = ok;
+    expect(peerCommands({ commands: [older] })).toEqual([{ ...ok, worktree: false }]);
+  });
 
   it("answers nothing for a body that is not {commands: [...]}", () => {
     for (const body of [undefined, null, "x", 3, [], {}, { commands: {} }, { commands: "x" }]) {

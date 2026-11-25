@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { ChevronRight, FileText, GitGraph, Plus, SquareTerminal } from "lucide-react";
 import { Link } from "react-router";
-import { effectiveCommands, type SessionMeta, type TicketSummary } from "@mojito/shared";
+import { effectiveCommands, type Command, type SessionMeta, type TicketSummary } from "@mojito/shared";
+import { RunCommandSheet } from "@/components/sheets/RunCommandSheet";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { usePeers } from "@/hooks/usePeers";
@@ -46,7 +48,9 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
   const commands = project !== null && settings ? effectiveCommands(settings.commands) : [];
   const clean = project !== null ? boardClean(commands, project) : undefined;
   const peers = usePeers().data;
-  const card = (ticket: TicketSummary, showStatus = true) => {
+  // The command whose run sheet is open (RIC-622).
+  const [running, setRunning] = useState<Command | null>(null);
+  const card =(ticket: TicketSummary, showStatus = true) => {
     // The ticket's session wherever it runs, and the host to name (RIC-617).
     const shown = cardSession(sessionForTicket(sessions, ticket.identifier), peers?.peers ?? [], peers?.self, ticket.identifier);
     return (
@@ -82,8 +86,8 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
           </Button>
         )}
         {project !== null && <GitButtons project={project} />}
-        {project !== null && clean && <CommandButton project={project} command={clean} />}
-        {project !== null && <CommandsMenu project={project} commands={menuCommands(commands, project)} />}
+        {project !== null && clean && <CommandButton project={project} command={clean} onRun={setRunning} />}
+        {project !== null && <CommandsMenu project={project} commands={menuCommands(commands, project)} onRun={setRunning} />}
         {project !== null && (
           <Button variant="ghost" size="icon-sm" aria-label={`New ticket in ${name}`} onClick={() => onNewTicket(project)}>
             <Plus size={16} />
@@ -137,6 +141,9 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
       )}
 
       {section.loose.length > 0 && <LooseSessions project={name} loose={section.loose} />}
+
+      {/* Outside the commands menu: a sheet inside its content would close with it. */}
+      {project !== null && running && <RunCommandSheet project={project} command={running} onClose={() => setRunning(null)} />}
 
       {/* Only a project can be empty (General is dropped then), and only with no filter narrowing the board. */}
       {section.active.length + section.backlog.length + section.loose.length === 0 && (

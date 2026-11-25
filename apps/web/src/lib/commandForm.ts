@@ -26,9 +26,12 @@ export type CommandDraft = Omit<Command, "id"> & { id: string | null };
 
 const nameKey = (name: string): string => name.trim().toLowerCase();
 
-/** A new command: no name or prompt yet, the zap icon, the new-session sheet's model and effort. */
+/** A new command: no name or prompt yet, the zap icon, the new-session sheet's model and effort, no worktree. */
 export function newDraft(defaults: { model: Model; effort: Effort }, project?: string): CommandDraft {
-  return { id: null, name: "", prompt: "", icon: "zap", project: project ?? null, excluded: [], model: defaults.model, effort: defaults.effort };
+  return {
+    id: null, name: "", prompt: "", icon: "zap", project: project ?? null, excluded: [],
+    model: defaults.model, effort: defaults.effort, worktree: false,
+  };
 }
 
 const NAME_MAX = 40;

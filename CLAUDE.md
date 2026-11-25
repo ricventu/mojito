@@ -209,7 +209,8 @@ app's state, left in place.
   `2026-11-16-commands-duplicate-exclude-design.md`; `CommandSchema` defaults it to `[]` — older rows
   and peers have none — and keeps it unique, plain-`sort()`ed, `[]` for a bound command; `commandsFor`
   honours it, so the run route 404s an excluded project; a project rename/removal renames/drops it
-  there too), model, effort). The `commands` settings key stores only the **diff
+  there too), model, effort, `worktree` (RIC-622; `CommandSchema` defaults it to `false`, Clean
+  ships `false`)). The `commands` settings key stores only the **diff
   from `DEFAULT_COMMANDS`**: `items` (custom commands + edited copies of defaults) and `removed`
   (deleted default ids), normalized on every write (`normalizeCommands`: an item equal to its
   default is dropped, so it follows later changes to the shipped text). Two id namespaces: a plain
@@ -228,7 +229,14 @@ app's state, left in place.
   (`{session, alreadyOpen}`) runs one through `launchProjectSession`: a live session is answered
   `alreadyOpen`, but only if the row is **this command's** (same project, no ticket, kind claude) —
   else 409 with `sessionId` (a hyphenated slug can collide; a case-only project rename or an adopted
-  row answers 409 too, the web's toast offers Open). Ids are `mj-<slug>-<command id>`, so Clean
+  row answers 409 too, the web's toast offers Open). That bodyless route runs the **stored**
+  command and stays only for a client on an older build; the web uses `POST
+  /api/projects/:name/commands/:id/run` (RIC-622, spec `2026-11-25-command-run-sheet-design.md`),
+  whose `CommandRunBody` carries the command itself — `{prompt, model, effort, worktree}`, the run
+  sheet's picks — and which never looks the id up: on a peer it is the sender's command, so a peer
+  runs exactly what the sheet showed. The id only names the session (`isRunnableCommandId`: a plain
+  word or `cmd-<hex6>`, else 400). `worktree` appends the ticket launch's `WORKTREE_INSTRUCTION`
+  (`withWorktree`); an `alreadyOpen` answer ignores the picks. Ids are `mj-<slug>-<command id>`, so Clean
   keeps `mj-<slug>-clean` (RIC-528): a session, not git commands — "merged" must include
   squash and rebase merges, which `git branch --merged` does not see; its fixed default prompt
   `CLEAN_PROMPT` waits for the human's yes in the terminal before deleting anything. The worktree
@@ -236,8 +244,8 @@ app's state, left in place.
   minus the main checkout and `prunable` ones; a `GitError` is a 409), belongs to the `clean` id
   only. `POST /api/commands/assist` (`commands/assist.ts`) is a one-shot Agent SDK call (no tools,
   sonnet, 60 s) that turns a rough idea into name/prompt/icon (an icon outside the list falls back
-  to the form's); its `ASSIST_PROMPT` is fixed, not a setting. `GET /api/commands` is the one new
-  entry on the peer relay table: import reads a peer, never writes it. A project **rename** moves
+  to the form's); its `ASSIST_PROMPT` is fixed, not a setting. `GET /api/commands` (import reads a
+  peer, never writes it) and the `…/run` route are on the peer relay table. A project **rename** moves
   its bound commands, its **removal** drops them (an edited default bound to it falls back to the
   shipped one) — `http/routes/projects.ts`.
 - **Folder picker** (RIC-585, `GET /api/fs/dirs?path` → `DirList`, `fs/dirs.ts`,
@@ -313,7 +321,7 @@ app's state, left in place.
   client** (spec `2026-11-02-peer-sessions-in-place-design.md`), so the browser only ever talks to
   this instance: an **allowlisted** HTTP relay, `/api/peers/:name/<rest>` (`peers/relay.ts`,
   `matchRelay` + `relayRequest`), and the pty relay above. The table is image upload
-  and view, the git graph/commit/diff, the docs list/file, the commands list (GET, for import) — nothing else (not settings, hooks, projects; no DELETE either: there is no Kill, and a peer's
+  and view, the git graph/commit/diff, the docs list/file, the commands list (GET, for import) and a command's `…/run` (the body is the command) — nothing else (not settings, hooks, projects; no DELETE either: there is no Kill, and a peer's
   rows are forgotten on the peer): off the table is 404, so a client bug
   cannot write a peer's settings. Each segment is decoded and must be one plain name (no
   `.`/`..`/`/`); the literal segments are matched verbatim and only the `:param` slots are
@@ -353,12 +361,18 @@ app's state, left in place.
 - Project header: Pull / Push icons (`GitButtons`, `lib/gitSync.ts`) — a toast, or on a conflict
   the git session's terminal (pushed, from the board). Then Clean, the default command, as its
   own button (`CommandButton`, `lib/commands.ts`: `boardClean`) when it is offered to the
-  project: it opens the clean session's terminal; its badge is the linked worktree count (hidden
+  project; its badge is the linked worktree count (hidden
   at 0, `9+`), `worktreeKey(project)` under `qk.worktrees` (re-read on reconnect) with a 30 s
   `refetchInterval` — worktrees come and go with sessions, which emit nothing about them. Every
-  other command is in a commands menu (`CommandsMenu`, `menuCommands`), run by
-  `hooks/useRunCommand.ts` (toast "Started"/"is already open"; a 409 with `sessionId` offers
-  Open). Below `sm` Git graph and Docs move into that menu too, so the header fits 320px.
+  other command is in a commands menu (`CommandsMenu`, `menuCommands`). Either opens the command's
+  **run sheet** (RIC-622, `sheets/RunCommandSheet.tsx`, held by `ProjectSection` outside the menu):
+  its prompt (read-only, clamped), Run on (`freeLaunchHosts` for the project, with peers: every
+  host listed, one that cannot run it disabled with why), Model / Effort, "Work in a worktree" —
+  all starting from the command, for this run only, never saved. Run is `hooks/useRunCommand.ts`
+  (`commandRunPath` through `hostApi`; the session into `qk.sessions`/`qk.peers`, toast
+  "Started"/"is already open" naming a peer, then its terminal; a 409 with `sessionId` offers
+  Open; an older peer's catch-all 404 reads "runs an older Mojito", `commandRunError`).
+  Below `sm` Git graph and Docs move into that menu too, so the header fits 320px.
 - **Git graph page** (RIC-505, `/git/:project`, `components/git`, `lib/git`, `hooks/useGitGraph.ts`):
   `ticket`/`commit`/`file`/`from` are the only view state (`lib/git/url.ts` is the one codec —
   `gitHref` for entry points, `parseGitSearch` drops what makes no sense). Entry points: project
@@ -509,7 +523,8 @@ app's state, left in place.
   opens HOME with the error shown — and writes the pick as `~/…` under HOME (`lib/folderPicker.ts`).
 - Settings → Commands (`components/settings/CommandsCard`, `CommandDialog`, `IconGrid`;
   `lib/commandForm.ts`, `lib/commandIcons.tsx` maps each `COMMAND_ICONS` name to its lucide
-  component): add, edit and delete commands, restore a deleted default; "Write with AI" first asks
+  component): add, edit and delete commands, restore a deleted default; model, effort and "Work in
+  a worktree" are the run sheet's starting picks; "Write with AI" first asks
   what the command should do (a field of its own, not the Prompt), then fills the form from the
   assist endpoint. "Skip on" (an "All projects" command only) is a select that adds
   a project it is not offered on (`skipOptions`; keyed on the list, so it empties after each pick)

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useProjects } from "@/hooks/useProjects";
 import { apiJson } from "@/lib/api";
@@ -267,6 +268,10 @@ function Form({ command, settings, write, onClose, initial, onDuplicate }: FormP
         onModel={(model) => edit({ model })}
         onEffort={(effort) => edit({ effort })}
       />
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor="command-worktree">Work in a worktree</Label>
+        <Switch id="command-worktree" checked={draft.worktree} onCheckedChange={(worktree) => edit({ worktree })} />
+      </div>
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}
