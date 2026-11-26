@@ -22,7 +22,7 @@ export function SidebarToggle() {
       onClick={sidebar.toggle}
     >
       <PanelLeft size={16} />
-      {waiting && <span aria-hidden className="absolute top-1 right-1 size-2 rounded-full bg-amber-500" />}
+      {waiting && <span aria-hidden className="absolute top-1 right-1 size-2 rounded-full bg-attention" />}
     </Button>
   );
 }

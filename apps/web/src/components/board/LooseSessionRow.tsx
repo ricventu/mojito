@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useResume } from "@/hooks/useResume";
 import { apiFetch } from "@/lib/api";
 import { startedLabel } from "@/lib/board";
-import { canResume } from "@/lib/endReason";
+import { canResume, endLook } from "@/lib/endReason";
 import { qk } from "@/lib/queryKeys";
 import { sessionName } from "@/lib/sidebar";
 import { cn } from "@/lib/utils";
@@ -32,9 +32,11 @@ export function LooseSessionRow({ session }: { session: SessionMeta }) {
   const waiting = session.state === "needs-input";
   const ended = session.state === "ended";
   const label = session.kind === "ticket" && session.ticket ? session.ticket : sessionName(session);
+  // An ended row sits under its "Ended N" heading: its badge only speaks when the end was abnormal.
+  const badge = !ended || endLook(session.endReason).abnormal;
 
   return (
-    <li className={cn("flex items-stretch rounded-lg border bg-card", waiting && "border-amber-500/60")}>
+    <li className={cn("flex items-stretch rounded-lg border bg-card", waiting && "border-attention/60")}>
       <button
         type="button"
         onClick={() => navigate(`/session/${encodeURIComponent(session.id)}`)}
@@ -42,16 +44,20 @@ export function LooseSessionRow({ session }: { session: SessionMeta }) {
       >
         <SquareTerminal size={16} className="shrink-0 text-muted-foreground" />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          {/* A long name gives way, the time stays. */}
-          <span className="flex min-w-0 text-sm font-medium">
+          {/* A long name gives way, the time stays: beside it from sm, under it on a phone, where
+              the row's buttons leave the name too little width to share. */}
+          <span className="flex min-w-0 flex-col text-sm font-medium sm:flex-row">
             <span className={cn("truncate", session.kind === "ticket" && "font-mono")}>{label}</span>
-            <span className="shrink-0 font-normal whitespace-pre text-muted-foreground"> · {startedLabel(session.createdAt)}</span>
+            <span className="shrink-0 text-xs font-normal whitespace-pre text-muted-foreground sm:text-sm">
+              <span className="hidden sm:inline"> · </span>
+              {startedLabel(session.createdAt)}
+            </span>
           </span>
           {waiting && session.alert && (
-            <span className="text-xs text-amber-700 dark:text-amber-300">{session.alert}</span>
+            <span className="text-xs text-warning">{session.alert}</span>
           )}
         </span>
-        <StateBadge state={session.state} endReason={session.endReason} />
+        {badge && <StateBadge state={session.state} endReason={session.endReason} />}
       </button>
       {ended ? (
         <>
@@ -59,7 +65,7 @@ export function LooseSessionRow({ session }: { session: SessionMeta }) {
             <Button
               variant="ghost"
               size="sm"
-              className="h-auto self-center text-muted-foreground"
+              className="h-auto self-center text-muted-foreground pointer-coarse:min-w-10"
               disabled={resume.isPending}
               aria-label="Resume"
               onClick={() => resume.mutate()}
@@ -71,7 +77,7 @@ export function LooseSessionRow({ session }: { session: SessionMeta }) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-auto self-center text-muted-foreground"
+            className="h-auto self-center text-muted-foreground pointer-coarse:min-w-10"
             disabled={remove.isPending}
             aria-label="Remove"
             onClick={() => remove.mutate()}

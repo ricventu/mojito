@@ -45,7 +45,7 @@ export function TicketCard({ ticket, session, host = null, selected, showStatus 
     <li
       className={cn(
         "flex flex-col rounded-lg border bg-card text-card-foreground",
-        waiting && "border-amber-500/60",
+        waiting && "border-attention/60",
         selected && "ring-2 ring-ring",
       )}
     >
@@ -61,7 +61,9 @@ export function TicketCard({ ticket, session, host = null, selected, showStatus 
             href={safeHref(ticket.url)}
             target="_blank"
             rel="noreferrer"
-            className="font-mono text-xs text-muted-foreground underline-offset-2 hover:underline"
+            // 24px tall for a finger (WCAG 2.5.8) without growing the row: the card's own tap
+            // region starts just below, and a 16px link let a tap on the card's edge open Linear.
+            className="-my-1 py-1 font-mono text-xs text-muted-foreground underline-offset-2 hover:underline"
           >
             {ticket.identifier}
           </a>
@@ -109,7 +111,7 @@ export function TicketCard({ ticket, session, host = null, selected, showStatus 
           </div>
         )}
         {waiting && session.alert && (
-          <p className="text-xs text-amber-700 dark:text-amber-300">{session.alert}</p>
+          <p className="text-xs text-warning">{session.alert}</p>
         )}
       </div>
     </li>

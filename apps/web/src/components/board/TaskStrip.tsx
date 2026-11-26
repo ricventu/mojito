@@ -13,8 +13,8 @@ import { safeHref } from "@/lib/url";
 
 const STATUS: Record<TaskStatus, { label: string; className: string }> = {
   queued: { label: "Queued", className: "text-muted-foreground" },
-  running: { label: "Running", className: "text-sky-600 dark:text-sky-400" },
-  done: { label: "Created", className: "text-emerald-600 dark:text-emerald-400" },
+  running: { label: "Running", className: "text-info" },
+  done: { label: "Created", className: "text-success" },
   failed: { label: "Failed", className: "text-destructive" },
 };
 
@@ -52,7 +52,7 @@ function TaskCard({ task, ticket, selected, onOpenTicket }: TaskCardProps) {
                   href={safeHref(task.result.url)}
                   target="_blank"
                   rel="noreferrer"
-                  className="relative z-10 font-mono text-xs underline-offset-2 hover:underline"
+                  className="relative z-10 -my-1 py-1 font-mono text-xs underline-offset-2 hover:underline"
                 >
                   {task.result.identifier}
                 </a>

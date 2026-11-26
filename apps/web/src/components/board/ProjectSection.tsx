@@ -69,7 +69,8 @@ export function ProjectSection({ section, sessions, selectedTicket, onOpenTicket
 
   return (
     <section className="flex flex-col gap-2">
-      <header className="flex items-center gap-1 sm:gap-2">
+      {/* No gap on a phone: six 40px touch targets side by side still leave the name room at 375px. */}
+      <header className="flex items-center sm:gap-2">
         <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{name}</h2>
         {project !== null && (
           <Button asChild variant="ghost" size="icon-sm" className="hidden sm:inline-flex">

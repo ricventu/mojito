@@ -21,14 +21,15 @@ export function Toolbar({ sessions, onNewTicket, onNewSession, children }: Props
 
   return (
     <div className="sticky top-0 z-10 border-b bg-background/95 pt-[var(--sat)] pr-[var(--sar)] pl-[var(--sal)] backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2">
+      {/* Tighter on a phone: its 40px touch targets would otherwise squeeze the host name out. */}
+      <div className="mx-auto flex max-w-6xl items-center gap-1 px-4 py-2 min-[420px]:gap-2">
         <SidebarToggle />
         <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{self}</h1>
         {waiting.length > 0 && (
           <Button
             asChild
             size="sm"
-            className="bg-amber-500 text-amber-950 hover:bg-amber-500/90"
+            className="bg-attention text-attention-foreground hover:bg-attention/90"
           >
             <Link to={`/session/${encodeURIComponent(waiting[0].id)}`} aria-label={`${waiting.length} sessions waiting for a reply`}>
               {waiting.length}

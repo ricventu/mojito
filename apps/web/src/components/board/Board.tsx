@@ -24,7 +24,7 @@ function Banner({ text }: { text: string }) {
   return (
     <div
       role="status"
-      className="flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200"
+      className="flex items-center gap-2 rounded-lg border border-attention/50 bg-attention/10 px-3 py-2 text-sm text-warning"
     >
       <TriangleAlert size={16} className="shrink-0" />
       <span className="min-w-0 break-words">{text}</span>

@@ -29,13 +29,25 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* 0.52, not shadcn's 0.556: secondary text sits on `muted` bands too, where 0.556 is 4.35:1. */
+  --muted-foreground: oklch(0.52 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+
+  /*
+   * A session's state (and a diff's lines): text tones that keep 4.5:1 on the card and on their own
+   * 10-15% tint, in both themes. `attention` is the one fill: the waiting dot, border and pill.
+   */
+  --success: oklch(0.508 0.118 165.612);
+  --info: oklch(0.5 0.134 242.749);
+  --warning: oklch(0.555 0.163 48.998);
+  --danger: oklch(0.505 0.213 27.518);
+  --attention: oklch(0.769 0.188 70.08);
+  --attention-foreground: oklch(0.279 0.077 45.635);
 
   /* Git graph lanes: eight hues far apart, dark enough to read on white. */
   --graph-0: oklch(0.55 0.2 255);
@@ -72,6 +84,13 @@
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
 
+  --success: oklch(0.765 0.177 163.223);
+  --info: oklch(0.746 0.16 232.661);
+  --warning: oklch(0.879 0.169 91.605);
+  --danger: oklch(0.704 0.191 22.216);
+  --attention: oklch(0.769 0.188 70.08);
+  --attention-foreground: oklch(0.279 0.077 45.635);
+
   /* The same hues, lighter, for the dark background. */
   --graph-0: oklch(0.72 0.15 255);
   --graph-1: oklch(0.76 0.15 150);
@@ -106,6 +125,12 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-info: var(--info);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-attention: var(--attention);
+  --color-attention-foreground: var(--attention-foreground);
 }
 
 @layer base {
@@ -114,5 +139,24 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/*
+ * Reduced motion: sheets, dialogs and menus still fade in and out, so the change of state stays
+ * visible, but they no longer slide, zoom or spin into place. Loading spinners keep turning.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    --tw-enter-translate-x: 0;
+    --tw-enter-translate-y: 0;
+    --tw-enter-scale: 1;
+    --tw-enter-rotate: 0;
+    --tw-exit-translate-x: 0;
+    --tw-exit-translate-y: 0;
+    --tw-exit-scale: 1;
+    --tw-exit-rotate: 0;
   }
 }

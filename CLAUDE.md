@@ -33,7 +33,9 @@ app's state, left in place.
   types (`DocEntry`, `DocList`, `DocFile`, `DOC_MAX_BYTES`) and `isDocPath`, the peer types
   (`PeerSnapshot`, `PeersAnswer`), the folder picker's `DirEntry`/`DirList`, and
   `openEventStream` (used by the web and by the server's peer links; `schedule` is required — the package has no timer typings). Consumed as source, no build; zod **4** everywhere (the Agent
-  SDK's peer).
+  SDK's peer). A module that builds a schema at load keeps zod in every bundle importing it, so
+  schemas live apart from what the board imports (`commandSchemas.ts`; `PriorityBody` in `api.ts`):
+  the board's eager chunk carries no zod.
 - `apps/server` — Node 22, Hono 4 on `@hono/node-server`, `ws` on the http `upgrade` event,
   `node-pty`, `better-sqlite3`. Built with tsup (`tsup.config.ts` bundles `@mojito/shared`
   — without `noExternal` the built server dies importing `.ts`).
@@ -351,7 +353,9 @@ app's state, left in place.
   module-level (leaving the board neither runs nor drops it), and the ticket stays hidden until
   the tickets refetch after the write (a refusal brings it back with an error toast).
   A ticket's status is a filled pill (`StatusBadge`): violet In Review, blue In Progress, neutral
-  otherwise — emerald, sky, amber and red mean a session's state. A label stays an outline pill
+  otherwise — emerald, sky, amber and red mean a session's state, always through the `index.css`
+  tokens (`text-success`/`info`/`warning`/`danger`, the `attention` fill), which keep 4.5:1 in both
+  themes; never a raw palette class. A label stays an outline pill
   with a dot in its Linear colour (RIC-608: `TicketSummary.labelColors`, optional for older
   peers, `#rrggbb` only — checked on the server and again by `lib/labels.ts`, it reaches a style).
   Priority (RIC-610, `lib/priority.ts`, `PRIORITIES` in shared, `PriorityIcon`): within each status,
@@ -576,7 +580,9 @@ app's state, left in place.
   one silently un-installs the app in Chromium.
 - Copy is English, like everything else (code, comments, server messages, agent
   prompts); the only Italian left is the create-ticket agent's output (tickets on Linear).
-  Only Tailwind utilities + shadcn components; icons are lucide with `size`.
+  Only Tailwind utilities + shadcn components; icons are lucide with `size`. On a touch screen
+  (`pointer-coarse`) Button, Input and Select are 40px tall; phone header rows drop their gaps to fit
+  375px. The terminal's ended panel is `dark`-scoped: its black is the terminal's in either theme.
 
 ## Commands
 

@@ -47,7 +47,7 @@ function Identity({
     // ticket's id (RIC-505 shown as RIC-5); status and title share one truncating span, so their
     // spacing goes with them instead of eating the id's width.
     return (
-      <div className="flex min-w-0 flex-1 items-center overflow-hidden text-sm">
+      <h1 className="flex min-w-0 flex-1 items-center overflow-hidden text-sm">
         {href ? (
           <a
             href={href}
@@ -66,14 +66,14 @@ function Identity({
             <span className="ml-2">{ticket.title}</span>
           </span>
         )}
-      </div>
+      </h1>
     );
   }
   return (
-    <div className="min-w-0 flex-1 truncate text-sm font-medium">
+    <h1 className="min-w-0 flex-1 truncate text-sm font-medium">
       {sessionName(session)}
       <span className="font-normal text-muted-foreground"> · {session.project ?? "General"}</span>
-    </div>
+    </h1>
   );
 }
 
@@ -171,9 +171,10 @@ export function TerminalPage() {
       )}
       style={band.rootStyle}
     >
-      <div className="flex min-w-0 flex-1 flex-col">
+      <main className="flex min-w-0 flex-1 flex-col">
         {!band.open && (
-          <header className="flex items-center gap-2 border-b px-3 py-2">
+          // Tighter on a phone, as the board's toolbar: the 40px touch targets would clip the ticket id.
+          <header className="flex items-center gap-1 border-b px-3 py-2 min-[420px]:gap-2">
             <SidebarToggle />
             <Button asChild variant="ghost" size="sm" className="shrink-0">
               <Link to={boardHref()}>
@@ -184,7 +185,7 @@ export function TerminalPage() {
               <Identity session={session} ticket={ticket} />
             ) : host.kind === "peer" ? (
               // Cold load, before the snapshot has the row: the url's id is all there is.
-              <div className="min-w-0 flex-1 truncate font-mono text-sm">{id}</div>
+              <h1 className="min-w-0 flex-1 truncate font-mono text-sm">{id}</h1>
             ) : (
               <div className="flex-1" />
             )}
@@ -195,7 +196,7 @@ export function TerminalPage() {
               </span>
             )}
             {session?.state === "needs-input" && session.alert && (
-              <span className="min-w-0 shrink truncate text-xs text-amber-700 dark:text-amber-300">
+              <span className="min-w-0 shrink truncate text-xs text-warning">
                 {session.alert}
               </span>
             )}
@@ -236,9 +237,11 @@ export function TerminalPage() {
           </header>
         )}
         {gone ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-[#08090a] p-6 text-center text-neutral-300">
+          // The terminal's own black (`terminalOptions`) in either theme: `dark` scopes the dark
+          // tokens here, so its text and buttons are drawn for that black, not for the app's theme.
+          <div className="dark flex flex-1 flex-col items-center justify-center gap-3 bg-[#08090a] p-6 text-center text-foreground">
             <p className="text-sm">Session ended</p>
-            {session?.endReason && <p className="max-w-sm text-xs text-neutral-400">{endLook(session.endReason).description}</p>}
+            {session?.endReason && <p className="max-w-sm text-xs text-muted-foreground">{endLook(session.endReason).description}</p>}
             <div className="flex flex-wrap justify-center gap-2">
               {resumable && (
                 <Button size="sm" disabled={resume.isPending} onClick={() => resume.mutate()}>
@@ -284,7 +287,7 @@ export function TerminalPage() {
             />
           </>
         )}
-      </div>
+      </main>
     </div>
   );
 }

@@ -25,9 +25,37 @@ export function writeTheme(theme: Theme, storage: Pick<Storage, "setItem"> | und
   }
 }
 
-/** Show a theme: the `dark` class on `<html>` is the whole mechanism. */
-export function applyTheme(theme: Theme, root: Pick<HTMLElement, "classList"> | undefined = defaultRoot()): void {
+/**
+ * The browser's own chrome for each theme (`<meta name="theme-color">`: Android's toolbar, an
+ * installed app's title bar): the theme's `--background`.
+ */
+export const THEME_COLORS: Record<Theme, string> = { dark: "#0a0a0a", light: "#ffffff" };
+
+let shown: Theme = DEFAULT_THEME;
+const listeners = new Set<() => void>();
+
+/**
+ * Show a theme: the `dark` class on `<html>` is the mechanism; the theme-color follows, and so does
+ * whatever subscribed (the toaster draws its own surfaces).
+ */
+export function applyTheme(
+  theme: Theme,
+  root: Pick<HTMLElement, "classList"> | undefined = defaultRoot(),
+  meta: Pick<HTMLMetaElement, "setAttribute"> | null | undefined = themeColorMeta(),
+): void {
   root?.classList.toggle("dark", theme === "dark");
+  meta?.setAttribute("content", THEME_COLORS[theme]);
+  if (theme === shown) return;
+  shown = theme;
+  for (const listener of listeners) listener();
+}
+
+/** The theme on screen, for `useSyncExternalStore`. */
+export const shownTheme = (): Theme => shown;
+
+export function subscribeTheme(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
 /** Called before the first render, so a light preference never flashes dark. */
@@ -45,4 +73,8 @@ function safeStorage(): Storage | undefined {
 
 function defaultRoot(): HTMLElement | undefined {
   return typeof document === "undefined" ? undefined : document.documentElement;
+}
+
+function themeColorMeta(): HTMLMetaElement | null | undefined {
+  return typeof document === "undefined" ? undefined : document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
 }

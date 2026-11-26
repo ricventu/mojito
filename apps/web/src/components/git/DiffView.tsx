@@ -9,9 +9,9 @@ import { gitHref, parseGitSearch } from "@/lib/git/url";
 import { cn } from "@/lib/utils";
 
 const TINT: Record<DiffLineKind, string> = {
-  add: "bg-emerald-500/10 text-emerald-800 dark:text-emerald-300",
-  del: "bg-red-500/10 text-red-800 dark:text-red-300",
-  hunk: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
+  add: "bg-success/10 text-success",
+  del: "bg-danger/10 text-danger",
+  hunk: "bg-info/10 text-info",
   ctx: "",
   note: "text-muted-foreground italic",
 };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { THEME_KEY, applyTheme, readTheme, writeTheme } from "@/lib/theme";
+import { THEME_KEY, applyTheme, readTheme, shownTheme, subscribeTheme, writeTheme } from "@/lib/theme";
 
 const store = (value: string | null) => ({ getItem: (k: string) => (k === THEME_KEY ? value : null) });
 
@@ -57,5 +57,34 @@ describe("applyTheme", () => {
     expect(classes.has("dark")).toBe(false);
     applyTheme("dark", root);
     expect(classes.has("dark")).toBe(true);
+  });
+});
+
+describe("applyTheme's followers", () => {
+  const root = { classList: { toggle: () => true } } as unknown as HTMLElement;
+
+  it("sets the theme-color to the theme's background", () => {
+    const set: [string, string][] = [];
+    const meta = { setAttribute: (k: string, v: string) => void set.push([k, v]) };
+    applyTheme("light", root, meta);
+    applyTheme("dark", root, meta);
+    expect(set).toEqual([
+      ["content", "#ffffff"],
+      ["content", "#0a0a0a"],
+    ]);
+  });
+
+  it("tells subscribers once per change, and shownTheme answers the new one", () => {
+    applyTheme("dark", root, null);
+    let calls = 0;
+    const stop = subscribeTheme(() => calls++);
+    applyTheme("light", root, null);
+    expect(shownTheme()).toBe("light");
+    applyTheme("light", root, null);
+    expect(calls).toBe(1);
+    stop();
+    applyTheme("dark", root, null);
+    expect(calls).toBe(1);
+    expect(shownTheme()).toBe("dark");
   });
 });

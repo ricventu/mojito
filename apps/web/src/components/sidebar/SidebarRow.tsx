@@ -3,9 +3,9 @@ import type { SessionMeta, SessionState } from "@mojito/shared";
 import { cn } from "@/lib/utils";
 
 const DOT: Record<SessionState, { label: string; className: string }> = {
-  starting: { label: "Starting", className: "bg-sky-500" },
-  running: { label: "Running", className: "bg-emerald-500" },
-  "needs-input": { label: "Needs you", className: "bg-amber-500" },
+  starting: { label: "Starting", className: "bg-info" },
+  running: { label: "Running", className: "bg-success" },
+  "needs-input": { label: "Needs you", className: "bg-attention" },
   idle: { label: "Idle", className: "bg-muted-foreground/40" },
   ended: { label: "Ended", className: "bg-muted-foreground/40" },
 };

@@ -4,11 +4,11 @@ import { endLook } from "@/lib/endReason";
 import { cn } from "@/lib/utils";
 
 const LOOK: Record<SessionState, { label: string; className: string }> = {
-  starting: { label: "Starting", className: "text-sky-600 dark:text-sky-400" },
-  running: { label: "Running", className: "text-emerald-600 dark:text-emerald-400" },
+  starting: { label: "Starting", className: "text-info" },
+  running: { label: "Running", className: "text-success" },
   "needs-input": {
     label: "Needs you",
-    className: "border-amber-500/50 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    className: "border-attention/50 bg-attention/15 text-warning",
   },
   idle: { label: "Idle", className: "text-muted-foreground" },
   // Struck on the label alone (`Label`), so a host after it stays readable.
@@ -38,7 +38,7 @@ export function StateBadge({
       <Badge
         variant="outline"
         title={end.description}
-        className={cn("max-w-full", end.abnormal ? "border-red-500/50 text-red-600 dark:text-red-400" : LOOK.ended.className, className)}
+        className={cn("max-w-full", end.abnormal ? "border-danger/50 text-danger" : LOOK.ended.className, className)}
       >
         <span className={cn(!end.abnormal && "line-through")}>{end.label}</span>
         {hostPart}

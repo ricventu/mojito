@@ -165,11 +165,11 @@ function Details({
 }
 
 const STATUS: Record<string, { label: string; className: string }> = {
-  A: { label: "Added", className: "text-emerald-600 dark:text-emerald-400" },
-  D: { label: "Deleted", className: "text-red-600 dark:text-red-400" },
-  M: { label: "Modified", className: "text-amber-600 dark:text-amber-400" },
-  R: { label: "Renamed", className: "text-sky-600 dark:text-sky-400" },
-  C: { label: "Copied", className: "text-sky-600 dark:text-sky-400" },
+  A: { label: "Added", className: "text-success" },
+  D: { label: "Deleted", className: "text-danger" },
+  M: { label: "Modified", className: "text-warning" },
+  R: { label: "Renamed", className: "text-info" },
+  C: { label: "Copied", className: "text-info" },
   T: { label: "Type changed", className: "text-muted-foreground" },
 };
 
