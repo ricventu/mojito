@@ -115,7 +115,10 @@ function Form({ command, settings, write, onClose, initial, onDuplicate }: FormP
 
   const pending = busy || assist.isPending;
 
-  const generate = (text: string) => assist.mutate({ text, project: draft.project ?? undefined, icon: draft.icon });
+  // The prompt goes too: with one written, the idea is a change to it, and the answer keeps the rest.
+  const generate = (text: string) =>
+    assist.mutate({ text, prompt: draft.prompt.trim() || undefined, project: draft.project ?? undefined, icon: draft.icon });
+  const revising = draft.prompt.trim() !== "";
 
   return (
     <form onSubmit={save} noValidate className="flex flex-col gap-4 px-4">
@@ -212,7 +215,7 @@ function Form({ command, settings, write, onClose, initial, onDuplicate }: FormP
         ) : (
           // Asked first: the idea is its own text, so the prompt above stays as it is until the answer.
           <div className="flex flex-col gap-1.5 rounded-md border p-3">
-            <Label htmlFor="command-idea">What should this command do?</Label>
+            <Label htmlFor="command-idea">{revising ? "What should change in the prompt?" : "What should this command do?"}</Label>
             <Textarea
               id="command-idea"
               autoFocus
@@ -226,7 +229,7 @@ function Form({ command, settings, write, onClose, initial, onDuplicate }: FormP
                   generate(idea);
                 }
               }}
-              placeholder="e.g. update the dependencies, run the tests, open a PR"
+              placeholder={revising ? "e.g. also remove the databases no longer used" : "e.g. update the dependencies, run the tests, open a PR"}
               className="max-h-[30dvh] min-h-20"
             />
             <div className="flex flex-wrap items-center justify-end gap-2">

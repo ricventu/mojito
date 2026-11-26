@@ -71,6 +71,28 @@ describe("assistCommand", () => {
     await expect(assistCommand({ text: "x" }, { query: hang, timeoutMs: 10 })).rejects.toThrow(/timed out/);
   });
 
+  it("sends the current prompt with the change, so an edit keeps what it does not touch", async () => {
+    const q = ok('{"name":"A","prompt":"p","icon":"zap"}');
+    await assistCommand({ text: "also drop unused databases", prompt: "Delete merged branches." }, { query: q });
+    const args = q.mock.calls[0]![0] as { prompt: AsyncIterable<unknown> };
+    const sent: string[] = [];
+    for await (const m of args.prompt) sent.push(JSON.stringify(m));
+    const joined = sent.join("");
+    expect(joined).toContain("Current prompt:");
+    expect(joined).toContain("Delete merged branches.");
+    expect(joined).toContain("also drop unused databases");
+    expect(ASSIST_PROMPT).toMatch(/current prompt/i);
+  });
+
+  it("sends no current prompt when the form's is blank", async () => {
+    const q = ok('{"name":"A","prompt":"p","icon":"zap"}');
+    await assistCommand({ text: "idea", prompt: "   " }, { query: q });
+    const args = q.mock.calls[0]![0] as { prompt: AsyncIterable<unknown> };
+    const sent: string[] = [];
+    for await (const m of args.prompt) sent.push(JSON.stringify(m));
+    expect(sent.join("")).not.toContain("Current prompt:");
+  });
+
   it("calls the SDK with no tools, no settings and the project and icons in the message", async () => {
     const q = ok('{"name":"A","prompt":"p","icon":"zap"}');
     await assistCommand({ text: "rough idea", project: "Web" }, { query: q });

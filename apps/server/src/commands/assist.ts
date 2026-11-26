@@ -14,11 +14,11 @@ export interface AssistDeps {
 /** The prompt's cap is checked apart, so an over-long answer gets its own message. */
 const Proposal = z.object({ name: z.string(), prompt: z.string().trim().min(1), icon: z.string() });
 
-const message = ({ text, project }: AssistBody): string =>
+const message = ({ text, prompt, project }: AssistBody): string =>
   [
     project ? `Project: ${project}` : "Project: none given",
     `Icons to choose from: ${COMMAND_ICONS.join(", ")}`,
-    "Text to turn into a command:",
+    ...(prompt?.trim() ? ["Current prompt:", prompt.trim(), "Change to make to it:"] : ["Text to turn into a command:"]),
     text,
   ].join("\n");
 

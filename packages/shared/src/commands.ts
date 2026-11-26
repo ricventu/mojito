@@ -294,6 +294,7 @@ export function importCommands(local: CommandsSetting, incoming: Command[], rand
 export const ASSIST_PROMPT = [
   "You help write a quick command for Mojito: a prompt that starts a Claude Code session working in a project's git repository.",
   "The user gives you a rough idea or a finished prompt. Rewrite it as a clear, self-contained instruction in English for that session.",
+  "When the message holds a current prompt, the text is a change to it: answer the whole revised prompt, keeping everything the current prompt says that the change does not alter or remove.",
   "Keep the user's intent and every constraint they state; do not add goals they did not ask for.",
   "Where the work could be destructive (deleting, force-pushing, resetting, discarding changes), tell the session to stop and ask the human before doing it.",
   `Keep the prompt under ${COMMAND_PROMPT_MAX} characters.`,
@@ -303,6 +304,8 @@ export const ASSIST_PROMPT = [
 
 export const AssistBody = z.object({
   text: z.string().trim().min(1).max(20000),
+  /** The form's prompt as it stands: when not blank, `text` is a change to it, not a new command. */
+  prompt: z.string().max(COMMAND_PROMPT_MAX).optional(),
   project: z.string().optional(),
   /** The form's current icon: the fallback when the assistant picks one outside the list. */
   icon: z.enum(COMMAND_ICONS).optional(),
