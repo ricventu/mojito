@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 /** Linear's priority values: 0 none, 1 urgent … 4 low. */
 export type PriorityValue = 0 | 1 | 2 | 3 | 4;
 
@@ -24,6 +22,3 @@ export const PRIORITIES: readonly PriorityInfo[] = [
 /** Whether `value` is one of Linear's priorities: an integer 0-4. */
 export const isPriority = (value: unknown): value is PriorityValue =>
   typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 4;
-
-export const PriorityBody = z.object({ priority: z.number().int().min(0).max(4) });
-export type PriorityBody = z.infer<typeof PriorityBody>;

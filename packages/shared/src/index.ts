@@ -5,6 +5,7 @@ export * from "./api";
 export * from "./pty";
 export * from "./prompts";
 export * from "./commands";
+export * from "./commandSchemas";
 export * from "./git";
 export * from "./docs";
 export * from "./images";

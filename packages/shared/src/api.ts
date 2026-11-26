@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { EFFORTS, MODELS } from "./models";
-import { CommandsSettingBody } from "./commands";
+import { CommandsSettingBody } from "./commandSchemas";
 import { PromptsBody } from "./prompts";
 
 export const LaunchTicketBody = z.object({
@@ -65,3 +65,7 @@ export type SettingsBody = z.infer<typeof SettingsBody>;
 
 export const StatusBody = z.object({ status: z.string().min(1) });
 export type StatusBody = z.infer<typeof StatusBody>;
+
+/** `POST /api/tickets/:id/priority` (RIC-610): Linear's 0 none, 1 urgent … 4 low. */
+export const PriorityBody = z.object({ priority: z.number().int().min(0).max(4) });
+export type PriorityBody = z.infer<typeof PriorityBody>;
